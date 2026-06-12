@@ -1,0 +1,479 @@
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
+
+from app.db.database import get_db
+from app.models.user import User
+from app.models.role import Role, UserRole
+from app.schemas.user import (
+    UserCreate,
+    UserRead,
+    UserUpdate,
+    UserAdminUpdate,
+    UserRoleAssign,
+    UserWithRolesRead,
+)
+from app.core.security import hash_password
+from app.api.deps import (
+    get_current_user,
+    get_current_active_validated_user,
+    require_admin_or_team_leader,
+    require_sg_or_admin,
+    get_user_role_names,
+)
+from app.services.audit_service import create_audit_log, get_client_ip
+
+
+router = APIRouter(prefix="/users", tags=["Utilisateurs"])
+
+
+VALID_USER_STATUSES = {
+    "pending",
+    "active",
+    "inactive",
+    "alumni",
+    "candidate",
+    "rejected",
+    "suspended",
+}
+
+
+def get_user_or_404(db: Session, user_id: str) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utilisateur introuvable",
+        )
+
+    return user
+
+
+def build_user_with_roles(db: Session, user: User) -> UserWithRolesRead:
+    data = UserRead.model_validate(user).model_dump()
+    data["roles"] = sorted(list(get_user_role_names(db, user.id)))
+    return UserWithRolesRead(**data)
+
+
+@router.post("/", response_model=UserRead)
+def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == payload.email).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Un compte existe déjà avec cet email",
+        )
+
+    user = User(
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=payload.email,
+        phone=payload.phone,
+        password_hash=hash_password(payload.password),
+        department=payload.department,
+        study_level=payload.study_level,
+        promotion=payload.promotion,
+        bio=payload.bio,
+        linkedin_url=payload.linkedin_url,
+        github_url=payload.github_url,
+        portfolio_url=payload.portfolio_url,
+        status="pending",
+        email_verified=False,
+        is_active=True,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.get("/me", response_model=UserWithRolesRead)
+def read_me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return build_user_with_roles(db, current_user)
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    fields = [
+        "first_name",
+        "last_name",
+        "phone",
+        "photo_url",
+        "department",
+        "study_level",
+        "promotion",
+        "bio",
+        "linkedin_url",
+        "github_url",
+        "portfolio_url",
+    ]
+
+    for field in fields:
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(current_user, field, value)
+
+    current_user.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(current_user)
+
+    return current_user
+
+
+@router.get("/", response_model=list[UserWithRolesRead])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return [build_user_with_roles(db, user) for user in users]
+
+
+@router.get("/pending", response_model=list[UserWithRolesRead])
+def list_pending_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
+    users = db.query(User).filter(
+        User.status == "pending"
+    ).order_by(User.created_at.desc()).all()
+
+    return [build_user_with_roles(db, user) for user in users]
+
+
+@router.get("/{user_id}", response_model=UserWithRolesRead)
+def get_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    user = get_user_or_404(db, user_id)
+    return build_user_with_roles(db, user)
+
+
+@router.patch("/{user_id}/admin", response_model=UserRead)
+def admin_update_user(
+    user_id: str,
+    payload: UserAdminUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_value = {
+        "status": user.status,
+        "email_verified": user.email_verified,
+        "is_active": user.is_active,
+        "department": user.department,
+        "study_level": user.study_level,
+        "promotion": user.promotion,
+    }
+
+    if payload.status is not None:
+        if payload.status not in VALID_USER_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Statut utilisateur invalide",
+            )
+        user.status = payload.status
+
+    if payload.email_verified is not None:
+        user.email_verified = payload.email_verified
+
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+
+    if payload.department is not None:
+        user.department = payload.department
+
+    if payload.study_level is not None:
+        user.study_level = payload.study_level
+
+    if payload.promotion is not None:
+        user.promotion = payload.promotion
+
+    user.updated_at = datetime.utcnow()
+
+    create_audit_log(
+        db=db,
+        action="modification_admin_utilisateur",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={
+            "status": user.status,
+            "email_verified": user.email_verified,
+            "is_active": user.is_active,
+            "department": user.department,
+            "study_level": user.study_level,
+            "promotion": user.promotion,
+        },
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.post("/{user_id}/approve", response_model=UserRead)
+def approve_user(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_value = {
+        "status": user.status,
+        "email_verified": user.email_verified,
+    }
+
+    user.status = "active"
+    user.email_verified = True
+    user.is_active = True
+    user.updated_at = datetime.utcnow()
+
+    create_audit_log(
+        db=db,
+        action="validation_compte",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={
+            "status": user.status,
+            "email_verified": user.email_verified,
+            "is_active": user.is_active,
+        },
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.post("/{user_id}/reject", response_model=UserRead)
+def reject_user(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_value = {
+        "status": user.status,
+    }
+
+    user.status = "rejected"
+    user.updated_at = datetime.utcnow()
+
+    create_audit_log(
+        db=db,
+        action="rejet_compte",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={"status": user.status},
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.post("/{user_id}/suspend", response_model=UserRead)
+def suspend_user(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_value = {
+        "status": user.status,
+        "is_active": user.is_active,
+    }
+
+    user.status = "suspended"
+    user.is_active = False
+    user.updated_at = datetime.utcnow()
+
+    create_audit_log(
+        db=db,
+        action="suspension_compte",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={
+            "status": user.status,
+            "is_active": user.is_active,
+        },
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.post("/{user_id}/make-alumni", response_model=UserRead)
+def make_user_alumni(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_value = {
+        "status": user.status,
+    }
+
+    user.status = "alumni"
+    user.updated_at = datetime.utcnow()
+
+    create_audit_log(
+        db=db,
+        action="passage_alumni",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={"status": user.status},
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.post("/{user_id}/roles", response_model=UserWithRolesRead)
+def assign_roles_to_user(
+    user_id: str,
+    payload: UserRoleAssign,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_roles = sorted(list(get_user_role_names(db, user.id)))
+
+    roles = db.query(Role).filter(Role.name.in_(payload.role_names)).all()
+    found_role_names = {role.name for role in roles}
+    missing_roles = set(payload.role_names) - found_role_names
+
+    if missing_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Rôles introuvables : {', '.join(sorted(missing_roles))}",
+        )
+
+    for role in roles:
+        existing = db.query(UserRole).filter(
+            UserRole.user_id == user.id,
+            UserRole.role_id == role.id,
+        ).first()
+
+        if existing:
+            continue
+
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+
+    db.flush()
+
+    new_roles = sorted(list(get_user_role_names(db, user.id)))
+
+    create_audit_log(
+        db=db,
+        action="ajout_roles_utilisateur",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value={"roles": old_roles},
+        new_value={"roles": new_roles},
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return build_user_with_roles(db, user)
+
+
+@router.delete("/{user_id}/roles/{role_name}", response_model=UserWithRolesRead)
+def remove_role_from_user(
+    user_id: str,
+    role_name: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    user = get_user_or_404(db, user_id)
+
+    old_roles = sorted(list(get_user_role_names(db, user.id)))
+
+    role = db.query(Role).filter(Role.name == role_name).first()
+
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rôle introuvable",
+        )
+
+    link = db.query(UserRole).filter(
+        UserRole.user_id == user.id,
+        UserRole.role_id == role.id,
+    ).first()
+
+    if link:
+        db.delete(link)
+
+    db.flush()
+
+    new_roles = sorted(list(get_user_role_names(db, user.id)))
+
+    create_audit_log(
+        db=db,
+        action="suppression_role_utilisateur",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value={"roles": old_roles},
+        new_value={"roles": new_roles},
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return build_user_with_roles(db, user)

@@ -1,0 +1,58 @@
+import uuid
+from datetime import datetime
+
+from sqlalchemy import String, Text, Boolean, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.database import Base
+from app.db.types import GUID
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    email: Mapped[str] = mapped_column(
+        String(150),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    department: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    study_level: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    promotion: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    linkedin_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    github_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    portfolio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user_roles = relationship(
+        "UserRole",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
