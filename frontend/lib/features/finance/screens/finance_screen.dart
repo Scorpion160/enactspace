@@ -123,6 +123,28 @@ class _FinanceScreenState extends State<FinanceScreen> {
     }
   }
 
+  Future<void> _openCreateFeeDialog() async {
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return CreateFeeDialog(
+          financeService: _financeService,
+          members: _members,
+        );
+      },
+    );
+
+    if (created == true) {
+      await _loadFinance();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Frais créé avec succès.')));
+    }
+  }
+
   Future<void> _validatePayment(PaymentModel payment) async {
     try {
       await _financeService.validatePayment(payment.id);
@@ -181,6 +203,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             validatedPayments: _validatedPayments,
             onRefresh: _loadFinance,
             onCreatePayment: _openCreatePaymentDialog,
+            onCreateFee: _openCreateFeeDialog,
           ),
           const SizedBox(height: 22),
           if (_loading)
@@ -217,7 +240,7 @@ class _FinanceHeader extends StatelessWidget {
   final double validatedPayments;
   final VoidCallback onRefresh;
   final VoidCallback onCreatePayment;
-
+  final VoidCallback onCreateFee;
   const _FinanceHeader({
     required this.totalDue,
     required this.totalPaid,
@@ -225,6 +248,7 @@ class _FinanceHeader extends StatelessWidget {
     required this.validatedPayments,
     required this.onRefresh,
     required this.onCreatePayment,
+    required this.onCreateFee,
   });
 
   @override
@@ -239,6 +263,11 @@ class _FinanceHeader extends StatelessWidget {
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
+        ),
+        ElevatedButton.icon(
+          onPressed: onCreateFee,
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text('Nouveau frais'),
         ),
         ElevatedButton.icon(
           onPressed: onCreatePayment,
@@ -588,6 +617,268 @@ class _PaymentsCard extends StatelessWidget {
                 );
               }).toList(),
             ),
+    );
+  }
+}
+
+class CreateFeeDialog extends StatefulWidget {
+  final FinanceService financeService;
+  final List<MemberModel> members;
+
+  const CreateFeeDialog({
+    super.key,
+    required this.financeService,
+    required this.members,
+  });
+
+  @override
+  State<CreateFeeDialog> createState() => _CreateFeeDialogState();
+}
+
+class _CreateFeeDialogState extends State<CreateFeeDialog> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _labelController = TextEditingController(text: 'Cotisation mensuelle');
+  final _amountController = TextEditingController(text: '1000');
+
+  String? _selectedUserId;
+  String _type = 'cotisation';
+  DateTime? _dueDate = DateTime.now().add(const Duration(days: 7));
+
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDueDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2035),
+    );
+
+    if (selected == null) return;
+
+    setState(() {
+      _dueDate = selected;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedUserId == null) {
+      setState(() {
+        _error = 'Sélectionnez un membre.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await widget.financeService.createFee(
+        userId: _selectedUserId!,
+        type: _type,
+        label: _labelController.text,
+        amount: double.parse(_amountController.text.trim()),
+        dueDate: _dueDate,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  String get _dueDateLabel {
+    if (_dueDate == null) return 'Aucune date limite';
+
+    final d = _dueDate!;
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nouveau frais'),
+      content: SizedBox(
+        width: 520,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                if (_error != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: Colors.red.shade700),
+                    ),
+                  ),
+                DropdownButtonFormField<String>(
+                  value: _selectedUserId,
+                  decoration: const InputDecoration(
+                    labelText: 'Membre',
+                    prefixIcon: Icon(Icons.person_rounded),
+                  ),
+                  items: widget.members.map((member) {
+                    return DropdownMenuItem(
+                      value: member.id,
+                      child: Text(member.displayName),
+                    );
+                  }).toList(),
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _selectedUserId = value;
+                          });
+                        },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Sélectionnez un membre.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: _type,
+                  decoration: const InputDecoration(
+                    labelText: 'Type',
+                    prefixIcon: Icon(Icons.category_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'cotisation',
+                      child: Text('Cotisation'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'penalite',
+                      child: Text('Pénalité'),
+                    ),
+                    DropdownMenuItem(value: 'event', child: Text('Événement')),
+                    DropdownMenuItem(value: 'autre', child: Text('Autre')),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _type = value;
+                          });
+                        },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _labelController,
+                  decoration: const InputDecoration(
+                    labelText: 'Libellé',
+                    prefixIcon: Icon(Icons.label_rounded),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Le libellé est obligatoire.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Montant',
+                    suffixText: 'FCFA',
+                    prefixIcon: Icon(Icons.payments_rounded),
+                  ),
+                  validator: (value) {
+                    final amount = double.tryParse(value ?? '');
+                    if (amount == null || amount <= 0) {
+                      return 'Montant invalide.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.event_rounded),
+                    title: const Text('Date limite'),
+                    subtitle: Text(_dueDateLabel),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: _loading ? null : _pickDueDate,
+                          child: const Text('Choisir'),
+                        ),
+                        TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _dueDate = null;
+                                  });
+                                },
+                          child: const Text('Aucune'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _loading ? null : _submit,
+          icon: _loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_rounded),
+          label: Text(_loading ? 'Création...' : 'Créer'),
+        ),
+      ],
     );
   }
 }

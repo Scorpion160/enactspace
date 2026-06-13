@@ -127,4 +127,44 @@ class FinanceService {
     }
     return [];
   }
+
+  Future<FeeModel> createFee({
+    required String userId,
+    String? seasonId,
+    required String type,
+    required String label,
+    required double amount,
+    DateTime? dueDate,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    String? formattedDueDate;
+
+    if (dueDate != null) {
+      final year = dueDate.year.toString().padLeft(4, '0');
+      final month = dueDate.month.toString().padLeft(2, '0');
+      final day = dueDate.day.toString().padLeft(2, '0');
+      formattedDueDate = '$year-$month-$day';
+    }
+
+    final response = await _apiClient.postJson(
+      '/finance/fees',
+      token: token,
+      data: {
+        'user_id': userId,
+        'season_id': seasonId,
+        'type': type,
+        'label': label.trim(),
+        'amount': amount,
+        'due_date': formattedDueDate,
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return FeeModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la création du frais.');
+  }
 }
