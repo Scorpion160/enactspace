@@ -1,0 +1,116 @@
+class MemberModel {
+  final String id;
+  final String email;
+  final String? firstName;
+  final String? lastName;
+  final String? fullName;
+  final String? status;
+  final bool? isActive;
+  final bool? emailVerified;
+  final String? corePoleId;
+  final List<String> roles;
+  final String? department;
+
+  const MemberModel({
+    required this.id,
+    required this.email,
+    this.firstName,
+    this.lastName,
+    this.fullName,
+    this.status,
+    this.isActive,
+    this.emailVerified,
+    this.corePoleId,
+    this.roles = const [],
+    this.department,
+  });
+
+  factory MemberModel.fromJson(Map<String, dynamic> json) {
+    return MemberModel(
+      id: json['id']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      firstName: json['first_name']?.toString(),
+      lastName: json['last_name']?.toString(),
+      fullName:
+          json['full_name']?.toString() ??
+          json['name']?.toString() ??
+          _buildFullName(json),
+      status: json['status']?.toString(),
+      isActive: json['is_active'] is bool ? json['is_active'] as bool : null,
+      emailVerified: json['email_verified'] is bool
+          ? json['email_verified'] as bool
+          : null,
+      corePoleId: json['core_pole_id']?.toString(),
+      roles: _parseRoles(json['roles']),
+      department: json['department']?.toString(),
+    );
+  }
+
+  static List<String> _parseRoles(dynamic value) {
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
+  static String? _buildFullName(Map<String, dynamic> json) {
+    final firstName = json['first_name']?.toString();
+    final lastName = json['last_name']?.toString();
+
+    final parts = [
+      if (firstName != null && firstName.trim().isNotEmpty) firstName.trim(),
+      if (lastName != null && lastName.trim().isNotEmpty) lastName.trim(),
+    ];
+
+    if (parts.isEmpty) return null;
+    return parts.join(' ');
+  }
+
+  String get displayName {
+    if (fullName != null && fullName!.trim().isNotEmpty) {
+      return fullName!;
+    }
+
+    final parts = [
+      if (firstName != null && firstName!.trim().isNotEmpty) firstName!.trim(),
+      if (lastName != null && lastName!.trim().isNotEmpty) lastName!.trim(),
+    ];
+
+    if (parts.isNotEmpty) return parts.join(' ');
+
+    return email;
+  }
+
+  String get statusLabel {
+    switch (status) {
+      case 'active':
+        return 'Actif';
+      case 'pending':
+        return 'En attente';
+      case 'inactive':
+        return 'Inactif';
+      case 'resigned':
+        return 'Démissionné';
+      case 'removed':
+        return 'Renvoyé';
+      default:
+        return status ?? 'Non défini';
+    }
+  }
+
+  String get rolesLabel {
+    final safeRoles = roles.where((role) => role.trim().isNotEmpty).toList();
+
+    if (safeRoles.isEmpty) return 'Aucun rôle';
+
+    return safeRoles.join(', ');
+  }
+
+  String get departmentLabel {
+    if (department == null || department!.trim().isEmpty) {
+      return 'Non défini';
+    }
+
+    return department!;
+  }
+}

@@ -1,0 +1,76 @@
+import 'package:go_router/go_router.dart';
+import '../core/auth/auth_service.dart';
+import '../features/attendance/screens/attendance_screen.dart';
+import '../features/auth/screens/login_screen.dart';
+import '../features/dashboard/screens/dashboard_screen.dart';
+import '../features/documents/screens/documents_screen.dart';
+import '../features/finance/screens/finance_screen.dart';
+import '../features/members/screens/members_screen.dart';
+import '../features/notifications/screens/notifications_screen.dart';
+import '../features/recruitment/screens/recruitment_screen.dart';
+import '../features/tasks/screens/tasks_screen.dart';
+import '../shared/layout/app_shell.dart';
+
+class AppRouter {
+  static final AuthService _authService = AuthService();
+
+  static final GoRouter router = GoRouter(
+    initialLocation: '/login',
+    redirect: (context, state) async {
+      final loggedIn = await _authService.isLoggedIn();
+      final goingToLogin = state.matchedLocation == '/login';
+
+      if (!loggedIn && !goingToLogin) {
+        return '/login';
+      }
+
+      if (loggedIn && goingToLogin) {
+        return '/dashboard';
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      ShellRoute(
+        builder: (context, state, child) {
+          return AppShell(currentPath: state.uri.path, child: child);
+        },
+        routes: [
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/members',
+            builder: (context, state) => const MembersScreen(),
+          ),
+          GoRoute(
+            path: '/attendance',
+            builder: (context, state) => const AttendanceScreen(),
+          ),
+          GoRoute(
+            path: '/tasks',
+            builder: (context, state) => const TasksScreen(),
+          ),
+          GoRoute(
+            path: '/finance',
+            builder: (context, state) => const FinanceScreen(),
+          ),
+          GoRoute(
+            path: '/recruitment',
+            builder: (context, state) => const RecruitmentScreen(),
+          ),
+          GoRoute(
+            path: '/documents',
+            builder: (context, state) => const DocumentsScreen(),
+          ),
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+        ],
+      ),
+    ],
+  );
+}
