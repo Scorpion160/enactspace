@@ -123,6 +123,11 @@ class _AppShellState extends State<AppShell> {
           ),
         ],
       ),
+      bottomNavigationBar: _MobileBottomNavigation(
+        currentPath: widget.currentPath,
+        unreadNotifications: _unreadNotifications,
+        lateTasks: _lateTasks,
+      ),
       drawer: Drawer(
         child: _SideMenu(
           currentPath: widget.currentPath,
@@ -532,6 +537,107 @@ class _NotificationIconButton extends StatelessWidget {
   }
 }
 
+class _MobileBottomNavigation extends StatelessWidget {
+  final String currentPath;
+  final int? unreadNotifications;
+  final int? lateTasks;
+
+  const _MobileBottomNavigation({
+    required this.currentPath,
+    required this.unreadNotifications,
+    required this.lateTasks,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final destinations = [
+      _MobileDestination(
+        label: 'Accueil',
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard_rounded,
+        path: '/dashboard',
+      ),
+      _MobileDestination(
+        label: 'Com',
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum_rounded,
+        path: '/posts',
+      ),
+      _MobileDestination(
+        label: 'Tâches',
+        icon: Icons.task_alt_outlined,
+        selectedIcon: Icons.task_alt_rounded,
+        path: '/tasks',
+        badgeCount: lateTasks,
+      ),
+      _MobileDestination(
+        label: 'Membres',
+        icon: Icons.people_alt_outlined,
+        selectedIcon: Icons.people_alt_rounded,
+        path: '/members',
+      ),
+      _MobileDestination(
+        label: 'Alertes',
+        icon: Icons.notifications_outlined,
+        selectedIcon: Icons.notifications_rounded,
+        path: '/notifications',
+        badgeCount: unreadNotifications,
+      ),
+    ];
+
+    final selectedIndex = destinations.indexWhere(
+      (item) => _isSelected(currentPath, item.path),
+    );
+
+    return NavigationBar(
+      height: 72,
+      selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+      onDestinationSelected: (index) => context.go(destinations[index].path),
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      destinations: [
+        for (final destination in destinations)
+          NavigationDestination(
+            icon: _BottomNavIcon(
+              icon: destination.icon,
+              badgeCount: destination.badgeCount,
+            ),
+            selectedIcon: _BottomNavIcon(
+              icon: destination.selectedIcon,
+              badgeCount: destination.badgeCount,
+              selected: true,
+            ),
+            label: destination.label,
+          ),
+      ],
+    );
+  }
+}
+
+class _BottomNavIcon extends StatelessWidget {
+  final IconData icon;
+  final int? badgeCount;
+  final bool selected;
+
+  const _BottomNavIcon({
+    required this.icon,
+    required this.badgeCount,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = badgeCount ?? 0;
+
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text(count > 99 ? '99+' : count.toString()),
+      backgroundColor: selected ? AppTheme.softBlack : Colors.red.shade700,
+      textColor: Colors.white,
+      child: Icon(icon),
+    );
+  }
+}
+
 class _LogoutTile extends StatelessWidget {
   final VoidCallback onLogout;
 
@@ -568,6 +674,22 @@ class _LogoutTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MobileDestination {
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String path;
+  final int? badgeCount;
+
+  const _MobileDestination({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.path,
+    this.badgeCount,
+  });
 }
 
 class _MenuSection {

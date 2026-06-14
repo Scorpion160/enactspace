@@ -266,17 +266,19 @@ class _PostsScreenState extends State<PostsScreen> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _loadPosts,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _PostsHeader(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 1180;
+          final horizontalPadding = constraints.maxWidth < 560 ? 14.0 : 24.0;
+
+          final header = _PostsHeader(
             total: _posts.length,
             official: _posts.where((post) => post.isOfficial).length,
             pinned: _posts.where((post) => post.isPinned).length,
             onRefresh: _loadPosts,
-          ),
-          const SizedBox(height: 18),
-          _PostComposer(
+          );
+
+          final composer = _PostComposer(
             titleController: _titleController,
             contentController: _contentController,
             postType: _composerPostType,
@@ -293,9 +295,9 @@ class _PostsScreenState extends State<PostsScreen> {
               setState(() => _composerOfficial = value);
             },
             onSubmit: _createPost,
-          ),
-          const SizedBox(height: 18),
-          _PostFilters(
+          );
+
+          final filters = _PostFilters(
             searchController: _searchController,
             postType: _postType,
             visibility: _visibility,
@@ -308,39 +310,98 @@ class _PostsScreenState extends State<PostsScreen> {
               setState(() => _visibility = value);
               await _loadPosts();
             },
-          ),
-          const SizedBox(height: 22),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_error != null)
-            _ErrorCard(message: _error!, onRetry: _loadPosts)
-          else if (_posts.isEmpty)
-            const _EmptyFeedCard()
-          else
-            ..._posts.map(
-              (post) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _PostCard(
-                  post: post,
-                  authorName: _authorName(post),
-                  stats: _statsByPostId[post.id],
-                  comments: _commentsByPostId[post.id] ?? const [],
-                  commentsExpanded: _expandedPosts.contains(post.id),
-                  commentsLoading: _loadingComments.contains(post.id),
-                  commentController: _commentControllerFor(post.id),
-                  onToggleComments: () => _toggleComments(post),
-                  onCreateComment: () => _createComment(post),
-                  onReact: () => _react(post),
+          );
+
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              20,
+              horizontalPadding,
+              28,
+            ),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1280),
+                  child: Column(
+                    children: [
+                      header,
+                      const SizedBox(height: 18),
+                      if (isWide)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 390,
+                              child: Column(
+                                children: [
+                                  composer,
+                                  const SizedBox(height: 18),
+                                  filters,
+                                  const SizedBox(height: 18),
+                                  const _CommunityPulseCard(),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 22),
+                            Expanded(child: _buildFeed()),
+                          ],
+                        )
+                      else ...[
+                        composer,
+                        const SizedBox(height: 18),
+                        filters,
+                        const SizedBox(height: 22),
+                        _buildFeed(),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildFeed() {
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return _ErrorCard(message: _error!, onRetry: _loadPosts);
+    }
+
+    if (_posts.isEmpty) {
+      return const _EmptyFeedCard();
+    }
+
+    return Column(
+      children: [
+        for (final post in _posts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _PostCard(
+              post: post,
+              authorName: _authorName(post),
+              stats: _statsByPostId[post.id],
+              comments: _commentsByPostId[post.id] ?? const [],
+              commentsExpanded: _expandedPosts.contains(post.id),
+              commentsLoading: _loadingComments.contains(post.id),
+              commentController: _commentControllerFor(post.id),
+              onToggleComments: () => _toggleComments(post),
+              onCreateComment: () => _createComment(post),
+              onReact: () => _react(post),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -468,6 +529,58 @@ class _HeaderChip extends StatelessWidget {
   }
 }
 
+class _CommunityPulseCard extends StatelessWidget {
+  const _CommunityPulseCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppTheme.enactusYellow,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: AppTheme.softBlack,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Vie de communauté',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Les annonces, idées, opportunités et retours terrain vivent ici. '
+              'Un fil clair aide les Enacteurs à rester alignés sans fouiller '
+              'dans plusieurs groupes.',
+              style: TextStyle(color: Colors.black54, height: 1.45),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const [
+                _MetaChip(label: 'Annonces', icon: Icons.campaign_rounded),
+                _MetaChip(label: 'Idées', icon: Icons.lightbulb_rounded),
+                _MetaChip(label: 'Opportunités', icon: Icons.work_rounded),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PostComposer extends StatelessWidget {
   final TextEditingController titleController;
   final TextEditingController contentController;
@@ -538,7 +651,7 @@ class _PostComposer extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: 240,
+                  width: _responsiveControlWidth(context, 240),
                   child: DropdownButtonFormField<String>(
                     initialValue: postType,
                     isExpanded: true,
@@ -550,7 +663,7 @@ class _PostComposer extends StatelessWidget {
                   ),
                 ),
                 SizedBox(
-                  width: 240,
+                  width: _responsiveControlWidth(context, 240),
                   child: DropdownButtonFormField<String>(
                     initialValue: visibility,
                     isExpanded: true,
@@ -622,7 +735,7 @@ class _PostFilters extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SizedBox(
-              width: 320,
+              width: _responsiveControlWidth(context, 320),
               child: TextField(
                 controller: searchController,
                 decoration: InputDecoration(
@@ -637,7 +750,7 @@ class _PostFilters extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: 220,
+              width: _responsiveControlWidth(context, 220),
               child: DropdownButtonFormField<String>(
                 initialValue: postType,
                 isExpanded: true,
@@ -649,7 +762,7 @@ class _PostFilters extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: 220,
+              width: _responsiveControlWidth(context, 220),
               child: DropdownButtonFormField<String>(
                 initialValue: visibility,
                 isExpanded: true,
@@ -975,6 +1088,14 @@ List<DropdownMenuItem<String>> _visibilityItems({bool includeAll = true}) {
     const DropdownMenuItem(value: 'alumni_only', child: Text('Alumni')),
     const DropdownMenuItem(value: 'private', child: Text('Privé')),
   ];
+}
+
+double _responsiveControlWidth(BuildContext context, double preferred) {
+  final screenWidth = MediaQuery.sizeOf(context).width;
+
+  if (screenWidth >= 560) return preferred;
+
+  return (screenWidth - 92).clamp(180.0, preferred).toDouble();
 }
 
 String _initials(String name) {
