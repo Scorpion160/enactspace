@@ -34,6 +34,53 @@ class AuthService {
     return prefs.getString(_tokenKey);
   }
 
+  Future<void> requestPasswordResetOtp({required String email}) async {
+    await _apiClient.postJson(
+      '/auth/password-reset/request',
+      data: {'email': email},
+    );
+  }
+
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _apiClient.postJson(
+      '/auth/password-reset/confirm',
+      data: {'email': email, 'otp': otp, 'new_password': newPassword},
+    );
+  }
+
+  Future<void> submitJoinRequest({
+    required String profileType,
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? phone,
+    String? department,
+    String? level,
+    String? skills,
+    String? motivation,
+  }) async {
+    await _apiClient.postJson(
+      '/auth/join-requests',
+      data: {
+        'profile_type': profileType,
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': email,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (department != null && department.isNotEmpty)
+          'department': department,
+        if (level != null && level.isNotEmpty) 'level': level,
+        if (skills != null && skills.isNotEmpty) 'skills': skills,
+        if (motivation != null && motivation.isNotEmpty)
+          'motivation': motivation,
+      },
+    );
+  }
+
   Future<bool> isLoggedIn() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;

@@ -175,6 +175,27 @@ class _LoginPanel extends StatelessWidget {
     required this.onLogin,
   });
 
+  void _showForgotPasswordDialog(BuildContext context) {
+    showDialog(context: context, builder: (_) => const _ForgotPasswordDialog());
+  }
+
+  void _showJoinRequestSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const _JoinEnactusSheet(),
+    );
+  }
+
+  void _showGuideDialog(BuildContext context) {
+    showDialog(context: context, builder: (_) => const _BeginnerGuideDialog());
+  }
+
+  void _showBiometricDialog(BuildContext context) {
+    showDialog(context: context, builder: (_) => const _BiometricSetupDialog());
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -235,6 +256,16 @@ class _LoginPanel extends StatelessWidget {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: loading
+                                ? null
+                                : () => _showForgotPasswordDialog(context),
+                            child: const Text('Mot de passe oublié ?'),
+                          ),
+                        ),
                         const SizedBox(height: 18),
                         if (error != null) ...[
                           _ErrorBanner(message: error!),
@@ -253,6 +284,31 @@ class _LoginPanel extends StatelessWidget {
                                 )
                               : const Icon(Icons.login_rounded),
                           label: const Text('Se connecter'),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: loading
+                                  ? null
+                                  : () => _showJoinRequestSheet(context),
+                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              label: const Text('Rejoindre Enactus ESP'),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _showGuideDialog(context),
+                              icon: const Icon(Icons.explore_rounded),
+                              label: const Text('Guide débutant'),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _showBiometricDialog(context),
+                              icon: const Icon(Icons.fingerprint_rounded),
+                              label: const Text('Biométrie'),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 18),
                         Container(
@@ -281,6 +337,529 @@ class _LoginPanel extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  const _ForgotPasswordDialog();
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _emailController = TextEditingController();
+  final _otpController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _codeSent = false;
+  bool _obscurePassword = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _otpController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  void _sendCode() {
+    final email = _emailController.text.trim();
+    if (!email.contains('@') || email.length < 6) {
+      setState(() => _error = 'Renseigne une adresse email valide.');
+      return;
+    }
+
+    setState(() {
+      _codeSent = true;
+      _error = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Code OTP préparé. Le backend email reste à brancher.'),
+      ),
+    );
+  }
+
+  void _confirmReset() {
+    if (_otpController.text.trim().length < 4) {
+      setState(() => _error = 'Entre le code OTP reçu par email.');
+      return;
+    }
+    if (_passwordController.text.length < 8) {
+      setState(
+        () => _error =
+            'Le nouveau mot de passe doit faire au moins 8 caractères.',
+      );
+      return;
+    }
+    if (_passwordController.text != _confirmController.text) {
+      setState(() => _error = 'Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Parcours prêt. API OTP/réinitialisation à connecter.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Réinitialiser le mot de passe'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Un code OTP sera envoyé à ton email avant de définir le nouveau mot de passe.',
+                style: TextStyle(color: Colors.black54, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_codeSent,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              if (_codeSent) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Code OTP',
+                    prefixIcon: Icon(Icons.pin_outlined),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Nouveau mot de passe',
+                    prefixIcon: const Icon(Icons.lock_reset_rounded),
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _confirmController,
+                  obscureText: _obscurePassword,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmer',
+                    prefixIcon: Icon(Icons.verified_user_outlined),
+                  ),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                _ErrorBanner(message: _error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _codeSent ? _confirmReset : _sendCode,
+          icon: Icon(_codeSent ? Icons.check_rounded : Icons.mail_rounded),
+          label: Text(_codeSent ? 'Valider' : 'Envoyer le code'),
+        ),
+      ],
+    );
+  }
+}
+
+class _JoinEnactusSheet extends StatefulWidget {
+  const _JoinEnactusSheet();
+
+  @override
+  State<_JoinEnactusSheet> createState() => _JoinEnactusSheetState();
+}
+
+class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _levelController = TextEditingController();
+  final _skillsController = TextEditingController();
+  final _motivationController = TextEditingController();
+
+  String _profileType = 'enacteur';
+  String? _error;
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _departmentController.dispose();
+    _levelController.dispose();
+    _skillsController.dispose();
+    _motivationController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final requiredFields = [
+      _firstNameController.text.trim(),
+      _lastNameController.text.trim(),
+      _emailController.text.trim(),
+      _departmentController.text.trim(),
+    ];
+
+    if (requiredFields.any((value) => value.isEmpty)) {
+      setState(() => _error = 'Complète au moins identité, email et filière.');
+      return;
+    }
+
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Demande préparée. Validation SG, Team Leader, Veille ou admin à brancher.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.88,
+        minChildSize: 0.55,
+        maxChildSize: 0.95,
+        builder: (context, controller) {
+          return SingleChildScrollView(
+            controller: controller,
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Rejoindre Enactus ESP',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Le compte reste en attente jusqu’à validation par les responsables autorisés.',
+                      style: TextStyle(color: Colors.black54, height: 1.4),
+                    ),
+                    const SizedBox(height: 18),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'enacteur',
+                          label: Text('Enacteur'),
+                          icon: Icon(Icons.school_rounded),
+                        ),
+                        ButtonSegment(
+                          value: 'alumni',
+                          label: Text('Alumni'),
+                          icon: Icon(Icons.workspace_premium_rounded),
+                        ),
+                      ],
+                      selected: {_profileType},
+                      onSelectionChanged: (values) {
+                        setState(() => _profileType = values.first);
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final twoColumns = constraints.maxWidth >= 560;
+                        final fieldWidth = twoColumns
+                            ? (constraints.maxWidth - 12) / 2
+                            : constraints.maxWidth;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            _JoinField(
+                              controller: _firstNameController,
+                              label: 'Prénom',
+                              icon: Icons.badge_outlined,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _lastNameController,
+                              label: 'Nom',
+                              icon: Icons.badge_outlined,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _emailController,
+                              label: 'Email',
+                              icon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _phoneController,
+                              label: 'Téléphone',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _departmentController,
+                              label: 'Filière / école',
+                              icon: Icons.account_balance_outlined,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _levelController,
+                              label: _profileType == 'alumni'
+                                  ? 'Promotion'
+                                  : 'Niveau',
+                              icon: Icons.timeline_rounded,
+                              width: fieldWidth,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _skillsController,
+                      minLines: 2,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Compétences clés',
+                        prefixIcon: Icon(Icons.auto_awesome_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _motivationController,
+                      minLines: 3,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Motivation / expérience Enactus',
+                        prefixIcon: Icon(Icons.edit_note_rounded),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      _ErrorBanner(message: _error!),
+                    ],
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Annuler'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _submit,
+                            icon: const Icon(Icons.send_rounded),
+                            label: const Text('Envoyer'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _JoinField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final double width;
+  final TextInputType? keyboardType;
+
+  const _JoinField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.width,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+      ),
+    );
+  }
+}
+
+class _BeginnerGuideDialog extends StatelessWidget {
+  const _BeginnerGuideDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      _GuideItem(
+        icon: Icons.dynamic_feed_rounded,
+        title: 'Fil d’actualité',
+        body:
+            'Suis les annonces officielles, réactions, commentaires et posts épinglés.',
+      ),
+      _GuideItem(
+        icon: Icons.chat_bubble_rounded,
+        title: 'Chat interne',
+        body:
+            'Discute en privé, par pôle, projet ou groupe avec médias et messages importants.',
+      ),
+      _GuideItem(
+        icon: Icons.assignment_turned_in_rounded,
+        title: 'Travail d’équipe',
+        body:
+            'Retrouve tâches, présences, documents, projets, événements et objectifs.',
+      ),
+      _GuideItem(
+        icon: Icons.privacy_tip_rounded,
+        title: 'Accès adapté',
+        body:
+            'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
+      ),
+    ];
+
+    return AlertDialog(
+      title: const Text('Guide débutant'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final item in items) ...[
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.enactusYellow.withValues(
+                      alpha: 0.22,
+                    ),
+                    foregroundColor: AppTheme.softBlack,
+                    child: Icon(item.icon),
+                  ),
+                  title: Text(
+                    item.title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(item.body),
+                ),
+                const Divider(height: 1),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        ElevatedButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.check_rounded),
+          label: const Text('Compris'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GuideItem {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _GuideItem({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+}
+
+class _BiometricSetupDialog extends StatelessWidget {
+  const _BiometricSetupDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Déverrouillage biométrique'),
+      content: const Text(
+        'L’écran est prêt pour Face ID, empreinte et déverrouillage mobile. '
+        'La dépendance native sera ajoutée lors du branchement mobile final.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Plus tard'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.fingerprint_rounded),
+          label: const Text('Activer bientôt'),
+        ),
+      ],
     );
   }
 }
