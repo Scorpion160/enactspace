@@ -238,6 +238,19 @@ class ChatService {
     );
   }
 
+  Future<List<ChatThreadMemberModel>> getParticipants(String threadId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get(
+      '/chat/threads/$threadId/participants',
+      token: token,
+    );
+
+    return _extractList(response)
+        .whereType<Map<String, dynamic>>()
+        .map(ChatThreadMemberModel.fromJson)
+        .toList();
+  }
+
   Future<void> updateParticipantRole({
     required String threadId,
     required String userId,

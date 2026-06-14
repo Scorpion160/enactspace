@@ -421,11 +421,54 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (context) => _ConversationInfoDialog(
         thread: thread,
+        chatService: _chatService,
+        currentUserId: _user?.id,
         pinned: _pinnedThreadIds.contains(thread.id),
+        onChanged: () async {
+          await _refreshThreads();
+          final selected = _selectedThread;
+          if (selected != null) {
+            await _selectThread(selected, silent: true);
+          }
+        },
         onTogglePin: () async {
           await _toggleSelectedThreadPin();
           if (context.mounted) Navigator.of(context).pop();
         },
+        onLeave: () async {
+          final user = _user;
+          if (user == null) return;
+          await _chatService.removeParticipant(
+            threadId: thread.id,
+            userId: user.id,
+          );
+          if (!mounted) return;
+          setState(() {
+            _selectedThread = null;
+            _messages = [];
+          });
+          await _loadChat();
+          if (context.mounted) Navigator.of(context).pop();
+        },
+        onAddMember: thread.canManageMembers && thread.threadType != 'direct'
+            ? () async {
+                final selectedIds = await showDialog<List<String>>(
+                  context: context,
+                  builder: (context) => _AddChatMembersDialog(
+                    chatService: _chatService,
+                    existingUserIds: thread.participantsPreview
+                        .map((participant) => participant.userId)
+                        .toSet(),
+                  ),
+                );
+                if (selectedIds == null || selectedIds.isEmpty) return;
+                await _chatService.addParticipants(
+                  threadId: thread.id,
+                  userIds: selectedIds,
+                );
+                await _refreshThreads();
+              }
+            : null,
         onDelete: thread.canManageMembers
             ? () async {
                 await _deleteSelectedThread();
@@ -1164,14 +1207,24 @@ class _MessageComposer extends StatelessWidget {
 
 class _ConversationInfoDialog extends StatelessWidget {
   final ChatThreadModel thread;
+  final ChatService chatService;
+  final String? currentUserId;
   final bool pinned;
+  final Future<void> Function() onChanged;
   final Future<void> Function() onTogglePin;
+  final Future<void> Function() onLeave;
+  final Future<void> Function()? onAddMember;
   final Future<void> Function()? onDelete;
 
   const _ConversationInfoDialog({
     required this.thread,
+    required this.chatService,
+    required this.currentUserId,
     required this.pinned,
+    required this.onChanged,
     required this.onTogglePin,
+    required this.onLeave,
+    required this.onAddMember,
     required this.onDelete,
   });
 
@@ -1225,6 +1278,26 @@ class _ConversationInfoDialog extends StatelessWidget {
                       label: Text(pinned ? 'Désépingler' : 'Épingler'),
                     ),
                   ),
+                  if (onAddMember != null) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onAddMember,
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                        label: const Text('Ajouter'),
+                      ),
+                    ),
+                  ],
+                  if (thread.threadType != 'direct') ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onLeave,
+                        icon: const Icon(Icons.logout_rounded),
+                        label: const Text('Quitter'),
+                      ),
+                    ),
+                  ],
                   if (onDelete != null) ...[
                     const SizedBox(width: 10),
                     Expanded(
@@ -1270,6 +1343,150 @@ class _ConversationInfoDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Fermer'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddChatMembersDialog extends StatefulWidget {
+  final ChatService chatService;
+  final Set<String> existingUserIds;
+
+  const _AddChatMembersDialog({
+    required this.chatService,
+    required this.existingUserIds,
+  });
+
+  @override
+  State<_AddChatMembersDialog> createState() => _AddChatMembersDialogState();
+}
+
+class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  final Set<String> _selectedIds = {};
+  bool _loading = true;
+  String? _error;
+  List<ChatContactModel> _contacts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContacts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadContacts() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final contacts = await widget.chatService.getContacts(
+        search: _searchController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _contacts = contacts
+            .where((contact) => !widget.existingUserIds.contains(contact.id))
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Ajouter des membres'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32)
+            .clamp(280.0, 520.0)
+            .toDouble(),
+        height: (MediaQuery.sizeOf(context).height * 0.58)
+            .clamp(320.0, 560.0)
+            .toDouble(),
+        child: Column(
+          children: [
+            if (_error != null) _DialogError(message: _error!),
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Rechercher une personne',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  onPressed: _loadContacts,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+              ),
+              onSubmitted: (_) => _loadContacts(),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _contacts.isEmpty
+                  ? const Center(child: Text('Aucun membre à ajouter.'))
+                  : ListView.builder(
+                      itemCount: _contacts.length,
+                      itemBuilder: (context, index) {
+                        final contact = _contacts[index];
+                        final selected = _selectedIds.contains(contact.id);
+
+                        return CheckboxListTile(
+                          value: selected,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedIds.add(contact.id);
+                              } else {
+                                _selectedIds.remove(contact.id);
+                              }
+                            });
+                          },
+                          title: Text(contact.displayName),
+                          subtitle: Text(contact.email),
+                          secondary: _ChatAvatar(
+                            title: contact.displayName,
+                            imageUrl: _absoluteUrl(contact.photoUrl),
+                            selected: selected,
+                            icon: Icons.person_rounded,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _selectedIds.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_selectedIds.toList()),
+          icon: const Icon(Icons.person_add_alt_1_rounded),
+          label: const Text('Ajouter'),
         ),
       ],
     );
