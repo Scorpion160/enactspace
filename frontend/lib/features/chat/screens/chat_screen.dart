@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
@@ -39,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessageModel> _messages = [];
   Set<String> _pinnedThreadIds = {};
   Set<String> _pinnedMessageIds = {};
+  ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
 
   @override
@@ -212,6 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage() async {
     final thread = _selectedThread;
     final content = _messageController.text.trim();
+    final reply = _replyingToMessage;
 
     if (thread == null || content.isEmpty || _sending) return;
 
@@ -222,13 +225,16 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final message = await _chatService.sendMessage(
         threadId: thread.id,
-        content: content,
+        content: reply == null
+            ? content
+            : 'Réponse à "${_messagePreview(reply)}"\n$content',
       );
       _messageController.clear();
 
       if (!mounted) return;
       setState(() {
         _messages = [..._messages, message];
+        _replyingToMessage = null;
       });
       if (_user != null) {
         await _chatService.cacheMessages(
@@ -398,6 +404,87 @@ class _ChatScreenState extends State<ChatScreen> {
         _pinnedMessageIds.remove(message.id);
       }
     });
+  }
+
+  Future<void> _copyMessage(ChatMessageModel message) async {
+    await Clipboard.setData(ClipboardData(text: message.content));
+    _showInfo('Message copié.');
+  }
+
+  void _replyToMessage(ChatMessageModel message) {
+    setState(() {
+      _replyingToMessage = message;
+    });
+  }
+
+  void _clearReply() {
+    setState(() {
+      _replyingToMessage = null;
+    });
+  }
+
+  void _reactToMessage(ChatMessageModel message, String emoji) {
+    _showInfo('$emoji réaction ajoutée localement.');
+  }
+
+  Future<void> _openMessageActions(ChatMessageModel message) async {
+    final pinned = _pinnedMessageIds.contains(message.id);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.reply_rounded),
+                  title: const Text('Répondre'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _replyToMessage(message);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.copy_rounded),
+                  title: const Text('Copier'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _copyMessage(message);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  ),
+                  title: Text(pinned ? 'Désépingler' : 'Épingler'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _toggleMessagePin(message);
+                  },
+                ),
+                const Divider(),
+                Wrap(
+                  spacing: 10,
+                  children: ['👍', '👏', '💛', '🔥', '🙏'].map((emoji) {
+                    return ActionChip(
+                      label: Text(emoji),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _reactToMessage(message, emoji);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _deleteSelectedThread() async {
@@ -594,13 +681,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     messages: _messages,
                     currentUserId: _user?.id,
                     pinnedMessageIds: _pinnedMessageIds,
-                    onTogglePin: _toggleMessagePin,
+                    onMessageLongPress: _openMessageActions,
                   ),
           ),
           if (_selectedThread != null)
             _MessageComposer(
               controller: _messageController,
               sending: _sending,
+              replyingTo: _replyingToMessage,
+              onClearReply: _clearReply,
               onSend: _sendMessage,
               onAttach: _openAttachmentDialog,
             ),
@@ -949,13 +1038,13 @@ class _MessagesList extends StatelessWidget {
   final List<ChatMessageModel> messages;
   final String? currentUserId;
   final Set<String> pinnedMessageIds;
-  final ValueChanged<ChatMessageModel> onTogglePin;
+  final ValueChanged<ChatMessageModel> onMessageLongPress;
 
   const _MessagesList({
     required this.messages,
     required this.currentUserId,
     required this.pinnedMessageIds,
-    required this.onTogglePin,
+    required this.onMessageLongPress,
   });
 
   @override
@@ -980,7 +1069,7 @@ class _MessagesList extends StatelessWidget {
         return Align(
           alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
           child: GestureDetector(
-            onLongPress: () => onTogglePin(message),
+            onLongPress: () => onMessageLongPress(message),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 520),
               margin: const EdgeInsets.only(bottom: 10),
@@ -1150,12 +1239,16 @@ class _MediaFallback extends StatelessWidget {
 class _MessageComposer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
+  final ChatMessageModel? replyingTo;
+  final VoidCallback onClearReply;
   final VoidCallback onSend;
   final VoidCallback onAttach;
 
   const _MessageComposer({
     required this.controller,
     required this.sending,
+    required this.replyingTo,
+    required this.onClearReply,
     required this.onSend,
     required this.onAttach,
   });
@@ -1168,36 +1261,68 @@ class _MessageComposer extends StatelessWidget {
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          IconButton(
-            tooltip: 'Joindre',
-            onPressed: sending ? null : onAttach,
-            icon: const Icon(Icons.attach_file_rounded),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              minLines: 1,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Écrire un message...',
-                prefixIcon: Icon(Icons.message_rounded),
+          if (replyingTo != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.enactusYellow.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
               ),
-              onSubmitted: (_) => onSend(),
+              child: Row(
+                children: [
+                  const Icon(Icons.reply_rounded, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _messagePreview(replyingTo!),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onClearReply,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          IconButton.filled(
-            onPressed: sending ? null : onSend,
-            icon: sending
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.send_rounded),
+          ],
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Joindre',
+                onPressed: sending ? null : onAttach,
+                icon: const Icon(Icons.attach_file_rounded),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Écrire un message...',
+                    prefixIcon: Icon(Icons.message_rounded),
+                  ),
+                  onSubmitted: (_) => onSend(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.filled(
+                onPressed: sending ? null : onSend,
+                icon: sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded),
+              ),
+            ],
           ),
         ],
       ),
@@ -2369,6 +2494,13 @@ String _threadSubtitle(ChatThreadModel thread) {
   }
 
   return '${thread.participantsCount} participant(s)';
+}
+
+String _messagePreview(ChatMessageModel message) {
+  final value = message.isMedia ? message.attachmentLabel : message.content;
+  final normalized = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (normalized.length <= 70) return normalized;
+  return '${normalized.substring(0, 70)}...';
 }
 
 String? _optional(String value) {
