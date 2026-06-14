@@ -14,6 +14,7 @@ from app.api.routes import (
     tasks,
     documents,
     posts,
+    chat,
     recruitment,
     alumni,
     notifications,
@@ -76,6 +77,7 @@ app.include_router(finance.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 app.include_router(recruitment.router, prefix="/api")
 app.include_router(alumni.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")

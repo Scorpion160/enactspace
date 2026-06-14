@@ -678,6 +678,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/posts',
       ),
       const _QuickAccessItem(
+        title: 'Chat',
+        subtitle: 'Messages et groupes',
+        icon: Icons.chat_rounded,
+        route: '/chat',
+      ),
+      const _QuickAccessItem(
         title: 'Gamification',
         subtitle: 'Points et badges',
         icon: Icons.workspace_premium_rounded,

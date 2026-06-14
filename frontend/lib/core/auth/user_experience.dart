@@ -117,6 +117,7 @@ class UserExperience {
       '/dashboard',
       '/notifications',
       '/posts',
+      '/chat',
       '/tasks',
       '/documents',
       '/events',

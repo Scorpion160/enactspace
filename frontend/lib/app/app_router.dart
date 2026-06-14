@@ -4,6 +4,7 @@ import '../core/auth/user_experience.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
+import '../features/chat/screens/chat_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/documents/screens/documents_screen.dart';
 import '../features/events/screens/events_screen.dart';
@@ -96,6 +97,10 @@ class AppRouter {
           GoRoute(
             path: '/posts',
             builder: (context, state) => const PostsScreen(),
+          ),
+          GoRoute(
+            path: '/chat',
+            builder: (context, state) => const ChatScreen(),
           ),
           GoRoute(
             path: '/poles',

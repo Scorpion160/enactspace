@@ -251,6 +251,11 @@ class _SideMenu extends StatelessWidget {
                     path: '/posts',
                   ),
                   _MenuItem(
+                    label: 'Chat',
+                    icon: Icons.chat_rounded,
+                    path: '/chat',
+                  ),
+                  _MenuItem(
                     label: 'Gamification',
                     icon: Icons.workspace_premium_rounded,
                     path: '/gamification',
@@ -620,10 +625,10 @@ class _MobileBottomNavigation extends StatelessWidget {
         path: '/dashboard',
       ),
       _MobileDestination(
-        label: 'Com',
-        icon: Icons.forum_outlined,
-        selectedIcon: Icons.forum_rounded,
-        path: '/posts',
+        label: 'Chat',
+        icon: Icons.chat_outlined,
+        selectedIcon: Icons.chat_rounded,
+        path: '/chat',
       ),
       _MobileDestination(
         label: 'Tâches',
@@ -644,6 +649,12 @@ class _MobileBottomNavigation extends StatelessWidget {
         selectedIcon: Icons.notifications_rounded,
         path: '/notifications',
         badgeCount: unreadNotifications,
+      ),
+      _MobileDestination(
+        label: 'Com',
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum_rounded,
+        path: '/posts',
       ),
       _MobileDestination(
         label: 'Membres',
@@ -812,6 +823,7 @@ String _navigationTitle(String currentPath) {
     '/recruitment': 'Recrutement',
     '/notifications': 'Notifications',
     '/posts': 'Communication',
+    '/chat': 'Chat',
     '/gamification': 'Gamification',
   };
 

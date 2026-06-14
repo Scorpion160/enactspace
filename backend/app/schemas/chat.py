@@ -1,0 +1,71 @@
+from datetime import datetime
+from typing import Optional, List
+from uuid import UUID
+
+from pydantic import BaseModel
+
+
+class ChatContactRead(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    email: str
+    status: str
+    photo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ChatThreadCreate(BaseModel):
+    title: Optional[str] = None
+    thread_type: str = "group"
+    scope_type: Optional[str] = None
+    scope_id: Optional[UUID] = None
+    participant_ids: List[UUID] = []
+
+
+class ChatThreadRead(BaseModel):
+    id: UUID
+    title: Optional[str]
+    thread_type: str
+    scope_type: Optional[str]
+    scope_id: Optional[UUID]
+    created_by: Optional[UUID]
+    created_at: datetime
+    updated_at: datetime
+    participants_count: int = 0
+    unread_count: int = 0
+    last_message: Optional[str] = None
+    last_message_at: Optional[datetime] = None
+
+
+class ChatParticipantRead(BaseModel):
+    id: UUID
+    thread_id: UUID
+    user_id: UUID
+    participant_role: str
+    joined_at: datetime
+    last_read_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class ChatMessageCreate(BaseModel):
+    content: str
+    message_type: str = "text"
+
+
+class ChatMessageRead(BaseModel):
+    id: UUID
+    thread_id: UUID
+    author_id: UUID
+    content: str
+    message_type: str
+    created_at: datetime
+    edited_at: Optional[datetime]
+    deleted_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
