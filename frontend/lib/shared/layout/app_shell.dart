@@ -247,6 +247,11 @@ class _SideMenu extends StatelessWidget {
             path: '/projects',
           ),
           _MenuItem(
+            label: 'Événements',
+            icon: Icons.event_available_rounded,
+            path: '/events',
+          ),
+          _MenuItem(
             label: 'Présences',
             icon: Icons.fact_check_rounded,
             path: '/attendance',
@@ -731,6 +736,7 @@ String _navigationTitle(String currentPath) {
     '/members': 'Membres',
     '/poles': 'Pôles',
     '/projects': 'Projets',
+    '/events': 'Événements',
     '/attendance': 'Présences',
     '/tasks': 'Tâches',
     '/finance': 'Finance',

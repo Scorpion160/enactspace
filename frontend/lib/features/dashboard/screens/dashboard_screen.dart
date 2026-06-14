@@ -582,6 +582,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/projects',
       ),
       const _QuickAccessItem(
+        title: 'Événements',
+        subtitle: 'Calendrier et pointage',
+        icon: Icons.event_available_rounded,
+        route: '/events',
+      ),
+      const _QuickAccessItem(
         title: 'Communication',
         subtitle: 'Posts et annonces',
         icon: Icons.forum_rounded,

@@ -4,6 +4,7 @@ import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/documents/screens/documents_screen.dart';
+import '../features/events/screens/events_screen.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
@@ -83,6 +84,10 @@ class AppRouter {
           GoRoute(
             path: '/projects',
             builder: (context, state) => const ProjectsScreen(),
+          ),
+          GoRoute(
+            path: '/events',
+            builder: (context, state) => const EventsScreen(),
           ),
         ],
       ),
