@@ -83,3 +83,18 @@ class ChatMessageRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ChatUploadCreate(BaseModel):
+    file_name: str
+    content_type: Optional[str] = None
+    data_base64: str
+    message_type: str = "document"
+
+
+class ChatUploadRead(BaseModel):
+    url: str
+    file_name: str
+    content_type: Optional[str]
+    size_bytes: int
+    message_type: str

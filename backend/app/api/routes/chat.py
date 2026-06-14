@@ -1,5 +1,9 @@
 import json
+import base64
+import binascii
+import re
 from datetime import datetime
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -20,6 +24,8 @@ from app.schemas.chat import (
     ChatParticipantRead,
     ChatMessageCreate,
     ChatMessageRead,
+    ChatUploadCreate,
+    ChatUploadRead,
 )
 
 
@@ -28,6 +34,8 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
 VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker"}
 MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text"}
+CHAT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
+CHAT_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads" / "chat"
 ENACCHEF_ROLES = {
     "administrateur",
     "team_leader",
@@ -127,6 +135,18 @@ def build_message_content(payload: ChatMessageCreate) -> str:
         {key: value for key, value in media_payload.items() if value is not None},
         ensure_ascii=False,
     )
+
+
+def safe_upload_name(file_name: str) -> str:
+    base_name = Path(file_name).name
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", base_name).strip("._")
+    return sanitized or "chat-media.bin"
+
+
+def normalize_base64(data: str) -> str:
+    if "," in data and data.strip().lower().startswith("data:"):
+        return data.split(",", 1)[1]
+    return data
 
 
 def get_participant_or_404(
@@ -271,6 +291,55 @@ def list_chat_contacts(
         )
 
     return query.distinct().order_by(User.first_name.asc(), User.last_name.asc()).limit(80).all()
+
+
+@router.post("/uploads", response_model=ChatUploadRead)
+def upload_chat_media(
+    payload: ChatUploadCreate,
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if payload.message_type not in MEDIA_MESSAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de média invalide",
+        )
+
+    try:
+        file_bytes = base64.b64decode(
+            normalize_base64(payload.data_base64),
+            validate=True,
+        )
+    except (binascii.Error, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Fichier encodé invalide",
+        )
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le fichier est vide",
+        )
+
+    if len(file_bytes) > CHAT_UPLOAD_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Le fichier dépasse 25 Mo",
+        )
+
+    CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    file_name = safe_upload_name(payload.file_name)
+    stored_name = f"{current_user.id}_{int(datetime.utcnow().timestamp())}_{file_name}"
+    file_path = CHAT_UPLOAD_DIR / stored_name
+    file_path.write_bytes(file_bytes)
+
+    return ChatUploadRead(
+        url=f"/uploads/chat/{stored_name}",
+        file_name=file_name,
+        content_type=payload.content_type,
+        size_bytes=len(file_bytes),
+        message_type=payload.message_type,
+    )
 
 
 @router.post("/threads", response_model=ChatThreadRead)

@@ -176,6 +176,31 @@ class ChatService {
     throw Exception('Réponse invalide lors de l’envoi du message.');
   }
 
+  Future<ChatUploadedMediaModel> uploadMediaBase64({
+    required String fileName,
+    required String dataBase64,
+    required String messageType,
+    String? contentType,
+  }) async {
+    final token = await _requireToken();
+    final response = await _apiClient.postJson(
+      '/chat/uploads',
+      token: token,
+      data: {
+        'file_name': fileName.trim(),
+        'content_type': _nullable(contentType),
+        'data_base64': dataBase64.trim(),
+        'message_type': messageType,
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ChatUploadedMediaModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de l’upload du média.');
+  }
+
   Future<String> _requireToken() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

@@ -1,3 +1,5 @@
+import '../../../core/api/api_client.dart';
+
 class ChatContactModel {
   final String id;
   final String firstName;
@@ -194,6 +196,13 @@ class ChatMessageModel {
 
   bool get isMedia => messageType != 'text';
 
+  String? get absoluteAttachmentUrl {
+    final url = attachmentUrl;
+    if (url == null || url.trim().isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${ApiClient.serverUrl}$url';
+  }
+
   String get attachmentLabel {
     final name = attachmentName?.trim();
     if (name != null && name.isNotEmpty) return name;
@@ -212,5 +221,36 @@ class ChatMessageModel {
       default:
         return 'Média';
     }
+  }
+}
+
+class ChatUploadedMediaModel {
+  final String url;
+  final String fileName;
+  final String? contentType;
+  final int sizeBytes;
+  final String messageType;
+
+  const ChatUploadedMediaModel({
+    required this.url,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.messageType,
+  });
+
+  factory ChatUploadedMediaModel.fromJson(Map<String, dynamic> json) {
+    return ChatUploadedMediaModel(
+      url: json['url']?.toString() ?? '',
+      fileName: json['file_name']?.toString() ?? '',
+      contentType: json['content_type']?.toString(),
+      sizeBytes: int.tryParse(json['size_bytes']?.toString() ?? '') ?? 0,
+      messageType: json['message_type']?.toString() ?? 'document',
+    );
+  }
+
+  String get absoluteUrl {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${ApiClient.serverUrl}$url';
   }
 }

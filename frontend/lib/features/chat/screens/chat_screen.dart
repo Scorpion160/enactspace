@@ -277,7 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final attachment = await showDialog<_OutgoingAttachment>(
       context: context,
-      builder: (context) => const _AttachmentMessageDialog(),
+      builder: (context) => _AttachmentMessageDialog(chatService: _chatService),
     );
 
     if (attachment == null) return;
@@ -772,7 +772,7 @@ class _MessageBody extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Image.network(
-              message.attachmentUrl ?? '',
+              message.absoluteAttachmentUrl ?? '',
               width: message.messageType == 'sticker' ? 150 : 260,
               height: message.messageType == 'sticker' ? 150 : 170,
               fit: BoxFit.cover,
@@ -948,7 +948,9 @@ class _OutgoingAttachment {
 }
 
 class _AttachmentMessageDialog extends StatefulWidget {
-  const _AttachmentMessageDialog();
+  final ChatService chatService;
+
+  const _AttachmentMessageDialog({required this.chatService});
 
   @override
   State<_AttachmentMessageDialog> createState() =>
@@ -964,8 +966,10 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
   final TextEditingController _durationController = TextEditingController();
   final TextEditingController _thumbnailController = TextEditingController();
   final TextEditingController _stickerPackController = TextEditingController();
+  final TextEditingController _dataBase64Controller = TextEditingController();
 
   String _messageType = 'image';
+  bool _uploading = false;
   String? _error;
 
   @override
@@ -978,28 +982,70 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
     _durationController.dispose();
     _thumbnailController.dispose();
     _stickerPackController.dispose();
+    _dataBase64Controller.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final url = _urlController.text.trim();
-    if (url.isEmpty) {
+    final dataBase64 = _dataBase64Controller.text.trim();
+    final name = _nameController.text.trim().isEmpty
+        ? _messageTypeLabel(_messageType)
+        : _nameController.text.trim();
+
+    if (url.isEmpty && dataBase64.isEmpty) {
       setState(() {
-        _error = 'Ajoute le lien du fichier ou du sticker.';
+        _error = 'Ajoute un lien ou des données base64 du fichier.';
       });
       return;
     }
 
+    if (dataBase64.isNotEmpty && _nameController.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Donne un nom au fichier à uploader.';
+      });
+      return;
+    }
+
+    var finalUrl = url;
+    var finalSizeBytes = int.tryParse(_sizeController.text.trim());
+    var finalMimeType = _optional(_mimeController.text);
+
+    if (dataBase64.isNotEmpty) {
+      setState(() {
+        _uploading = true;
+        _error = null;
+      });
+
+      try {
+        final upload = await widget.chatService.uploadMediaBase64(
+          fileName: name,
+          dataBase64: dataBase64,
+          messageType: _messageType,
+          contentType: finalMimeType,
+        );
+        finalUrl = upload.url;
+        finalSizeBytes = upload.sizeBytes;
+        finalMimeType = upload.contentType;
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _uploading = false;
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+        return;
+      }
+    }
+
+    if (!mounted) return;
     Navigator.of(context).pop(
       _OutgoingAttachment(
         messageType: _messageType,
-        url: url,
-        name: _nameController.text.trim().isEmpty
-            ? _messageTypeLabel(_messageType)
-            : _nameController.text.trim(),
+        url: finalUrl,
+        name: name,
         caption: _captionController.text.trim(),
-        mimeType: _optional(_mimeController.text),
-        sizeBytes: int.tryParse(_sizeController.text.trim()),
+        mimeType: finalMimeType,
+        sizeBytes: finalSizeBytes,
         durationSeconds: int.tryParse(_durationController.text.trim()),
         thumbnailUrl: _optional(_thumbnailController.text),
         stickerPack: _optional(_stickerPackController.text),
@@ -1051,8 +1097,18 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
               TextField(
                 controller: _urlController,
                 decoration: const InputDecoration(
-                  labelText: 'Lien du fichier',
+                  labelText: 'Lien du fichier existant',
                   prefixIcon: Icon(Icons.link_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _dataBase64Controller,
+                minLines: 1,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Données base64 à uploader',
+                  prefixIcon: Icon(Icons.cloud_upload_rounded),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1127,13 +1183,22 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _uploading ? null : () => Navigator.of(context).pop(),
           child: const Text('Annuler'),
         ),
         ElevatedButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.send_rounded),
-          label: const Text('Envoyer'),
+          onPressed: _uploading ? null : _submit,
+          icon: _uploading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.send_rounded),
+          label: Text(_uploading ? 'Upload...' : 'Envoyer'),
         ),
       ],
     );
