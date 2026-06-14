@@ -28,6 +28,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _messagesLoading = false;
   bool _sending = false;
+  bool _usingLocalCache = false;
   String? _error;
   UserExperience? _user;
   List<ChatThreadModel> _threads = [];
@@ -54,7 +55,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final user = UserExperience.fromJson(await _authService.getCurrentUser());
+      final cachedThreads = await _chatService.getCachedThreads(
+        userId: user.id,
+      );
+
+      if (mounted && cachedThreads.isNotEmpty) {
+        setState(() {
+          _user = user;
+          _threads = cachedThreads;
+          _selectedThread = cachedThreads.first;
+          _usingLocalCache = true;
+          _loading = false;
+        });
+
+        await _loadCachedMessages(cachedThreads.first);
+      }
+
       final threads = await _chatService.getThreads();
+      await _chatService.cacheThreads(userId: user.id, threads: threads);
 
       if (!mounted) return;
 
@@ -62,6 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _user = user;
         _threads = threads;
         _selectedThread = threads.isNotEmpty ? threads.first : null;
+        _usingLocalCache = false;
       });
 
       if (threads.isNotEmpty) {
@@ -69,9 +88,16 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (_threads.isNotEmpty) {
+        setState(() {
+          _usingLocalCache = true;
+        });
+        _showInfo('Connexion indisponible. Chats affichés depuis ce support.');
+      } else {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -79,6 +105,22 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadCachedMessages(ChatThreadModel thread) async {
+    final userId = _user?.id;
+    if (userId == null) return;
+
+    final cached = await _chatService.getCachedMessages(
+      userId: userId,
+      threadId: thread.id,
+    );
+
+    if (!mounted || cached.isEmpty) return;
+
+    setState(() {
+      _messages = cached;
+    });
   }
 
   Future<void> _selectThread(
@@ -96,6 +138,8 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
 
+    var displayedCachedMessages = false;
+
     try {
       final userId = _user?.id;
       if (userId != null) {
@@ -106,7 +150,9 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted && cached.isNotEmpty) {
           setState(() {
             _messages = cached;
+            _usingLocalCache = true;
           });
+          displayedCachedMessages = true;
         }
       }
 
@@ -115,6 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _selectedThread = thread;
         _messages = messages;
+        _usingLocalCache = false;
       });
       if (userId != null) {
         await _chatService.cacheMessages(
@@ -125,7 +172,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString().replaceAll('Exception: ', ''));
+      if (displayedCachedMessages) {
+        _showInfo('Messages affichés depuis ce support.');
+      } else {
+        _showError(e.toString().replaceAll('Exception: ', ''));
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -177,6 +228,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _refreshThreads() async {
     final threads = await _chatService.getThreads();
+    if (_user != null) {
+      await _chatService.cacheThreads(userId: _user!.id, threads: threads);
+    }
     if (!mounted) return;
     setState(() {
       _threads = threads;
@@ -211,6 +265,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _showInfo(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -233,7 +294,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   constraints: const BoxConstraints(maxWidth: 1280),
                   child: Column(
                     children: [
-                      _ChatHeader(onNewThread: _openNewThreadDialog),
+                      _ChatHeader(
+                        onNewThread: _openNewThreadDialog,
+                        usingLocalCache: _usingLocalCache,
+                      ),
                       const SizedBox(height: 16),
                       if (_loading)
                         const _LoadingCard()
@@ -314,8 +378,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
 class _ChatHeader extends StatelessWidget {
   final VoidCallback onNewThread;
+  final bool usingLocalCache;
 
-  const _ChatHeader({required this.onNewThread});
+  const _ChatHeader({required this.onNewThread, required this.usingLocalCache});
 
   @override
   Widget build(BuildContext context) {
@@ -323,20 +388,14 @@ class _ChatHeader extends StatelessWidget {
       color: AppTheme.softBlack,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            const CircleAvatar(
-              radius: 26,
-              backgroundColor: AppTheme.enactusYellow,
-              foregroundColor: AppTheme.softBlack,
-              child: Icon(Icons.chat_rounded),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 520;
+            final title = Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Chat EnactSpace',
                     style: TextStyle(
                       color: Colors.white,
@@ -344,18 +403,92 @@ class _ChatHeader extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     'Discussions directes et groupes de travail.',
                     style: TextStyle(color: Colors.white70),
                   ),
+                  if (usingLocalCache) ...[
+                    const SizedBox(height: 8),
+                    const _LocalCacheChip(),
+                  ],
                 ],
               ),
-            ),
-            ElevatedButton.icon(
+            );
+            final action = ElevatedButton.icon(
               onPressed: onNewThread,
               icon: const Icon(Icons.add_comment_rounded),
               label: const Text('Nouvelle'),
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 26,
+                        backgroundColor: AppTheme.enactusYellow,
+                        foregroundColor: AppTheme.softBlack,
+                        child: Icon(Icons.chat_rounded),
+                      ),
+                      const SizedBox(width: 14),
+                      title,
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(width: double.infinity, child: action),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                const CircleAvatar(
+                  radius: 26,
+                  backgroundColor: AppTheme.enactusYellow,
+                  foregroundColor: AppTheme.softBlack,
+                  child: Icon(Icons.chat_rounded),
+                ),
+                const SizedBox(width: 14),
+                title,
+                const SizedBox(width: 12),
+                action,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _LocalCacheChip extends StatelessWidget {
+  const _LocalCacheChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.offline_bolt_rounded, color: Colors.white, size: 14),
+            SizedBox(width: 6),
+            Text(
+              'Disponible localement',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),

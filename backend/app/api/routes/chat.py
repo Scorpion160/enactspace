@@ -74,6 +74,33 @@ def build_thread_read(db: Session, thread: ChatThread, user_id) -> ChatThreadRea
         ChatMessage.deleted_at.is_(None),
     )
 
+    if participant and participant.last_read_at:
+        unread_query = unread_query.filter(
+            ChatMessage.created_at > participant.last_read_at,
+        )
+
+    unread_count = unread_query.scalar() or 0
+
+    last_message = db.query(ChatMessage).filter(
+        ChatMessage.thread_id == thread.id,
+        ChatMessage.deleted_at.is_(None),
+    ).order_by(ChatMessage.created_at.desc()).first()
+
+    return ChatThreadRead(
+        id=thread.id,
+        title=thread.title,
+        thread_type=thread.thread_type,
+        scope_type=thread.scope_type,
+        scope_id=thread.scope_id,
+        created_by=thread.created_by,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+        participants_count=int(participants_count),
+        unread_count=int(unread_count),
+        last_message=last_message.content if last_message else None,
+        last_message_at=last_message.created_at if last_message else None,
+    )
+
 
 def scope_participant_ids(db: Session, payload: ChatThreadCreate) -> set:
     if payload.thread_type == "enacchef" or payload.scope_type == "enacchef":
@@ -112,33 +139,6 @@ def scope_participant_ids(db: Session, payload: ChatThreadCreate) -> set:
         return {row[0] for row in rows}
 
     return set()
-
-    if participant and participant.last_read_at:
-        unread_query = unread_query.filter(
-            ChatMessage.created_at > participant.last_read_at,
-        )
-
-    unread_count = unread_query.scalar() or 0
-
-    last_message = db.query(ChatMessage).filter(
-        ChatMessage.thread_id == thread.id,
-        ChatMessage.deleted_at.is_(None),
-    ).order_by(ChatMessage.created_at.desc()).first()
-
-    return ChatThreadRead(
-        id=thread.id,
-        title=thread.title,
-        thread_type=thread.thread_type,
-        scope_type=thread.scope_type,
-        scope_id=thread.scope_id,
-        created_by=thread.created_by,
-        created_at=thread.created_at,
-        updated_at=thread.updated_at,
-        participants_count=int(participants_count),
-        unread_count=int(unread_count),
-        last_message=last_message.content if last_message else None,
-        last_message_at=last_message.created_at if last_message else None,
-    )
 
 
 @router.get("/contacts", response_model=list[ChatContactRead])

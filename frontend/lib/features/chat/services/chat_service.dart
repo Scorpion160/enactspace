@@ -35,6 +35,38 @@ class ChatService {
     ).whereType<Map<String, dynamic>>().map(ChatThreadModel.fromJson).toList();
   }
 
+  Future<List<ChatThreadModel>> getCachedThreads({
+    required String userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_threadsCacheKey(userId));
+
+    if (raw == null || raw.isEmpty) return [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(ChatThreadModel.fromJson)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> cacheThreads({
+    required String userId,
+    required List<ChatThreadModel> threads,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _threadsCacheKey(userId),
+      jsonEncode(threads.map((thread) => thread.toJson()).toList()),
+    );
+  }
+
   Future<ChatThreadModel> createThread({
     String? title,
     required String threadType,
@@ -83,14 +115,17 @@ class ChatService {
 
     if (raw == null || raw.isEmpty) return [];
 
-    final decoded = jsonDecode(raw);
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
 
-    if (decoded is! List) return [];
-
-    return decoded
-        .whereType<Map<String, dynamic>>()
-        .map(ChatMessageModel.fromJson)
-        .toList();
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(ChatMessageModel.fromJson)
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> cacheMessages({
@@ -143,6 +178,10 @@ class ChatService {
   String? _nullable(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  String _threadsCacheKey(String userId) {
+    return 'enactspace_chat_threads_$userId';
   }
 
   String _messagesCacheKey(String userId, String threadId) {

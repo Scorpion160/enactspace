@@ -88,6 +88,23 @@ class ChatThreadModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'thread_type': threadType,
+      'scope_type': scopeType,
+      'scope_id': scopeId,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'participants_count': participantsCount,
+      'unread_count': unreadCount,
+      'last_message': lastMessage,
+      'last_message_at': lastMessageAt?.toIso8601String(),
+    };
+  }
+
   String get displayTitle {
     if (title != null && title!.trim().isNotEmpty) return title!.trim();
     if (threadType == 'direct') return 'Discussion directe';
