@@ -485,11 +485,6 @@ class _MembersList extends StatelessWidget {
                                 tooltip: 'Approuver',
                                 color: Colors.green,
                               ),
-                            IconButton(
-                              onPressed: () => onAssignDepartment(member),
-                              icon: const Icon(Icons.account_tree_rounded),
-                              tooltip: 'Assigner pôle cœur',
-                            ),
                           ],
                         ),
                       ),
@@ -503,75 +498,34 @@ class _MembersList extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: members.map((member) {
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                _Avatar(name: member.displayName),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        member.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        member.email,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          _StatusChip(member: member),
-                          _BooleanChip(value: member.emailVerified),
-                          _RolesChip(roles: member.roles),
-                          _DepartmentChip(department: member.departmentLabel),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () => _showMemberDetails(context, member),
-                      icon: const Icon(Icons.visibility_rounded),
-                      tooltip: 'Voir',
-                    ),
-                    if (member.status == 'pending')
-                      IconButton(
-                        onPressed: () => onApprove(member),
-                        icon: const Icon(Icons.verified_user_rounded),
-                        tooltip: 'Approuver',
-                        color: Colors.green,
-                      ),
-                    IconButton(
-                      onPressed: () => onAssignRole(member),
-                      icon: const Icon(Icons.admin_panel_settings_rounded),
-                      tooltip: 'Assigner rôle',
-                    ),
-                  ],
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = constraints.maxWidth >= 820 ? 2 : 1;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: members.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: count,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: count == 1 ? 236 : 248,
           ),
+          itemBuilder: (context, index) {
+            final member = members[index];
+            return _MemberCard(
+              member: member,
+              onDetails: () => _showMemberDetails(context, member),
+              onApprove: member.status == 'pending'
+                  ? () => onApprove(member)
+                  : null,
+              onAssignRole: () => onAssignRole(member),
+              onAssignDepartment: () => onAssignDepartment(member),
+            );
+          },
         );
-      }).toList(),
+      },
     );
   }
 
@@ -637,6 +591,102 @@ class _MemberIdentity extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ],
+    );
+  }
+}
+
+class _MemberCard extends StatelessWidget {
+  final MemberModel member;
+  final VoidCallback onDetails;
+  final VoidCallback? onApprove;
+  final VoidCallback onAssignRole;
+  final VoidCallback onAssignDepartment;
+
+  const _MemberCard({
+    required this.member,
+    required this.onDetails,
+    required this.onApprove,
+    required this.onAssignRole,
+    required this.onAssignDepartment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _Avatar(name: member.displayName),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        member.email,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _StatusChip(member: member),
+                _RolesChip(roles: member.roles),
+                _DepartmentChip(department: member.departmentLabel),
+              ],
+            ),
+            const Spacer(),
+            const Divider(height: 20),
+            Wrap(
+              spacing: 4,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: onDetails,
+                  icon: const Icon(Icons.visibility_rounded),
+                  tooltip: 'Voir',
+                ),
+                IconButton(
+                  onPressed: onAssignRole,
+                  icon: const Icon(Icons.admin_panel_settings_rounded),
+                  tooltip: 'Assigner rôle',
+                ),
+                IconButton(
+                  onPressed: onAssignDepartment,
+                  icon: const Icon(Icons.account_tree_rounded),
+                  tooltip: 'Assigner pôle cœur',
+                ),
+                if (onApprove != null)
+                  FilledButton.icon(
+                    onPressed: onApprove,
+                    icon: const Icon(Icons.verified_user_rounded),
+                    label: const Text('Approuver'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

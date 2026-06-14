@@ -546,79 +546,101 @@ class _RecruitmentFilters extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 280,
-              child: TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                  labelText: 'Rechercher',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    onPressed: onSearch,
-                    icon: const Icon(Icons.arrow_forward_rounded),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 760;
+            final searchWidth = isCompact ? constraints.maxWidth : 280.0;
+            final campaignWidth = isCompact ? constraints.maxWidth : 260.0;
+            final statusWidth = isCompact ? constraints.maxWidth : 230.0;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: searchWidth,
+                  child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Rechercher',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: IconButton(
+                        onPressed: onSearch,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                      ),
+                    ),
+                    onSubmitted: (_) => onSearch(),
                   ),
                 ),
-                onSubmitted: (_) => onSearch(),
-              ),
-            ),
-            SizedBox(
-              width: 260,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: selectedCampaign,
-                decoration: const InputDecoration(labelText: 'Campagne'),
-                items: [
-                  const DropdownMenuItem(
-                    value: 'all',
-                    child: Text('Toutes les campagnes'),
+                SizedBox(
+                  width: campaignWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: selectedCampaign,
+                    decoration: const InputDecoration(labelText: 'Campagne'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Toutes les campagnes'),
+                      ),
+                      ...campaigns.map(
+                        (campaign) => DropdownMenuItem(
+                          value: campaign.id,
+                          child: Text(campaign.title),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onCampaignChanged(value);
+                    },
                   ),
-                  ...campaigns.map(
-                    (campaign) => DropdownMenuItem(
-                      value: campaign.id,
-                      child: Text(campaign.title),
-                    ),
+                ),
+                SizedBox(
+                  width: statusWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: selectedStatus,
+                    decoration: const InputDecoration(labelText: 'Statut'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Tous')),
+                      DropdownMenuItem(
+                        value: 'received',
+                        child: Text('Reçues'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'preselected',
+                        child: Text('Présélectionnées'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'interview',
+                        child: Text('Entretien'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'accepted',
+                        child: Text('Acceptées'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'rejected',
+                        child: Text('Rejetées'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onStatusChanged(value);
+                    },
                   ),
-                ],
-                onChanged: (value) {
-                  if (value != null) onCampaignChanged(value);
-                },
-              ),
-            ),
-            SizedBox(
-              width: 230,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: selectedStatus,
-                decoration: const InputDecoration(labelText: 'Statut'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Tous')),
-                  DropdownMenuItem(value: 'received', child: Text('Reçues')),
-                  DropdownMenuItem(
-                    value: 'preselected',
-                    child: Text('Présélectionnées'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'interview',
-                    child: Text('Entretien'),
-                  ),
-                  DropdownMenuItem(value: 'accepted', child: Text('Acceptées')),
-                  DropdownMenuItem(value: 'rejected', child: Text('Rejetées')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onStatusChanged(value);
-                },
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+}
+
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
 }
 
 class _ApplicationsGrid extends StatelessWidget {
@@ -900,9 +922,10 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouvelle campagne'),
       content: SizedBox(
-        width: 520,
+        width: _dialogWidth(context, 520),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1119,9 +1142,10 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouvelle candidature'),
       content: SizedBox(
-        width: 620,
+        width: _dialogWidth(context, 620),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1395,9 +1419,10 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text('Évaluer ${widget.application.fullName}'),
       content: SizedBox(
-        width: 480,
+        width: _dialogWidth(context, 480),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1503,9 +1528,10 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Créer un compte membre'),
       content: SizedBox(
-        width: 460,
+        width: _dialogWidth(context, 460),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -400,116 +400,138 @@ class _DocumentsFilters extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 280,
-              child: TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                  labelText: 'Rechercher',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    onPressed: onSearch,
-                    icon: const Icon(Icons.arrow_forward_rounded),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 760;
+            final searchWidth = wide ? 280.0 : constraints.maxWidth;
+            final filterWidth = constraints.maxWidth >= 560
+                ? 260.0
+                : constraints.maxWidth;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: searchWidth,
+                  child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Rechercher',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: IconButton(
+                        onPressed: onSearch,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                      ),
+                    ),
+                    onSubmitted: (_) => onSearch(),
                   ),
                 ),
-                onSubmitted: (_) => onSearch(),
-              ),
-            ),
-            SizedBox(
-              width: 260,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: category,
-                decoration: const InputDecoration(labelText: 'Catégorie'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Toutes')),
-                  DropdownMenuItem(value: 'general', child: Text('Général')),
-                  DropdownMenuItem(value: 'pv', child: Text('PV')),
-                  DropdownMenuItem(value: 'rapport', child: Text('Rapport')),
-                  DropdownMenuItem(value: 'budget', child: Text('Budget')),
-                  DropdownMenuItem(
-                    value: 'fiche_projet',
-                    child: Text('Fiche projet'),
+                SizedBox(
+                  width: filterWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: category,
+                    decoration: const InputDecoration(labelText: 'Catégorie'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Toutes')),
+                      DropdownMenuItem(
+                        value: 'general',
+                        child: Text('Général'),
+                      ),
+                      DropdownMenuItem(value: 'pv', child: Text('PV')),
+                      DropdownMenuItem(
+                        value: 'rapport',
+                        child: Text('Rapport'),
+                      ),
+                      DropdownMenuItem(value: 'budget', child: Text('Budget')),
+                      DropdownMenuItem(
+                        value: 'fiche_projet',
+                        child: Text('Fiche projet'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'pitch_deck',
+                        child: Text('Pitch deck'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'support_formation',
+                        child: Text('Support formation'),
+                      ),
+                      DropdownMenuItem(value: 'photo', child: Text('Photo')),
+                      DropdownMenuItem(value: 'video', child: Text('Vidéo')),
+                      DropdownMenuItem(
+                        value: 'code_source',
+                        child: Text('Code source'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'administratif',
+                        child: Text('Administratif'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'partenariat',
+                        child: Text('Partenariat'),
+                      ),
+                      DropdownMenuItem(value: 'autre', child: Text('Autre')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onCategoryChanged(value);
+                    },
                   ),
-                  DropdownMenuItem(
-                    value: 'pitch_deck',
-                    child: Text('Pitch deck'),
+                ),
+                SizedBox(
+                  width: filterWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: visibility,
+                    decoration: const InputDecoration(labelText: 'Visibilité'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Toutes')),
+                      DropdownMenuItem(
+                        value: 'public_club',
+                        child: Text('Club'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'internal',
+                        child: Text('Interne'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'pole_only',
+                        child: Text('Pôle uniquement'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'project_only',
+                        child: Text('Projet uniquement'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'enacchef_only',
+                        child: Text('Bureau uniquement'),
+                      ),
+                      DropdownMenuItem(value: 'private', child: Text('Privé')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onVisibilityChanged(value);
+                    },
                   ),
-                  DropdownMenuItem(
-                    value: 'support_formation',
-                    child: Text('Support formation'),
-                  ),
-                  DropdownMenuItem(value: 'photo', child: Text('Photo')),
-                  DropdownMenuItem(value: 'video', child: Text('Vidéo')),
-                  DropdownMenuItem(
-                    value: 'code_source',
-                    child: Text('Code source'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'administratif',
-                    child: Text('Administratif'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'partenariat',
-                    child: Text('Partenariat'),
-                  ),
-                  DropdownMenuItem(value: 'autre', child: Text('Autre')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onCategoryChanged(value);
-                },
-              ),
-            ),
-            SizedBox(
-              width: 260,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: visibility,
-                decoration: const InputDecoration(labelText: 'Visibilité'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Toutes')),
-                  DropdownMenuItem(value: 'public_club', child: Text('Club')),
-                  DropdownMenuItem(value: 'internal', child: Text('Interne')),
-                  DropdownMenuItem(
-                    value: 'pole_only',
-                    child: Text('Pôle uniquement'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'project_only',
-                    child: Text('Projet uniquement'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'enacchef_only',
-                    child: Text('Bureau uniquement'),
-                  ),
-                  DropdownMenuItem(value: 'private', child: Text('Privé')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onVisibilityChanged(value);
-                },
-              ),
-            ),
-            ChoiceChip(
-              selected: officialFilter == null,
-              label: const Text('Tous'),
-              onSelected: (_) => onOfficialChanged(null),
-            ),
-            ChoiceChip(
-              selected: officialFilter == true,
-              label: const Text('Officiels'),
-              onSelected: (_) => onOfficialChanged(true),
-            ),
-            ChoiceChip(
-              selected: officialFilter == false,
-              label: const Text('Non officiels'),
-              onSelected: (_) => onOfficialChanged(false),
-            ),
-          ],
+                ),
+                ChoiceChip(
+                  selected: officialFilter == null,
+                  label: const Text('Tous'),
+                  onSelected: (_) => onOfficialChanged(null),
+                ),
+                ChoiceChip(
+                  selected: officialFilter == true,
+                  label: const Text('Officiels'),
+                  onSelected: (_) => onOfficialChanged(true),
+                ),
+                ChoiceChip(
+                  selected: officialFilter == false,
+                  label: const Text('Non officiels'),
+                  onSelected: (_) => onOfficialChanged(false),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

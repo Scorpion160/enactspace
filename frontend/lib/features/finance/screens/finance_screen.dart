@@ -719,9 +719,10 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouveau frais'),
       content: SizedBox(
-        width: 520,
+        width: _dialogWidth(context, 520),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -964,9 +965,10 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouveau paiement'),
       content: SizedBox(
-        width: 520,
+        width: _dialogWidth(context, 520),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1098,6 +1100,10 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
       ],
     );
   }
+}
+
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
 }
 
 class _SectionCard extends StatelessWidget {
