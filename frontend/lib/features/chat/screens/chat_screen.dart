@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -947,6 +950,57 @@ class _OutgoingAttachment {
   });
 }
 
+class _PickedFilePreview extends StatelessWidget {
+  final String fileName;
+  final int? sizeBytes;
+
+  const _PickedFilePreview({required this.fileName, required this.sizeBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.enactusYellow),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            backgroundColor: AppTheme.softBlack,
+            foregroundColor: Colors.white,
+            child: Icon(Icons.attach_file_rounded),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                if (sizeBytes != null)
+                  Text(
+                    _formatBytes(sizeBytes!),
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.56),
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttachmentMessageDialog extends StatefulWidget {
   final ChatService chatService;
 
@@ -970,6 +1024,9 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 
   String _messageType = 'image';
   bool _uploading = false;
+  bool _picking = false;
+  String? _pickedFileName;
+  int? _pickedFileSize;
   String? _error;
 
   @override
@@ -984,6 +1041,58 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
     _stickerPackController.dispose();
     _dataBase64Controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        withData: true,
+        type: FileType.any,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final bytes = file.bytes;
+
+      if (bytes == null || bytes.isEmpty) {
+        setState(() {
+          _error = 'Impossible de lire ce fichier sur ce support.';
+        });
+        return;
+      }
+
+      final inferredType = _inferMessageTypeFromFileName(file.name);
+      final inferredMime = _inferMimeTypeFromFileName(file.name);
+
+      setState(() {
+        _messageType = inferredType;
+        _pickedFileName = file.name;
+        _pickedFileSize = file.size;
+        _nameController.text = file.name;
+        _mimeController.text = inferredMime ?? '';
+        _sizeController.text = file.size.toString();
+        _dataBase64Controller.text = base64Encode(bytes);
+        _urlController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _picking = false;
+        });
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -1093,6 +1202,25 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                   });
                 },
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _picking || _uploading ? null : _pickFile,
+                icon: _picking
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.folder_open_rounded),
+                label: Text(_picking ? 'Ouverture...' : 'Choisir un fichier'),
+              ),
+              if (_pickedFileName != null) ...[
+                const SizedBox(height: 10),
+                _PickedFilePreview(
+                  fileName: _pickedFileName!,
+                  sizeBytes: _pickedFileSize,
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _urlController,
@@ -1638,4 +1766,87 @@ String _messageTypeLabel(String type) {
     default:
       return 'Média';
   }
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes o';
+  final kb = bytes / 1024;
+  if (kb < 1024) return '${kb.toStringAsFixed(kb < 100 ? 1 : 0)} Ko';
+  final mb = kb / 1024;
+  return '${mb.toStringAsFixed(mb < 100 ? 1 : 0)} Mo';
+}
+
+String _inferMessageTypeFromFileName(String fileName) {
+  final extension = _fileExtension(fileName);
+
+  if (['webp', 'gif'].contains(extension) &&
+      fileName.toLowerCase().contains('sticker')) {
+    return 'sticker';
+  }
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(extension)) {
+    return 'image';
+  }
+
+  if (['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'].contains(extension)) {
+    return 'video';
+  }
+
+  if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'opus', 'weba'].contains(extension)) {
+    return 'audio';
+  }
+
+  return 'document';
+}
+
+String? _inferMimeTypeFromFileName(String fileName) {
+  switch (_fileExtension(fileName)) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'mp4':
+      return 'video/mp4';
+    case 'mov':
+      return 'video/quicktime';
+    case 'webm':
+      return 'video/webm';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'm4a':
+      return 'audio/mp4';
+    case 'wav':
+      return 'audio/wav';
+    case 'ogg':
+    case 'opus':
+      return 'audio/ogg';
+    case 'pdf':
+      return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'ppt':
+      return 'application/vnd.ms-powerpoint';
+    case 'pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    case 'txt':
+      return 'text/plain';
+    default:
+      return null;
+  }
+}
+
+String _fileExtension(String fileName) {
+  final parts = fileName.toLowerCase().split('.');
+  return parts.length > 1 ? parts.last : '';
 }
