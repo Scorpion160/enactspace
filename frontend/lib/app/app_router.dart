@@ -7,6 +7,7 @@ import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/documents/screens/documents_screen.dart';
 import '../features/events/screens/events_screen.dart';
 import '../features/finance/screens/finance_screen.dart';
+import '../features/gamification/screens/gamification_screen.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
@@ -93,6 +94,10 @@ class AppRouter {
           GoRoute(
             path: '/alumni',
             builder: (context, state) => const AlumniScreen(),
+          ),
+          GoRoute(
+            path: '/gamification',
+            builder: (context, state) => const GamificationScreen(),
           ),
         ],
       ),

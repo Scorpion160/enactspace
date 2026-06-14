@@ -594,6 +594,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/posts',
       ),
       const _QuickAccessItem(
+        title: 'Gamification',
+        subtitle: 'Points et badges',
+        icon: Icons.workspace_premium_rounded,
+        route: '/gamification',
+      ),
+      const _QuickAccessItem(
         title: 'Présences',
         subtitle: 'Absences et retards',
         icon: Icons.fact_check_rounded,

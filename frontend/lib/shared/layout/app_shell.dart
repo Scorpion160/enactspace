@@ -230,6 +230,11 @@ class _SideMenu extends StatelessWidget {
             icon: Icons.forum_rounded,
             path: '/posts',
           ),
+          _MenuItem(
+            label: 'Gamification',
+            icon: Icons.workspace_premium_rounded,
+            path: '/gamification',
+          ),
         ],
       ),
       _MenuSection(
@@ -750,6 +755,7 @@ String _navigationTitle(String currentPath) {
     '/recruitment': 'Recrutement',
     '/notifications': 'Notifications',
     '/posts': 'Communication',
+    '/gamification': 'Gamification',
   };
 
   return sections.entries
