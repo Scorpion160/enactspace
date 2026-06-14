@@ -38,6 +38,46 @@ class NotificationModel {
     );
   }
 
+  NotificationModel copyWith({bool? isRead, String? readAt}) {
+    return NotificationModel(
+      id: id,
+      userId: userId,
+      title: title,
+      message: message,
+      type: type,
+      isRead: isRead ?? this.isRead,
+      relatedType: relatedType,
+      relatedId: relatedId,
+      readAt: readAt ?? this.readAt,
+      createdAt: createdAt,
+    );
+  }
+
+  String? get routePath {
+    final source =
+        (relatedType == null || relatedType!.isEmpty ? type : relatedType!)
+            .toLowerCase();
+
+    if (source.contains('task')) return '/tasks';
+    if (source.contains('attendance') || source.contains('presence')) {
+      return '/attendance';
+    }
+    if (source.contains('payment') || source.contains('finance')) {
+      return '/finance';
+    }
+    if (source.contains('document')) return '/documents';
+    if (source.contains('recruitment')) return '/recruitment';
+    if (source.contains('post') || source.contains('communication')) {
+      return '/posts';
+    }
+    if (source.contains('chat') || source.contains('message')) return '/chat';
+    if (source.contains('event')) return '/events';
+    if (source.contains('project')) return '/projects';
+    if (source.contains('pole')) return '/poles';
+
+    return null;
+  }
+
   String get typeLabel {
     switch (type) {
       case 'task_assigned':

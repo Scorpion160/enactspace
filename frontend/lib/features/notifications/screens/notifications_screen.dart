@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/notification_model.dart';
 import '../services/notifications_service.dart';
@@ -17,6 +18,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String? _error;
 
   List<NotificationModel> _notifications = [];
+  final Set<String> _busyNotificationIds = {};
   int _unreadCount = 0;
 
   bool _unreadOnly = false;
@@ -65,6 +67,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markAsRead(NotificationModel notification) async {
     if (notification.isRead) return;
 
+    setState(() {
+      _busyNotificationIds.add(notification.id);
+      _notifications = _notifications
+          .map(
+            (item) => item.id == notification.id
+                ? item.copyWith(
+                    isRead: true,
+                    readAt: DateTime.now().toIso8601String(),
+                  )
+                : item,
+          )
+          .toList();
+      if (_unreadCount > 0) _unreadCount -= 1;
+    });
+
     try {
       await _service.markAsRead(notification.id);
       await _loadNotifications();
@@ -75,10 +92,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     } catch (e) {
       _showError(e);
+      await _loadNotifications();
+    } finally {
+      if (mounted) {
+        setState(() => _busyNotificationIds.remove(notification.id));
+      }
     }
   }
 
   Future<void> _markAllAsRead() async {
+    setState(() {
+      _notifications = _notifications
+          .map(
+            (item) => item.copyWith(
+              isRead: true,
+              readAt: DateTime.now().toIso8601String(),
+            ),
+          )
+          .toList();
+      _unreadCount = 0;
+    });
+
     try {
       final updated = await _service.markAllAsRead();
       await _loadNotifications();
@@ -91,21 +125,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     } catch (e) {
       _showError(e);
+      await _loadNotifications();
     }
   }
 
   Future<void> _deleteNotification(NotificationModel notification) async {
+    final previousNotifications = List<NotificationModel>.from(_notifications);
+    final previousUnreadCount = _unreadCount;
+
+    setState(() {
+      _busyNotificationIds.add(notification.id);
+      _notifications = _notifications
+          .where((item) => item.id != notification.id)
+          .toList();
+      if (!notification.isRead && _unreadCount > 0) _unreadCount -= 1;
+    });
+
     try {
       await _service.deleteNotification(notification.id);
-      await _loadNotifications();
 
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Notification supprimée.')));
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications = previousNotifications;
+          _unreadCount = previousUnreadCount;
+        });
+      }
       _showError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _busyNotificationIds.remove(notification.id));
+      }
     }
+  }
+
+  Future<void> _openNotification(NotificationModel notification) async {
+    await _markAsRead(notification);
+    if (!mounted) return;
+
+    final route = notification.routePath;
+    if (route == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucune page liée pour cette notification.'),
+        ),
+      );
+      return;
+    }
+
+    context.go(route);
   }
 
   void _showError(Object e) {
@@ -165,7 +237,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           else
             _NotificationsList(
               notifications: _notifications,
+              busyNotificationIds: _busyNotificationIds,
               onMarkAsRead: _markAsRead,
+              onOpen: _openNotification,
               onDelete: _deleteNotification,
             ),
         ],
@@ -406,12 +480,16 @@ class _NotificationsFilters extends StatelessWidget {
 
 class _NotificationsList extends StatelessWidget {
   final List<NotificationModel> notifications;
+  final Set<String> busyNotificationIds;
   final ValueChanged<NotificationModel> onMarkAsRead;
+  final ValueChanged<NotificationModel> onOpen;
   final ValueChanged<NotificationModel> onDelete;
 
   const _NotificationsList({
     required this.notifications,
+    required this.busyNotificationIds,
     required this.onMarkAsRead,
+    required this.onOpen,
     required this.onDelete,
   });
 
@@ -423,7 +501,9 @@ class _NotificationsList extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 12),
           child: _NotificationCard(
             notification: notification,
+            busy: busyNotificationIds.contains(notification.id),
             onMarkAsRead: onMarkAsRead,
+            onOpen: onOpen,
             onDelete: onDelete,
           ),
         );
@@ -434,12 +514,16 @@ class _NotificationsList extends StatelessWidget {
 
 class _NotificationCard extends StatelessWidget {
   final NotificationModel notification;
+  final bool busy;
   final ValueChanged<NotificationModel> onMarkAsRead;
+  final ValueChanged<NotificationModel> onOpen;
   final ValueChanged<NotificationModel> onDelete;
 
   const _NotificationCard({
     required this.notification,
+    required this.busy,
     required this.onMarkAsRead,
+    required this.onOpen,
     required this.onDelete,
   });
 
@@ -450,7 +534,7 @@ class _NotificationCard extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => onMarkAsRead(notification),
+        onTap: busy ? null : () => onOpen(notification),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -504,23 +588,39 @@ class _NotificationCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Wrap(
-                spacing: 6,
-                children: [
-                  if (!notification.isRead)
-                    IconButton(
-                      onPressed: () => onMarkAsRead(notification),
-                      icon: const Icon(Icons.mark_email_read_rounded),
-                      tooltip: 'Marquer comme lue',
-                    ),
-                  IconButton(
-                    onPressed: () => onDelete(notification),
-                    icon: const Icon(Icons.delete_rounded),
-                    tooltip: 'Supprimer',
-                    color: Colors.red,
+              if (busy)
+                const SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: Padding(
+                    padding: EdgeInsets.all(9),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ],
-              ),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    if (notification.routePath != null)
+                      IconButton(
+                        onPressed: () => onOpen(notification),
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        tooltip: 'Ouvrir',
+                      ),
+                    if (!notification.isRead)
+                      IconButton(
+                        onPressed: () => onMarkAsRead(notification),
+                        icon: const Icon(Icons.mark_email_read_rounded),
+                        tooltip: 'Marquer comme lue',
+                      ),
+                    IconButton(
+                      onPressed: () => onDelete(notification),
+                      icon: const Icon(Icons.delete_rounded),
+                      tooltip: 'Supprimer',
+                      color: Colors.red,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
