@@ -26,6 +26,8 @@ from app.schemas.chat import (
     ChatMessageRead,
     ChatUploadCreate,
     ChatUploadRead,
+    ChatParticipantsUpdate,
+    ChatParticipantRoleUpdate,
 )
 
 
@@ -149,6 +151,54 @@ def normalize_base64(data: str) -> str:
     return data
 
 
+def user_display_name(user: User | None) -> str:
+    if not user:
+        return "Membre"
+
+    name = " ".join(
+        part for part in [user.first_name, user.last_name] if part and part.strip()
+    ).strip()
+    return name or user.email
+
+
+def serialize_participant(participant: ChatParticipant) -> dict:
+    user = participant.user
+    return {
+        "id": participant.id,
+        "thread_id": participant.thread_id,
+        "user_id": participant.user_id,
+        "first_name": user.first_name if user else None,
+        "last_name": user.last_name if user else None,
+        "email": user.email if user else None,
+        "status": user.status if user else None,
+        "photo_url": user.photo_url if user else None,
+        "participant_role": participant.participant_role,
+        "joined_at": participant.joined_at,
+        "last_read_at": participant.last_read_at,
+    }
+
+
+def participant_preview(participant: ChatParticipant) -> dict:
+    user = participant.user
+    return {
+        "user_id": participant.user_id,
+        "first_name": user.first_name if user else "",
+        "last_name": user.last_name if user else "",
+        "email": user.email if user else "",
+        "status": user.status if user else "",
+        "photo_url": user.photo_url if user else None,
+        "participant_role": participant.participant_role,
+    }
+
+
+def require_thread_admin(participant: ChatParticipant):
+    if participant.participant_role not in {"owner", "admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action réservée aux administrateurs du groupe",
+        )
+
+
 def get_participant_or_404(
     db: Session,
     thread_id: str,
@@ -196,9 +246,34 @@ def build_thread_read(db: Session, thread: ChatThread, user_id) -> ChatThreadRea
         ChatMessage.deleted_at.is_(None),
     ).order_by(ChatMessage.created_at.desc()).first()
 
+    participants = db.query(ChatParticipant).filter(
+        ChatParticipant.thread_id == thread.id,
+    ).order_by(ChatParticipant.joined_at.asc()).limit(6).all()
+
+    other_participants = [
+        item for item in participants if str(item.user_id) != str(user_id)
+    ]
+    display_title = thread.title
+    avatar_url = None
+
+    if not display_title and thread.thread_type == "direct" and other_participants:
+        other_user = other_participants[0].user
+        display_title = user_display_name(other_user)
+        avatar_url = other_user.photo_url
+
+    if not display_title:
+        names = [
+            user_display_name(item.user)
+            for item in other_participants[:3]
+            if item.user is not None
+        ]
+        display_title = ", ".join(names) if names else "Conversation"
+
     return ChatThreadRead(
         id=thread.id,
         title=thread.title,
+        display_title=display_title,
+        avatar_url=avatar_url,
         thread_type=thread.thread_type,
         scope_type=thread.scope_type,
         scope_id=thread.scope_id,
@@ -209,6 +284,10 @@ def build_thread_read(db: Session, thread: ChatThread, user_id) -> ChatThreadRea
         unread_count=int(unread_count),
         last_message=message_preview(last_message) if last_message else None,
         last_message_at=last_message.created_at if last_message else None,
+        current_user_role=participant.participant_role if participant else "member",
+        participants_preview=[
+            participant_preview(item) for item in participants
+        ],
     )
 
 
@@ -363,6 +442,27 @@ def create_thread(
             detail="Une discussion privée doit contenir exactement deux personnes",
         )
 
+    if payload.thread_type == "direct":
+        existing_threads = db.query(ChatThread).join(
+            ChatParticipant,
+            ChatParticipant.thread_id == ChatThread.id,
+        ).filter(
+            ChatThread.thread_type == "direct",
+            ChatParticipant.user_id.in_(participant_ids),
+        ).group_by(ChatThread.id).having(
+            func.count(ChatParticipant.id) == 2,
+        ).all()
+
+        for existing_thread in existing_threads:
+            existing_participants = {
+                item[0]
+                for item in db.query(ChatParticipant.user_id).filter(
+                    ChatParticipant.thread_id == existing_thread.id,
+                ).all()
+            }
+            if existing_participants == participant_ids:
+                return build_thread_read(db, existing_thread, current_user.id)
+
     active_users_count = db.query(func.count(User.id)).filter(
         User.id.in_(participant_ids),
         User.is_active.is_(True),
@@ -424,9 +524,142 @@ def list_thread_participants(
 ):
     get_participant_or_404(db, thread_id, current_user.id)
 
-    return db.query(ChatParticipant).filter(
+    participants = db.query(ChatParticipant).filter(
         ChatParticipant.thread_id == thread_id,
     ).order_by(ChatParticipant.joined_at.asc()).all()
+
+    return [serialize_participant(participant) for participant in participants]
+
+
+@router.post("/threads/{thread_id}/participants", response_model=list[ChatParticipantRead])
+def add_thread_participants(
+    thread_id: str,
+    payload: ChatParticipantsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    current_participant = get_participant_or_404(db, thread_id, current_user.id)
+    require_thread_admin(current_participant)
+
+    if not payload.user_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ajoutez au moins un membre",
+        )
+
+    existing_ids = {
+        item[0]
+        for item in db.query(ChatParticipant.user_id).filter(
+            ChatParticipant.thread_id == thread_id,
+        ).all()
+    }
+
+    active_users = db.query(User).filter(
+        User.id.in_(payload.user_ids),
+        User.is_active.is_(True),
+        User.status.in_(["active", "alumni"]),
+    ).all()
+
+    for user in active_users:
+        if user.id in existing_ids:
+            continue
+        db.add(
+            ChatParticipant(
+                thread_id=UUID(thread_id),
+                user_id=user.id,
+                participant_role="member",
+            )
+        )
+
+    thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
+    if thread:
+        thread.updated_at = datetime.utcnow()
+
+    db.commit()
+
+    participants = db.query(ChatParticipant).filter(
+        ChatParticipant.thread_id == thread_id,
+    ).order_by(ChatParticipant.joined_at.asc()).all()
+    return [serialize_participant(participant) for participant in participants]
+
+
+@router.patch(
+    "/threads/{thread_id}/participants/{user_id}/role",
+    response_model=ChatParticipantRead,
+)
+def update_thread_participant_role(
+    thread_id: str,
+    user_id: UUID,
+    payload: ChatParticipantRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    current_participant = get_participant_or_404(db, thread_id, current_user.id)
+    require_thread_admin(current_participant)
+
+    if payload.participant_role not in {"admin", "member"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rôle de participant invalide",
+        )
+
+    target = get_participant_or_404(db, thread_id, user_id)
+    if target.participant_role == "owner":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le propriétaire du groupe ne peut pas être modifié",
+        )
+
+    target.participant_role = payload.participant_role
+    db.commit()
+    db.refresh(target)
+    return serialize_participant(target)
+
+
+@router.delete("/threads/{thread_id}/participants/{user_id}")
+def remove_thread_participant(
+    thread_id: str,
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    current_participant = get_participant_or_404(db, thread_id, current_user.id)
+    is_self = str(current_user.id) == str(user_id)
+
+    if not is_self:
+        require_thread_admin(current_participant)
+
+    target = get_participant_or_404(db, thread_id, user_id)
+    if target.participant_role == "owner" and not is_self:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le propriétaire ne peut pas être retiré",
+        )
+
+    db.delete(target)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/threads/{thread_id}")
+def delete_thread(
+    thread_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    current_participant = get_participant_or_404(db, thread_id, current_user.id)
+    require_thread_admin(current_participant)
+
+    thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
+    if not thread:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation introuvable",
+        )
+
+    db.delete(thread)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/threads/{thread_id}/messages", response_model=list[ChatMessageRead])
@@ -460,16 +693,16 @@ def send_message(
 
     content = payload.content.strip()
 
-    if not content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le message ne peut pas être vide",
-        )
-
     if payload.message_type not in VALID_MESSAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de message invalide",
+        )
+
+    if payload.message_type == "text" and not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le message ne peut pas être vide",
         )
 
     if payload.message_type in MEDIA_MESSAGE_TYPES and not payload.attachment_url:

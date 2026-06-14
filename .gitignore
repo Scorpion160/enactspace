@@ -14,6 +14,7 @@ env/
 
 # FastAPI / logs
 *.log
+backend/uploads/
 
 # SQLite dev database
 backend/enactspace_dev.db

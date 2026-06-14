@@ -40,6 +40,8 @@ class ChatContactModel {
 class ChatThreadModel {
   final String id;
   final String? title;
+  final String? serverDisplayTitle;
+  final String? avatarUrl;
   final String threadType;
   final String? scopeType;
   final String? scopeId;
@@ -50,10 +52,14 @@ class ChatThreadModel {
   final int unreadCount;
   final String? lastMessage;
   final DateTime? lastMessageAt;
+  final String currentUserRole;
+  final List<ChatThreadMemberModel> participantsPreview;
 
   const ChatThreadModel({
     required this.id,
     required this.title,
+    required this.serverDisplayTitle,
+    required this.avatarUrl,
     required this.threadType,
     required this.scopeType,
     required this.scopeId,
@@ -64,12 +70,23 @@ class ChatThreadModel {
     required this.unreadCount,
     required this.lastMessage,
     required this.lastMessageAt,
+    required this.currentUserRole,
+    required this.participantsPreview,
   });
 
   factory ChatThreadModel.fromJson(Map<String, dynamic> json) {
+    final participants = json['participants_preview'] is List
+        ? (json['participants_preview'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(ChatThreadMemberModel.fromJson)
+              .toList()
+        : <ChatThreadMemberModel>[];
+
     return ChatThreadModel(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString(),
+      serverDisplayTitle: json['display_title']?.toString(),
+      avatarUrl: json['avatar_url']?.toString(),
       threadType: json['thread_type']?.toString() ?? 'group',
       scopeType: json['scope_type']?.toString(),
       scopeId: json['scope_id']?.toString(),
@@ -87,6 +104,8 @@ class ChatThreadModel {
       lastMessageAt: DateTime.tryParse(
         json['last_message_at']?.toString() ?? '',
       ),
+      currentUserRole: json['current_user_role']?.toString() ?? 'member',
+      participantsPreview: participants,
     );
   }
 
@@ -94,6 +113,8 @@ class ChatThreadModel {
     return {
       'id': id,
       'title': title,
+      'display_title': serverDisplayTitle,
+      'avatar_url': avatarUrl,
       'thread_type': threadType,
       'scope_type': scopeType,
       'scope_id': scopeId,
@@ -104,14 +125,83 @@ class ChatThreadModel {
       'unread_count': unreadCount,
       'last_message': lastMessage,
       'last_message_at': lastMessageAt?.toIso8601String(),
+      'current_user_role': currentUserRole,
+      'participants_preview': participantsPreview
+          .map((participant) => participant.toJson())
+          .toList(),
     };
   }
 
   String get displayTitle {
+    if (serverDisplayTitle != null && serverDisplayTitle!.trim().isNotEmpty) {
+      return serverDisplayTitle!.trim();
+    }
     if (title != null && title!.trim().isNotEmpty) return title!.trim();
     if (threadType == 'direct') return 'Discussion directe';
     if (threadType == 'club') return 'Club Enactus';
     return 'Conversation';
+  }
+
+  bool get canManageMembers =>
+      currentUserRole == 'owner' || currentUserRole == 'admin';
+
+  String? get absoluteAvatarUrl {
+    final url = avatarUrl;
+    if (url == null || url.trim().isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${ApiClient.serverUrl}$url';
+  }
+}
+
+class ChatThreadMemberModel {
+  final String userId;
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String status;
+  final String? photoUrl;
+  final String participantRole;
+
+  const ChatThreadMemberModel({
+    required this.userId,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.status,
+    required this.photoUrl,
+    required this.participantRole,
+  });
+
+  factory ChatThreadMemberModel.fromJson(Map<String, dynamic> json) {
+    return ChatThreadMemberModel(
+      userId: json['user_id']?.toString() ?? '',
+      firstName: json['first_name']?.toString() ?? '',
+      lastName: json['last_name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      photoUrl: json['photo_url']?.toString(),
+      participantRole: json['participant_role']?.toString() ?? 'member',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_id': userId,
+      'first_name': firstName,
+      'last_name': lastName,
+      'email': email,
+      'status': status,
+      'photo_url': photoUrl,
+      'participant_role': participantRole,
+    };
+  }
+
+  String get displayName {
+    final name = [
+      firstName,
+      lastName,
+    ].where((part) => part.trim().isNotEmpty).join(' ');
+    return name.isNotEmpty ? name : email;
   }
 }
 

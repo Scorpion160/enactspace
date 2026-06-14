@@ -25,9 +25,21 @@ class ChatThreadCreate(BaseModel):
     participant_ids: List[UUID] = []
 
 
+class ChatThreadMemberRead(BaseModel):
+    user_id: UUID
+    first_name: str
+    last_name: str
+    email: str
+    status: str
+    photo_url: Optional[str] = None
+    participant_role: str = "member"
+
+
 class ChatThreadRead(BaseModel):
     id: UUID
     title: Optional[str]
+    display_title: Optional[str] = None
+    avatar_url: Optional[str] = None
     thread_type: str
     scope_type: Optional[str]
     scope_id: Optional[UUID]
@@ -38,12 +50,19 @@ class ChatThreadRead(BaseModel):
     unread_count: int = 0
     last_message: Optional[str] = None
     last_message_at: Optional[datetime] = None
+    current_user_role: str = "member"
+    participants_preview: List[ChatThreadMemberRead] = []
 
 
 class ChatParticipantRead(BaseModel):
     id: UUID
     thread_id: UUID
     user_id: UUID
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    status: Optional[str] = None
+    photo_url: Optional[str] = None
     participant_role: str
     joined_at: datetime
     last_read_at: Optional[datetime]
@@ -98,3 +117,11 @@ class ChatUploadRead(BaseModel):
     content_type: Optional[str]
     size_bytes: int
     message_type: str
+
+
+class ChatParticipantsUpdate(BaseModel):
+    user_ids: List[UUID]
+
+
+class ChatParticipantRoleUpdate(BaseModel):
+    participant_role: str

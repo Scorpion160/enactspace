@@ -632,12 +632,11 @@ class _ThreadTile extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: selected ? AppTheme.enactusYellow : Colors.black12,
-          foregroundColor: AppTheme.softBlack,
-          child: Icon(
-            thread.threadType == 'direct' ? Icons.person : Icons.groups,
-          ),
+        leading: _ChatAvatar(
+          title: thread.displayTitle,
+          imageUrl: thread.absoluteAvatarUrl,
+          selected: selected,
+          icon: thread.threadType == 'direct' ? Icons.person : Icons.groups,
         ),
         title: Text(
           thread.displayTitle,
@@ -662,6 +661,39 @@ class _ThreadTile extends StatelessWidget {
   }
 }
 
+class _ChatAvatar extends StatelessWidget {
+  final String title;
+  final String? imageUrl;
+  final bool selected;
+  final IconData icon;
+
+  const _ChatAvatar({
+    required this.title,
+    required this.imageUrl,
+    required this.selected,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(
+        backgroundColor: Colors.black12,
+        backgroundImage: NetworkImage(url),
+      );
+    }
+
+    final initials = _initials(title);
+    return CircleAvatar(
+      backgroundColor: selected ? AppTheme.enactusYellow : Colors.black12,
+      foregroundColor: AppTheme.softBlack,
+      child: initials == '?' ? Icon(icon) : Text(initials),
+    );
+  }
+}
+
 class _ConversationHeader extends StatelessWidget {
   final ChatThreadModel? thread;
   final bool showBack;
@@ -681,10 +713,11 @@ class _ConversationHeader extends StatelessWidget {
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back_rounded),
             )
-          : const CircleAvatar(
-              backgroundColor: AppTheme.enactusYellow,
-              foregroundColor: AppTheme.softBlack,
-              child: Icon(Icons.chat_bubble_rounded),
+          : _ChatAvatar(
+              title: thread?.displayTitle ?? 'Chat',
+              imageUrl: thread?.absoluteAvatarUrl,
+              selected: true,
+              icon: Icons.chat_bubble_rounded,
             ),
       title: Text(
         thread?.displayTitle ?? 'Sélectionne une conversation',
@@ -693,7 +726,7 @@ class _ConversationHeader extends StatelessWidget {
       ),
       subtitle: thread == null
           ? const Text('Tes messages apparaîtront ici.')
-          : Text('${thread!.participantsCount} participant(s)'),
+          : Text(_threadSubtitle(thread!)),
     );
   }
 }
@@ -1025,6 +1058,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
   String _messageType = 'image';
   bool _uploading = false;
   bool _picking = false;
+  bool _showAdvanced = false;
   String? _pickedFileName;
   int? _pickedFileSize;
   String? _error;
@@ -1164,9 +1198,10 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final showDuration = _messageType == 'audio' || _messageType == 'video';
-    final showThumbnail = _messageType == 'video';
-    final showStickerPack = _messageType == 'sticker';
+    final showDuration =
+        _showAdvanced && (_messageType == 'audio' || _messageType == 'video');
+    final showThumbnail = _showAdvanced && _messageType == 'video';
+    final showStickerPack = _showAdvanced && _messageType == 'sticker';
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1222,31 +1257,34 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                 ),
               ],
               const SizedBox(height: 12),
-              TextField(
-                controller: _urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Lien du fichier existant',
-                  prefixIcon: Icon(Icons.link_rounded),
+              if (_showAdvanced)
+                TextField(
+                  controller: _urlController,
+                  decoration: const InputDecoration(
+                    labelText: 'Lien du fichier existant',
+                    prefixIcon: Icon(Icons.link_rounded),
+                  ),
                 ),
-              ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _dataBase64Controller,
-                minLines: 1,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Données base64 à uploader',
-                  prefixIcon: Icon(Icons.cloud_upload_rounded),
+              if (_showAdvanced)
+                TextField(
+                  controller: _dataBase64Controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Données base64 à uploader',
+                    prefixIcon: Icon(Icons.cloud_upload_rounded),
+                  ),
                 ),
-              ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nom affiché',
-                  prefixIcon: Icon(Icons.drive_file_rename_outline_rounded),
+              if (_showAdvanced)
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom affiché',
+                    prefixIcon: Icon(Icons.drive_file_rename_outline_rounded),
+                  ),
                 ),
-              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _captionController,
@@ -1258,22 +1296,43 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _mimeController,
-                decoration: const InputDecoration(
-                  labelText: 'Type MIME optionnel',
-                  prefixIcon: Icon(Icons.code_rounded),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showAdvanced = !_showAdvanced;
+                    });
+                  },
+                  icon: Icon(
+                    _showAdvanced
+                        ? Icons.expand_less_rounded
+                        : Icons.tune_rounded,
+                  ),
+                  label: Text(
+                    _showAdvanced ? 'Masquer les options' : 'Options avancées',
+                  ),
                 ),
               ),
+              if (_showAdvanced) const SizedBox(height: 8),
+              if (_showAdvanced)
+                TextField(
+                  controller: _mimeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Type MIME optionnel',
+                    prefixIcon: Icon(Icons.code_rounded),
+                  ),
+                ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _sizeController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Taille en octets optionnelle',
-                  prefixIcon: Icon(Icons.storage_rounded),
+              if (_showAdvanced)
+                TextField(
+                  controller: _sizeController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Taille en octets optionnelle',
+                    prefixIcon: Icon(Icons.storage_rounded),
+                  ),
                 ),
-              ),
               if (showDuration) ...[
                 const SizedBox(height: 12),
                 TextField(
@@ -1744,6 +1803,23 @@ String _initials(String name) {
   if (parts.isEmpty) return '?';
   if (parts.length == 1) return parts.first[0].toUpperCase();
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
+
+String _threadSubtitle(ChatThreadModel thread) {
+  final names = thread.participantsPreview
+      .map((participant) => participant.displayName)
+      .where((name) => name.trim().isNotEmpty)
+      .take(3)
+      .join(', ');
+
+  if (names.isNotEmpty) {
+    final suffix = thread.participantsCount > 3
+        ? ' +${thread.participantsCount - 3}'
+        : '';
+    return '$names$suffix';
+  }
+
+  return '${thread.participantsCount} participant(s)';
 }
 
 String? _optional(String value) {

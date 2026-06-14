@@ -176,6 +176,47 @@ class ChatService {
     throw Exception('Réponse invalide lors de l’envoi du message.');
   }
 
+  Future<void> addParticipants({
+    required String threadId,
+    required List<String> userIds,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.postJson(
+      '/chat/threads/$threadId/participants',
+      token: token,
+      data: {'user_ids': userIds},
+    );
+  }
+
+  Future<void> updateParticipantRole({
+    required String threadId,
+    required String userId,
+    required String participantRole,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.patchJson(
+      '/chat/threads/$threadId/participants/$userId/role',
+      token: token,
+      data: {'participant_role': participantRole},
+    );
+  }
+
+  Future<void> removeParticipant({
+    required String threadId,
+    required String userId,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.delete(
+      '/chat/threads/$threadId/participants/$userId',
+      token: token,
+    );
+  }
+
+  Future<void> deleteThread(String threadId) async {
+    final token = await _requireToken();
+    await _apiClient.delete('/chat/threads/$threadId', token: token);
+  }
+
   Future<ChatUploadedMediaModel> uploadMediaBase64({
     required String fileName,
     required String dataBase64,
