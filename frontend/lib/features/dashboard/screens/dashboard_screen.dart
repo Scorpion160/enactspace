@@ -576,6 +576,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/poles',
       ),
       const _QuickAccessItem(
+        title: 'Projets',
+        subtitle: 'Impact et avancement',
+        icon: Icons.rocket_launch_rounded,
+        route: '/projects',
+      ),
+      const _QuickAccessItem(
         title: 'Communication',
         subtitle: 'Posts et annonces',
         icon: Icons.forum_rounded,

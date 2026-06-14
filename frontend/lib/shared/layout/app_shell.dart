@@ -242,6 +242,11 @@ class _SideMenu extends StatelessWidget {
           ),
           _MenuItem(label: 'Pôles', icon: Icons.hub_rounded, path: '/poles'),
           _MenuItem(
+            label: 'Projets',
+            icon: Icons.rocket_launch_rounded,
+            path: '/projects',
+          ),
+          _MenuItem(
             label: 'Présences',
             icon: Icons.fact_check_rounded,
             path: '/attendance',
@@ -725,6 +730,7 @@ String _navigationTitle(String currentPath) {
     '/dashboard': 'Tableau de bord Enactus ESP',
     '/members': 'Membres',
     '/poles': 'Pôles',
+    '/projects': 'Projets',
     '/attendance': 'Présences',
     '/tasks': 'Tâches',
     '/finance': 'Finance',
