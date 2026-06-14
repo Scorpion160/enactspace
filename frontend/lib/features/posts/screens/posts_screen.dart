@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -19,6 +21,7 @@ class PostsScreen extends StatefulWidget {
 class _PostsScreenState extends State<PostsScreen> {
   final PostsService _postsService = PostsService();
   final MembersService _membersService = MembersService();
+  final AuthService _authService = AuthService();
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -28,6 +31,7 @@ class _PostsScreenState extends State<PostsScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  UserExperience? _user;
 
   List<PostModel> _posts = [];
   Map<String, MemberModel> _membersById = {};
@@ -74,6 +78,7 @@ class _PostsScreenState extends State<PostsScreen> {
         visibility: _visibility,
       );
 
+      final user = await _loadUserSafely();
       final members = await _loadMembersSafely();
       final stats = await Future.wait(posts.map(_loadStatsSafely));
 
@@ -81,6 +86,7 @@ class _PostsScreenState extends State<PostsScreen> {
 
       setState(() {
         _posts = posts;
+        _user = user;
         _membersById = {for (final member in members) member.id: member};
         _statsByPostId = {for (final stat in stats) stat.postId: stat};
       });
@@ -104,6 +110,14 @@ class _PostsScreenState extends State<PostsScreen> {
       return await _membersService.getMembers();
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<UserExperience?> _loadUserSafely() async {
+    try {
+      return UserExperience.fromJson(await _authService.getCurrentUser());
+    } catch (_) {
+      return null;
     }
   }
 
@@ -137,7 +151,7 @@ class _PostsScreenState extends State<PostsScreen> {
         content: content,
         postType: _composerPostType,
         visibility: _composerVisibility,
-        isOfficial: _composerOfficial,
+        isOfficial: (_user?.isEnacchef ?? false) && _composerOfficial,
       );
 
       _titleController.clear();
@@ -242,6 +256,50 @@ class _PostsScreenState extends State<PostsScreen> {
     }
   }
 
+  Future<void> _togglePostPin(PostModel post) async {
+    try {
+      if (post.isPinned) {
+        await _postsService.unpinPost(post.id);
+      } else {
+        await _postsService.pinPost(post.id);
+      }
+
+      await _loadPosts();
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  Future<void> _deletePost(PostModel post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer la publication'),
+        content: Text('Supprimer "${post.displayTitle}" ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _postsService.deletePost(post.id);
+      await _loadPosts();
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
   TextEditingController _commentControllerFor(String postId) {
     return _commentControllers.putIfAbsent(postId, TextEditingController.new);
   }
@@ -280,6 +338,7 @@ class _PostsScreenState extends State<PostsScreen> {
             pinned: _posts.where((post) => post.isPinned).length,
             onRefresh: _loadPosts,
           );
+          final canModerate = _user?.isEnacchef ?? false;
 
           final composer = _PostComposer(
             titleController: _titleController,
@@ -287,6 +346,7 @@ class _PostsScreenState extends State<PostsScreen> {
             postType: _composerPostType,
             visibility: _composerVisibility,
             isOfficial: _composerOfficial,
+            canPublishOfficial: canModerate,
             creating: _creating,
             onPostTypeChanged: (value) {
               setState(() => _composerPostType = value);
@@ -402,6 +462,9 @@ class _PostsScreenState extends State<PostsScreen> {
               onToggleComments: () => _toggleComments(post),
               onCreateComment: () => _createComment(post),
               onReact: () => _react(post),
+              canModerate: _user?.isEnacchef ?? false,
+              onTogglePin: () => _togglePostPin(post),
+              onDelete: () => _deletePost(post),
             ),
           ),
       ],
@@ -590,6 +653,7 @@ class _PostComposer extends StatelessWidget {
   final String postType;
   final String visibility;
   final bool isOfficial;
+  final bool canPublishOfficial;
   final bool creating;
   final ValueChanged<String> onPostTypeChanged;
   final ValueChanged<String> onVisibilityChanged;
@@ -602,6 +666,7 @@ class _PostComposer extends StatelessWidget {
     required this.postType,
     required this.visibility,
     required this.isOfficial,
+    required this.canPublishOfficial,
     required this.creating,
     required this.onPostTypeChanged,
     required this.onVisibilityChanged,
@@ -677,12 +742,13 @@ class _PostComposer extends StatelessWidget {
                     },
                   ),
                 ),
-                FilterChip(
-                  selected: isOfficial,
-                  onSelected: onOfficialChanged,
-                  avatar: const Icon(Icons.verified_rounded),
-                  label: const Text('Officielle'),
-                ),
+                if (canPublishOfficial)
+                  FilterChip(
+                    selected: isOfficial,
+                    onSelected: onOfficialChanged,
+                    avatar: const Icon(Icons.verified_rounded),
+                    label: const Text('Officielle'),
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -794,6 +860,9 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onToggleComments;
   final VoidCallback onCreateComment;
   final VoidCallback onReact;
+  final bool canModerate;
+  final VoidCallback onTogglePin;
+  final VoidCallback onDelete;
 
   const _PostCard({
     required this.post,
@@ -806,6 +875,9 @@ class _PostCard extends StatelessWidget {
     required this.onToggleComments,
     required this.onCreateComment,
     required this.onReact,
+    required this.canModerate,
+    required this.onTogglePin,
+    required this.onDelete,
   });
 
   @override
@@ -847,6 +919,37 @@ class _PostCard extends StatelessWidget {
                           ),
                           if (post.isPinned)
                             const Icon(Icons.push_pin_rounded, size: 18),
+                          if (canModerate)
+                            PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'pin') onTogglePin();
+                                if (value == 'delete') onDelete();
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'pin',
+                                  child: ListTile(
+                                    leading: Icon(
+                                      post.isPinned
+                                          ? Icons.push_pin_rounded
+                                          : Icons.push_pin_outlined,
+                                    ),
+                                    title: Text(
+                                      post.isPinned
+                                          ? 'Désépingler'
+                                          : 'Épingler',
+                                    ),
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline_rounded),
+                                    title: Text('Supprimer'),
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                       const SizedBox(height: 4),

@@ -134,6 +134,41 @@ class PostsService {
         .toList();
   }
 
+  Future<PostModel> pinPost(String postId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.postJson(
+      '/posts/$postId/pin',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PostModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de l’épinglage.');
+  }
+
+  Future<PostModel> unpinPost(String postId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.postJson(
+      '/posts/$postId/unpin',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PostModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du désépinglage.');
+  }
+
+  Future<void> deletePost(String postId) async {
+    final token = await _requireToken();
+    await _apiClient.delete('/posts/$postId', token: token);
+  }
+
   Future<PostStatsModel> getStats(String postId) async {
     final token = await _requireToken();
     final response = await _apiClient.get('/posts/$postId/stats', token: token);
