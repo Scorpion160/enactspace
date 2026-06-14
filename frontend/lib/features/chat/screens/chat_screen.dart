@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -36,6 +37,8 @@ class _ChatScreenState extends State<ChatScreen> {
   UserExperience? _user;
   List<ChatThreadModel> _threads = [];
   List<ChatMessageModel> _messages = [];
+  Set<String> _pinnedThreadIds = {};
+  Set<String> _pinnedMessageIds = {};
   ChatThreadModel? _selectedThread;
 
   @override
@@ -58,6 +61,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final user = UserExperience.fromJson(await _authService.getCurrentUser());
+      final pinnedThreadIds = await _chatService.getPinnedThreadIds(
+        userId: user.id,
+      );
       final cachedThreads = await _chatService.getCachedThreads(
         userId: user.id,
       );
@@ -65,7 +71,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted && cachedThreads.isNotEmpty) {
         setState(() {
           _user = user;
-          _threads = cachedThreads;
+          _pinnedThreadIds = pinnedThreadIds;
+          _threads = _sortThreads(cachedThreads, pinnedThreadIds);
           _selectedThread = cachedThreads.first;
           _usingLocalCache = true;
           _loading = false;
@@ -81,7 +88,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       setState(() {
         _user = user;
-        _threads = threads;
+        _pinnedThreadIds = pinnedThreadIds;
+        _threads = _sortThreads(threads, pinnedThreadIds);
         _selectedThread = threads.isNotEmpty ? threads.first : null;
         _usingLocalCache = false;
       });
@@ -114,6 +122,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final userId = _user?.id;
     if (userId == null) return;
 
+    final pinnedMessageIds = await _chatService.getPinnedMessageIds(
+      userId: userId,
+      threadId: thread.id,
+    );
     final cached = await _chatService.getCachedMessages(
       userId: userId,
       threadId: thread.id,
@@ -123,6 +135,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _messages = cached;
+      _pinnedMessageIds = pinnedMessageIds;
     });
   }
 
@@ -142,10 +155,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     var displayedCachedMessages = false;
+    var pinnedMessageIds = <String>{};
 
     try {
       final userId = _user?.id;
       if (userId != null) {
+        pinnedMessageIds = await _chatService.getPinnedMessageIds(
+          userId: userId,
+          threadId: thread.id,
+        );
         final cached = await _chatService.getCachedMessages(
           userId: userId,
           threadId: thread.id,
@@ -153,6 +171,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted && cached.isNotEmpty) {
           setState(() {
             _messages = cached;
+            _pinnedMessageIds = pinnedMessageIds;
             _usingLocalCache = true;
           });
           displayedCachedMessages = true;
@@ -164,6 +183,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _selectedThread = thread;
         _messages = messages;
+        _pinnedMessageIds = pinnedMessageIds;
         _usingLocalCache = false;
       });
       if (userId != null) {
@@ -294,13 +314,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (!mounted) return;
     setState(() {
-      _threads = threads;
+      _threads = _sortThreads(threads, _pinnedThreadIds);
       if (_selectedThread != null) {
         _selectedThread = threads
             .where((thread) => thread.id == _selectedThread!.id)
             .firstOrNull;
       }
     });
+  }
+
+  List<ChatThreadModel> _sortThreads(
+    List<ChatThreadModel> threads,
+    Set<String> pinnedIds,
+  ) {
+    final sorted = [...threads];
+    sorted.sort((a, b) {
+      final pinnedCompare = (pinnedIds.contains(b.id) ? 1 : 0).compareTo(
+        pinnedIds.contains(a.id) ? 1 : 0,
+      );
+      if (pinnedCompare != 0) return pinnedCompare;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    return sorted;
   }
 
   Future<void> _openNewThreadDialog() async {
@@ -317,6 +352,88 @@ class _ChatScreenState extends State<ChatScreen> {
 
     await _loadChat();
     await _selectThread(created);
+  }
+
+  Future<void> _toggleSelectedThreadPin() async {
+    final user = _user;
+    final thread = _selectedThread;
+    if (user == null || thread == null) return;
+
+    final shouldPin = !_pinnedThreadIds.contains(thread.id);
+    await _chatService.setThreadPinned(
+      userId: user.id,
+      threadId: thread.id,
+      pinned: shouldPin,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      if (shouldPin) {
+        _pinnedThreadIds.add(thread.id);
+      } else {
+        _pinnedThreadIds.remove(thread.id);
+      }
+      _threads = _sortThreads(_threads, _pinnedThreadIds);
+    });
+  }
+
+  Future<void> _toggleMessagePin(ChatMessageModel message) async {
+    final user = _user;
+    final thread = _selectedThread;
+    if (user == null || thread == null) return;
+
+    final shouldPin = !_pinnedMessageIds.contains(message.id);
+    await _chatService.setMessagePinned(
+      userId: user.id,
+      threadId: thread.id,
+      messageId: message.id,
+      pinned: shouldPin,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      if (shouldPin) {
+        _pinnedMessageIds.add(message.id);
+      } else {
+        _pinnedMessageIds.remove(message.id);
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedThread() async {
+    final thread = _selectedThread;
+    if (thread == null) return;
+
+    await _chatService.deleteThread(thread.id);
+    if (!mounted) return;
+    setState(() {
+      _selectedThread = null;
+      _messages = [];
+    });
+    await _loadChat();
+  }
+
+  Future<void> _openConversationInfo() async {
+    final thread = _selectedThread;
+    if (thread == null) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _ConversationInfoDialog(
+        thread: thread,
+        pinned: _pinnedThreadIds.contains(thread.id),
+        onTogglePin: () async {
+          await _toggleSelectedThreadPin();
+          if (context.mounted) Navigator.of(context).pop();
+        },
+        onDelete: thread.canManageMembers
+            ? () async {
+                await _deleteSelectedThread();
+                if (context.mounted) Navigator.of(context).pop();
+              }
+            : null,
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -375,6 +492,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: _ThreadsPanel(
                                   threads: _threads,
                                   selectedThread: _selectedThread,
+                                  pinnedThreadIds: _pinnedThreadIds,
                                   onSelect: _selectThread,
                                 ),
                               ),
@@ -390,6 +508,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: _ThreadsPanel(
                                   threads: _threads,
                                   selectedThread: _selectedThread,
+                                  pinnedThreadIds: _pinnedThreadIds,
                                   onSelect: _selectThread,
                                 ),
                               )
@@ -415,7 +534,12 @@ class _ChatScreenState extends State<ChatScreen> {
           _ConversationHeader(
             thread: _selectedThread,
             showBack: showBack,
+            pinned: _selectedThread == null
+                ? false
+                : _pinnedThreadIds.contains(_selectedThread!.id),
             onBack: () => setState(() => _selectedThread = null),
+            onInfo: _openConversationInfo,
+            onTogglePin: _toggleSelectedThreadPin,
           ),
           const Divider(height: 1),
           Expanded(
@@ -423,7 +547,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _selectedThread == null
                 ? const _EmptyConversation()
-                : _MessagesList(messages: _messages, currentUserId: _user?.id),
+                : _MessagesList(
+                    messages: _messages,
+                    currentUserId: _user?.id,
+                    pinnedMessageIds: _pinnedMessageIds,
+                    onTogglePin: _toggleMessagePin,
+                  ),
           ),
           if (_selectedThread != null)
             _MessageComposer(
@@ -562,11 +691,13 @@ class _LocalCacheChip extends StatelessWidget {
 class _ThreadsPanel extends StatelessWidget {
   final List<ChatThreadModel> threads;
   final ChatThreadModel? selectedThread;
+  final Set<String> pinnedThreadIds;
   final ValueChanged<ChatThreadModel> onSelect;
 
   const _ThreadsPanel({
     required this.threads,
     required this.selectedThread,
+    required this.pinnedThreadIds,
     required this.onSelect,
   });
 
@@ -597,6 +728,7 @@ class _ThreadsPanel extends StatelessWidget {
                         return _ThreadTile(
                           thread: thread,
                           selected: selected,
+                          pinned: pinnedThreadIds.contains(thread.id),
                           onTap: () => onSelect(thread),
                         );
                       },
@@ -612,11 +744,13 @@ class _ThreadsPanel extends StatelessWidget {
 class _ThreadTile extends StatelessWidget {
   final ChatThreadModel thread;
   final bool selected;
+  final bool pinned;
   final VoidCallback onTap;
 
   const _ThreadTile({
     required this.thread,
     required this.selected,
+    required this.pinned,
     required this.onTap,
   });
 
@@ -647,15 +781,20 @@ class _ThreadTile extends StatelessWidget {
           thread.lastMessage ?? '${thread.participantsCount} participant(s)',
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: thread.unreadCount > 0
-            ? Badge(
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (pinned) const Icon(Icons.push_pin_rounded, size: 16),
+            if (thread.unreadCount > 0)
+              Badge(
                 label: Text(
                   thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}',
                 ),
                 backgroundColor: AppTheme.enactusYellow,
                 textColor: AppTheme.softBlack,
-              )
-            : null,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -697,12 +836,18 @@ class _ChatAvatar extends StatelessWidget {
 class _ConversationHeader extends StatelessWidget {
   final ChatThreadModel? thread;
   final bool showBack;
+  final bool pinned;
   final VoidCallback onBack;
+  final VoidCallback onInfo;
+  final VoidCallback onTogglePin;
 
   const _ConversationHeader({
     required this.thread,
     required this.showBack,
+    required this.pinned,
     required this.onBack,
+    required this.onInfo,
+    required this.onTogglePin,
   });
 
   @override
@@ -727,6 +872,32 @@ class _ConversationHeader extends StatelessWidget {
       subtitle: thread == null
           ? const Text('Tes messages apparaîtront ici.')
           : Text(_threadSubtitle(thread!)),
+      trailing: thread == null
+          ? null
+          : PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'pin') onTogglePin();
+                if (value == 'info') onInfo();
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'pin',
+                  child: ListTile(
+                    leading: Icon(
+                      pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                    ),
+                    title: Text(pinned ? 'Désépingler' : 'Épingler'),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'info',
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline_rounded),
+                    title: Text('Infos'),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -734,8 +905,15 @@ class _ConversationHeader extends StatelessWidget {
 class _MessagesList extends StatelessWidget {
   final List<ChatMessageModel> messages;
   final String? currentUserId;
+  final Set<String> pinnedMessageIds;
+  final ValueChanged<ChatMessageModel> onTogglePin;
 
-  const _MessagesList({required this.messages, required this.currentUserId});
+  const _MessagesList({
+    required this.messages,
+    required this.currentUserId,
+    required this.pinnedMessageIds,
+    required this.onTogglePin,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -754,34 +932,59 @@ class _MessagesList extends StatelessWidget {
       itemBuilder: (context, index) {
         final message = messages[index];
         final mine = message.authorId == currentUserId;
+        final pinned = pinnedMessageIds.contains(message.id);
 
         return Align(
           alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 520),
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: mine ? AppTheme.enactusYellow : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(18).copyWith(
-                bottomRight: mine ? const Radius.circular(4) : null,
-                bottomLeft: mine ? null : const Radius.circular(4),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _MessageBody(message: message),
-                const SizedBox(height: 4),
-                Text(
-                  DateFormat('HH:mm').format(message.createdAt),
-                  style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.48),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: GestureDetector(
+            onLongPress: () => onTogglePin(message),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 520),
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: mine ? AppTheme.enactusYellow : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(18).copyWith(
+                  bottomRight: mine ? const Radius.circular(4) : null,
+                  bottomLeft: mine ? null : const Radius.circular(4),
                 ),
-              ],
+                border: pinned
+                    ? Border.all(color: AppTheme.softBlack, width: 1.4)
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (pinned)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Icon(Icons.push_pin_rounded, size: 14),
+                    ),
+                  _MessageBody(message: message),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        DateFormat('HH:mm').format(message.createdAt),
+                        style: TextStyle(
+                          color: Colors.black.withValues(alpha: 0.48),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (mine) ...[
+                        const SizedBox(width: 5),
+                        Icon(
+                          Icons.done_all_rounded,
+                          size: 15,
+                          color: Colors.black.withValues(alpha: 0.48),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -955,6 +1158,120 @@ class _MessageComposer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ConversationInfoDialog extends StatelessWidget {
+  final ChatThreadModel thread;
+  final bool pinned;
+  final Future<void> Function() onTogglePin;
+  final Future<void> Function()? onDelete;
+
+  const _ConversationInfoDialog({
+    required this.thread,
+    required this.pinned,
+    required this.onTogglePin,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Infos'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32)
+            .clamp(280.0, 520.0)
+            .toDouble(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ChatAvatar(
+                title: thread.displayTitle,
+                imageUrl: thread.absoluteAvatarUrl,
+                selected: true,
+                icon: thread.threadType == 'direct'
+                    ? Icons.person_rounded
+                    : Icons.groups_rounded,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                thread.displayTitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _threadSubtitle(thread),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onTogglePin,
+                      icon: Icon(
+                        pinned
+                            ? Icons.push_pin_rounded
+                            : Icons.push_pin_outlined,
+                      ),
+                      label: Text(pinned ? 'Désépingler' : 'Épingler'),
+                    ),
+                  ),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Supprimer'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${thread.participantsCount} participant(s)',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...thread.participantsPreview.map((participant) {
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: _ChatAvatar(
+                    title: participant.displayName,
+                    imageUrl: _absoluteUrl(participant.photoUrl),
+                    selected: false,
+                    icon: Icons.person_rounded,
+                  ),
+                  title: Text(participant.displayName),
+                  subtitle: Text(participant.email),
+                  trailing: participant.participantRole == 'member'
+                      ? null
+                      : Chip(label: Text(participant.participantRole)),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+      ],
     );
   }
 }
@@ -1825,6 +2142,12 @@ String _threadSubtitle(ChatThreadModel thread) {
 String? _optional(String value) {
   final trimmed = value.trim();
   return trimmed.isEmpty ? null : trimmed;
+}
+
+String? _absoluteUrl(String? url) {
+  if (url == null || url.trim().isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return '${ApiClient.serverUrl}$url';
 }
 
 String _messageTypeLabel(String type) {

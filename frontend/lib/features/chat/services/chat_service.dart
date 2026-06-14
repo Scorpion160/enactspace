@@ -67,6 +67,56 @@ class ChatService {
     );
   }
 
+  Future<Set<String>> getPinnedThreadIds({required String userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_pinnedThreadsKey(userId))?.toSet() ?? {};
+  }
+
+  Future<void> setThreadPinned({
+    required String userId,
+    required String threadId,
+    required bool pinned,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_pinnedThreadsKey(userId))?.toSet() ?? {};
+    if (pinned) {
+      ids.add(threadId);
+    } else {
+      ids.remove(threadId);
+    }
+    await prefs.setStringList(_pinnedThreadsKey(userId), ids.toList());
+  }
+
+  Future<Set<String>> getPinnedMessageIds({
+    required String userId,
+    required String threadId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_pinnedMessagesKey(userId, threadId))?.toSet() ??
+        {};
+  }
+
+  Future<void> setMessagePinned({
+    required String userId,
+    required String threadId,
+    required String messageId,
+    required bool pinned,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids =
+        prefs.getStringList(_pinnedMessagesKey(userId, threadId))?.toSet() ??
+        {};
+    if (pinned) {
+      ids.add(messageId);
+    } else {
+      ids.remove(messageId);
+    }
+    await prefs.setStringList(
+      _pinnedMessagesKey(userId, threadId),
+      ids.toList(),
+    );
+  }
+
   Future<ChatThreadModel> createThread({
     String? title,
     required String threadType,
@@ -268,7 +318,15 @@ class ChatService {
     return 'enactspace_chat_threads_$userId';
   }
 
+  String _pinnedThreadsKey(String userId) {
+    return 'enactspace_chat_pinned_threads_$userId';
+  }
+
   String _messagesCacheKey(String userId, String threadId) {
     return 'enactspace_chat_messages_${userId}_$threadId';
+  }
+
+  String _pinnedMessagesKey(String userId, String threadId) {
+    return 'enactspace_chat_pinned_messages_${userId}_$threadId';
   }
 }
