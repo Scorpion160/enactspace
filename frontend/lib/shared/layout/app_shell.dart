@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/user_experience.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/notifications/services/notifications_service.dart';
 import '../../features/tasks/services/tasks_service.dart';
@@ -23,6 +24,7 @@ class _AppShellState extends State<AppShell> {
 
   int? _unreadNotifications;
   int? _lateTasks;
+  UserExperience? _userExperience;
 
   @override
   void initState() {
@@ -42,6 +44,14 @@ class _AppShellState extends State<AppShell> {
   Future<void> _loadNavigationMetrics() async {
     int? unreadNotifications;
     int? lateTasks;
+    UserExperience? userExperience;
+
+    try {
+      final user = await _authService.getCurrentUser();
+      userExperience = UserExperience.fromJson(user);
+    } catch (_) {
+      userExperience = null;
+    }
 
     try {
       unreadNotifications = await _notificationsService.getUnreadCount();
@@ -60,6 +70,7 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _unreadNotifications = unreadNotifications;
       _lateTasks = lateTasks;
+      _userExperience = userExperience;
     });
   }
 
@@ -86,6 +97,7 @@ class _AppShellState extends State<AppShell> {
           children: [
             _SideMenu(
               currentPath: widget.currentPath,
+              userExperience: _userExperience,
               unreadNotifications: _unreadNotifications,
               lateTasks: _lateTasks,
               onLogout: () => _logout(context),
@@ -125,12 +137,14 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: _MobileBottomNavigation(
         currentPath: widget.currentPath,
+        userExperience: _userExperience,
         unreadNotifications: _unreadNotifications,
         lateTasks: _lateTasks,
       ),
       drawer: Drawer(
         child: _SideMenu(
           currentPath: widget.currentPath,
+          userExperience: _userExperience,
           unreadNotifications: _unreadNotifications,
           lateTasks: _lateTasks,
           onLogout: () => _logout(context),
@@ -195,6 +209,7 @@ class _TopBar extends StatelessWidget {
 
 class _SideMenu extends StatelessWidget {
   final String currentPath;
+  final UserExperience? userExperience;
   final int? unreadNotifications;
   final int? lateTasks;
   final VoidCallback onLogout;
@@ -202,6 +217,7 @@ class _SideMenu extends StatelessWidget {
 
   const _SideMenu({
     required this.currentPath,
+    required this.userExperience,
     required this.unreadNotifications,
     required this.lateTasks,
     required this.onLogout,
@@ -210,92 +226,110 @@ class _SideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sections = [
-      _MenuSection(
-        title: 'Pilotage',
-        items: [
-          _MenuItem(
-            label: 'Dashboard',
-            icon: Icons.dashboard_rounded,
-            path: '/dashboard',
-          ),
-          _MenuItem(
-            label: 'Notifications',
-            icon: Icons.notifications_rounded,
-            path: '/notifications',
-            badgeCount: unreadNotifications,
-          ),
-          _MenuItem(
-            label: 'Communication',
-            icon: Icons.forum_rounded,
-            path: '/posts',
-          ),
-          _MenuItem(
-            label: 'Gamification',
-            icon: Icons.workspace_premium_rounded,
-            path: '/gamification',
-          ),
-        ],
-      ),
-      _MenuSection(
-        title: 'Opérations',
-        items: [
-          _MenuItem(
-            label: 'Membres',
-            icon: Icons.people_alt_rounded,
-            path: '/members',
-          ),
-          _MenuItem(label: 'Pôles', icon: Icons.hub_rounded, path: '/poles'),
-          _MenuItem(
-            label: 'Projets',
-            icon: Icons.rocket_launch_rounded,
-            path: '/projects',
-          ),
-          _MenuItem(
-            label: 'Événements',
-            icon: Icons.event_available_rounded,
-            path: '/events',
-          ),
-          _MenuItem(
-            label: 'Présences',
-            icon: Icons.fact_check_rounded,
-            path: '/attendance',
-          ),
-          _MenuItem(
-            label: 'Tâches',
-            icon: Icons.task_alt_rounded,
-            path: '/tasks',
-            badgeCount: lateTasks,
-            badgeColor: Colors.red.shade700,
-          ),
-        ],
-      ),
-      _MenuSection(
-        title: 'Ressources',
-        items: [
-          _MenuItem(
-            label: 'Finance',
-            icon: Icons.payments_rounded,
-            path: '/finance',
-          ),
-          _MenuItem(
-            label: 'Documents',
-            icon: Icons.folder_rounded,
-            path: '/documents',
-          ),
-          _MenuItem(
-            label: 'Alumni',
-            icon: Icons.school_rounded,
-            path: '/alumni',
-          ),
-          _MenuItem(
-            label: 'Recrutement',
-            icon: Icons.how_to_reg_rounded,
-            path: '/recruitment',
-          ),
-        ],
-      ),
-    ];
+    final allowedRoutes = UserExperience.visibleRoutesFor(
+      userExperience,
+    ).toSet();
+    final sections =
+        [
+              _MenuSection(
+                title: 'Pilotage',
+                items: [
+                  _MenuItem(
+                    label: 'Dashboard',
+                    icon: Icons.dashboard_rounded,
+                    path: '/dashboard',
+                  ),
+                  _MenuItem(
+                    label: 'Notifications',
+                    icon: Icons.notifications_rounded,
+                    path: '/notifications',
+                    badgeCount: unreadNotifications,
+                  ),
+                  _MenuItem(
+                    label: 'Communication',
+                    icon: Icons.forum_rounded,
+                    path: '/posts',
+                  ),
+                  _MenuItem(
+                    label: 'Gamification',
+                    icon: Icons.workspace_premium_rounded,
+                    path: '/gamification',
+                  ),
+                ],
+              ),
+              _MenuSection(
+                title: 'Opérations',
+                items: [
+                  _MenuItem(
+                    label: 'Membres',
+                    icon: Icons.people_alt_rounded,
+                    path: '/members',
+                  ),
+                  _MenuItem(
+                    label: 'Pôles',
+                    icon: Icons.hub_rounded,
+                    path: '/poles',
+                  ),
+                  _MenuItem(
+                    label: 'Projets',
+                    icon: Icons.rocket_launch_rounded,
+                    path: '/projects',
+                  ),
+                  _MenuItem(
+                    label: 'Événements',
+                    icon: Icons.event_available_rounded,
+                    path: '/events',
+                  ),
+                  _MenuItem(
+                    label: 'Présences',
+                    icon: Icons.fact_check_rounded,
+                    path: '/attendance',
+                  ),
+                  _MenuItem(
+                    label: 'Tâches',
+                    icon: Icons.task_alt_rounded,
+                    path: '/tasks',
+                    badgeCount: lateTasks,
+                    badgeColor: Colors.red.shade700,
+                  ),
+                ],
+              ),
+              _MenuSection(
+                title: 'Ressources',
+                items: [
+                  _MenuItem(
+                    label: 'Finance',
+                    icon: Icons.payments_rounded,
+                    path: '/finance',
+                  ),
+                  _MenuItem(
+                    label: 'Documents',
+                    icon: Icons.folder_rounded,
+                    path: '/documents',
+                  ),
+                  _MenuItem(
+                    label: 'Alumni',
+                    icon: Icons.school_rounded,
+                    path: '/alumni',
+                  ),
+                  _MenuItem(
+                    label: 'Recrutement',
+                    icon: Icons.how_to_reg_rounded,
+                    path: '/recruitment',
+                  ),
+                ],
+              ),
+            ]
+            .map((section) {
+              return _MenuSection(
+                title: section.title,
+                items: section.items
+                    .where((item) => allowedRoutes.contains(item.path))
+                    .toList(),
+              );
+            })
+            .where((section) => section.items.isNotEmpty)
+            .toList();
 
     return Material(
       color: AppTheme.softBlack,
@@ -304,7 +338,7 @@ class _SideMenu extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              const _BrandHeader(),
+              _BrandHeader(userExperience: userExperience),
               const Divider(color: Colors.white12, height: 1),
               Expanded(
                 child: ListView(
@@ -338,7 +372,9 @@ class _SideMenu extends StatelessWidget {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
+  final UserExperience? userExperience;
+
+  const _BrandHeader({required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
@@ -359,11 +395,11 @@ class _BrandHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'EnactSpace',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -372,11 +408,11 @@ class _BrandHeader extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Enactus ESP',
+                  userExperience?.audienceLabel ?? 'Enactus ESP',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
                 ),
               ],
             ),
@@ -560,18 +596,23 @@ class _NotificationIconButton extends StatelessWidget {
 
 class _MobileBottomNavigation extends StatelessWidget {
   final String currentPath;
+  final UserExperience? userExperience;
   final int? unreadNotifications;
   final int? lateTasks;
 
   const _MobileBottomNavigation({
     required this.currentPath,
+    required this.userExperience,
     required this.unreadNotifications,
     required this.lateTasks,
   });
 
   @override
   Widget build(BuildContext context) {
-    final destinations = [
+    final allowedRoutes = UserExperience.visibleRoutesFor(
+      userExperience,
+    ).toSet();
+    final preferred = [
       _MobileDestination(
         label: 'Accueil',
         icon: Icons.dashboard_outlined,
@@ -592,10 +633,10 @@ class _MobileBottomNavigation extends StatelessWidget {
         badgeCount: lateTasks,
       ),
       _MobileDestination(
-        label: 'Membres',
-        icon: Icons.people_alt_outlined,
-        selectedIcon: Icons.people_alt_rounded,
-        path: '/members',
+        label: 'Points',
+        icon: Icons.workspace_premium_outlined,
+        selectedIcon: Icons.workspace_premium_rounded,
+        path: '/gamification',
       ),
       _MobileDestination(
         label: 'Alertes',
@@ -604,7 +645,23 @@ class _MobileBottomNavigation extends StatelessWidget {
         path: '/notifications',
         badgeCount: unreadNotifications,
       ),
+      _MobileDestination(
+        label: 'Membres',
+        icon: Icons.people_alt_outlined,
+        selectedIcon: Icons.people_alt_rounded,
+        path: '/members',
+      ),
+      _MobileDestination(
+        label: 'Docs',
+        icon: Icons.folder_outlined,
+        selectedIcon: Icons.folder_rounded,
+        path: '/documents',
+      ),
     ];
+    final destinations = preferred
+        .where((item) => allowedRoutes.contains(item.path))
+        .take(5)
+        .toList();
 
     final selectedIndex = destinations.indexWhere(
       (item) => _isSelected(currentPath, item.path),

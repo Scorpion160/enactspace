@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
+import '../core/auth/user_experience.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -32,6 +33,23 @@ class AppRouter {
 
       if (loggedIn && goingToLogin) {
         return '/dashboard';
+      }
+
+      if (loggedIn) {
+        try {
+          final user = UserExperience.fromJson(
+            await _authService.getCurrentUser(),
+          );
+          final visibleRoutes = UserExperience.visibleRoutesFor(user);
+          final path = state.uri.path;
+          final allowed = visibleRoutes.any(
+            (route) => path == route || path.startsWith('$route/'),
+          );
+
+          if (!allowed) return '/dashboard';
+        } catch (_) {
+          return '/login';
+        }
       }
 
       return null;

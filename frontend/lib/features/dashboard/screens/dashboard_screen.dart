@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/services/attendance_service.dart';
 import '../../documents/services/documents_service.dart';
@@ -51,6 +53,7 @@ class _DashboardStats {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final AuthService _authService = AuthService();
   final MembersService _membersService = MembersService();
   final AttendanceService _attendanceService = AttendanceService();
   final TasksService _tasksService = TasksService();
@@ -62,6 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
   _DashboardStats? _stats;
+  UserExperience? _userExperience;
 
   @override
   void initState() {
@@ -76,14 +80,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final members = await _membersService.getMembers();
-      final sessions = await _attendanceService.getSessions();
-      final lateTasks = await _tasksService.getLateTasks();
-      final accounts = await _financeService.getAccounts();
-      final payments = await _financeService.getPayments();
-      final documents = await _documentsService.getDocuments();
-      final applications = await _recruitmentService.getApplications();
-      final unreadCount = await _notificationsService.getUnreadCount();
+      final user = UserExperience.fromJson(await _authService.getCurrentUser());
+
+      final members = user.canManageMembers
+          ? await _safeList(() => _membersService.getMembers())
+          : const [];
+      final sessions = user.isAlumni
+          ? const []
+          : await _safeList(() => _attendanceService.getSessions());
+      final lateTasks = await _safeList(() => _tasksService.getLateTasks());
+      final accounts = user.canViewFinance
+          ? await _safeList(() => _financeService.getAccounts())
+          : const [];
+      final payments = user.canViewFinance
+          ? await _safeList(() => _financeService.getPayments())
+          : const [];
+      final documents = await _safeList(() => _documentsService.getDocuments());
+      final applications = user.canViewRecruitment
+          ? await _safeList(() => _recruitmentService.getApplications())
+          : const [];
+      final unreadCount = await _safeValue(
+        () => _notificationsService.getUnreadCount(),
+        0,
+      );
 
       final totalDue = accounts.fold<double>(
         0,
@@ -102,6 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
 
       setState(() {
+        _userExperience = user;
         _stats = _DashboardStats(
           members: members.length,
           sessions: sessions.length,
@@ -129,6 +149,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<List<T>> _safeList<T>(Future<List<T>> Function() loader) async {
+    try {
+      return await loader();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<T> _safeValue<T>(Future<T> Function() loader, T fallback) async {
+    try {
+      return await loader();
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -152,6 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       _DashboardHeader(
                         stats: _stats,
+                        userExperience: _userExperience,
                         loading: _loading,
                         onRefresh: _loadDashboard,
                       ),
@@ -161,7 +198,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       else if (_error != null)
                         _ErrorCard(message: _error!, onRetry: _loadDashboard)
                       else if (_stats != null)
-                        _DashboardContent(stats: _stats!),
+                        _DashboardContent(
+                          stats: _stats!,
+                          userExperience: _userExperience,
+                        ),
                     ],
                   ),
                 ),
@@ -176,8 +216,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DashboardContent extends StatelessWidget {
   final _DashboardStats stats;
+  final UserExperience? userExperience;
 
-  const _DashboardContent({required this.stats});
+  const _DashboardContent({required this.stats, required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
@@ -193,9 +234,9 @@ class _DashboardContent extends StatelessWidget {
                 flex: 7,
                 child: Column(
                   children: [
-                    _PriorityGrid(stats: stats),
+                    _PriorityGrid(stats: stats, userExperience: userExperience),
                     const SizedBox(height: 22),
-                    const _QuickAccessGrid(),
+                    _QuickAccessGrid(userExperience: userExperience),
                   ],
                 ),
               ),
@@ -204,9 +245,12 @@ class _DashboardContent extends StatelessWidget {
                 flex: 4,
                 child: Column(
                   children: [
-                    _QuickInsights(stats: stats),
+                    _QuickInsights(
+                      stats: stats,
+                      userExperience: userExperience,
+                    ),
                     const SizedBox(height: 22),
-                    _MomentumCard(stats: stats),
+                    _MomentumCard(stats: stats, userExperience: userExperience),
                   ],
                 ),
               ),
@@ -216,13 +260,13 @@ class _DashboardContent extends StatelessWidget {
 
         return Column(
           children: [
-            _PriorityGrid(stats: stats),
+            _PriorityGrid(stats: stats, userExperience: userExperience),
             const SizedBox(height: 22),
-            const _QuickAccessGrid(),
+            _QuickAccessGrid(userExperience: userExperience),
             const SizedBox(height: 22),
-            _QuickInsights(stats: stats),
+            _QuickInsights(stats: stats, userExperience: userExperience),
             const SizedBox(height: 22),
-            _MomentumCard(stats: stats),
+            _MomentumCard(stats: stats, userExperience: userExperience),
           ],
         );
       },
@@ -232,11 +276,13 @@ class _DashboardContent extends StatelessWidget {
 
 class _DashboardHeader extends StatelessWidget {
   final _DashboardStats? stats;
+  final UserExperience? userExperience;
   final bool loading;
   final VoidCallback onRefresh;
 
   const _DashboardHeader({
     required this.stats,
+    required this.userExperience,
     required this.loading,
     required this.onRefresh,
   });
@@ -262,7 +308,12 @@ class _DashboardHeader extends StatelessWidget {
               children: [
                 const _HeaderIcon(),
                 const SizedBox(width: 18),
-                Expanded(child: _HeaderText(statusText: statusText)),
+                Expanded(
+                  child: _HeaderText(
+                    userExperience: userExperience,
+                    statusText: statusText,
+                  ),
+                ),
                 const SizedBox(width: 18),
                 _HeaderActions(onRefresh: onRefresh),
               ],
@@ -272,7 +323,10 @@ class _DashboardHeader extends StatelessWidget {
               children: [
                 const _HeaderIcon(),
                 const SizedBox(height: 18),
-                _HeaderText(statusText: statusText),
+                _HeaderText(
+                  userExperience: userExperience,
+                  statusText: statusText,
+                ),
                 const SizedBox(height: 18),
                 _HeaderActions(onRefresh: onRefresh),
               ],
@@ -303,17 +357,18 @@ class _HeaderIcon extends StatelessWidget {
 }
 
 class _HeaderText extends StatelessWidget {
+  final UserExperience? userExperience;
   final String statusText;
 
-  const _HeaderText({required this.statusText});
+  const _HeaderText({required this.userExperience, required this.statusText});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Tableau de bord',
+        Text(
+          userExperience?.dashboardTitle ?? 'Tableau de bord',
           style: TextStyle(
             color: Colors.white,
             fontSize: 30,
@@ -321,8 +376,9 @@ class _HeaderText extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Le cockpit quotidien de Enactus ESP.',
+        Text(
+          userExperience?.dashboardSubtitle ??
+              'Le cockpit quotidien de Enactus ESP.',
           style: TextStyle(color: Colors.white70, height: 1.4),
         ),
         const SizedBox(height: 14),
@@ -373,21 +429,24 @@ class _HeaderActions extends StatelessWidget {
 
 class _PriorityGrid extends StatelessWidget {
   final _DashboardStats stats;
+  final UserExperience? userExperience;
 
-  const _PriorityGrid({required this.stats});
+  const _PriorityGrid({required this.stats, required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
+    final user = userExperience;
     final items = [
+      if (user?.canManageMembers == true)
+        _StatItem(
+          title: 'Membres',
+          value: stats.members.toString(),
+          subtitle: 'Enacteurs enregistrés',
+          icon: Icons.people_alt_rounded,
+          route: '/members',
+        ),
       _StatItem(
-        title: 'Membres',
-        value: stats.members.toString(),
-        subtitle: 'Enacteurs enregistrés',
-        icon: Icons.people_alt_rounded,
-        route: '/members',
-      ),
-      _StatItem(
-        title: 'Communication',
+        title: 'Notifications',
         value: stats.unreadNotifications.toString(),
         subtitle: 'notifications non lues',
         icon: Icons.notifications_active_rounded,
@@ -395,28 +454,32 @@ class _PriorityGrid extends StatelessWidget {
         danger: stats.unreadNotifications > 0,
       ),
       _StatItem(
-        title: 'Tâches',
+        title: user?.isMemberExperience == true ? 'Mes tâches' : 'Tâches',
         value: stats.lateTasks.toString(),
         subtitle: 'tâches en retard',
         icon: Icons.warning_rounded,
         route: '/tasks',
         danger: stats.lateTasks > 0,
       ),
-      _StatItem(
-        title: 'Finance',
-        value: _money(stats.totalDue),
-        subtitle: 'reste à encaisser',
-        icon: Icons.account_balance_wallet_rounded,
-        route: '/finance',
-        danger: stats.totalDue > 0,
-      ),
-      _StatItem(
-        title: 'Présences',
-        value: stats.sessions.toString(),
-        subtitle: 'sessions suivies',
-        icon: Icons.event_available_rounded,
-        route: '/attendance',
-      ),
+      if (user?.canViewFinance == true)
+        _StatItem(
+          title: 'Finance',
+          value: _money(stats.totalDue),
+          subtitle: 'reste à encaisser',
+          icon: Icons.account_balance_wallet_rounded,
+          route: '/finance',
+          danger: stats.totalDue > 0,
+        ),
+      if (user?.isAlumni != true)
+        _StatItem(
+          title: 'Présences',
+          value: stats.sessions.toString(),
+          subtitle: user?.isMemberExperience == true
+              ? 'sessions du club'
+              : 'sessions suivies',
+          icon: Icons.event_available_rounded,
+          route: '/attendance',
+        ),
       _StatItem(
         title: 'Documents',
         value: stats.documents.toString(),
@@ -425,20 +488,36 @@ class _PriorityGrid extends StatelessWidget {
         route: '/documents',
       ),
       _StatItem(
-        title: 'Paiements',
-        value: stats.pendingPayments.toString(),
-        subtitle: 'paiements à valider',
-        icon: Icons.pending_actions_rounded,
-        route: '/finance',
-        danger: stats.pendingPayments > 0,
+        title: 'Engagement',
+        value: user?.isAlumni == true ? 'Alumni' : 'Points',
+        subtitle: 'badges et contributions',
+        icon: Icons.workspace_premium_rounded,
+        route: '/gamification',
       ),
-      _StatItem(
-        title: 'Recrutement',
-        value: stats.applications.toString(),
-        subtitle: 'candidatures',
-        icon: Icons.how_to_reg_rounded,
-        route: '/recruitment',
+      const _StatItem(
+        title: 'Communication',
+        value: 'Fil',
+        subtitle: 'posts et annonces',
+        icon: Icons.forum_rounded,
+        route: '/posts',
       ),
+      if (user?.canViewFinance == true)
+        _StatItem(
+          title: 'Paiements',
+          value: stats.pendingPayments.toString(),
+          subtitle: 'paiements à valider',
+          icon: Icons.pending_actions_rounded,
+          route: '/finance',
+          danger: stats.pendingPayments > 0,
+        ),
+      if (user?.canViewRecruitment == true)
+        _StatItem(
+          title: 'Recrutement',
+          value: stats.applications.toString(),
+          subtitle: 'candidatures',
+          icon: Icons.how_to_reg_rounded,
+          route: '/recruitment',
+        ),
     ];
 
     return LayoutBuilder(
@@ -558,10 +637,15 @@ class _StatCard extends StatelessWidget {
 }
 
 class _QuickAccessGrid extends StatelessWidget {
-  const _QuickAccessGrid();
+  final UserExperience? userExperience;
+
+  const _QuickAccessGrid({required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
+    final allowedRoutes = UserExperience.visibleRoutesFor(
+      userExperience,
+    ).toSet();
     final items = [
       const _QuickAccessItem(
         title: 'Membres',
@@ -641,7 +725,7 @@ class _QuickAccessGrid extends StatelessWidget {
         icon: Icons.notifications_rounded,
         route: '/notifications',
       ),
-    ];
+    ].where((item) => allowedRoutes.contains(item.route)).toList();
 
     return Card(
       child: Padding(
@@ -753,8 +837,9 @@ class _QuickAccessCard extends StatelessWidget {
 
 class _QuickInsights extends StatelessWidget {
   final _DashboardStats stats;
+  final UserExperience? userExperience;
 
-  const _QuickInsights({required this.stats});
+  const _QuickInsights({required this.stats, required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
@@ -772,7 +857,7 @@ class _QuickInsights extends StatelessWidget {
       );
     }
 
-    if (stats.pendingPayments > 0) {
+    if (userExperience?.canViewFinance == true && stats.pendingPayments > 0) {
       alerts.add(
         _InsightItem(
           icon: Icons.pending_actions_rounded,
@@ -784,7 +869,7 @@ class _QuickInsights extends StatelessWidget {
       );
     }
 
-    if (stats.totalDue > 0) {
+    if (userExperience?.canViewFinance == true && stats.totalDue > 0) {
       alerts.add(
         _InsightItem(
           icon: Icons.account_balance_wallet_rounded,
@@ -838,11 +923,13 @@ class _QuickInsights extends StatelessWidget {
 
 class _MomentumCard extends StatelessWidget {
   final _DashboardStats stats;
+  final UserExperience? userExperience;
 
-  const _MomentumCard({required this.stats});
+  const _MomentumCard({required this.stats, required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
+    final showFinance = userExperience?.canViewFinance == true;
     final totalFinancial = stats.totalPaid + stats.totalDue;
     final paidRatio = totalFinancial <= 0
         ? 0.0
@@ -856,21 +943,23 @@ class _MomentumCard extends StatelessWidget {
           children: [
             const _SectionTitle(
               icon: Icons.auto_graph_rounded,
-              title: 'Dynamique du club',
+              title: 'Dynamique utile',
             ),
             const Divider(height: 26),
-            _ProgressLine(
-              label: 'Encaissement',
-              value: paidRatio,
-              trailing: '${(paidRatio * 100).round()}%',
-            ),
-            const SizedBox(height: 16),
-            _SoftMetric(
-              icon: Icons.verified_rounded,
-              label: 'Total payé',
-              value: _money(stats.totalPaid),
-            ),
-            const SizedBox(height: 10),
+            if (showFinance) ...[
+              _ProgressLine(
+                label: 'Encaissement',
+                value: paidRatio,
+                trailing: '${(paidRatio * 100).round()}%',
+              ),
+              const SizedBox(height: 16),
+              _SoftMetric(
+                icon: Icons.verified_rounded,
+                label: 'Total payé',
+                value: _money(stats.totalPaid),
+              ),
+              const SizedBox(height: 10),
+            ],
             _SoftMetric(
               icon: Icons.description_rounded,
               label: 'Documents',
@@ -878,9 +967,15 @@ class _MomentumCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _SoftMetric(
-              icon: Icons.how_to_reg_rounded,
-              label: 'Recrutement',
-              value: '${stats.applications} candidature(s)',
+              icon: userExperience?.isAlumni == true
+                  ? Icons.school_rounded
+                  : Icons.workspace_premium_rounded,
+              label: userExperience?.canViewRecruitment == true
+                  ? 'Recrutement'
+                  : 'Espace',
+              value: userExperience?.canViewRecruitment == true
+                  ? '${stats.applications} candidature(s)'
+                  : userExperience?.audienceLabel ?? 'EnactSpace',
             ),
           ],
         ),
