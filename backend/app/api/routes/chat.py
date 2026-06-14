@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from uuid import UUID
 
@@ -25,7 +26,8 @@ from app.schemas.chat import (
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
-VALID_MESSAGE_TYPES = {"text"}
+VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker"}
+MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text"}
 ENACCHEF_ROLES = {
     "administrateur",
     "team_leader",
@@ -37,6 +39,94 @@ ENACCHEF_ROLES = {
     "adjoint_chef_projet",
     "faculty_advisor",
 }
+
+MESSAGE_TYPE_LABELS = {
+    "image": "Photo",
+    "video": "Vidéo",
+    "audio": "Audio",
+    "document": "Document",
+    "sticker": "Sticker",
+}
+
+
+def parse_message_payload(message: ChatMessage) -> dict:
+    if message.message_type == "text":
+        return {"content": message.content}
+
+    try:
+        payload = json.loads(message.content)
+    except (TypeError, json.JSONDecodeError):
+        payload = {"content": message.content}
+
+    if not isinstance(payload, dict):
+        return {"content": str(message.content)}
+
+    return payload
+
+
+def serialize_message(message: ChatMessage) -> dict:
+    payload = parse_message_payload(message)
+
+    return {
+        "id": message.id,
+        "thread_id": message.thread_id,
+        "author_id": message.author_id,
+        "content": payload.get("content") or "",
+        "message_type": message.message_type,
+        "created_at": message.created_at,
+        "edited_at": message.edited_at,
+        "deleted_at": message.deleted_at,
+        "attachment_url": payload.get("attachment_url"),
+        "attachment_name": payload.get("attachment_name"),
+        "attachment_mime_type": payload.get("attachment_mime_type"),
+        "attachment_size_bytes": payload.get("attachment_size_bytes"),
+        "duration_seconds": payload.get("duration_seconds"),
+        "thumbnail_url": payload.get("thumbnail_url"),
+        "sticker_pack": payload.get("sticker_pack"),
+    }
+
+
+def message_preview(message: ChatMessage) -> str:
+    if message.message_type == "text":
+        return message.content
+
+    payload = parse_message_payload(message)
+    label = MESSAGE_TYPE_LABELS.get(message.message_type, "Média")
+    name = payload.get("attachment_name") or payload.get("content")
+
+    return f"{label} · {name}" if name else label
+
+
+def build_message_content(payload: ChatMessageCreate) -> str:
+    content = payload.content.strip()
+
+    if payload.message_type in MEDIA_MESSAGE_TYPES and not content:
+        content = MESSAGE_TYPE_LABELS.get(payload.message_type, "Média")
+
+    if payload.message_type == "text":
+        return content
+
+    media_payload = {
+        "content": content,
+        "attachment_url": payload.attachment_url.strip()
+        if payload.attachment_url
+        else None,
+        "attachment_name": payload.attachment_name.strip()
+        if payload.attachment_name
+        else None,
+        "attachment_mime_type": payload.attachment_mime_type.strip()
+        if payload.attachment_mime_type
+        else None,
+        "attachment_size_bytes": payload.attachment_size_bytes,
+        "duration_seconds": payload.duration_seconds,
+        "thumbnail_url": payload.thumbnail_url.strip() if payload.thumbnail_url else None,
+        "sticker_pack": payload.sticker_pack.strip() if payload.sticker_pack else None,
+    }
+
+    return json.dumps(
+        {key: value for key, value in media_payload.items() if value is not None},
+        ensure_ascii=False,
+    )
 
 
 def get_participant_or_404(
@@ -97,7 +187,7 @@ def build_thread_read(db: Session, thread: ChatThread, user_id) -> ChatThreadRea
         updated_at=thread.updated_at,
         participants_count=int(participants_count),
         unread_count=int(unread_count),
-        last_message=last_message.content if last_message else None,
+        last_message=message_preview(last_message) if last_message else None,
         last_message_at=last_message.created_at if last_message else None,
     )
 
@@ -287,7 +377,7 @@ def list_messages(
     participant.last_read_at = datetime.utcnow()
     db.commit()
 
-    return list(reversed(messages))
+    return [serialize_message(message) for message in reversed(messages)]
 
 
 @router.post("/threads/{thread_id}/messages", response_model=ChatMessageRead)
@@ -313,10 +403,18 @@ def send_message(
             detail="Type de message invalide",
         )
 
+    if payload.message_type in MEDIA_MESSAGE_TYPES and not payload.attachment_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ajoutez un lien de fichier pour ce message",
+        )
+
     message = ChatMessage(
         thread_id=UUID(thread_id),
         author_id=current_user.id,
-        content=content,
+        content=build_message_content(
+            payload.model_copy(update={"content": content}),
+        ),
         message_type=payload.message_type,
     )
 
@@ -331,7 +429,7 @@ def send_message(
     db.commit()
     db.refresh(message)
 
-    return message
+    return serialize_message(message)
 
 
 @router.post("/threads/{thread_id}/read", response_model=ChatThreadRead)

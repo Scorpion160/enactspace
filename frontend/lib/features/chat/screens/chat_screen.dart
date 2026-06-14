@@ -226,6 +226,64 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendAttachmentMessage(_OutgoingAttachment attachment) async {
+    final thread = _selectedThread;
+
+    if (thread == null || _sending) return;
+
+    setState(() {
+      _sending = true;
+    });
+
+    try {
+      final message = await _chatService.sendMessage(
+        threadId: thread.id,
+        content: attachment.caption,
+        messageType: attachment.messageType,
+        attachmentUrl: attachment.url,
+        attachmentName: attachment.name,
+        attachmentMimeType: attachment.mimeType,
+        attachmentSizeBytes: attachment.sizeBytes,
+        durationSeconds: attachment.durationSeconds,
+        thumbnailUrl: attachment.thumbnailUrl,
+        stickerPack: attachment.stickerPack,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _messages = [..._messages, message];
+      });
+      if (_user != null) {
+        await _chatService.cacheMessages(
+          userId: _user!.id,
+          threadId: thread.id,
+          messages: _messages,
+        );
+      }
+      await _refreshThreads();
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openAttachmentDialog() async {
+    if (_selectedThread == null || _sending) return;
+
+    final attachment = await showDialog<_OutgoingAttachment>(
+      context: context,
+      builder: (context) => const _AttachmentMessageDialog(),
+    );
+
+    if (attachment == null) return;
+    await _sendAttachmentMessage(attachment);
+  }
+
   Future<void> _refreshThreads() async {
     final threads = await _chatService.getThreads();
     if (_user != null) {
@@ -369,6 +427,7 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _messageController,
               sending: _sending,
               onSend: _sendMessage,
+              onAttach: _openAttachmentDialog,
             ),
         ],
       ),
@@ -676,7 +735,7 @@ class _MessagesList extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(message.content, style: const TextStyle(height: 1.35)),
+                _MessageBody(message: message),
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('HH:mm').format(message.createdAt),
@@ -695,15 +754,128 @@ class _MessagesList extends StatelessWidget {
   }
 }
 
+class _MessageBody extends StatelessWidget {
+  final ChatMessageModel message;
+
+  const _MessageBody({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!message.isMedia) {
+      return Text(message.content, style: const TextStyle(height: 1.35));
+    }
+
+    if (message.messageType == 'image' || message.messageType == 'sticker') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.network(
+              message.attachmentUrl ?? '',
+              width: message.messageType == 'sticker' ? 150 : 260,
+              height: message.messageType == 'sticker' ? 150 : 170,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _MediaFallback(message: message);
+              },
+            ),
+          ),
+          if (message.content.trim().isNotEmpty &&
+              message.content != message.attachmentLabel) ...[
+            const SizedBox(height: 8),
+            Text(message.content, style: const TextStyle(height: 1.35)),
+          ],
+        ],
+      );
+    }
+
+    return _MediaFallback(message: message);
+  }
+}
+
+class _MediaFallback extends StatelessWidget {
+  final ChatMessageModel message;
+
+  const _MediaFallback({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (message.messageType) {
+      'audio' => Icons.graphic_eq_rounded,
+      'video' => Icons.play_circle_fill_rounded,
+      'document' => Icons.description_rounded,
+      'sticker' => Icons.emoji_emotions_rounded,
+      'image' => Icons.image_rounded,
+      _ => Icons.attach_file_rounded,
+    };
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 220),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.softBlack,
+            foregroundColor: Colors.white,
+            child: Icon(icon),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.attachmentLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                if (message.content.trim().isNotEmpty &&
+                    message.content != message.attachmentLabel)
+                  Text(
+                    message.content,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (message.durationSeconds != null)
+                  Text('${message.durationSeconds}s'),
+                if (message.attachmentUrl != null)
+                  Text(
+                    message.attachmentUrl!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.54),
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MessageComposer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  final VoidCallback onAttach;
 
   const _MessageComposer({
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.onAttach,
   });
 
   @override
@@ -716,6 +888,12 @@ class _MessageComposer extends StatelessWidget {
       ),
       child: Row(
         children: [
+          IconButton(
+            tooltip: 'Joindre',
+            onPressed: sending ? null : onAttach,
+            icon: const Icon(Icons.attach_file_rounded),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: controller,
@@ -741,6 +919,223 @@ class _MessageComposer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _OutgoingAttachment {
+  final String messageType;
+  final String url;
+  final String name;
+  final String caption;
+  final String? mimeType;
+  final int? sizeBytes;
+  final int? durationSeconds;
+  final String? thumbnailUrl;
+  final String? stickerPack;
+
+  const _OutgoingAttachment({
+    required this.messageType,
+    required this.url,
+    required this.name,
+    required this.caption,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.durationSeconds,
+    required this.thumbnailUrl,
+    required this.stickerPack,
+  });
+}
+
+class _AttachmentMessageDialog extends StatefulWidget {
+  const _AttachmentMessageDialog();
+
+  @override
+  State<_AttachmentMessageDialog> createState() =>
+      _AttachmentMessageDialogState();
+}
+
+class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
+  final TextEditingController _urlController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _captionController = TextEditingController();
+  final TextEditingController _mimeController = TextEditingController();
+  final TextEditingController _sizeController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
+  final TextEditingController _thumbnailController = TextEditingController();
+  final TextEditingController _stickerPackController = TextEditingController();
+
+  String _messageType = 'image';
+  String? _error;
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _nameController.dispose();
+    _captionController.dispose();
+    _mimeController.dispose();
+    _sizeController.dispose();
+    _durationController.dispose();
+    _thumbnailController.dispose();
+    _stickerPackController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      setState(() {
+        _error = 'Ajoute le lien du fichier ou du sticker.';
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _OutgoingAttachment(
+        messageType: _messageType,
+        url: url,
+        name: _nameController.text.trim().isEmpty
+            ? _messageTypeLabel(_messageType)
+            : _nameController.text.trim(),
+        caption: _captionController.text.trim(),
+        mimeType: _optional(_mimeController.text),
+        sizeBytes: int.tryParse(_sizeController.text.trim()),
+        durationSeconds: int.tryParse(_durationController.text.trim()),
+        thumbnailUrl: _optional(_thumbnailController.text),
+        stickerPack: _optional(_stickerPackController.text),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showDuration = _messageType == 'audio' || _messageType == 'video';
+    final showThumbnail = _messageType == 'video';
+    final showStickerPack = _messageType == 'sticker';
+
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Envoyer un média'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32)
+            .clamp(280.0, 520.0)
+            .toDouble(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_error != null) _DialogError(message: _error!),
+              DropdownButtonFormField<String>(
+                initialValue: _messageType,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Type',
+                  prefixIcon: Icon(Icons.category_rounded),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'image', child: Text('Photo')),
+                  DropdownMenuItem(value: 'video', child: Text('Vidéo')),
+                  DropdownMenuItem(value: 'audio', child: Text('Audio')),
+                  DropdownMenuItem(value: 'document', child: Text('Document')),
+                  DropdownMenuItem(value: 'sticker', child: Text('Sticker')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _messageType = value;
+                    _error = null;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Lien du fichier',
+                  prefixIcon: Icon(Icons.link_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom affiché',
+                  prefixIcon: Icon(Icons.drive_file_rename_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _captionController,
+                minLines: 1,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Légende optionnelle',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _mimeController,
+                decoration: const InputDecoration(
+                  labelText: 'Type MIME optionnel',
+                  prefixIcon: Icon(Icons.code_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _sizeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Taille en octets optionnelle',
+                  prefixIcon: Icon(Icons.storage_rounded),
+                ),
+              ),
+              if (showDuration) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _durationController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Durée en secondes',
+                    prefixIcon: Icon(Icons.timer_rounded),
+                  ),
+                ),
+              ],
+              if (showThumbnail) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _thumbnailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Miniature optionnelle',
+                    prefixIcon: Icon(Icons.image_rounded),
+                  ),
+                ),
+              ],
+              if (showStickerPack) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _stickerPackController,
+                  decoration: const InputDecoration(
+                    labelText: 'Pack sticker optionnel',
+                    prefixIcon: Icon(Icons.emoji_emotions_rounded),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.send_rounded),
+          label: const Text('Envoyer'),
+        ),
+      ],
     );
   }
 }
@@ -1156,4 +1551,26 @@ String _initials(String name) {
   if (parts.isEmpty) return '?';
   if (parts.length == 1) return parts.first[0].toUpperCase();
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
+
+String? _optional(String value) {
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+String _messageTypeLabel(String type) {
+  switch (type) {
+    case 'image':
+      return 'Photo';
+    case 'video':
+      return 'Vidéo';
+    case 'audio':
+      return 'Audio';
+    case 'document':
+      return 'Document';
+    case 'sticker':
+      return 'Sticker';
+    default:
+      return 'Média';
+  }
 }

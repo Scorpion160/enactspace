@@ -119,6 +119,13 @@ class ChatMessageModel {
   final String authorId;
   final String content;
   final String messageType;
+  final String? attachmentUrl;
+  final String? attachmentName;
+  final String? attachmentMimeType;
+  final int? attachmentSizeBytes;
+  final int? durationSeconds;
+  final String? thumbnailUrl;
+  final String? stickerPack;
   final DateTime createdAt;
   final DateTime? editedAt;
   final DateTime? deletedAt;
@@ -129,6 +136,13 @@ class ChatMessageModel {
     required this.authorId,
     required this.content,
     required this.messageType,
+    required this.attachmentUrl,
+    required this.attachmentName,
+    required this.attachmentMimeType,
+    required this.attachmentSizeBytes,
+    required this.durationSeconds,
+    required this.thumbnailUrl,
+    required this.stickerPack,
     required this.createdAt,
     required this.editedAt,
     required this.deletedAt,
@@ -141,6 +155,15 @@ class ChatMessageModel {
       authorId: json['author_id']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
       messageType: json['message_type']?.toString() ?? 'text',
+      attachmentUrl: json['attachment_url']?.toString(),
+      attachmentName: json['attachment_name']?.toString(),
+      attachmentMimeType: json['attachment_mime_type']?.toString(),
+      attachmentSizeBytes: int.tryParse(
+        json['attachment_size_bytes']?.toString() ?? '',
+      ),
+      durationSeconds: int.tryParse(json['duration_seconds']?.toString() ?? ''),
+      thumbnailUrl: json['thumbnail_url']?.toString(),
+      stickerPack: json['sticker_pack']?.toString(),
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -156,9 +179,38 @@ class ChatMessageModel {
       'author_id': authorId,
       'content': content,
       'message_type': messageType,
+      'attachment_url': attachmentUrl,
+      'attachment_name': attachmentName,
+      'attachment_mime_type': attachmentMimeType,
+      'attachment_size_bytes': attachmentSizeBytes,
+      'duration_seconds': durationSeconds,
+      'thumbnail_url': thumbnailUrl,
+      'sticker_pack': stickerPack,
       'created_at': createdAt.toIso8601String(),
       'edited_at': editedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
     };
+  }
+
+  bool get isMedia => messageType != 'text';
+
+  String get attachmentLabel {
+    final name = attachmentName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+
+    switch (messageType) {
+      case 'image':
+        return 'Photo';
+      case 'video':
+        return 'Vidéo';
+      case 'audio':
+        return 'Message audio';
+      case 'document':
+        return 'Document';
+      case 'sticker':
+        return 'Sticker';
+      default:
+        return 'Média';
+    }
   }
 }

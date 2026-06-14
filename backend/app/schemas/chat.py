@@ -55,6 +55,13 @@ class ChatParticipantRead(BaseModel):
 class ChatMessageCreate(BaseModel):
     content: str
     message_type: str = "text"
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    attachment_mime_type: Optional[str] = None
+    attachment_size_bytes: Optional[int] = None
+    duration_seconds: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    sticker_pack: Optional[str] = None
 
 
 class ChatMessageRead(BaseModel):
@@ -66,6 +73,13 @@ class ChatMessageRead(BaseModel):
     created_at: datetime
     edited_at: Optional[datetime]
     deleted_at: Optional[datetime]
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    attachment_mime_type: Optional[str] = None
+    attachment_size_bytes: Optional[int] = None
+    duration_seconds: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    sticker_pack: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -143,12 +143,30 @@ class ChatService {
   Future<ChatMessageModel> sendMessage({
     required String threadId,
     required String content,
+    String messageType = 'text',
+    String? attachmentUrl,
+    String? attachmentName,
+    String? attachmentMimeType,
+    int? attachmentSizeBytes,
+    int? durationSeconds,
+    String? thumbnailUrl,
+    String? stickerPack,
   }) async {
     final token = await _requireToken();
     final response = await _apiClient.postJson(
       '/chat/threads/$threadId/messages',
       token: token,
-      data: {'content': content.trim(), 'message_type': 'text'},
+      data: {
+        'content': content.trim(),
+        'message_type': messageType,
+        'attachment_url': _nullable(attachmentUrl),
+        'attachment_name': _nullable(attachmentName),
+        'attachment_mime_type': _nullable(attachmentMimeType),
+        'attachment_size_bytes': attachmentSizeBytes,
+        'duration_seconds': durationSeconds,
+        'thumbnail_url': _nullable(thumbnailUrl),
+        'sticker_pack': _nullable(stickerPack),
+      },
     );
 
     if (response is Map<String, dynamic>) {
