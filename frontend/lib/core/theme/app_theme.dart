@@ -16,7 +16,6 @@ class AppTheme {
         primary: softBlack,
         secondary: enactusYellow,
         surface: cardColor,
-        background: background,
       ),
     );
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../attendance/services/attendance_service.dart';
@@ -139,6 +140,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _ErrorCard(message: _error!, onRetry: _loadDashboard)
           else if (_stats != null) ...[
             _StatsGrid(stats: _stats!),
+            const SizedBox(height: 22),
+            const _QuickAccessGrid(),
             const SizedBox(height: 22),
             _QuickInsights(stats: _stats!),
           ],
@@ -404,6 +407,180 @@ class _StatCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAccessGrid extends StatelessWidget {
+  const _QuickAccessGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _QuickAccessItem(
+        title: 'Membres',
+        subtitle: 'Gérer les enacteurs',
+        icon: Icons.people_alt_rounded,
+        route: '/members',
+      ),
+      _QuickAccessItem(
+        title: 'Présences',
+        subtitle: 'Absences et retards',
+        icon: Icons.fact_check_rounded,
+        route: '/attendance',
+      ),
+      _QuickAccessItem(
+        title: 'Tâches',
+        subtitle: 'Kanban et suivi',
+        icon: Icons.task_alt_rounded,
+        route: '/tasks',
+      ),
+      _QuickAccessItem(
+        title: 'Finance',
+        subtitle: 'Paiements et pénalités',
+        icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
+      ),
+      _QuickAccessItem(
+        title: 'Documents',
+        subtitle: 'PV, rapports, fichiers',
+        icon: Icons.folder_copy_rounded,
+        route: '/documents',
+      ),
+      _QuickAccessItem(
+        title: 'Recrutement',
+        subtitle: 'Candidatures',
+        icon: Icons.how_to_reg_rounded,
+        route: '/recruitment',
+      ),
+      _QuickAccessItem(
+        title: 'Notifications',
+        subtitle: 'Alertes et rappels',
+        icon: Icons.notifications_rounded,
+        route: '/notifications',
+      ),
+      _QuickAccessItem(
+        title: 'Communication',
+        subtitle: 'Posts et annonces',
+        icon: Icons.forum_rounded,
+        route: '/posts',
+      ),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.grid_view_rounded),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Accès rapides',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 26),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final count = constraints.maxWidth >= 1100
+                    ? 4
+                    : constraints.maxWidth >= 760
+                    ? 3
+                    : constraints.maxWidth >= 520
+                    ? 2
+                    : 1;
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: count,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 2.6,
+                  ),
+                  itemBuilder: (context, index) {
+                    return _QuickAccessCard(item: items[index]);
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAccessItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String route;
+
+  const _QuickAccessItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.route,
+  });
+}
+
+class _QuickAccessCard extends StatelessWidget {
+  final _QuickAccessItem item;
+
+  const _QuickAccessCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.go(item.route),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.enactusYellow.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppTheme.enactusYellow,
+              foregroundColor: AppTheme.softBlack,
+              child: Icon(item.icon),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    item.subtitle,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),

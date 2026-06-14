@@ -693,7 +693,7 @@ class _StatusChip extends StatelessWidget {
       ),
       backgroundColor: background,
       labelStyle: TextStyle(color: foreground, fontWeight: FontWeight.w700),
-      side: BorderSide(color: foreground.withOpacity(0.2)),
+      side: BorderSide(color: foreground.withValues(alpha: 0.2)),
     );
   }
 }
@@ -1364,7 +1364,7 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
                 ),
               ),
             DropdownButtonFormField<String>(
-              value: _selectedDepartment,
+              initialValue: _selectedDepartment,
               decoration: const InputDecoration(
                 labelText: 'Pôle cœur',
                 prefixIcon: Icon(Icons.account_tree_rounded),

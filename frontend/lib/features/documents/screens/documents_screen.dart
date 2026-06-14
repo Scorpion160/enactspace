@@ -424,7 +424,7 @@ class _DocumentsFilters extends StatelessWidget {
               width: 260,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: category,
+                initialValue: category,
                 decoration: const InputDecoration(labelText: 'Catégorie'),
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('Toutes')),
@@ -469,7 +469,7 @@ class _DocumentsFilters extends StatelessWidget {
               width: 260,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: visibility,
+                initialValue: visibility,
                 decoration: const InputDecoration(labelText: 'Visibilité'),
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('Toutes')),
@@ -831,7 +831,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _category,
+                  initialValue: _category,
                   decoration: const InputDecoration(
                     labelText: 'Catégorie',
                     prefixIcon: Icon(Icons.category_rounded),
@@ -878,7 +878,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _visibility,
+                  initialValue: _visibility,
                   decoration: const InputDecoration(
                     labelText: 'Visibilité',
                     prefixIcon: Icon(Icons.visibility_rounded),

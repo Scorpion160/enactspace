@@ -512,7 +512,7 @@ class _CreateAttendanceSessionDialogState
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _sessionType,
+                  initialValue: _sessionType,
                   decoration: const InputDecoration(
                     labelText: 'Type de session',
                     prefixIcon: Icon(Icons.category_rounded),

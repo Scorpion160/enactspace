@@ -351,7 +351,7 @@ class _NotificationsFilters extends StatelessWidget {
               width: 260,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: type,
+                initialValue: type,
                 decoration: const InputDecoration(labelText: 'Type'),
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('Tous les types')),

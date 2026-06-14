@@ -482,7 +482,7 @@ class _StatsGrid extends StatelessWidget {
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: Colors.white10),
               ),
@@ -570,7 +570,7 @@ class _RecruitmentFilters extends StatelessWidget {
               width: 260,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: selectedCampaign,
+                initialValue: selectedCampaign,
                 decoration: const InputDecoration(labelText: 'Campagne'),
                 items: [
                   const DropdownMenuItem(
@@ -593,7 +593,7 @@ class _RecruitmentFilters extends StatelessWidget {
               width: 230,
               child: DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: selectedStatus,
+                initialValue: selectedStatus,
                 decoration: const InputDecoration(labelText: 'Statut'),
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('Tous')),
@@ -763,7 +763,7 @@ class _ApplicationCard extends StatelessWidget {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               isExpanded: true,
-              value: application.status,
+              initialValue: application.status,
               decoration: const InputDecoration(labelText: 'Statut'),
               items: const [
                 DropdownMenuItem(value: 'received', child: Text('Reçue')),
@@ -1130,7 +1130,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                 if (_error != null) _DialogError(message: _error!),
                 DropdownButtonFormField<String>(
                   isExpanded: true,
-                  value: _campaignId,
+                  initialValue: _campaignId,
                   decoration: const InputDecoration(
                     labelText: 'Campagne',
                     prefixIcon: Icon(Icons.campaign_rounded),

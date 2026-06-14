@@ -604,7 +604,7 @@ class _TaskCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: task.status,
+                    initialValue: task.status,
                     decoration: const InputDecoration(
                       labelText: 'Statut',
                       isDense: true,
@@ -800,7 +800,7 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _priority,
+                  initialValue: _priority,
                   decoration: const InputDecoration(
                     labelText: 'Priorité',
                     prefixIcon: Icon(Icons.flag_rounded),

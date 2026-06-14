@@ -421,7 +421,7 @@ class _FinanceStatsGrid extends StatelessWidget {
             return Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: Colors.white10),
               ),
@@ -743,7 +743,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                     ),
                   ),
                 DropdownButtonFormField<String>(
-                  value: _selectedUserId,
+                  initialValue: _selectedUserId,
                   decoration: const InputDecoration(
                     labelText: 'Membre',
                     prefixIcon: Icon(Icons.person_rounded),
@@ -770,7 +770,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _type,
+                  initialValue: _type,
                   decoration: const InputDecoration(
                     labelText: 'Type',
                     prefixIcon: Icon(Icons.category_rounded),
@@ -988,7 +988,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     ),
                   ),
                 DropdownButtonFormField<String>(
-                  value: _selectedUserId,
+                  initialValue: _selectedUserId,
                   decoration: const InputDecoration(
                     labelText: 'Membre',
                     prefixIcon: Icon(Icons.person_rounded),
@@ -1032,7 +1032,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _method,
+                  initialValue: _method,
                   decoration: const InputDecoration(
                     labelText: 'Méthode',
                     prefixIcon: Icon(Icons.account_balance_wallet_rounded),
