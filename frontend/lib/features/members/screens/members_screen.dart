@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/member_model.dart';
 import '../services/members_service.dart';
@@ -11,11 +13,13 @@ class MembersScreen extends StatefulWidget {
 }
 
 class _MembersScreenState extends State<MembersScreen> {
+  final AuthService _authService = AuthService();
   final MembersService _membersService = MembersService();
 
   bool _loading = true;
   String? _error;
   List<MemberModel> _members = [];
+  UserExperience? _userExperience;
   String _search = '';
 
   @override
@@ -31,11 +35,13 @@ class _MembersScreenState extends State<MembersScreen> {
     });
 
     try {
+      final user = UserExperience.fromJson(await _authService.getCurrentUser());
       final members = await _membersService.getMembers();
 
       if (!mounted) return;
 
       setState(() {
+        _userExperience = user;
         _members = members;
       });
     } catch (e) {
@@ -128,6 +134,7 @@ class _MembersScreenState extends State<MembersScreen> {
       builder: (context) {
         return AssignRoleDialog(
           member: member,
+          userExperience: _userExperience,
           membersService: _membersService,
         );
       },
@@ -1099,11 +1106,13 @@ class _RolesChip extends StatelessWidget {
 
 class AssignRoleDialog extends StatefulWidget {
   final MemberModel member;
+  final UserExperience? userExperience;
   final MembersService membersService;
 
   const AssignRoleDialog({
     super.key,
     required this.member,
+    required this.userExperience,
     required this.membersService,
   });
 
@@ -1112,17 +1121,6 @@ class AssignRoleDialog extends StatefulWidget {
 }
 
 class _AssignRoleDialogState extends State<AssignRoleDialog> {
-  final List<String> _availableRoles = const [
-    'team_leader',
-    'secretaire_generale',
-    'admin',
-    'chef_pole',
-    'chef_projet',
-    'adjoint_pole',
-    'adjoint_projet',
-    'enacteur',
-  ];
-
   late final Set<String> _selectedRoles;
 
   bool _loading = false;
@@ -1131,7 +1129,58 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedRoles = {...widget.member.roles};
+    _selectedRoles = {
+      ...widget.member.roles.where(_availableRoles.contains),
+      if (widget.member.status != 'alumni') 'enacteur',
+    };
+  }
+
+  List<String> get _availableRoles {
+    final user = widget.userExperience;
+
+    if (user?.isAdmin == true) {
+      return const [
+        'administrateur',
+        'team_leader',
+        'secretaire_generale',
+        'financier',
+        'chef_pole',
+        'adjoint_chef_pole',
+        'chef_projet',
+        'adjoint_chef_projet',
+        'faculty_advisor',
+        'enacteur',
+        'alumni',
+      ];
+    }
+
+    if (user?.isTeamLeader == true) {
+      return const [
+        'secretaire_generale',
+        'financier',
+        'chef_pole',
+        'adjoint_chef_pole',
+        'chef_projet',
+        'adjoint_chef_projet',
+        'faculty_advisor',
+        'enacteur',
+        'alumni',
+      ];
+    }
+
+    if (user?.isSecretary == true) {
+      return const [
+        'financier',
+        'chef_pole',
+        'adjoint_chef_pole',
+        'chef_projet',
+        'adjoint_chef_projet',
+        'enacteur',
+        'alumni',
+      ];
+    }
+
+    return const ['enacteur'];
   }
 
   Future<void> _submit() async {
@@ -1174,18 +1223,24 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
         return 'Team Leader';
       case 'secretaire_generale':
         return 'Secrétaire Générale';
-      case 'admin':
-        return 'Admin';
+      case 'administrateur':
+        return 'Administrateur';
+      case 'financier':
+        return 'Financier';
       case 'chef_pole':
         return 'Chef de pôle';
       case 'chef_projet':
         return 'Chef de projet';
-      case 'adjoint_pole':
+      case 'adjoint_chef_pole':
         return 'Adjoint pôle';
-      case 'adjoint_projet':
+      case 'adjoint_chef_projet':
         return 'Adjoint projet';
+      case 'faculty_advisor':
+        return 'Faculty Advisor';
       case 'enacteur':
         return 'Enacteur';
+      case 'alumni':
+        return 'Alumni';
       default:
         return role;
     }

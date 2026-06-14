@@ -39,6 +39,108 @@ VALID_USER_STATUSES = {
 }
 
 
+BASE_ACTIVE_ROLE = "enacteur"
+
+RESPONSIBILITY_ROLES = {
+    "team_leader",
+    "secretaire_generale",
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+}
+
+ADMIN_MANAGED_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+    "faculty_advisor",
+    "enacteur",
+    "alumni",
+    "candidat",
+}
+
+TEAM_LEADER_MANAGED_ROLES = {
+    "secretaire_generale",
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+    "faculty_advisor",
+    "enacteur",
+    "alumni",
+}
+
+SECRETARY_MANAGED_ROLES = {
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+    "enacteur",
+    "alumni",
+}
+
+
+def get_managed_role_names(db: Session, current_user: User) -> set[str]:
+    roles = get_user_role_names(db, current_user.id)
+
+    if "administrateur" in roles:
+        return ADMIN_MANAGED_ROLES
+
+    if "team_leader" in roles:
+        return TEAM_LEADER_MANAGED_ROLES
+
+    if "secretaire_generale" in roles:
+        return SECRETARY_MANAGED_ROLES
+
+    return set()
+
+
+def ensure_role_authority(
+    db: Session,
+    current_user: User,
+    requested_roles: set[str],
+) -> set[str]:
+    managed_roles = get_managed_role_names(db, current_user)
+
+    if not managed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission insuffisante pour gérer les responsabilités",
+        )
+
+    forbidden = requested_roles - managed_roles
+
+    if forbidden:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Rôle(s) non autorisé(s) : {', '.join(sorted(forbidden))}",
+        )
+
+    return managed_roles
+
+
+def normalize_lifecycle_roles(db: Session, user: User, role_names: set[str]) -> set[str]:
+    if user.status == "alumni":
+        return role_names
+
+    if user.status in {"active", "pending", "inactive"}:
+        role_names.add(BASE_ACTIVE_ROLE)
+
+    if role_names.intersection(RESPONSIBILITY_ROLES):
+        role_names.add(BASE_ACTIVE_ROLE)
+
+    return role_names
+
+
 def get_user_or_404(db: Session, user_id: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -382,15 +484,18 @@ def assign_roles_to_user(
     payload: UserRoleAssign,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     user = get_user_or_404(db, user_id)
 
-    old_roles = sorted(list(get_user_role_names(db, user.id)))
+    requested_role_names = set(payload.role_names)
+    managed_roles = ensure_role_authority(db, current_user, requested_role_names)
+    current_role_names = get_user_role_names(db, user.id)
+    old_roles = sorted(list(current_role_names))
 
-    roles = db.query(Role).filter(Role.name.in_(payload.role_names)).all()
+    roles = db.query(Role).filter(Role.name.in_(requested_role_names)).all()
     found_role_names = {role.name for role in roles}
-    missing_roles = set(payload.role_names) - found_role_names
+    missing_roles = requested_role_names - found_role_names
 
     if missing_roles:
         raise HTTPException(
@@ -398,7 +503,32 @@ def assign_roles_to_user(
             detail=f"Rôles introuvables : {', '.join(sorted(missing_roles))}",
         )
 
-    for role in roles:
+    next_role_names = (current_role_names - managed_roles) | requested_role_names
+    next_role_names = normalize_lifecycle_roles(db, user, next_role_names)
+
+    next_roles = db.query(Role).filter(Role.name.in_(next_role_names)).all()
+    next_roles_by_name = {role.name: role for role in next_roles}
+    missing_next_roles = next_role_names - set(next_roles_by_name.keys())
+
+    if missing_next_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Rôles introuvables : {', '.join(sorted(missing_next_roles))}",
+        )
+
+    existing_links = (
+        db.query(UserRole)
+        .join(Role, UserRole.role_id == Role.id)
+        .filter(UserRole.user_id == user.id)
+        .all()
+    )
+
+    for link in existing_links:
+        if link.role.name in managed_roles and link.role.name not in next_role_names:
+            db.delete(link)
+
+    for role_name in next_role_names:
+        role = next_roles_by_name[role_name]
         existing = db.query(UserRole).filter(
             UserRole.user_id == user.id,
             UserRole.role_id == role.id,
@@ -415,7 +545,7 @@ def assign_roles_to_user(
 
     create_audit_log(
         db=db,
-        action="ajout_roles_utilisateur",
+        action="synchronisation_roles_utilisateur",
         user_id=current_user.id,
         entity_type="user",
         entity_id=user.id,
@@ -436,9 +566,10 @@ def remove_role_from_user(
     role_name: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     user = get_user_or_404(db, user_id)
+    ensure_role_authority(db, current_user, {role_name})
 
     old_roles = sorted(list(get_user_role_names(db, user.id)))
 
@@ -459,6 +590,16 @@ def remove_role_from_user(
         db.delete(link)
 
     db.flush()
+
+    normalized_roles = normalize_lifecycle_roles(db, user, get_user_role_names(db, user.id))
+    missing_roles = normalized_roles - get_user_role_names(db, user.id)
+
+    if missing_roles:
+        roles = db.query(Role).filter(Role.name.in_(missing_roles)).all()
+        for role in roles:
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+
+        db.flush()
 
     new_roles = sorted(list(get_user_role_names(db, user.id)))
 
