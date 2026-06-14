@@ -101,6 +101,42 @@ class ApplicationModel {
     return '${finalScore!.toStringAsFixed(1)}/20';
   }
 
+  String get anonymousCode {
+    final source = id.isNotEmpty ? id : email;
+    final seed = source.codeUnits.fold<int>(
+      0,
+      (value, unit) => (value * 31 + unit) % 9999,
+    );
+    return 'Candidat #${seed.toString().padLeft(4, '0')}';
+  }
+
+  String get stabilityLabel {
+    final level = (studyLevel ?? '').toLowerCase();
+
+    if (level.contains('dic1') ||
+        level.contains('l1') ||
+        level.contains('1ere') ||
+        level.contains('1ère') ||
+        level.contains('premi')) {
+      return 'StabilitÃ© forte';
+    }
+
+    if (level.contains('dic2') ||
+        level.contains('l2') ||
+        level.contains('deux')) {
+      return 'Bonne stabilitÃ©';
+    }
+
+    if (level.contains('dic3') ||
+        level.contains('m2') ||
+        level.contains('fin') ||
+        level.contains('5')) {
+      return 'DÃ©part proche';
+    }
+
+    return 'StabilitÃ© Ã  qualifier';
+  }
+
   bool get isConverted {
     return convertedUserId != null && convertedUserId!.isNotEmpty;
   }

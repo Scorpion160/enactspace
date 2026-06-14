@@ -16,6 +16,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
+  bool _anonymousReview = false;
   String? _error;
 
   List<RecruitmentCampaignModel> _campaigns = [];
@@ -246,6 +247,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             campaigns: _campaigns,
             selectedCampaign: _selectedCampaign,
             selectedStatus: _selectedStatus,
+            anonymousReview: _anonymousReview,
             onCampaignChanged: (value) async {
               setState(() => _selectedCampaign = value);
               await _loadRecruitment();
@@ -253,6 +255,9 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             onStatusChanged: (value) async {
               setState(() => _selectedStatus = value);
               await _loadRecruitment();
+            },
+            onAnonymousChanged: (value) {
+              setState(() => _anonymousReview = value);
             },
             onSearch: _loadRecruitment,
           ),
@@ -271,6 +276,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
           else
             _ApplicationsGrid(
               applications: _applications,
+              anonymousReview: _anonymousReview,
               campaignTitle: _campaignTitle,
               onStatusChanged: _changeStatus,
               onReview: _openReviewDialog,
@@ -527,8 +533,10 @@ class _RecruitmentFilters extends StatelessWidget {
   final List<RecruitmentCampaignModel> campaigns;
   final String selectedCampaign;
   final String selectedStatus;
+  final bool anonymousReview;
   final ValueChanged<String> onCampaignChanged;
   final ValueChanged<String> onStatusChanged;
+  final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onSearch;
 
   const _RecruitmentFilters({
@@ -536,8 +544,10 @@ class _RecruitmentFilters extends StatelessWidget {
     required this.campaigns,
     required this.selectedCampaign,
     required this.selectedStatus,
+    required this.anonymousReview,
     required this.onCampaignChanged,
     required this.onStatusChanged,
+    required this.onAnonymousChanged,
     required this.onSearch,
   });
 
@@ -552,6 +562,7 @@ class _RecruitmentFilters extends StatelessWidget {
             final searchWidth = isCompact ? constraints.maxWidth : 280.0;
             final campaignWidth = isCompact ? constraints.maxWidth : 260.0;
             final statusWidth = isCompact ? constraints.maxWidth : 230.0;
+            final switchWidth = isCompact ? constraints.maxWidth : 250.0;
 
             return Wrap(
               spacing: 12,
@@ -630,6 +641,20 @@ class _RecruitmentFilters extends StatelessWidget {
                     },
                   ),
                 ),
+                SizedBox(
+                  width: switchWidth,
+                  child: SwitchListTile(
+                    value: anonymousReview,
+                    onChanged: onAnonymousChanged,
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text(
+                      'Mode anonymisé',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: const Text('Masquer identité pendant le tri'),
+                  ),
+                ),
               ],
             );
           },
@@ -645,6 +670,7 @@ double _dialogWidth(BuildContext context, double maxWidth) {
 
 class _ApplicationsGrid extends StatelessWidget {
   final List<ApplicationModel> applications;
+  final bool anonymousReview;
   final String Function(String campaignId) campaignTitle;
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
@@ -653,6 +679,7 @@ class _ApplicationsGrid extends StatelessWidget {
 
   const _ApplicationsGrid({
     required this.applications,
+    required this.anonymousReview,
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
@@ -668,28 +695,27 @@ class _ApplicationsGrid extends StatelessWidget {
             : constraints.maxWidth >= 780
             ? 2
             : 1;
+        const spacing = 14.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: applications.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.18,
-          ),
-          itemBuilder: (context, index) {
-            final application = applications[index];
-
-            return _ApplicationCard(
-              application: application,
-              campaignTitle: campaignTitle(application.campaignId),
-              onStatusChanged: onStatusChanged,
-              onReview: onReview,
-              onConvert: onConvert,
-            );
-          },
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final application in applications)
+              SizedBox(
+                width: itemWidth,
+                child: _ApplicationCard(
+                  application: application,
+                  anonymousReview: anonymousReview,
+                  campaignTitle: campaignTitle(application.campaignId),
+                  onStatusChanged: onStatusChanged,
+                  onReview: onReview,
+                  onConvert: onConvert,
+                ),
+              ),
+          ],
         );
       },
     );
@@ -698,6 +724,7 @@ class _ApplicationsGrid extends StatelessWidget {
 
 class _ApplicationCard extends StatelessWidget {
   final ApplicationModel application;
+  final bool anonymousReview;
   final String campaignTitle;
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
@@ -706,6 +733,7 @@ class _ApplicationCard extends StatelessWidget {
 
   const _ApplicationCard({
     required this.application,
+    required this.anonymousReview,
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
@@ -714,6 +742,15 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayName = anonymousReview
+        ? application.anonymousCode
+        : application.fullName;
+    final avatarLabel = anonymousReview
+        ? '#'
+        : application.firstName.isEmpty
+        ? '?'
+        : application.firstName[0].toUpperCase();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -726,16 +763,14 @@ class _ApplicationCard extends StatelessWidget {
                   backgroundColor: AppTheme.enactusYellow,
                   foregroundColor: AppTheme.softBlack,
                   child: Text(
-                    application.firstName.isEmpty
-                        ? '?'
-                        : application.firstName[0].toUpperCase(),
+                    avatarLabel,
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    application.fullName,
+                    displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -748,7 +783,9 @@ class _ApplicationCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              application.email,
+              anonymousReview
+                  ? 'Identité masquée pendant l’évaluation.'
+                  : application.email,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.black54),
@@ -767,6 +804,7 @@ class _ApplicationCard extends StatelessWidget {
               children: [
                 Chip(label: Text(application.statusLabel)),
                 Chip(label: Text(application.scoreLabel)),
+                Chip(label: Text(application.stabilityLabel)),
                 if (application.department != null)
                   Chip(label: Text(application.department!)),
                 if (application.isConverted)
@@ -774,13 +812,13 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: Text(
-                application.motivation ?? 'Aucune motivation renseignée.',
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black54, height: 1.35),
-              ),
+            _ApplicationProgress(status: application.status),
+            const SizedBox(height: 10),
+            Text(
+              application.motivation ?? 'Aucune motivation renseignée.',
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.black54, height: 1.35),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
@@ -824,6 +862,86 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicationProgress extends StatelessWidget {
+  final String status;
+
+  const _ApplicationProgress({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = [
+      _RecruitmentStep('received', 'Reçue'),
+      _RecruitmentStep('preselected', 'Tri'),
+      _RecruitmentStep('interview', 'Entretien'),
+      _RecruitmentStep('accepted', 'Acceptée'),
+    ];
+
+    final activeIndex = status == 'rejected'
+        ? 3
+        : steps.indexWhere((step) => step.value == status);
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (var index = 0; index < steps.length; index++)
+          _ProgressChip(
+            label: status == 'rejected' && index == steps.length - 1
+                ? 'Rejetée'
+                : steps[index].label,
+            active: index <= activeIndex,
+            rejected: status == 'rejected' && index == steps.length - 1,
+          ),
+      ],
+    );
+  }
+}
+
+class _RecruitmentStep {
+  final String value;
+  final String label;
+
+  const _RecruitmentStep(this.value, this.label);
+}
+
+class _ProgressChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final bool rejected;
+
+  const _ProgressChip({
+    required this.label,
+    required this.active,
+    required this.rejected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = rejected
+        ? Colors.red.shade100
+        : active
+        ? AppTheme.enactusYellow.withValues(alpha: 0.34)
+        : Colors.black.withValues(alpha: 0.06);
+    final foregroundColor = rejected ? Colors.red.shade800 : AppTheme.softBlack;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foregroundColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
