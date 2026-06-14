@@ -4,6 +4,10 @@ import 'package:intl/intl.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/chat_models.dart';
 import '../services/chat_service.dart';
 
@@ -17,6 +21,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
   final TextEditingController _messageController = TextEditingController();
 
   bool _loading = true;
@@ -91,12 +97,32 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     try {
+      final userId = _user?.id;
+      if (userId != null) {
+        final cached = await _chatService.getCachedMessages(
+          userId: userId,
+          threadId: thread.id,
+        );
+        if (mounted && cached.isNotEmpty) {
+          setState(() {
+            _messages = cached;
+          });
+        }
+      }
+
       final messages = await _chatService.getMessages(thread.id);
       if (!mounted) return;
       setState(() {
         _selectedThread = thread;
         _messages = messages;
       });
+      if (userId != null) {
+        await _chatService.cacheMessages(
+          userId: userId,
+          threadId: thread.id,
+          messages: messages,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -130,6 +156,13 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages = [..._messages, message];
       });
+      if (_user != null) {
+        await _chatService.cacheMessages(
+          userId: _user!.id,
+          threadId: thread.id,
+          messages: _messages,
+        );
+      }
       await _refreshThreads();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -158,7 +191,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _openNewThreadDialog() async {
     final created = await showDialog<ChatThreadModel>(
       context: context,
-      builder: (context) => NewChatThreadDialog(chatService: _chatService),
+      builder: (context) => NewChatThreadDialog(
+        chatService: _chatService,
+        polesService: _polesService,
+        projectsService: _projectsService,
+      ),
     );
 
     if (created == null) return;
@@ -577,8 +614,15 @@ class _MessageComposer extends StatelessWidget {
 
 class NewChatThreadDialog extends StatefulWidget {
   final ChatService chatService;
+  final PolesService polesService;
+  final ProjectsService projectsService;
 
-  const NewChatThreadDialog({super.key, required this.chatService});
+  const NewChatThreadDialog({
+    super.key,
+    required this.chatService,
+    required this.polesService,
+    required this.projectsService,
+  });
 
   @override
   State<NewChatThreadDialog> createState() => _NewChatThreadDialogState();
@@ -590,7 +634,11 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  String _threadType = 'direct';
+  String? _scopeId;
   List<ChatContactModel> _contacts = [];
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
   final Set<String> _selectedIds = {};
 
   @override
@@ -613,12 +661,16 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
     });
 
     try {
-      final contacts = await widget.chatService.getContacts(
-        search: _searchController.text,
-      );
+      final results = await Future.wait<dynamic>([
+        widget.chatService.getContacts(search: _searchController.text),
+        widget.polesService.getPoles(),
+        widget.projectsService.getProjects(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _contacts = contacts;
+        _contacts = results[0] as List<ChatContactModel>;
+        _poles = results[1] as List<PoleModel>;
+        _projects = results[2] as List<ProjectModel>;
       });
     } catch (e) {
       setState(() {
@@ -634,9 +686,17 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
   }
 
   Future<void> _create() async {
-    if (_selectedIds.isEmpty) {
+    if (_threadType == 'direct' && _selectedIds.length != 1) {
       setState(() {
-        _error = 'Sélectionne au moins un participant.';
+        _error = 'Choisis une seule personne pour un chat privé.';
+      });
+      return;
+    }
+
+    if ((_threadType == 'pole' || _threadType == 'project') &&
+        _scopeId == null) {
+      setState(() {
+        _error = 'Choisis le périmètre de la conversation.';
       });
       return;
     }
@@ -649,7 +709,14 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
     try {
       final thread = await widget.chatService.createThread(
         title: _titleController.text,
-        threadType: _selectedIds.length == 1 ? 'direct' : 'group',
+        threadType: _threadType,
+        scopeType:
+            _threadType == 'pole' ||
+                _threadType == 'project' ||
+                _threadType == 'enacchef'
+            ? _threadType
+            : null,
+        scopeId: _scopeId,
         participantIds: _selectedIds.toList(),
       );
       if (!mounted) return;
@@ -690,6 +757,92 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
               ),
             ),
             const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _threadType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Type de chat',
+                prefixIcon: Icon(Icons.forum_rounded),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'direct', child: Text('Privé')),
+                DropdownMenuItem(value: 'group', child: Text('Groupe libre')),
+                DropdownMenuItem(value: 'pole', child: Text('Chat de pôle')),
+                DropdownMenuItem(
+                  value: 'project',
+                  child: Text('Chat de projet'),
+                ),
+                DropdownMenuItem(value: 'enacchef', child: Text('Enacchef')),
+              ],
+              onChanged: _creating
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _threadType = value;
+                        _scopeId = null;
+                        if (value == 'direct' && _selectedIds.length > 1) {
+                          final first = _selectedIds.first;
+                          _selectedIds
+                            ..clear()
+                            ..add(first);
+                        }
+                      });
+                    },
+            ),
+            if (_threadType == 'pole') ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _scopeId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Pôle',
+                  prefixIcon: Icon(Icons.hub_rounded),
+                ),
+                items: _poles.map((pole) {
+                  return DropdownMenuItem(
+                    value: pole.id,
+                    child: Text(pole.name),
+                  );
+                }).toList(),
+                onChanged: _creating
+                    ? null
+                    : (value) => setState(() => _scopeId = value),
+              ),
+            ],
+            if (_threadType == 'project') ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _scopeId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Projet',
+                  prefixIcon: Icon(Icons.rocket_launch_rounded),
+                ),
+                items: _projects.map((project) {
+                  return DropdownMenuItem(
+                    value: project.id,
+                    child: Text(project.name),
+                  );
+                }).toList(),
+                onChanged: _creating
+                    ? null
+                    : (value) => setState(() => _scopeId = value),
+              ),
+            ],
+            if (_threadType == 'pole' ||
+                _threadType == 'project' ||
+                _threadType == 'enacchef') ...[
+              const SizedBox(height: 10),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Les membres du périmètre seront ajoutés automatiquement. Tu peux ajouter d’autres participants si besoin.',
+                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -717,6 +870,9 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
                           onChanged: (value) {
                             setState(() {
                               if (value == true) {
+                                if (_threadType == 'direct') {
+                                  _selectedIds.clear();
+                                }
                                 _selectedIds.add(contact.id);
                               } else {
                                 _selectedIds.remove(contact.id);

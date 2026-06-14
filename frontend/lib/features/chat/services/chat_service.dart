@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/chat_models.dart';
@@ -35,6 +39,8 @@ class ChatService {
     String? title,
     required String threadType,
     required List<String> participantIds,
+    String? scopeType,
+    String? scopeId,
   }) async {
     final token = await _requireToken();
     final response = await _apiClient.postJson(
@@ -43,6 +49,8 @@ class ChatService {
       data: {
         'title': title?.trim().isEmpty == true ? null : title?.trim(),
         'thread_type': threadType,
+        'scope_type': _nullable(scopeType),
+        'scope_id': _nullable(scopeId),
         'participant_ids': participantIds,
       },
     );
@@ -64,6 +72,37 @@ class ChatService {
     return _extractList(
       response,
     ).whereType<Map<String, dynamic>>().map(ChatMessageModel.fromJson).toList();
+  }
+
+  Future<List<ChatMessageModel>> getCachedMessages({
+    required String userId,
+    required String threadId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_messagesCacheKey(userId, threadId));
+
+    if (raw == null || raw.isEmpty) return [];
+
+    final decoded = jsonDecode(raw);
+
+    if (decoded is! List) return [];
+
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(ChatMessageModel.fromJson)
+        .toList();
+  }
+
+  Future<void> cacheMessages({
+    required String userId,
+    required String threadId,
+    required List<ChatMessageModel> messages,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _messagesCacheKey(userId, threadId),
+      jsonEncode(messages.map((message) => message.toJson()).toList()),
+    );
   }
 
   Future<ChatMessageModel> sendMessage({
@@ -99,5 +138,14 @@ class ChatService {
       return response['items'] as List;
     }
     return [];
+  }
+
+  String? _nullable(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  String _messagesCacheKey(String userId, String threadId) {
+    return 'enactspace_chat_messages_${userId}_$threadId';
   }
 }

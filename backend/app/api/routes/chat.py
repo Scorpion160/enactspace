@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_validated_user
 from app.db.database import get_db
 from app.models.chat import ChatThread, ChatParticipant, ChatMessage
+from app.models.pole import PoleMember
+from app.models.project import ProjectMember
+from app.models.role import Role, UserRole
 from app.models.user import User
 from app.schemas.chat import (
     ChatContactRead,
@@ -21,8 +24,19 @@ from app.schemas.chat import (
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project"}
+VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
 VALID_MESSAGE_TYPES = {"text"}
+ENACCHEF_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+    "faculty_advisor",
+}
 
 
 def get_participant_or_404(
@@ -60,6 +74,45 @@ def build_thread_read(db: Session, thread: ChatThread, user_id) -> ChatThreadRea
         ChatMessage.deleted_at.is_(None),
     )
 
+
+def scope_participant_ids(db: Session, payload: ChatThreadCreate) -> set:
+    if payload.thread_type == "enacchef" or payload.scope_type == "enacchef":
+        rows = (
+            db.query(UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .filter(Role.name.in_(ENACCHEF_ROLES))
+            .all()
+        )
+        return {row[0] for row in rows}
+
+    if payload.thread_type == "pole" or payload.scope_type == "pole":
+        if not payload.scope_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Choisissez un pôle pour cette conversation",
+            )
+
+        rows = db.query(PoleMember.user_id).filter(
+            PoleMember.pole_id == payload.scope_id,
+            PoleMember.is_active.is_(True),
+        ).all()
+        return {row[0] for row in rows}
+
+    if payload.thread_type == "project" or payload.scope_type == "project":
+        if not payload.scope_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Choisissez un projet pour cette conversation",
+            )
+
+        rows = db.query(ProjectMember.user_id).filter(
+            ProjectMember.project_id == payload.scope_id,
+            ProjectMember.is_active.is_(True),
+        ).all()
+        return {row[0] for row in rows}
+
+    return set()
+
     if participant and participant.last_read_at:
         unread_query = unread_query.filter(
             ChatMessage.created_at > participant.last_read_at,
@@ -93,11 +146,31 @@ def list_chat_contacts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
     search: str | None = Query(default=None),
+    scope_type: str | None = Query(default=None),
+    scope_id: str | None = Query(default=None),
 ):
     query = db.query(User).filter(
         User.is_active.is_(True),
         User.status.in_(["active", "alumni"]),
     )
+
+    if scope_type == "enacchef":
+        query = query.join(UserRole, UserRole.user_id == User.id).join(
+            Role,
+            Role.id == UserRole.role_id,
+        ).filter(Role.name.in_(ENACCHEF_ROLES))
+
+    if scope_type == "pole" and scope_id:
+        query = query.join(PoleMember, PoleMember.user_id == User.id).filter(
+            PoleMember.pole_id == scope_id,
+            PoleMember.is_active.is_(True),
+        )
+
+    if scope_type == "project" and scope_id:
+        query = query.join(ProjectMember, ProjectMember.user_id == User.id).filter(
+            ProjectMember.project_id == scope_id,
+            ProjectMember.is_active.is_(True),
+        )
 
     if search:
         like = f"%{search.strip()}%"
@@ -107,7 +180,7 @@ def list_chat_contacts(
             | (User.email.ilike(like))
         )
 
-    return query.order_by(User.first_name.asc(), User.last_name.asc()).limit(80).all()
+    return query.distinct().order_by(User.first_name.asc(), User.last_name.asc()).limit(80).all()
 
 
 @router.post("/threads", response_model=ChatThreadRead)
@@ -122,8 +195,14 @@ def create_thread(
             detail="Type de conversation invalide",
         )
 
-    participant_ids = set(payload.participant_ids)
+    participant_ids = set(payload.participant_ids) | scope_participant_ids(db, payload)
     participant_ids.add(current_user.id)
+
+    if payload.thread_type == "direct" and len(participant_ids) != 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une discussion privée doit contenir exactement deux personnes",
+        )
 
     active_users_count = db.query(func.count(User.id)).filter(
         User.id.in_(participant_ids),

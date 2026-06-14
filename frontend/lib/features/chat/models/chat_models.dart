@@ -131,4 +131,17 @@ class ChatMessageModel {
       deletedAt: DateTime.tryParse(json['deleted_at']?.toString() ?? ''),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'thread_id': threadId,
+      'author_id': authorId,
+      'content': content,
+      'message_type': messageType,
+      'created_at': createdAt.toIso8601String(),
+      'edited_at': editedAt?.toIso8601String(),
+      'deleted_at': deletedAt?.toIso8601String(),
+    };
+  }
 }
