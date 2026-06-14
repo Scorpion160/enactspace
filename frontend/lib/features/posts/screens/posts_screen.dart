@@ -270,6 +270,9 @@ class _PostsScreenState extends State<PostsScreen> {
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 1180;
           final horizontalPadding = constraints.maxWidth < 560 ? 14.0 : 24.0;
+          final sidebarWidth = (constraints.maxWidth * 0.31)
+              .clamp(340.0, 410.0)
+              .toDouble();
 
           final header = _PostsHeader(
             total: _posts.length,
@@ -332,7 +335,7 @@ class _PostsScreenState extends State<PostsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             SizedBox(
-                              width: 390,
+                              width: sidebarWidth,
                               child: Column(
                                 children: [
                                   composer,

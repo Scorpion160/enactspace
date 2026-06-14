@@ -457,7 +457,7 @@ class _PriorityGrid extends StatelessWidget {
             crossAxisCount: count,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 3.3 : 1.55,
+            mainAxisExtent: count == 1 ? 132 : 174,
           ),
           itemBuilder: (context, index) {
             return _StatCard(item: items[index]);
@@ -663,7 +663,7 @@ class _QuickAccessGrid extends StatelessWidget {
                     crossAxisCount: count,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: count == 1 ? 3.8 : 2.2,
+                    mainAxisExtent: 92,
                   ),
                   itemBuilder: (context, index) {
                     return _QuickAccessCard(item: items[index]);

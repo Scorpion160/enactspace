@@ -330,57 +330,74 @@ class _NotificationsFilters extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            ChoiceChip(
-              selected: !unreadOnly,
-              label: const Text('Toutes'),
-              avatar: const Icon(Icons.list_rounded, size: 18),
-              onSelected: (_) => onUnreadOnlyChanged(false),
-            ),
-            ChoiceChip(
-              selected: unreadOnly,
-              label: const Text('Non lues'),
-              avatar: const Icon(Icons.mark_email_unread_rounded, size: 18),
-              onSelected: (_) => onUnreadOnlyChanged(true),
-            ),
-            SizedBox(
-              width: 260,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Type'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Tous les types')),
-                  DropdownMenuItem(
-                    value: 'task_assigned',
-                    child: Text('Tâche assignée'),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final typeWidth = constraints.maxWidth < 560
+                ? constraints.maxWidth
+                : 260.0;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ChoiceChip(
+                  selected: !unreadOnly,
+                  label: const Text('Toutes'),
+                  avatar: const Icon(Icons.list_rounded, size: 18),
+                  onSelected: (_) => onUnreadOnlyChanged(false),
+                ),
+                ChoiceChip(
+                  selected: unreadOnly,
+                  label: const Text('Non lues'),
+                  avatar: const Icon(Icons.mark_email_unread_rounded, size: 18),
+                  onSelected: (_) => onUnreadOnlyChanged(true),
+                ),
+                SizedBox(
+                  width: typeWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: type,
+                    decoration: const InputDecoration(labelText: 'Type'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Tous les types'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'task_assigned',
+                        child: Text('Tâche assignée'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'deadline_near',
+                        child: Text('Échéance proche'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'attendance',
+                        child: Text('Présence'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'payment',
+                        child: Text('Paiement'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'document',
+                        child: Text('Document'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'recruitment',
+                        child: Text('Recrutement'),
+                      ),
+                      DropdownMenuItem(value: 'system', child: Text('Système')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onTypeChanged(value);
+                    },
                   ),
-                  DropdownMenuItem(
-                    value: 'deadline_near',
-                    child: Text('Échéance proche'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'attendance',
-                    child: Text('Présence'),
-                  ),
-                  DropdownMenuItem(value: 'payment', child: Text('Paiement')),
-                  DropdownMenuItem(value: 'document', child: Text('Document')),
-                  DropdownMenuItem(
-                    value: 'recruitment',
-                    child: Text('Recrutement'),
-                  ),
-                  DropdownMenuItem(value: 'system', child: Text('Système')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onTypeChanged(value);
-                },
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
