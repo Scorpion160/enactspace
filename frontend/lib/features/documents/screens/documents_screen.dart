@@ -775,9 +775,10 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouveau document'),
       content: SizedBox(
-        width: 540,
+        width: _dialogWidth(context, 540),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -969,6 +970,10 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
       ],
     );
   }
+}
+
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
 }
 
 class _EmptyDocumentsCard extends StatelessWidget {

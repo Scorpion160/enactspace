@@ -442,27 +442,37 @@ class _KanbanBoard extends StatelessWidget {
       _KanbanColumnData(title: 'Validé', status: 'valide', tasks: validated),
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: columns.map((column) {
-          return SizedBox(
-            width: 310,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: _KanbanColumn(
-                data: column,
-                members: members,
-                assigneesByTaskId: assigneesByTaskId,
-                onChangeStatus: onChangeStatus,
-                onSubmitProof: onSubmitProof,
-                onValidate: onValidate,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnWidth = constraints.maxWidth >= 1280
+            ? ((constraints.maxWidth - 42) / 4).clamp(310.0, 360.0).toDouble()
+            : constraints.maxWidth < 380
+            ? (constraints.maxWidth - 24).clamp(260.0, 310.0).toDouble()
+            : 310.0;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: columns.map((column) {
+              return SizedBox(
+                width: columnWidth,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: _KanbanColumn(
+                    data: column,
+                    members: members,
+                    assigneesByTaskId: assigneesByTaskId,
+                    onChangeStatus: onChangeStatus,
+                    onSubmitProof: onSubmitProof,
+                    onValidate: onValidate,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
@@ -752,9 +762,10 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Créer une tâche'),
       content: SizedBox(
-        width: 560,
+        width: _dialogWidth(context, 560),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -989,6 +1000,10 @@ class _TaskAssigneesPreview extends StatelessWidget {
       }).toList(),
     );
   }
+}
+
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
 }
 
 class _TaskViewFilters extends StatelessWidget {

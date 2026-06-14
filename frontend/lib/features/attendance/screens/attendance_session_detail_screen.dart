@@ -430,6 +430,10 @@ class _AddExpectedMemberCard extends StatelessWidget {
   }
 }
 
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
+}
+
 class _SelectMemberDialog extends StatelessWidget {
   final List<MemberModel> members;
 
@@ -438,10 +442,13 @@ class _SelectMemberDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Choisir un membre'),
       content: SizedBox(
-        width: 480,
-        height: 420,
+        width: _dialogWidth(context, 480),
+        height: (MediaQuery.sizeOf(context).height * 0.58)
+            .clamp(280.0, 420.0)
+            .toDouble(),
         child: ListView.builder(
           itemCount: members.length,
           itemBuilder: (context, index) {

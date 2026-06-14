@@ -867,6 +867,10 @@ class _EmptyMembersCard extends StatelessWidget {
   }
 }
 
+double _dialogWidth(BuildContext context, double maxWidth) {
+  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
+}
+
 class AddMemberDialog extends StatefulWidget {
   final MembersService membersService;
 
@@ -931,9 +935,10 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Ajouter un membre'),
       content: SizedBox(
-        width: 460,
+        width: _dialogWidth(context, 460),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1189,9 +1194,10 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Assigner un rôle'),
       content: SizedBox(
-        width: 480,
+        width: _dialogWidth(context, 480),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1382,9 +1388,10 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Assigner le pôle cœur'),
       content: SizedBox(
-        width: 460,
+        width: _dialogWidth(context, 460),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
