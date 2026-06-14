@@ -240,6 +240,7 @@ class _SideMenu extends StatelessWidget {
             icon: Icons.people_alt_rounded,
             path: '/members',
           ),
+          _MenuItem(label: 'Pôles', icon: Icons.hub_rounded, path: '/poles'),
           _MenuItem(
             label: 'Présences',
             icon: Icons.fact_check_rounded,
@@ -723,6 +724,7 @@ String _navigationTitle(String currentPath) {
   final sections = <String, String>{
     '/dashboard': 'Tableau de bord Enactus ESP',
     '/members': 'Membres',
+    '/poles': 'Pôles',
     '/attendance': 'Présences',
     '/tasks': 'Tâches',
     '/finance': 'Finance',

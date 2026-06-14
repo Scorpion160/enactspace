@@ -570,6 +570,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/members',
       ),
       const _QuickAccessItem(
+        title: 'Pôles',
+        subtitle: 'Équipes et objectifs',
+        icon: Icons.hub_rounded,
+        route: '/poles',
+      ),
+      const _QuickAccessItem(
         title: 'Communication',
         subtitle: 'Posts et annonces',
         icon: Icons.forum_rounded,

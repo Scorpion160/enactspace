@@ -7,6 +7,7 @@ import '../features/documents/screens/documents_screen.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
+import '../features/poles/screens/poles_screen.dart';
 import '../features/posts/screens/posts_screen.dart';
 import '../features/recruitment/screens/recruitment_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
@@ -73,6 +74,10 @@ class AppRouter {
           GoRoute(
             path: '/posts',
             builder: (context, state) => const PostsScreen(),
+          ),
+          GoRoute(
+            path: '/poles',
+            builder: (context, state) => const PolesScreen(),
           ),
         ],
       ),
