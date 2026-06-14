@@ -618,6 +618,12 @@ class _QuickAccessGrid extends StatelessWidget {
         route: '/documents',
       ),
       const _QuickAccessItem(
+        title: 'Alumni',
+        subtitle: 'Mentorat et réseau',
+        icon: Icons.school_rounded,
+        route: '/alumni',
+      ),
+      const _QuickAccessItem(
         title: 'Recrutement',
         subtitle: 'Candidatures',
         icon: Icons.how_to_reg_rounded,

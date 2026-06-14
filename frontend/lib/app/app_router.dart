@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
+import '../features/alumni/screens/alumni_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
@@ -88,6 +89,10 @@ class AppRouter {
           GoRoute(
             path: '/events',
             builder: (context, state) => const EventsScreen(),
+          ),
+          GoRoute(
+            path: '/alumni',
+            builder: (context, state) => const AlumniScreen(),
           ),
         ],
       ),

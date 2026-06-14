@@ -279,6 +279,11 @@ class _SideMenu extends StatelessWidget {
             path: '/documents',
           ),
           _MenuItem(
+            label: 'Alumni',
+            icon: Icons.school_rounded,
+            path: '/alumni',
+          ),
+          _MenuItem(
             label: 'Recrutement',
             icon: Icons.how_to_reg_rounded,
             path: '/recruitment',
@@ -741,6 +746,7 @@ String _navigationTitle(String currentPath) {
     '/tasks': 'Tâches',
     '/finance': 'Finance',
     '/documents': 'Documents',
+    '/alumni': 'Alumni',
     '/recruitment': 'Recrutement',
     '/notifications': 'Notifications',
     '/posts': 'Communication',
