@@ -39,6 +39,15 @@ class _DashboardStats {
     required this.totalPaid,
     required this.pendingPayments,
   });
+
+  int get alertCount {
+    return [
+      lateTasks,
+      pendingPayments,
+      unreadNotifications,
+      totalDue > 0 ? 1 : 0,
+    ].where((value) => value > 0).length;
+  }
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
@@ -124,77 +133,148 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _loadDashboard,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _DashboardHeader(onRefresh: _loadDashboard),
-          const SizedBox(height: 22),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth < 560 ? 14.0 : 24.0;
+
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              20,
+              horizontalPadding,
+              28,
+            ),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1280),
+                  child: Column(
+                    children: [
+                      _DashboardHeader(
+                        stats: _stats,
+                        loading: _loading,
+                        onRefresh: _loadDashboard,
+                      ),
+                      const SizedBox(height: 22),
+                      if (_loading)
+                        const _DashboardLoading()
+                      else if (_error != null)
+                        _ErrorCard(message: _error!, onRetry: _loadDashboard)
+                      else if (_stats != null)
+                        _DashboardContent(stats: _stats!),
+                    ],
+                  ),
+                ),
               ),
-            )
-          else if (_error != null)
-            _ErrorCard(message: _error!, onRetry: _loadDashboard)
-          else if (_stats != null) ...[
-            _StatsGrid(stats: _stats!),
-            const SizedBox(height: 22),
-            const _QuickAccessGrid(),
-            const SizedBox(height: 22),
-            _QuickInsights(stats: _stats!),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  final VoidCallback onRefresh;
+class _DashboardContent extends StatelessWidget {
+  final _DashboardStats stats;
 
-  const _DashboardHeader({required this.onRefresh});
+  const _DashboardContent({required this.stats});
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 760;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 1120;
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 7,
+                child: Column(
+                  children: [
+                    _PriorityGrid(stats: stats),
+                    const SizedBox(height: 22),
+                    const _QuickAccessGrid(),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 22),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  children: [
+                    _QuickInsights(stats: stats),
+                    const SizedBox(height: 22),
+                    _MomentumCard(stats: stats),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            _PriorityGrid(stats: stats),
+            const SizedBox(height: 22),
+            const _QuickAccessGrid(),
+            const SizedBox(height: 22),
+            _QuickInsights(stats: stats),
+            const SizedBox(height: 22),
+            _MomentumCard(stats: stats),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DashboardHeader extends StatelessWidget {
+  final _DashboardStats? stats;
+  final bool loading;
+  final VoidCallback onRefresh;
+
+  const _DashboardHeader({
+    required this.stats,
+    required this.loading,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.sizeOf(context).width >= 820;
+    final alertCount = stats?.alertCount ?? 0;
+    final statusText = loading
+        ? 'Synchronisation des données...'
+        : alertCount == 0
+        ? 'Tout est calme pour le moment.'
+        : '$alertCount point(s) à suivre aujourd’hui.';
 
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
       ),
       child: isWide
           ? Row(
               children: [
-                _HeaderIcon(),
+                const _HeaderIcon(),
                 const SizedBox(width: 18),
-                const Expanded(child: _HeaderText()),
-                OutlinedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Actualiser'),
-                ),
+                Expanded(child: _HeaderText(statusText: statusText)),
+                const SizedBox(width: 18),
+                _HeaderActions(onRefresh: onRefresh),
               ],
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    _HeaderIcon(),
-                    const SizedBox(width: 18),
-                    const Expanded(child: _HeaderText()),
-                  ],
-                ),
+                const _HeaderIcon(),
                 const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Actualiser'),
-                ),
+                _HeaderText(statusText: statusText),
+                const SizedBox(height: 18),
+                _HeaderActions(onRefresh: onRefresh),
               ],
             ),
     );
@@ -202,54 +282,99 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
+  const _HeaderIcon();
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 58,
-      height: 58,
+      width: 62,
+      height: 62,
       decoration: BoxDecoration(
         color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: const Icon(
         Icons.dashboard_rounded,
         color: AppTheme.softBlack,
-        size: 34,
+        size: 36,
       ),
     );
   }
 }
 
 class _HeaderText extends StatelessWidget {
-  const _HeaderText();
+  final String statusText;
+
+  const _HeaderText({required this.statusText});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Tableau de bord',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 28,
+            fontSize: 30,
             fontWeight: FontWeight.w900,
           ),
         ),
-        SizedBox(height: 6),
-        Text(
-          'Vue globale de la vie du club Enactus ESP.',
+        const SizedBox(height: 6),
+        const Text(
+          'Le cockpit quotidien de Enactus ESP.',
           style: TextStyle(color: Colors.white70, height: 1.4),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            statusText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
-class _StatsGrid extends StatelessWidget {
+class _HeaderActions extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _HeaderActions({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onRefresh,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Actualiser'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => context.go('/posts'),
+          icon: const Icon(Icons.forum_rounded),
+          label: const Text('Communication'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PriorityGrid extends StatelessWidget {
   final _DashboardStats stats;
 
-  const _StatsGrid({required this.stats});
+  const _PriorityGrid({required this.stats});
 
   @override
   Widget build(BuildContext context) {
@@ -257,68 +382,70 @@ class _StatsGrid extends StatelessWidget {
       _StatItem(
         title: 'Membres',
         value: stats.members.toString(),
-        subtitle: 'membres enregistrés',
+        subtitle: 'Enacteurs enregistrés',
         icon: Icons.people_alt_rounded,
+        route: '/members',
       ),
       _StatItem(
-        title: 'Réunions',
-        value: stats.sessions.toString(),
-        subtitle: 'sessions de présence',
-        icon: Icons.event_available_rounded,
+        title: 'Communication',
+        value: stats.unreadNotifications.toString(),
+        subtitle: 'notifications non lues',
+        icon: Icons.notifications_active_rounded,
+        route: '/notifications',
+        danger: stats.unreadNotifications > 0,
       ),
       _StatItem(
-        title: 'Tâches en retard',
+        title: 'Tâches',
         value: stats.lateTasks.toString(),
-        subtitle: 'à surveiller',
+        subtitle: 'tâches en retard',
         icon: Icons.warning_rounded,
+        route: '/tasks',
         danger: stats.lateTasks > 0,
       ),
       _StatItem(
-        title: 'Dette totale',
+        title: 'Finance',
         value: _money(stats.totalDue),
-        subtitle: 'reste à payer',
+        subtitle: 'reste à encaisser',
         icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
         danger: stats.totalDue > 0,
       ),
       _StatItem(
-        title: 'Total payé',
-        value: _money(stats.totalPaid),
-        subtitle: 'paiements validés',
-        icon: Icons.verified_rounded,
-      ),
-      _StatItem(
-        title: 'Paiements attente',
-        value: stats.pendingPayments.toString(),
-        subtitle: 'à valider',
-        icon: Icons.pending_actions_rounded,
-        danger: stats.pendingPayments > 0,
+        title: 'Présences',
+        value: stats.sessions.toString(),
+        subtitle: 'sessions suivies',
+        icon: Icons.event_available_rounded,
+        route: '/attendance',
       ),
       _StatItem(
         title: 'Documents',
         value: stats.documents.toString(),
-        subtitle: 'documents partagés',
+        subtitle: 'ressources partagées',
         icon: Icons.folder_copy_rounded,
+        route: '/documents',
       ),
       _StatItem(
-        title: 'Candidatures',
+        title: 'Paiements',
+        value: stats.pendingPayments.toString(),
+        subtitle: 'paiements à valider',
+        icon: Icons.pending_actions_rounded,
+        route: '/finance',
+        danger: stats.pendingPayments > 0,
+      ),
+      _StatItem(
+        title: 'Recrutement',
         value: stats.applications.toString(),
-        subtitle: 'recrutement',
+        subtitle: 'candidatures',
         icon: Icons.how_to_reg_rounded,
-      ),
-      _StatItem(
-        title: 'Notifications',
-        value: stats.unreadNotifications.toString(),
-        subtitle: 'non lues',
-        icon: Icons.notifications_active_rounded,
-        danger: stats.unreadNotifications > 0,
+        route: '/recruitment',
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth >= 1200
-            ? 3
-            : constraints.maxWidth >= 760
+        final count = constraints.maxWidth >= 900
+            ? 4
+            : constraints.maxWidth >= 620
             ? 2
             : 1;
 
@@ -330,7 +457,7 @@ class _StatsGrid extends StatelessWidget {
             crossAxisCount: count,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
-            childAspectRatio: 2.6,
+            childAspectRatio: count == 1 ? 3.3 : 1.55,
           ),
           itemBuilder: (context, index) {
             return _StatCard(item: items[index]);
@@ -346,6 +473,7 @@ class _StatItem {
   final String value;
   final String subtitle;
   final IconData icon;
+  final String route;
   final bool danger;
 
   const _StatItem({
@@ -353,6 +481,7 @@ class _StatItem {
     required this.value,
     required this.subtitle,
     required this.icon,
+    required this.route,
     this.danger = false,
   });
 }
@@ -365,24 +494,37 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = item.danger ? Colors.red.shade700 : AppTheme.softBlack;
+    final background = item.danger
+        ? Colors.red.shade50
+        : AppTheme.enactusYellow.withValues(alpha: 0.18);
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: item.danger
-                  ? Colors.red.shade50
-                  : AppTheme.enactusYellow,
-              foregroundColor: color,
-              child: Icon(item.icon),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      child: InkWell(
+        onTap: () => context.go(item.route),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 23,
+                    backgroundColor: background,
+                    foregroundColor: color,
+                    child: Icon(item.icon),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.black.withValues(alpha: 0.36),
+                    size: 20,
+                  ),
+                ],
+              ),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -394,10 +536,11 @@ class _StatCard extends StatelessWidget {
                       color: color,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     item.title,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   Text(
                     item.subtitle,
@@ -406,8 +549,8 @@ class _StatCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -420,53 +563,53 @@ class _QuickAccessGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Membres',
-        subtitle: 'Gérer les enacteurs',
+        subtitle: 'Profils, rôles, statuts',
         icon: Icons.people_alt_rounded,
         route: '/members',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
+        title: 'Communication',
+        subtitle: 'Posts et annonces',
+        icon: Icons.forum_rounded,
+        route: '/posts',
+      ),
+      const _QuickAccessItem(
         title: 'Présences',
         subtitle: 'Absences et retards',
         icon: Icons.fact_check_rounded,
         route: '/attendance',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Tâches',
         subtitle: 'Kanban et suivi',
         icon: Icons.task_alt_rounded,
         route: '/tasks',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Finance',
-        subtitle: 'Paiements et pénalités',
+        subtitle: 'Paiements, dettes',
         icon: Icons.account_balance_wallet_rounded,
         route: '/finance',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Documents',
         subtitle: 'PV, rapports, fichiers',
         icon: Icons.folder_copy_rounded,
         route: '/documents',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Recrutement',
         subtitle: 'Candidatures',
         icon: Icons.how_to_reg_rounded,
         route: '/recruitment',
       ),
-      _QuickAccessItem(
+      const _QuickAccessItem(
         title: 'Notifications',
         subtitle: 'Alertes et rappels',
         icon: Icons.notifications_rounded,
         route: '/notifications',
-      ),
-      _QuickAccessItem(
-        title: 'Communication',
-        subtitle: 'Posts et annonces',
-        icon: Icons.forum_rounded,
-        route: '/posts',
       ),
     ];
 
@@ -475,26 +618,16 @@ class _QuickAccessGrid extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Row(
-              children: [
-                Icon(Icons.grid_view_rounded),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Accès rapides',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ],
+            const _SectionTitle(
+              icon: Icons.grid_view_rounded,
+              title: 'Accès rapides',
             ),
             const Divider(height: 26),
             LayoutBuilder(
               builder: (context, constraints) {
-                final count = constraints.maxWidth >= 1100
+                final count = constraints.maxWidth >= 860
                     ? 4
-                    : constraints.maxWidth >= 760
-                    ? 3
-                    : constraints.maxWidth >= 520
+                    : constraints.maxWidth >= 560
                     ? 2
                     : 1;
 
@@ -506,7 +639,7 @@ class _QuickAccessGrid extends StatelessWidget {
                     crossAxisCount: count,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 2.6,
+                    childAspectRatio: count == 1 ? 3.8 : 2.2,
                   ),
                   itemBuilder: (context, index) {
                     return _QuickAccessCard(item: items[index]);
@@ -595,26 +728,64 @@ class _QuickInsights extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alerts = <String>[];
+    final alerts = <_InsightItem>[];
 
     if (stats.lateTasks > 0) {
-      alerts.add('${stats.lateTasks} tâche(s) en retard doivent être suivies.');
+      alerts.add(
+        _InsightItem(
+          icon: Icons.warning_rounded,
+          title: 'Tâches en retard',
+          message: '${stats.lateTasks} tâche(s) doivent être suivies.',
+          route: '/tasks',
+          danger: true,
+        ),
+      );
     }
 
     if (stats.pendingPayments > 0) {
-      alerts.add('${stats.pendingPayments} paiement(s) attendent validation.');
+      alerts.add(
+        _InsightItem(
+          icon: Icons.pending_actions_rounded,
+          title: 'Paiements à valider',
+          message: '${stats.pendingPayments} paiement(s) attendent validation.',
+          route: '/finance',
+          danger: true,
+        ),
+      );
     }
 
     if (stats.totalDue > 0) {
-      alerts.add('La dette totale actuelle est de ${_money(stats.totalDue)}.');
+      alerts.add(
+        _InsightItem(
+          icon: Icons.account_balance_wallet_rounded,
+          title: 'Dette totale',
+          message: '${_money(stats.totalDue)} restent à encaisser.',
+          route: '/finance',
+          danger: true,
+        ),
+      );
     }
 
     if (stats.unreadNotifications > 0) {
-      alerts.add('${stats.unreadNotifications} notification(s) non lue(s).');
+      alerts.add(
+        _InsightItem(
+          icon: Icons.notifications_active_rounded,
+          title: 'Notifications',
+          message: '${stats.unreadNotifications} notification(s) non lue(s).',
+          route: '/notifications',
+        ),
+      );
     }
 
     if (alerts.isEmpty) {
-      alerts.add('Aucune alerte critique pour le moment.');
+      alerts.add(
+        const _InsightItem(
+          icon: Icons.check_circle_rounded,
+          title: 'Tout est sous contrôle',
+          message: 'Aucune alerte critique pour le moment.',
+          route: '/dashboard',
+        ),
+      );
     }
 
     return Card(
@@ -622,27 +793,246 @@ class _QuickInsights extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Row(
-              children: [
-                Icon(Icons.insights_rounded),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Points d’attention',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ],
+            const _SectionTitle(
+              icon: Icons.insights_rounded,
+              title: 'Points d’attention',
             ),
             const Divider(height: 26),
-            ...alerts.map(
-              (alert) => ListTile(
-                leading: const Icon(Icons.chevron_right_rounded),
-                title: Text(alert),
-              ),
+            ...alerts.map((alert) => _InsightTile(item: alert)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MomentumCard extends StatelessWidget {
+  final _DashboardStats stats;
+
+  const _MomentumCard({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalFinancial = stats.totalPaid + stats.totalDue;
+    final paidRatio = totalFinancial <= 0
+        ? 0.0
+        : stats.totalPaid / totalFinancial;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionTitle(
+              icon: Icons.auto_graph_rounded,
+              title: 'Dynamique du club',
+            ),
+            const Divider(height: 26),
+            _ProgressLine(
+              label: 'Encaissement',
+              value: paidRatio,
+              trailing: '${(paidRatio * 100).round()}%',
+            ),
+            const SizedBox(height: 16),
+            _SoftMetric(
+              icon: Icons.verified_rounded,
+              label: 'Total payé',
+              value: _money(stats.totalPaid),
+            ),
+            const SizedBox(height: 10),
+            _SoftMetric(
+              icon: Icons.description_rounded,
+              label: 'Documents',
+              value: '${stats.documents} ressource(s)',
+            ),
+            const SizedBox(height: 10),
+            _SoftMetric(
+              icon: Icons.how_to_reg_rounded,
+              label: 'Recrutement',
+              value: '${stats.applications} candidature(s)',
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProgressLine extends StatelessWidget {
+  final String label;
+  final double value;
+  final String trailing;
+
+  const _ProgressLine({
+    required this.label,
+    required this.value,
+    required this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            Text(trailing, style: const TextStyle(fontWeight: FontWeight.w900)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 10,
+            value: value.clamp(0.0, 1.0),
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.18),
+            valueColor: const AlwaysStoppedAnimation(AppTheme.enactusYellow),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SoftMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _SoftMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F0),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.softBlack),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightItem {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String route;
+  final bool danger;
+
+  const _InsightItem({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.route,
+    this.danger = false,
+  });
+}
+
+class _InsightTile extends StatelessWidget {
+  final _InsightItem item;
+
+  const _InsightTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.danger ? Colors.red.shade700 : AppTheme.softBlack;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => context.go(item.route),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: item.danger
+                ? Colors.red.shade50
+                : AppTheme.enactusYellow.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Icon(item.icon, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      item.message,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _SectionTitle({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardLoading extends StatelessWidget {
+  const _DashboardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
       ),
     );
   }
