@@ -442,6 +442,12 @@ def create_thread(
             detail="Une discussion privée doit contenir exactement deux personnes",
         )
 
+    if payload.thread_type != "direct" and not (payload.title or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Donnez un nom à cette conversation",
+        )
+
     if payload.thread_type == "direct":
         existing_threads = db.query(ChatThread).join(
             ChatParticipant,
@@ -476,7 +482,7 @@ def create_thread(
         )
 
     thread = ChatThread(
-        title=payload.title.strip() if payload.title else None,
+        title=None if payload.thread_type == "direct" else payload.title.strip(),
         thread_type=payload.thread_type,
         scope_type=payload.scope_type,
         scope_id=payload.scope_id,

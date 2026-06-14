@@ -1790,6 +1790,13 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
       return;
     }
 
+    if (_threadType != 'direct' && _titleController.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Donne un nom à cette conversation.';
+      });
+      return;
+    }
+
     if ((_threadType == 'pole' || _threadType == 'project') &&
         _scopeId == null) {
       setState(() {
@@ -1805,7 +1812,7 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
 
     try {
       final thread = await widget.chatService.createThread(
-        title: _titleController.text,
+        title: _threadType == 'direct' ? null : _titleController.text,
         threadType: _threadType,
         scopeType:
             _threadType == 'pole' ||
@@ -1846,14 +1853,16 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
         child: Column(
           children: [
             if (_error != null) _DialogError(message: _error!),
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Titre optionnel',
-                prefixIcon: Icon(Icons.title_rounded),
+            if (_threadType != 'direct') ...[
+              TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom de la conversation',
+                  prefixIcon: Icon(Icons.title_rounded),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             DropdownButtonFormField<String>(
               initialValue: _threadType,
               isExpanded: true,
@@ -1878,6 +1887,9 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
                       setState(() {
                         _threadType = value;
                         _scopeId = null;
+                        if (value == 'direct') {
+                          _titleController.clear();
+                        }
                         if (value == 'direct' && _selectedIds.length > 1) {
                           final first = _selectedIds.first;
                           _selectedIds
@@ -1943,7 +1955,9 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Rechercher un contact',
+                labelText: _threadType == 'direct'
+                    ? 'Rechercher une personne'
+                    : 'Ajouter des membres',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
                   onPressed: _loadContacts,
@@ -1978,10 +1992,11 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
                           },
                           title: Text(contact.displayName),
                           subtitle: Text(contact.email),
-                          secondary: CircleAvatar(
-                            backgroundColor: AppTheme.enactusYellow,
-                            foregroundColor: AppTheme.softBlack,
-                            child: Text(_initials(contact.displayName)),
+                          secondary: _ChatAvatar(
+                            title: contact.displayName,
+                            imageUrl: _absoluteUrl(contact.photoUrl),
+                            selected: selected,
+                            icon: Icons.person_rounded,
                           ),
                         );
                       },
