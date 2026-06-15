@@ -1230,6 +1230,13 @@ class _MediaFallback extends StatelessWidget {
       'image' => Icons.image_rounded,
       _ => Icons.attach_file_rounded,
     };
+    final details = [
+      if (message.attachmentMimeType?.trim().isNotEmpty == true)
+        message.attachmentMimeType!.trim(),
+      if (message.attachmentSizeBytes != null)
+        _formatBytes(message.attachmentSizeBytes!),
+      if (message.durationSeconds != null) '${message.durationSeconds}s',
+    ].join(' · ');
 
     return Container(
       constraints: const BoxConstraints(minWidth: 220),
@@ -1265,11 +1272,9 @@ class _MediaFallback extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                if (message.durationSeconds != null)
-                  Text('${message.durationSeconds}s'),
-                if (message.attachmentUrl != null)
+                if (details.isNotEmpty)
                   Text(
-                    message.attachmentUrl!,
+                    details,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1954,7 +1959,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 
     if (url.isEmpty && dataBase64.isEmpty) {
       setState(() {
-        _error = 'Ajoute un lien ou des données base64 du fichier.';
+        _error = 'Choisis un fichier à envoyer.';
       });
       return;
     }
@@ -2031,29 +2036,6 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_error != null) _DialogError(message: _error!),
-              DropdownButtonFormField<String>(
-                initialValue: _messageType,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Type',
-                  prefixIcon: Icon(Icons.category_rounded),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'image', child: Text('Photo')),
-                  DropdownMenuItem(value: 'video', child: Text('Vidéo')),
-                  DropdownMenuItem(value: 'audio', child: Text('Audio')),
-                  DropdownMenuItem(value: 'document', child: Text('Document')),
-                  DropdownMenuItem(value: 'sticker', child: Text('Sticker')),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _messageType = value;
-                    _error = null;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _picking || _uploading ? null : _pickFile,
                 icon: _picking
@@ -2073,6 +2055,34 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                 ),
               ],
               const SizedBox(height: 12),
+              if (_showAdvanced) ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _messageType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nature du média',
+                    prefixIcon: Icon(Icons.category_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'image', child: Text('Photo')),
+                    DropdownMenuItem(value: 'video', child: Text('Vidéo')),
+                    DropdownMenuItem(value: 'audio', child: Text('Audio')),
+                    DropdownMenuItem(
+                      value: 'document',
+                      child: Text('Document'),
+                    ),
+                    DropdownMenuItem(value: 'sticker', child: Text('Sticker')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _messageType = value;
+                      _error = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
               if (_showAdvanced)
                 TextField(
                   controller: _urlController,
