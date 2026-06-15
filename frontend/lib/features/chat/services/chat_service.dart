@@ -156,6 +156,15 @@ class ChatService {
     ).whereType<Map<String, dynamic>>().map(ChatMessageModel.fromJson).toList();
   }
 
+  Future<void> markThreadAsRead(String threadId) async {
+    final token = await _requireToken();
+    await _apiClient.postJson(
+      '/chat/threads/$threadId/read',
+      token: token,
+      data: {},
+    );
+  }
+
   Future<List<ChatMessageModel>> getCachedMessages({
     required String userId,
     required String threadId,
@@ -224,6 +233,30 @@ class ChatService {
     }
 
     throw Exception('Réponse invalide lors de l’envoi du message.');
+  }
+
+  Future<void> reactToMessage({
+    required String threadId,
+    required String messageId,
+    required String reactionType,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.postJson(
+      '/chat/threads/$threadId/messages/$messageId/reaction',
+      token: token,
+      data: {'reaction_type': reactionType},
+    );
+  }
+
+  Future<void> deleteMessageReaction({
+    required String threadId,
+    required String messageId,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.delete(
+      '/chat/threads/$threadId/messages/$messageId/reaction',
+      token: token,
+    );
   }
 
   Future<void> addParticipants({

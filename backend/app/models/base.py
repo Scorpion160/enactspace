@@ -26,7 +26,12 @@ from app.models.task import (
 )
 from app.models.document import Document
 from app.models.post import Post, PostComment, PostReaction
-from app.models.chat import ChatThread, ChatParticipant, ChatMessage
+from app.models.chat import (
+    ChatThread,
+    ChatParticipant,
+    ChatMessage,
+    ChatMessageReaction,
+)
 from app.models.recruitment import (
     RecruitmentCampaign,
     Application,

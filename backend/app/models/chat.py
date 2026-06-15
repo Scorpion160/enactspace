@@ -88,3 +88,33 @@ class ChatMessage(Base):
 
     thread = relationship("ChatThread", back_populates="messages")
     author = relationship("User")
+    reactions = relationship(
+        "ChatMessageReaction",
+        back_populates="message",
+        cascade="all, delete-orphan",
+    )
+
+
+class ChatMessageReaction(Base):
+    __tablename__ = "chat_message_reactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("chat_messages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    reaction_type: Mapped[str] = mapped_column(String(40), default="👍")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    message = relationship("ChatMessage", back_populates="reactions")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", name="uq_chat_message_reaction"),
+    )

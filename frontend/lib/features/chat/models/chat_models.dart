@@ -218,6 +218,9 @@ class ChatMessageModel {
   final int? durationSeconds;
   final String? thumbnailUrl;
   final String? stickerPack;
+  final int reactionsCount;
+  final Map<String, int> reactionsSummary;
+  final String? currentUserReaction;
   final DateTime createdAt;
   final DateTime? editedAt;
   final DateTime? deletedAt;
@@ -235,6 +238,9 @@ class ChatMessageModel {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.stickerPack,
+    required this.reactionsCount,
+    required this.reactionsSummary,
+    required this.currentUserReaction,
     required this.createdAt,
     required this.editedAt,
     required this.deletedAt,
@@ -256,6 +262,10 @@ class ChatMessageModel {
       durationSeconds: int.tryParse(json['duration_seconds']?.toString() ?? ''),
       thumbnailUrl: json['thumbnail_url']?.toString(),
       stickerPack: json['sticker_pack']?.toString(),
+      reactionsCount:
+          int.tryParse(json['reactions_count']?.toString() ?? '') ?? 0,
+      reactionsSummary: _parseReactionsSummary(json['reactions_summary']),
+      currentUserReaction: json['current_user_reaction']?.toString(),
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -278,6 +288,9 @@ class ChatMessageModel {
       'duration_seconds': durationSeconds,
       'thumbnail_url': thumbnailUrl,
       'sticker_pack': stickerPack,
+      'reactions_count': reactionsCount,
+      'reactions_summary': reactionsSummary,
+      'current_user_reaction': currentUserReaction,
       'created_at': createdAt.toIso8601String(),
       'edited_at': editedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -312,6 +325,14 @@ class ChatMessageModel {
         return 'Média';
     }
   }
+}
+
+Map<String, int> _parseReactionsSummary(dynamic value) {
+  if (value is! Map) return {};
+
+  return value.map((key, count) {
+    return MapEntry(key.toString(), int.tryParse(count?.toString() ?? '') ?? 0);
+  });
 }
 
 class ChatUploadedMediaModel {

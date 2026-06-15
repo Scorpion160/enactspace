@@ -41,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Set<String> _pinnedThreadIds = {};
   Set<String> _pinnedMessageIds = {};
   final Map<String, String> _messageReactions = {};
+  final Set<String> _removedServerReactionIds = {};
   final Set<String> _hiddenMessageIds = {};
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
@@ -139,8 +140,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _messages = cached;
+      _mergeServerReactions(cached);
       _pinnedMessageIds = pinnedMessageIds;
     });
+  }
+
+  void _mergeServerReactions(List<ChatMessageModel> messages) {
+    for (final message in messages) {
+      final reaction = message.currentUserReaction;
+      if (reaction != null && reaction.trim().isNotEmpty) {
+        _messageReactions[message.id] = reaction;
+        _removedServerReactionIds.remove(message.id);
+      } else {
+        _messageReactions.remove(message.id);
+        _removedServerReactionIds.remove(message.id);
+      }
+    }
   }
 
   Future<void> _selectThread(
@@ -175,6 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted && cached.isNotEmpty) {
           setState(() {
             _messages = cached;
+            _mergeServerReactions(cached);
             _pinnedMessageIds = pinnedMessageIds;
             _usingLocalCache = true;
           });
@@ -187,6 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _selectedThread = thread;
         _messages = messages;
+        _mergeServerReactions(messages);
         _pinnedMessageIds = pinnedMessageIds;
         _usingLocalCache = false;
       });
@@ -425,17 +442,58 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _reactToMessage(ChatMessageModel message, String emoji) {
+  Future<void> _reactToMessage(ChatMessageModel message, String emoji) async {
+    final thread = _selectedThread;
+    final shouldRemove = _messageReactions[message.id] == emoji;
     setState(() {
-      _messageReactions[message.id] = emoji;
+      if (shouldRemove) {
+        _messageReactions.remove(message.id);
+        if (message.currentUserReaction != null) {
+          _removedServerReactionIds.add(message.id);
+        }
+      } else {
+        _messageReactions[message.id] = emoji;
+        _removedServerReactionIds.remove(message.id);
+      }
     });
-    _showInfo('$emoji réaction ajoutée.');
+
+    if (thread == null) {
+      _showInfo(
+        shouldRemove ? 'Réaction retirée.' : '$emoji réaction ajoutée.',
+      );
+      return;
+    }
+
+    try {
+      if (shouldRemove) {
+        await _chatService.deleteMessageReaction(
+          threadId: thread.id,
+          messageId: message.id,
+        );
+      } else {
+        await _chatService.reactToMessage(
+          threadId: thread.id,
+          messageId: message.id,
+          reactionType: emoji,
+        );
+      }
+      _showInfo(
+        shouldRemove ? 'Réaction retirée.' : '$emoji réaction synchronisée.',
+      );
+    } catch (_) {
+      _showInfo(
+        shouldRemove
+            ? 'Réaction retirée sur cet appareil.'
+            : '$emoji réaction gardée sur cet appareil.',
+      );
+    }
   }
 
   void _deleteMessageForMe(ChatMessageModel message) {
     setState(() {
       _hiddenMessageIds.add(message.id);
       _messageReactions.remove(message.id);
+      _removedServerReactionIds.remove(message.id);
       _pinnedMessageIds.remove(message.id);
       if (_replyingToMessage?.id == message.id) {
         _replyingToMessage = null;
@@ -717,6 +775,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     currentUserId: _user?.id,
                     pinnedMessageIds: _pinnedMessageIds,
                     messageReactions: _messageReactions,
+                    removedServerReactionIds: _removedServerReactionIds,
                     onMessageLongPress: _openMessageActions,
                   ),
           ),
@@ -1122,6 +1181,7 @@ class _MessagesList extends StatelessWidget {
   final String? currentUserId;
   final Set<String> pinnedMessageIds;
   final Map<String, String> messageReactions;
+  final Set<String> removedServerReactionIds;
   final ValueChanged<ChatMessageModel> onMessageLongPress;
 
   const _MessagesList({
@@ -1129,6 +1189,7 @@ class _MessagesList extends StatelessWidget {
     required this.currentUserId,
     required this.pinnedMessageIds,
     required this.messageReactions,
+    required this.removedServerReactionIds,
     required this.onMessageLongPress,
   });
 
@@ -1150,7 +1211,11 @@ class _MessagesList extends StatelessWidget {
         final message = messages[index];
         final mine = message.authorId == currentUserId;
         final pinned = pinnedMessageIds.contains(message.id);
-        final reaction = messageReactions[message.id];
+        final reaction = _messageReactionLabel(
+          message,
+          messageReactions[message.id],
+          removedServerReactionIds.contains(message.id),
+        );
 
         return Align(
           alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -3045,6 +3110,37 @@ String _messagePreview(ChatMessageModel message) {
   final normalized = value.replaceAll(RegExp(r'\s+'), ' ').trim();
   if (normalized.length <= 70) return normalized;
   return '${normalized.substring(0, 70)}...';
+}
+
+String? _messageReactionLabel(
+  ChatMessageModel message,
+  String? localReaction,
+  bool removedServerReaction,
+) {
+  final summary = Map<String, int>.from(message.reactionsSummary);
+  final serverReaction = message.currentUserReaction?.trim();
+
+  if (removedServerReaction &&
+      serverReaction != null &&
+      serverReaction.isNotEmpty &&
+      summary.containsKey(serverReaction)) {
+    summary[serverReaction] = summary[serverReaction]! - 1;
+  }
+
+  final reaction = localReaction?.trim();
+  if (reaction != null && reaction.isNotEmpty) {
+    summary[reaction] = summary.containsKey(reaction) ? summary[reaction]! : 1;
+  }
+
+  final visible = summary.entries
+      .where((entry) => entry.value > 0)
+      .take(3)
+      .map(
+        (entry) => entry.value > 1 ? '${entry.key} ${entry.value}' : entry.key,
+      )
+      .join('  ');
+
+  return visible.isEmpty ? null : visible;
 }
 
 String? _optional(String value) {

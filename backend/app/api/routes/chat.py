@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_validated_user
 from app.db.database import get_db
-from app.models.chat import ChatThread, ChatParticipant, ChatMessage
+from app.models.chat import (
+    ChatThread,
+    ChatParticipant,
+    ChatMessage,
+    ChatMessageReaction,
+)
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.role import Role, UserRole
@@ -28,6 +33,8 @@ from app.schemas.chat import (
     ChatUploadRead,
     ChatParticipantsUpdate,
     ChatParticipantRoleUpdate,
+    ChatMessageReactionCreate,
+    ChatMessageReactionRead,
 )
 
 
@@ -36,6 +43,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
 VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker"}
 MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text"}
+VALID_REACTION_TYPES = {"👍", "❤️", "😂", "😮", "😢", "🙏"}
 CHAT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
 CHAT_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads" / "chat"
 ENACCHEF_ROLES = {
@@ -74,8 +82,37 @@ def parse_message_payload(message: ChatMessage) -> dict:
     return payload
 
 
-def serialize_message(message: ChatMessage) -> dict:
+def message_reactions_summary(db: Session, message_id) -> dict[str, int]:
+    rows = db.query(
+        ChatMessageReaction.reaction_type,
+        func.count(ChatMessageReaction.id),
+    ).filter(
+        ChatMessageReaction.message_id == message_id,
+    ).group_by(ChatMessageReaction.reaction_type).all()
+
+    return {reaction_type: int(count or 0) for reaction_type, count in rows}
+
+
+def current_user_reaction(db: Session, message_id, user_id) -> str | None:
+    reaction = db.query(ChatMessageReaction).filter(
+        ChatMessageReaction.message_id == message_id,
+        ChatMessageReaction.user_id == user_id,
+    ).first()
+
+    return reaction.reaction_type if reaction else None
+
+
+def serialize_message(
+    message: ChatMessage,
+    db: Session | None = None,
+    current_user_id=None,
+) -> dict:
     payload = parse_message_payload(message)
+    reactions_summary = (
+        message_reactions_summary(db, message.id)
+        if db is not None
+        else {}
+    )
 
     return {
         "id": message.id,
@@ -93,6 +130,15 @@ def serialize_message(message: ChatMessage) -> dict:
         "duration_seconds": payload.get("duration_seconds"),
         "thumbnail_url": payload.get("thumbnail_url"),
         "sticker_pack": payload.get("sticker_pack"),
+        "reactions_count": sum(reactions_summary.values()),
+        "reactions_summary": reactions_summary,
+        "current_user_reaction": current_user_reaction(
+            db,
+            message.id,
+            current_user_id,
+        )
+        if db is not None and current_user_id is not None
+        else None,
     }
 
 
@@ -685,7 +731,10 @@ def list_messages(
     participant.last_read_at = datetime.utcnow()
     db.commit()
 
-    return [serialize_message(message) for message in reversed(messages)]
+    return [
+        serialize_message(message, db=db, current_user_id=current_user.id)
+        for message in reversed(messages)
+    ]
 
 
 @router.post("/threads/{thread_id}/messages", response_model=ChatMessageRead)
@@ -737,7 +786,119 @@ def send_message(
     db.commit()
     db.refresh(message)
 
-    return serialize_message(message)
+    return serialize_message(message, db=db, current_user_id=current_user.id)
+
+
+@router.post(
+    "/threads/{thread_id}/messages/{message_id}/reaction",
+    response_model=ChatMessageReactionRead,
+)
+def upsert_message_reaction(
+    thread_id: str,
+    message_id: str,
+    payload: ChatMessageReactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+
+    reaction_type = payload.reaction_type.strip()
+    if reaction_type not in VALID_REACTION_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Réaction invalide",
+        )
+
+    message = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.thread_id == thread_id,
+        ChatMessage.deleted_at.is_(None),
+    ).first()
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message introuvable",
+        )
+
+    reaction = db.query(ChatMessageReaction).filter(
+        ChatMessageReaction.message_id == message.id,
+        ChatMessageReaction.user_id == current_user.id,
+    ).first()
+
+    if reaction:
+        reaction.reaction_type = reaction_type
+        reaction.created_at = datetime.utcnow()
+    else:
+        reaction = ChatMessageReaction(
+            message_id=message.id,
+            user_id=current_user.id,
+            reaction_type=reaction_type,
+        )
+        db.add(reaction)
+
+    db.commit()
+    db.refresh(reaction)
+    return reaction
+
+
+@router.get(
+    "/threads/{thread_id}/messages/{message_id}/reactions",
+    response_model=list[ChatMessageReactionRead],
+)
+def list_message_reactions(
+    thread_id: str,
+    message_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+
+    message = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.thread_id == thread_id,
+        ChatMessage.deleted_at.is_(None),
+    ).first()
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message introuvable",
+        )
+
+    return db.query(ChatMessageReaction).filter(
+        ChatMessageReaction.message_id == message.id,
+    ).order_by(ChatMessageReaction.created_at.asc()).all()
+
+
+@router.delete("/threads/{thread_id}/messages/{message_id}/reaction")
+def delete_message_reaction(
+    thread_id: str,
+    message_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+
+    message = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.thread_id == thread_id,
+        ChatMessage.deleted_at.is_(None),
+    ).first()
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message introuvable",
+        )
+
+    reaction = db.query(ChatMessageReaction).filter(
+        ChatMessageReaction.message_id == message.id,
+        ChatMessageReaction.user_id == current_user.id,
+    ).first()
+
+    if reaction:
+        db.delete(reaction)
+        db.commit()
+
+    return {"ok": True}
 
 
 @router.post("/threads/{thread_id}/read", response_model=ChatThreadRead)
