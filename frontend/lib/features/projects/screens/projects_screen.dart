@@ -381,19 +381,20 @@ class _ProjectsGrid extends StatelessWidget {
             ? 2
             : 1;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: projects.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 1.24 : 0.94,
-          ),
-          itemBuilder: (context, index) {
-            return _ProjectCard(project: projects[index]);
-          },
+        const spacing = 14.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final project in projects)
+              SizedBox(
+                width: itemWidth,
+                child: _ProjectCard(project: project),
+              ),
+          ],
         );
       },
     );
@@ -499,7 +500,8 @@ class _ProjectCard extends StatelessWidget {
                 fallback: 'Solution à préciser',
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
+            _ProjectReadinessBar(project: project),
             const Divider(height: 26),
             Row(
               children: [
@@ -520,6 +522,15 @@ class _ProjectCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _showProjectDetails(context, project),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Détail projet'),
+              ),
             ),
           ],
         ),
@@ -563,6 +574,319 @@ class _ProgressLine extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProjectReadinessBar extends StatelessWidget {
+  final ProjectModel project;
+
+  const _ProjectReadinessBar({required this.project});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = _projectReadinessScore(project);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.fact_check_rounded, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Préparation compétition',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Text(
+                '$score/100',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: score / 100,
+              minHeight: 8,
+              backgroundColor: Colors.white,
+              color: AppTheme.enactusYellow,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _showProjectDetails(BuildContext context, ProjectModel project) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (context) => _ProjectDetailsSheet(project: project),
+  );
+}
+
+class _ProjectDetailsSheet extends StatelessWidget {
+  final ProjectModel project;
+
+  const _ProjectDetailsSheet({required this.project});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _statusColor(project.status);
+    final readiness = _projectReadinessScore(project);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.86,
+      minChildSize: 0.52,
+      maxChildSize: 0.95,
+      builder: (context, controller) {
+        return SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 780),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: AppTheme.enactusYellow,
+                        foregroundColor: AppTheme.softBlack,
+                        child: const Icon(Icons.rocket_launch_rounded),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              project.name,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              '${project.statusLabel} · ${_money(project.budgetEstimated)} · préparation $readiness/100',
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _ProgressLine(progress: project.progress, color: statusColor),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _ProjectDetailBlock(
+                        icon: Icons.report_problem_rounded,
+                        title: 'Problème',
+                        body: _safeText(
+                          project.problemStatement,
+                          fallback: 'Problématique à préciser.',
+                        ),
+                      ),
+                      _ProjectDetailBlock(
+                        icon: Icons.lightbulb_rounded,
+                        title: 'Solution',
+                        body: _safeText(
+                          project.solution,
+                          fallback: 'Solution à préciser.',
+                        ),
+                      ),
+                      _ProjectDetailBlock(
+                        icon: Icons.flag_rounded,
+                        title: 'Objectifs',
+                        body: _safeText(
+                          project.objectives,
+                          fallback: 'Objectifs à préciser.',
+                        ),
+                      ),
+                      _ProjectDetailBlock(
+                        icon: Icons.public_rounded,
+                        title: 'Impact / livrables',
+                        body: _safeText(
+                          project.expectedImpact,
+                          fallback: 'Impact attendu et livrables à préciser.',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _ProjectActionPanel(),
+                  const SizedBox(height: 16),
+                  _ProjectLogPreview(project: project),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProjectDetailBlock extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _ProjectDetailBlock({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: (MediaQuery.sizeOf(context).width - 72).clamp(280.0, 360.0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.enactusYellow.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(body, style: const TextStyle(height: 1.35)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectActionPanel extends StatelessWidget {
+  const _ProjectActionPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: const [
+        _ProjectActionChip(icon: Icons.groups_rounded, label: 'Équipe'),
+        _ProjectActionChip(icon: Icons.task_alt_rounded, label: 'Tâches'),
+        _ProjectActionChip(icon: Icons.description_rounded, label: 'Documents'),
+        _ProjectActionChip(icon: Icons.payments_rounded, label: 'Budget'),
+        _ProjectActionChip(icon: Icons.photo_library_rounded, label: 'Photos'),
+        _ProjectActionChip(icon: Icons.handshake_rounded, label: 'Partenaires'),
+      ],
+    );
+  }
+}
+
+class _ProjectActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _ProjectActionChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      backgroundColor: Colors.white,
+      side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _ProjectLogPreview extends StatelessWidget {
+  final ProjectModel project;
+
+  const _ProjectLogPreview({required this.project});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      'Création du projet le ${DateFormat('dd/MM/yyyy').format(project.createdAt)}',
+      if (project.startedAt != null)
+        'Démarrage terrain le ${DateFormat('dd/MM/yyyy').format(project.startedAt!)}',
+      if (project.endedAt != null)
+        'Clôture prévue le ${DateFormat('dd/MM/yyyy').format(project.endedAt!)}',
+      'Prochaine mise à jour: rapport impact, livrables et budget réel.',
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Journal de bord',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppTheme.enactusYellow,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -992,6 +1316,20 @@ Color _statusColor(String status) {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+int _projectReadinessScore(ProjectModel project) {
+  var score = project.progress;
+
+  if ((project.problemStatement ?? '').trim().length >= 40) score += 10;
+  if ((project.solution ?? '').trim().length >= 40) score += 10;
+  if ((project.objectives ?? '').trim().length >= 40) score += 10;
+  if ((project.expectedImpact ?? '').trim().length >= 40) score += 10;
+  if (project.budgetEstimated > 0) score += 10;
+  if (project.startedAt != null) score += 5;
+  if (project.endedAt != null) score += 5;
+
+  return score.clamp(0, 100);
 }
 
 String _money(double value) {
