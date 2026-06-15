@@ -216,6 +216,31 @@ class RecruitmentService {
     throw Exception('Réponse invalide lors de la conversion en membre.');
   }
 
+  Future<bool> prepareOnboardingAcademyPath({
+    required String applicationId,
+    required String userId,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connectÃ©.');
+
+    try {
+      await _apiClient.postJson(
+        '/academy/onboarding/assign',
+        token: token,
+        data: {
+          'application_id': applicationId,
+          'user_id': userId,
+          'path_id': 'onboarding',
+          'notify_user': true,
+          'send_email_if_available': true,
+        },
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<dynamic> _extractList(dynamic response) {
     if (response is List) return response;
     if (response is Map && response['data'] is List) {

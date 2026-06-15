@@ -198,7 +198,11 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compte membre créé ou associé.')),
+        const SnackBar(
+          content: Text(
+            'Compte membre créé ou associé. Parcours Academy Nouveau membre préparé.',
+          ),
+        ),
       );
     }
   }
@@ -1623,10 +1627,18 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
     });
 
     try {
-      await widget.service.convertToUser(
+      final response = await widget.service.convertToUser(
         applicationId: widget.application.id,
         password: _passwordController.text.trim(),
       );
+      final userId = response['user_id']?.toString();
+
+      if (userId != null && userId.isNotEmpty) {
+        await widget.service.prepareOnboardingAcademyPath(
+          applicationId: widget.application.id,
+          userId: userId,
+        );
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -1654,6 +1666,27 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Créer un compte pour ${widget.application.fullName}.'),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.enactusYellow.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.school_rounded, color: AppTheme.softBlack),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Le parcours Academy "Nouveau membre" sera préparé avec notification et email si le backend est disponible.',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 14),
             if (_error != null) _DialogError(message: _error!),
             TextFormField(
