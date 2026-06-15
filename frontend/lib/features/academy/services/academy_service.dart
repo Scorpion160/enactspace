@@ -1,8 +1,10 @@
 import '../models/academy_models.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../gamification/services/gamification_service.dart';
 
 class AcademyService {
+  final ApiClient _apiClient;
   final AuthService _authService;
   final GamificationService _gamificationService;
 
@@ -14,12 +16,51 @@ class AcademyService {
   int _academyPoints = 340;
 
   AcademyService({
+    ApiClient? apiClient,
     AuthService? authService,
     GamificationService? gamificationService,
-  }) : _authService = authService ?? AuthService(),
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _authService = authService ?? AuthService(),
        _gamificationService = gamificationService ?? GamificationService();
 
   Future<AcademyHomeData> getHome() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return _demoHome();
+
+      final responses = await Future.wait([
+        _apiClient.get('/academy/courses', token: token),
+        _apiClient.get('/academy/me/progress', token: token),
+      ]);
+
+      final coursesResponse = responses[0];
+      final progressResponse = responses[1];
+      if (coursesResponse is! List ||
+          progressResponse is! Map<String, dynamic>) {
+        return _demoHome();
+      }
+
+      final courses = coursesResponse
+          .whereType<Map<String, dynamic>>()
+          .map(_courseFromJson)
+          .map(_applyProgress)
+          .toList();
+      if (courses.isEmpty) return _demoHome();
+
+      final fallback = await _demoHome();
+      return AcademyHomeData(
+        courses: courses,
+        paths: fallback.paths,
+        badges: fallback.badges,
+        caseStudies: fallback.caseStudies,
+        progress: _progressFromJson(progressResponse, courses),
+      );
+    } catch (_) {
+      return _demoHome();
+    }
+  }
+
+  Future<AcademyHomeData> _demoHome() async {
     await Future<void>.delayed(const Duration(milliseconds: 240));
 
     final courses = [
@@ -634,6 +675,112 @@ class AcademyService {
           .toList(),
       quiz: course.quiz,
     );
+  }
+
+  AcademyCourseModel _courseFromJson(Map<String, dynamic> json) {
+    final lessons = _list(
+      json['lessons'],
+    ).whereType<Map<String, dynamic>>().map(_lessonFromJson).toList();
+
+    return AcademyCourseModel(
+      id: _string(json['id'], fallback: 'course'),
+      title: _string(json['title'], fallback: 'Cours Academy'),
+      category: _string(json['category'], fallback: 'Academy'),
+      level: _string(json['level'], fallback: 'Débutant'),
+      description: _string(
+        json['description'],
+        fallback: 'Parcours de formation Enactus ESP.',
+      ),
+      durationMinutes: _int(
+        json['duration_minutes'],
+        fallback: lessons.fold(
+          0,
+          (sum, lesson) => sum + lesson.durationMinutes,
+        ),
+      ),
+      points: _int(json['points'], fallback: lessons.length * 40),
+      lessons: lessons,
+      quiz: _quizFromJson(json['quiz']),
+    );
+  }
+
+  AcademyLessonModel _lessonFromJson(Map<String, dynamic> json) {
+    return AcademyLessonModel(
+      id: _string(json['id'], fallback: 'lesson'),
+      title: _string(json['title'], fallback: 'Leçon Academy'),
+      summary: _string(json['summary'], fallback: 'Résumé à compléter'),
+      durationMinutes: _int(json['duration_minutes'], fallback: 8),
+      completed: _completedLessonIds.contains(
+        _string(json['id'], fallback: ''),
+      ),
+    );
+  }
+
+  AcademyQuizModel _quizFromJson(dynamic value) {
+    final json = value is Map<String, dynamic> ? value : <String, dynamic>{};
+    final questions = _list(
+      json['questions'],
+    ).whereType<Map<String, dynamic>>().map(_questionFromJson).toList();
+
+    return AcademyQuizModel(
+      id: _string(json['id'], fallback: 'academy-quiz'),
+      title: _string(json['title'], fallback: 'Quiz Academy'),
+      category: _string(json['category'], fallback: 'Academy'),
+      level: _string(json['level'], fallback: 'Débutant'),
+      timeLimitMinutes: _int(json['time_limit_minutes'], fallback: 8),
+      questions: questions,
+    );
+  }
+
+  AcademyQuestionModel _questionFromJson(Map<String, dynamic> json) {
+    return AcademyQuestionModel(
+      question: _string(json['question'], fallback: 'Question Academy'),
+      choices: _list(json['choices'])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(),
+      correctIndex: _int(json['correct_index']),
+      explanation: _string(
+        json['explanation'],
+        fallback: 'Explication à compléter.',
+      ),
+    );
+  }
+
+  AcademyProgressModel _progressFromJson(
+    Map<String, dynamic> json,
+    List<AcademyCourseModel> courses,
+  ) {
+    final totalLessons = courses.fold(
+      0,
+      (sum, course) => sum + course.lessonCount,
+    );
+    return AcademyProgressModel(
+      completedLessons: _int(json['completed_lessons']),
+      totalLessons: _int(json['total_lessons'], fallback: totalLessons),
+      passedQuizzes: _int(json['passed_quizzes']),
+      totalQuizzes: _int(json['total_quizzes'], fallback: courses.length),
+      points: _int(json['points']),
+      rank: _int(json['rank']),
+      monthlyProgress: _double(json['monthly_progress']),
+    );
+  }
+
+  List<dynamic> _list(dynamic value) {
+    return value is List ? value : const [];
+  }
+
+  String _string(dynamic value, {required String fallback}) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? fallback : text;
+  }
+
+  int _int(dynamic value, {int fallback = 0}) {
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  double _double(dynamic value, {double fallback = 0}) {
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
   }
 
   Future<bool> _awardGamificationPoints({
