@@ -250,7 +250,9 @@ class _LoginPanel extends StatelessWidget {
   void _showRecruitmentDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => const _RecruitmentAccessDialog(),
+      builder: (_) => _RecruitmentAccessDialog(
+        onStart: () => _showJoinRequestSheet(context, profileType: 'enacteur'),
+      ),
     );
   }
 
@@ -1059,7 +1061,9 @@ class _JoinField extends StatelessWidget {
 }
 
 class _RecruitmentAccessDialog extends StatelessWidget {
-  const _RecruitmentAccessDialog();
+  final VoidCallback onStart;
+
+  const _RecruitmentAccessDialog({required this.onStart});
 
   @override
   Widget build(BuildContext context) {
@@ -1110,9 +1114,12 @@ class _RecruitmentAccessDialog extends StatelessWidget {
           child: const Text('Fermer'),
         ),
         ElevatedButton.icon(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            Navigator.of(context).pop();
+            onStart();
+          },
           icon: const Icon(Icons.how_to_reg_rounded),
-          label: const Text('Parcours prêt'),
+          label: const Text('Démarrer'),
         ),
       ],
     );
