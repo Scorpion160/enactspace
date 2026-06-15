@@ -265,6 +265,8 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             },
             onSearch: _loadRecruitment,
           ),
+          const SizedBox(height: 16),
+          _RecruitmentMethodPanel(anonymousReview: _anonymousReview),
           const SizedBox(height: 22),
           if (_loading)
             const Center(
@@ -668,6 +670,293 @@ class _RecruitmentFilters extends StatelessWidget {
   }
 }
 
+class _RecruitmentMethodPanel extends StatelessWidget {
+  final bool anonymousReview;
+
+  const _RecruitmentMethodPanel({required this.anonymousReview});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final twoColumns = constraints.maxWidth >= 860;
+            final panelWidth = twoColumns
+                ? (constraints.maxWidth - 14) / 2
+                : constraints.maxWidth;
+
+            return Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                SizedBox(
+                  width: panelWidth,
+                  child: _MethodBlock(
+                    icon: Icons.diversity_3_rounded,
+                    title: 'Besoins RH par pôle',
+                    children: const [
+                      _NeedRow(
+                        pole: 'Veille',
+                        target: '4 profils',
+                        detail: 'Analyse, enquête terrain, reporting.',
+                      ),
+                      _NeedRow(
+                        pole: 'Projets',
+                        target: '6 profils',
+                        detail: 'Gestion projet, suivi impact, terrain.',
+                      ),
+                      _NeedRow(
+                        pole: 'Communication',
+                        target: '3 profils',
+                        detail: 'Design, réseaux, photo/vidéo.',
+                      ),
+                      _NeedRow(
+                        pole: 'Finance',
+                        target: '2 profils',
+                        detail: 'Budget, caisse, reçus, reporting.',
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: panelWidth,
+                  child: _MethodBlock(
+                    icon: Icons.fact_check_rounded,
+                    title: 'Tri objectif',
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: const [
+                          _CriterionChip('Motivation', '20%'),
+                          _CriterionChip('Compréhension Enactus', '15%'),
+                          _CriterionChip('Disponibilité', '15%'),
+                          _CriterionChip('Compétences', '15%'),
+                          _CriterionChip('Leadership', '10%'),
+                          _CriterionChip('Esprit d’équipe', '10%'),
+                          _CriterionChip('Potentiel', '10%'),
+                          _CriterionChip('Stabilité club', '5%'),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _AnonymityNotice(enabled: anonymousReview),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: constraints.maxWidth,
+                  child: const _RecruitmentFlowNotice(),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MethodBlock extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  const _MethodBlock({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.enactusYellow,
+                foregroundColor: AppTheme.softBlack,
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _NeedRow extends StatelessWidget {
+  final String pole;
+  final String target;
+  final String detail;
+
+  const _NeedRow({
+    required this.pole,
+    required this.target,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 94,
+            child: Text(
+              pole,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  target,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  detail,
+                  style: const TextStyle(color: Colors.black54, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CriterionChip extends StatelessWidget {
+  final String label;
+  final String weight;
+
+  const _CriterionChip(this.label, this.weight);
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: const Icon(Icons.check_circle_outline_rounded, size: 16),
+      label: Text('$label · $weight'),
+      backgroundColor: Colors.white,
+      side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _AnonymityNotice extends StatelessWidget {
+  final bool enabled;
+
+  const _AnonymityNotice({required this.enabled});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: enabled ? Colors.green.shade50 : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: enabled ? Colors.green.shade200 : Colors.black12,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            enabled ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+            color: enabled ? Colors.green.shade700 : AppTheme.softBlack,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              enabled
+                  ? 'Anonymisation active: les évaluateurs voient les codes candidat.'
+                  : 'Anonymisation inactive: les identités restent visibles.',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecruitmentFlowNotice extends StatelessWidget {
+  const _RecruitmentFlowNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      ('1', 'Besoins pôle'),
+      ('2', 'Campagne'),
+      ('3', 'Tri anonyme'),
+      ('4', 'Entretien'),
+      ('5', 'Décision'),
+      ('6', 'Compte + Academy'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text(
+            'Parcours recommandé',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+          for (final step in steps)
+            Chip(
+              avatar: CircleAvatar(
+                backgroundColor: AppTheme.enactusYellow,
+                foregroundColor: AppTheme.softBlack,
+                child: Text(step.$1),
+              ),
+              label: Text(step.$2),
+              backgroundColor: Colors.white,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 double _dialogWidth(BuildContext context, double maxWidth) {
   return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
 }
@@ -818,6 +1107,8 @@ class _ApplicationCard extends StatelessWidget {
             const SizedBox(height: 10),
             _ApplicationProgress(status: application.status),
             const SizedBox(height: 10),
+            _ScreeningScoreBar(application: application),
+            const SizedBox(height: 10),
             Text(
               application.motivation ?? 'Aucune motivation renseignée.',
               maxLines: 4,
@@ -903,6 +1194,57 @@ class _ApplicationProgress extends StatelessWidget {
             rejected: status == 'rejected' && index == steps.length - 1,
           ),
       ],
+    );
+  }
+}
+
+class _ScreeningScoreBar extends StatelessWidget {
+  final ApplicationModel application;
+
+  const _ScreeningScoreBar({required this.application});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = application.screeningScore;
+    final progress = score / 100;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics_rounded, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  application.screeningLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Text(
+                '$score/100',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: Colors.white,
+              color: AppTheme.enactusYellow,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

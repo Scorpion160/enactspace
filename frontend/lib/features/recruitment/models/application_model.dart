@@ -137,6 +137,43 @@ class ApplicationModel {
     return 'StabilitÃ© Ã  qualifier';
   }
 
+  int get screeningScore {
+    var score = 0;
+
+    if ((motivation ?? '').trim().length >= 80) score += 20;
+    if ((enactusKnowledge ?? '').trim().length >= 50) score += 15;
+    if ((contribution ?? '').trim().length >= 50) score += 15;
+    if ((leadershipProfile ?? '').trim().length >= 40) score += 10;
+    if ((projectIdeas ?? '').trim().length >= 40) score += 10;
+    if ((department ?? '').trim().isNotEmpty) score += 10;
+    if ((phone ?? '').trim().isNotEmpty) score += 5;
+
+    final level = (studyLevel ?? '').toLowerCase();
+    if (level.contains('dic1') ||
+        level.contains('l1') ||
+        level.contains('1ere') ||
+        level.contains('1Ã¨re') ||
+        level.contains('premi')) {
+      score += 15;
+    } else if (level.contains('dic2') ||
+        level.contains('l2') ||
+        level.contains('deux')) {
+      score += 10;
+    } else if (level.trim().isNotEmpty) {
+      score += 5;
+    }
+
+    return score.clamp(0, 100);
+  }
+
+  String get screeningLabel {
+    final score = screeningScore;
+    if (score >= 75) return 'Priorité forte';
+    if (score >= 55) return 'Bon potentiel';
+    if (score >= 35) return 'À creuser';
+    return 'Dossier incomplet';
+  }
+
   bool get isConverted {
     return convertedUserId != null && convertedUserId!.isNotEmpty;
   }
