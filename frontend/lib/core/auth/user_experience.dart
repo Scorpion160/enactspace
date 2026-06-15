@@ -31,24 +31,58 @@ class UserExperience {
     );
   }
 
-  bool hasRole(String role) => roles.contains(role);
+  bool hasRole(String role) => roles.contains(_normalizeRole(role));
 
   bool hasAnyRole(Set<String> values) {
-    return roles.intersection(values).isNotEmpty;
+    return roles.intersection(values.map(_normalizeRole).toSet()).isNotEmpty;
   }
 
-  bool get isAdmin => hasRole('administrateur');
-  bool get isTeamLeader => hasRole('team_leader');
-  bool get isSecretary => hasRole('secretaire_generale');
-  bool get isFinance => hasRole('financier');
+  bool get isAdmin =>
+      hasAnyRole({'administrateur', 'admin', 'administrator', 'super_admin'});
+
+  bool get isTeamLeader => hasAnyRole({
+    'team_leader',
+    'team leader',
+    'tl',
+    'president',
+    'presidente',
+  });
+
+  bool get isSecretary => hasAnyRole({
+    'secretaire_generale',
+    'secretaire_general',
+    'secretary',
+    'sg',
+  });
+
+  bool get isFinance =>
+      hasAnyRole({'financier', 'finance', 'tresorier', 'treasurer'});
+
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
 
   bool get isProjectOrPoleLead {
     return hasAnyRole({
       'chef_pole',
+      'chef de pole',
       'adjoint_chef_pole',
+      'adjoint chef pole',
       'chef_projet',
+      'chef de projet',
       'adjoint_chef_projet',
+      'adjoint chef projet',
+      'project_lead',
+      'pole_lead',
+    });
+  }
+
+  bool get isRecruitmentLead {
+    return hasAnyRole({
+      'pole_veille',
+      'veille',
+      'chef_pole_veille',
+      'adjoint_pole_veille',
+      'recrutement',
+      'recruiter',
     });
   }
 
@@ -63,11 +97,14 @@ class UserExperience {
 
   bool get canManageMembers => isAdmin || isTeamLeader || isSecretary;
   bool get canViewFinance => isAdmin || isTeamLeader || isFinance;
+  bool get canManageFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
-      isAdmin || isTeamLeader || isSecretary || isEnacchef;
+      isAdmin || isTeamLeader || isSecretary || isRecruitmentLead || isEnacchef;
   bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
-  bool get canManageAttendance => isEnacchef;
+  bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
+  bool get canViewMembersDirectory => !isAlumni || canManageMembers;
+  bool get canViewOperations => !isAlumni;
 
   bool get isMemberExperience {
     return !isAdmin &&
@@ -128,14 +165,18 @@ class UserExperience {
     };
 
     if (!user.isAlumni) {
-      routes.addAll({'/poles', '/projects', '/attendance'});
+      routes.addAll({'/poles', '/projects'});
+    }
+
+    if (user.canManageAttendance) {
+      routes.add('/attendance');
     }
 
     if (user.isAlumni) {
       routes.add('/alumni');
     }
 
-    if (user.canManageMembers) {
+    if (user.canViewMembersDirectory) {
       routes.add('/members');
     }
 
@@ -164,7 +205,26 @@ class UserExperience {
 
 Set<String> _parseRoles(dynamic value) {
   if (value is List) {
-    return value.map((item) => item.toString()).toSet();
+    return value.map((item) => _normalizeRole(item.toString())).toSet();
   }
   return {};
+}
+
+String _normalizeRole(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('ë', 'e')
+      .replaceAll('à', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('î', 'i')
+      .replaceAll('ï', 'i')
+      .replaceAll('ô', 'o')
+      .replaceAll('ù', 'u')
+      .replaceAll('û', 'u')
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_');
 }
