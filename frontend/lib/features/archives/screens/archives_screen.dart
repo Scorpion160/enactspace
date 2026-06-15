@@ -358,14 +358,7 @@ class _ArchiveProjectCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.enactusYellow,
-                    foregroundColor: AppTheme.softBlack,
-                    child: Text(
-                      project.name.characters.first,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
+                  _ArchiveProjectLogo(project: project, size: 46),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -460,12 +453,20 @@ class _ArchiveProjectDetails extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Text(
-                    project.name,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  Row(
+                    children: [
+                      _ArchiveProjectLogo(project: project, size: 68),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          project.name,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -534,6 +535,54 @@ class _ArchiveProjectDetails extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ArchiveProjectLogo extends StatelessWidget {
+  final ArchiveProjectModel project;
+  final double size;
+
+  const _ArchiveProjectLogo({required this.project, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = project.logoAsset;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.28),
+      child: Container(
+        width: size,
+        height: size,
+        color: AppTheme.enactusYellow.withValues(alpha: 0.24),
+        child: asset == null
+            ? Center(
+                child: Text(
+                  project.name.characters.first,
+                  style: TextStyle(
+                    color: AppTheme.softBlack,
+                    fontSize: size * 0.38,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              )
+            : Image.asset(
+                asset,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      project.name.characters.first,
+                      style: TextStyle(
+                        color: AppTheme.softBlack,
+                        fontSize: size * 0.38,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
@@ -860,6 +909,30 @@ class _HallOfFameTile extends StatelessWidget {
                     item.description,
                     style: const TextStyle(color: Colors.black54, height: 1.35),
                   ),
+                  if (item.imageAsset != null) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        item.imageAsset!,
+                        width: double.infinity,
+                        height: 156,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 96,
+                            alignment: Alignment.center,
+                            color: AppTheme.enactusYellow.withValues(
+                              alpha: 0.16,
+                            ),
+                            child: const Icon(
+                              Icons.image_not_supported_rounded,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

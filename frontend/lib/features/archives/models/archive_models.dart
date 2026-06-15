@@ -48,6 +48,7 @@ class ArchiveProjectModel {
   final List<String> documents;
   final List<String> members;
   final List<String> lessons;
+  final String? logoAsset;
   final String status;
   final bool expansionReady;
 
@@ -75,6 +76,7 @@ class ArchiveProjectModel {
     required this.documents,
     required this.members,
     required this.lessons,
+    this.logoAsset,
     required this.status,
     required this.expansionReady,
   });
@@ -90,12 +92,14 @@ class HallOfFameItemModel {
   final String period;
   final String description;
   final String type;
+  final String? imageAsset;
 
   const HallOfFameItemModel({
     required this.title,
     required this.period,
     required this.description,
     required this.type,
+    this.imageAsset,
   });
 }
 
