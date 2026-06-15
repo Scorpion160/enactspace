@@ -16,6 +16,7 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   final TasksService _tasksService = TasksService();
   final MembersService _membersService = MembersService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
@@ -23,11 +24,18 @@ class _TasksScreenState extends State<TasksScreen> {
   List<MemberModel> _members = [];
   Map<String, List<TaskAssigneeModel>> _assigneesByTaskId = {};
   String _selectedView = 'all';
+  String _priorityFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTasks() async {
@@ -206,7 +214,36 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   List<TaskModel> _tasksByStatus(String status) {
-    return _tasks.where((task) => task.status == status).toList();
+    return _visibleTasks.where((task) => task.status == status).toList();
+  }
+
+  List<TaskModel> get _visibleTasks {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return _tasks.where((task) {
+      final assignees = _assigneesByTaskId[task.id] ?? [];
+      final assigneeNames = assignees
+          .map((assignee) {
+            return _members
+                .where((member) => member.id == assignee.userId)
+                .map((member) => member.displayName)
+                .join(' ');
+          })
+          .join(' ');
+      final searchable = [
+        task.title,
+        task.description ?? '',
+        task.priorityLabel,
+        task.statusLabel,
+        task.dueDateLabel,
+        assigneeNames,
+      ].join(' ').toLowerCase();
+      final matchesQuery = query.isEmpty || searchable.contains(query);
+      final matchesPriority =
+          _priorityFilter == 'all' || task.priority == _priorityFilter;
+
+      return matchesQuery && matchesPriority;
+    }).toList();
   }
 
   @override
@@ -217,7 +254,7 @@ class _TasksScreenState extends State<TasksScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           _TasksHeader(
-            total: _tasks.length,
+            total: _visibleTasks.length,
             todo: _tasksByStatus('a_faire').length,
             doing: _tasksByStatus('en_cours').length,
             done: _tasksByStatus('termine').length,
@@ -225,6 +262,7 @@ class _TasksScreenState extends State<TasksScreen> {
             onRefresh: _loadTasks,
             onCreate: _openCreateTaskDialog,
           ),
+          const SizedBox(height: 18),
           _TaskViewFilters(
             selectedView: _selectedView,
             onChanged: (value) async {
@@ -236,7 +274,15 @@ class _TasksScreenState extends State<TasksScreen> {
             },
           ),
           const SizedBox(height: 18),
-          const SizedBox(height: 22),
+          _TaskSearchFilters(
+            controller: _searchController,
+            priorityFilter: _priorityFilter,
+            onChanged: () => setState(() {}),
+            onPriorityChanged: (value) {
+              setState(() => _priorityFilter = value);
+            },
+          ),
+          const SizedBox(height: 18),
           if (_loading)
             const Center(
               child: Padding(
@@ -1042,6 +1088,127 @@ class _TaskViewFilters extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TaskSearchFilters extends StatelessWidget {
+  final TextEditingController controller;
+  final String priorityFilter;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onPriorityChanged;
+
+  const _TaskSearchFilters({
+    required this.controller,
+    required this.priorityFilter,
+    required this.onChanged,
+    required this.onPriorityChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 760;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: InputDecoration(
+                labelText: 'Rechercher tâche, membre, statut',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: controller.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          controller.clear();
+                          onChanged();
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Effacer',
+                      ),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _PriorityChoice(
+                  label: 'Toutes priorités',
+                  value: 'all',
+                  current: priorityFilter,
+                  onSelected: onPriorityChanged,
+                ),
+                _PriorityChoice(
+                  label: 'Basse',
+                  value: 'basse',
+                  current: priorityFilter,
+                  onSelected: onPriorityChanged,
+                ),
+                _PriorityChoice(
+                  label: 'Normale',
+                  value: 'normale',
+                  current: priorityFilter,
+                  onSelected: onPriorityChanged,
+                ),
+                _PriorityChoice(
+                  label: 'Haute',
+                  value: 'haute',
+                  current: priorityFilter,
+                  onSelected: onPriorityChanged,
+                ),
+                _PriorityChoice(
+                  label: 'Urgente',
+                  value: 'urgente',
+                  current: priorityFilter,
+                  onSelected: onPriorityChanged,
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PriorityChoice extends StatelessWidget {
+  final String label;
+  final String value;
+  final String current;
+  final ValueChanged<String> onSelected;
+
+  const _PriorityChoice({
+    required this.label,
+    required this.value,
+    required this.current,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: current == value,
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      onSelected: (_) => onSelected(value),
     );
   }
 }
