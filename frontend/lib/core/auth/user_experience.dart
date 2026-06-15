@@ -123,6 +123,7 @@ class UserExperience {
       '/documents',
       '/events',
       '/gamification',
+      '/academy',
     };
 
     if (!user.isAlumni) {

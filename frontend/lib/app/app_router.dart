@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
 import '../core/auth/user_experience.dart';
+import '../features/academy/screens/academy_home_screen.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -122,6 +123,10 @@ class AppRouter {
           GoRoute(
             path: '/gamification',
             builder: (context, state) => const GamificationScreen(),
+          ),
+          GoRoute(
+            path: '/academy',
+            builder: (context, state) => const AcademyHomeScreen(),
           ),
           GoRoute(
             path: '/impact',

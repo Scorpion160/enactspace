@@ -261,6 +261,11 @@ class _SideMenu extends StatelessWidget {
                     path: '/gamification',
                   ),
                   _MenuItem(
+                    label: 'Academy',
+                    icon: Icons.school_rounded,
+                    path: '/academy',
+                  ),
+                  _MenuItem(
                     label: 'Impact',
                     icon: Icons.insights_rounded,
                     path: '/impact',
@@ -649,12 +654,6 @@ class _MobileBottomNavigation extends StatelessWidget {
         path: '/gamification',
       ),
       _MobileDestination(
-        label: 'Impact',
-        icon: Icons.insights_outlined,
-        selectedIcon: Icons.insights_rounded,
-        path: '/impact',
-      ),
-      _MobileDestination(
         label: 'Alertes',
         icon: Icons.notifications_outlined,
         selectedIcon: Icons.notifications_rounded,
@@ -666,6 +665,18 @@ class _MobileBottomNavigation extends StatelessWidget {
         icon: Icons.forum_outlined,
         selectedIcon: Icons.forum_rounded,
         path: '/posts',
+      ),
+      _MobileDestination(
+        label: 'Academy',
+        icon: Icons.school_outlined,
+        selectedIcon: Icons.school_rounded,
+        path: '/academy',
+      ),
+      _MobileDestination(
+        label: 'Impact',
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights_rounded,
+        path: '/impact',
       ),
       _MobileDestination(
         label: 'Membres',
@@ -836,6 +847,7 @@ String _navigationTitle(String currentPath) {
     '/posts': 'Communication',
     '/chat': 'Chat',
     '/gamification': 'Gamification',
+    '/academy': 'EnactSpace Academy',
     '/impact': 'Impact & Performance',
   };
 
