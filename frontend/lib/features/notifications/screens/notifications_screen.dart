@@ -13,6 +13,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationsService _service = NotificationsService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
@@ -28,6 +29,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _loadNotifications();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNotifications() async {
@@ -195,6 +202,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return _notifications.where((n) => n.isRead).length;
   }
 
+  List<NotificationModel> get _filteredNotifications {
+    final query = _searchController.text.trim().toLowerCase();
+    final sorted = [..._notifications]
+      ..sort((a, b) {
+        if (a.isRead != b.isRead) return a.isRead ? 1 : -1;
+        return _notificationDate(b).compareTo(_notificationDate(a));
+      });
+
+    if (query.isEmpty) return sorted;
+
+    return sorted.where((notification) {
+      final searchable = [
+        notification.title,
+        notification.message ?? '',
+        notification.typeLabel,
+        notification.createdAtLabel,
+      ].join(' ').toLowerCase();
+
+      return searchable.contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -222,6 +251,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               await _loadNotifications();
             },
           ),
+          const SizedBox(height: 18),
+          _NotificationSearchCard(
+            controller: _searchController,
+            onChanged: () => setState(() {}),
+          ),
           const SizedBox(height: 22),
           if (_loading)
             const Center(
@@ -234,9 +268,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             _ErrorCard(message: _error!, onRetry: _loadNotifications)
           else if (_notifications.isEmpty)
             const _EmptyNotificationsCard()
+          else if (_filteredNotifications.isEmpty)
+            const _NoNotificationMatchCard()
           else
             _NotificationsList(
-              notifications: _notifications,
+              notifications: _filteredNotifications,
               busyNotificationIds: _busyNotificationIds,
               onMarkAsRead: _markAsRead,
               onOpen: _openNotification,
@@ -478,6 +514,43 @@ class _NotificationsFilters extends StatelessWidget {
   }
 }
 
+class _NotificationSearchCard extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  const _NotificationSearchCard({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: TextField(
+          controller: controller,
+          onChanged: (_) => onChanged(),
+          decoration: InputDecoration(
+            labelText: 'Rechercher une notification',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: controller.text.trim().isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      controller.clear();
+                      onChanged();
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Effacer',
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NotificationsList extends StatelessWidget {
   final List<NotificationModel> notifications;
   final Set<String> busyNotificationIds;
@@ -669,6 +742,25 @@ class _EmptyNotificationsCard extends StatelessWidget {
   }
 }
 
+class _NoNotificationMatchCard extends StatelessWidget {
+  const _NoNotificationMatchCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(26),
+        child: Center(
+          child: Text(
+            'Aucune notification ne correspond à la recherche.',
+            style: TextStyle(color: Colors.black54),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorCard extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -705,4 +797,9 @@ class _ErrorCard extends StatelessWidget {
       ),
     );
   }
+}
+
+DateTime _notificationDate(NotificationModel notification) {
+  return DateTime.tryParse(notification.createdAt ?? '') ??
+      DateTime.fromMillisecondsSinceEpoch(0);
 }
