@@ -702,14 +702,31 @@ class _MobileBottomNavigation extends StatelessWidget {
         path: '/archives',
       ),
     ];
-    final destinations = preferred
+    final allowedDestinations = preferred
         .where((item) => allowedRoutes.contains(item.path))
-        .take(5)
         .toList();
+    final destinations = allowedDestinations.take(5).toList();
+    final currentDestination = _currentMobileDestination(
+      allowedDestinations,
+      currentPath,
+    );
+
+    if (currentDestination != null &&
+        !destinations.any((item) => item.path == currentDestination.path)) {
+      if (destinations.length >= 5) {
+        destinations[destinations.length - 1] = currentDestination;
+      } else {
+        destinations.add(currentDestination);
+      }
+    }
 
     final selectedIndex = destinations.indexWhere(
       (item) => _isSelected(currentPath, item.path),
     );
+
+    if (destinations.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return NavigationBar(
       height: 72,
@@ -839,6 +856,18 @@ class _MenuItem {
 
 bool _isSelected(String currentPath, String itemPath) {
   return currentPath == itemPath || currentPath.startsWith('$itemPath/');
+}
+
+_MobileDestination? _currentMobileDestination(
+  List<_MobileDestination> destinations,
+  String currentPath,
+) {
+  for (final destination in destinations) {
+    if (_isSelected(currentPath, destination.path)) {
+      return destination;
+    }
+  }
+  return null;
 }
 
 String _navigationTitle(String currentPath) {
