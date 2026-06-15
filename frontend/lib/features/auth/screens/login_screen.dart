@@ -14,12 +14,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
 
-  final TextEditingController _emailController = TextEditingController(
-    text: 'cheikh@example.com',
-  );
-  final TextEditingController _passwordController = TextEditingController(
-    text: 'Admin12345',
-  );
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
@@ -93,62 +89,122 @@ class _BrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: AppTheme.softBlack,
-      padding: const EdgeInsets.all(52),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _BrandMark(size: 76),
-          const SizedBox(height: 34),
-          const Text(
-            'EnactSpace',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 46,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Le QG numérique des Enacteurs: annonces, tâches, présences, '
-            'documents, finance et vie de communauté.',
-            style: TextStyle(color: Colors.white70, fontSize: 18, height: 1.5),
-          ),
-          const SizedBox(height: 32),
-          const Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _BrandPill(icon: Icons.forum_rounded, label: 'Fil social'),
-              _BrandPill(icon: Icons.task_alt_rounded, label: 'Kanban'),
-              _BrandPill(icon: Icons.groups_2_rounded, label: 'Membres'),
-              _BrandPill(icon: Icons.notifications_rounded, label: 'Alertes'),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.verified_rounded, color: AppTheme.enactusYellow),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'FastAPI connecté, authentification JWT, interface Flutter '
-                    'responsive web et mobile.',
-                    style: TextStyle(color: Colors.white70, height: 1.4),
-                  ),
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 720;
+            final padding = compact ? 34.0 : 52.0;
+            final logoSize = compact ? 126.0 : 164.0;
+            final minPanelHeight = (constraints.maxHeight - (padding * 2))
+                .clamp(0.0, double.infinity)
+                .toDouble();
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(padding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: minPanelHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _BrandMark(size: logoSize),
+                        SizedBox(height: compact ? 24 : 34),
+                        const Text(
+                          'Enactus ESP',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'EnactSpace',
+                          style: TextStyle(
+                            color: AppTheme.enactusYellow,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Le QG numérique des Enacteurs: annonces, tâches, '
+                          'présences, documents, finance, projets et vie de '
+                          'communauté.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 18,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        const Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _BrandPill(
+                              icon: Icons.forum_rounded,
+                              label: 'Fil social',
+                            ),
+                            _BrandPill(
+                              icon: Icons.task_alt_rounded,
+                              label: 'Tâches',
+                            ),
+                            _BrandPill(
+                              icon: Icons.groups_2_rounded,
+                              label: 'Communauté',
+                            ),
+                            _BrandPill(
+                              icon: Icons.notifications_rounded,
+                              label: 'Alertes',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: EdgeInsets.only(top: compact ? 28 : 44),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.10),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.verified_rounded,
+                              color: AppTheme.enactusYellow,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Connexion sécurisée, accès par rôle et '
+                                'expérience pensée pour mobile, tablette et web.',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -213,7 +269,7 @@ class _LoginPanel extends StatelessWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 500),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -223,12 +279,14 @@ class _LoginPanel extends StatelessWidget {
                 ],
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(28),
+                    padding: EdgeInsets.all(
+                      MediaQuery.sizeOf(context).width < 420 ? 20 : 28,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Text(
-                          'Connexion',
+                          'Connexion EnactSpace',
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w900,
@@ -236,7 +294,7 @@ class _LoginPanel extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Retrouve ton espace Enactus ESP en quelques secondes.',
+                          'Accède à ton espace Enactus ESP avec ton compte validé.',
                           style: TextStyle(color: Colors.black54, height: 1.4),
                         ),
                         const SizedBox(height: 28),
@@ -295,52 +353,24 @@ class _LoginPanel extends StatelessWidget {
                               : const Icon(Icons.login_rounded),
                           label: const Text('Se connecter'),
                         ),
+                        const SizedBox(height: 20),
+                        const _LoginSectionLabel('Nouveau sur Enactus ESP ?'),
+                        const SizedBox(height: 10),
+                        _AccountRequestActions(
+                          loading: loading,
+                          onJoinEnacteur: () => _showJoinRequestSheet(context),
+                          onJoinAlumni: () => _showJoinRequestSheet(
+                            context,
+                            profileType: 'alumni',
+                          ),
+                        ),
                         const SizedBox(height: 16),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: loading
-                                  ? null
-                                  : () => _showJoinRequestSheet(context),
-                              icon: const Icon(Icons.person_add_alt_1_rounded),
-                              label: const Text('Rejoindre Enactus ESP'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: loading
-                                  ? null
-                                  : () => _showJoinRequestSheet(
-                                      context,
-                                      profileType: 'alumni',
-                                    ),
-                              icon: const Icon(Icons.workspace_premium_rounded),
-                              label: const Text('Rejoindre comme Alumni'),
-                            ),
-                            TextButton.icon(
-                              onPressed: loading
-                                  ? null
-                                  : () => _showJoinRequestSheet(context),
-                              icon: const Icon(Icons.app_registration_rounded),
-                              label: const Text('Créer un compte'),
-                            ),
-                            TextButton.icon(
-                              onPressed: () => _showRecruitmentDialog(context),
-                              icon: const Icon(Icons.how_to_reg_rounded),
-                              label: const Text('Candidature recrutement'),
-                            ),
-                            TextButton.icon(
-                              onPressed: () => _showGuideDialog(context),
-                              icon: const Icon(Icons.explore_rounded),
-                              label: const Text('Guide débutant'),
-                            ),
-                            TextButton.icon(
-                              onPressed: () => _showBiometricDialog(context),
-                              icon: const Icon(Icons.fingerprint_rounded),
-                              label: const Text('Biométrie'),
-                            ),
-                          ],
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                        _LoginSupportActions(
+                          onRecruitment: () => _showRecruitmentDialog(context),
+                          onGuide: () => _showGuideDialog(context),
+                          onBiometric: () => _showBiometricDialog(context),
                         ),
                         const SizedBox(height: 18),
                         Container(
@@ -352,7 +382,7 @@ class _LoginPanel extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Text(
-                            'Compte test admin: cheikh@example.com / Admin12345',
+                            'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -369,6 +399,109 @@ class _LoginPanel extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LoginSectionLabel extends StatelessWidget {
+  final String label;
+
+  const _LoginSectionLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(
+        color: Colors.black54,
+        fontSize: 12,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+}
+
+class _AccountRequestActions extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onJoinEnacteur;
+  final VoidCallback onJoinAlumni;
+
+  const _AccountRequestActions({
+    required this.loading,
+    required this.onJoinEnacteur,
+    required this.onJoinAlumni,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 430;
+        final buttonWidth = twoColumns
+            ? (constraints.maxWidth - 10) / 2
+            : constraints.maxWidth;
+
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            SizedBox(
+              width: buttonWidth,
+              child: OutlinedButton.icon(
+                onPressed: loading ? null : onJoinEnacteur,
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Rejoindre Enactus ESP'),
+              ),
+            ),
+            SizedBox(
+              width: buttonWidth,
+              child: OutlinedButton.icon(
+                onPressed: loading ? null : onJoinAlumni,
+                icon: const Icon(Icons.workspace_premium_rounded),
+                label: const Text('Rejoindre comme Alumni'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LoginSupportActions extends StatelessWidget {
+  final VoidCallback onRecruitment;
+  final VoidCallback onGuide;
+  final VoidCallback onBiometric;
+
+  const _LoginSupportActions({
+    required this.onRecruitment,
+    required this.onGuide,
+    required this.onBiometric,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        TextButton.icon(
+          onPressed: onRecruitment,
+          icon: const Icon(Icons.how_to_reg_rounded),
+          label: const Text('Candidature recrutement'),
+        ),
+        TextButton.icon(
+          onPressed: onGuide,
+          icon: const Icon(Icons.explore_rounded),
+          label: const Text('Guide débutant'),
+        ),
+        TextButton.icon(
+          onPressed: onBiometric,
+          icon: const Icon(Icons.fingerprint_rounded),
+          label: const Text('Biométrie'),
+        ),
+      ],
     );
   }
 }
@@ -1127,24 +1260,30 @@ class _MobileBrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return const Column(
       children: [
-        _BrandMark(size: 54),
-        SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'EnactSpace',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-              ),
-              Text(
-                'Espace interne Enactus ESP',
-                style: TextStyle(color: Colors.black54),
-              ),
-            ],
+        _BrandMark(size: 96),
+        SizedBox(height: 14),
+        Text(
+          'Enactus ESP',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'EnactSpace',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppTheme.softBlack,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
           ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'Espace interne des Enacteurs',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black54),
         ),
       ],
     );
@@ -1164,10 +1303,18 @@ class _BrandMark extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(size * 0.28),
+        borderRadius: BorderRadius.circular(size * 0.22),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: size * 0.22,
+            offset: Offset(0, size * 0.08),
+          ),
+        ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(size * 0.08),
+        padding: EdgeInsets.all(size * 0.10),
         child: Image.asset(
           'assets/img/logo_enactus_esp.png',
           fit: BoxFit.contain,
