@@ -13,16 +13,25 @@ class AcademyHomeScreen extends StatefulWidget {
 
 class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
   final AcademyService _service = AcademyService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _rewardingActionId;
   String? _error;
   AcademyHomeData? _data;
+  String _levelFilter = 'all';
+  String _categoryFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     _loadAcademy();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAcademy() async {
@@ -128,6 +137,14 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
           else
             _AcademyContent(
               data: _data!,
+              searchController: _searchController,
+              levelFilter: _levelFilter,
+              categoryFilter: _categoryFilter,
+              onFiltersChanged: () => setState(() {}),
+              onLevelChanged: (value) => setState(() => _levelFilter = value),
+              onCategoryChanged: (value) {
+                setState(() => _categoryFilter = value);
+              },
               rewardingActionId: _rewardingActionId,
               onCompleteNextLesson: _completeNextLesson,
               onPassQuiz: _passQuiz,
@@ -238,16 +255,71 @@ class _HeaderCopy extends StatelessWidget {
 
 class _AcademyContent extends StatelessWidget {
   final AcademyHomeData data;
+  final TextEditingController searchController;
+  final String levelFilter;
+  final String categoryFilter;
+  final VoidCallback onFiltersChanged;
+  final ValueChanged<String> onLevelChanged;
+  final ValueChanged<String> onCategoryChanged;
   final String? rewardingActionId;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
   final ValueChanged<AcademyCourseModel> onPassQuiz;
 
   const _AcademyContent({
     required this.data,
+    required this.searchController,
+    required this.levelFilter,
+    required this.categoryFilter,
+    required this.onFiltersChanged,
+    required this.onLevelChanged,
+    required this.onCategoryChanged,
     required this.rewardingActionId,
     required this.onCompleteNextLesson,
     required this.onPassQuiz,
   });
+
+  List<AcademyCourseModel> get _filteredCourses {
+    final query = searchController.text.trim().toLowerCase();
+
+    return data.courses.where((course) {
+      final searchable = [
+        course.title,
+        course.description,
+        course.category,
+        course.level,
+        ...course.lessons.map((lesson) => lesson.title),
+        ...course.lessons.map((lesson) => lesson.summary),
+      ].join(' ').toLowerCase();
+      final matchesQuery = query.isEmpty || searchable.contains(query);
+      final matchesLevel =
+          levelFilter == 'all' || _academyKey(course.level) == levelFilter;
+      final matchesCategory =
+          categoryFilter == 'all' ||
+          _academyKey(course.category) == categoryFilter;
+
+      return matchesQuery && matchesLevel && matchesCategory;
+    }).toList();
+  }
+
+  List<AcademyCaseStudyModel> get _filteredCaseStudies {
+    final query = searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return data.caseStudies;
+
+    return data.caseStudies.where((caseStudy) {
+      final searchable = [
+        caseStudy.projectName,
+        caseStudy.title,
+        caseStudy.context,
+        caseStudy.problem,
+        caseStudy.solution,
+        caseStudy.impact,
+        caseStudy.difficulties,
+        ...caseStudy.lessons,
+      ].join(' ').toLowerCase();
+
+      return searchable.contains(query);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +327,15 @@ class _AcademyContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ProgressPanel(progress: data.progress),
+        const SizedBox(height: 22),
+        _AcademyFiltersCard(
+          controller: searchController,
+          levelFilter: levelFilter,
+          categoryFilter: categoryFilter,
+          onChanged: onFiltersChanged,
+          onLevelChanged: onLevelChanged,
+          onCategoryChanged: onCategoryChanged,
+        ),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Parcours recommandés',
@@ -271,7 +352,7 @@ class _AcademyContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _CourseGrid(
-          courses: data.courses,
+          courses: _filteredCourses,
           rewardingActionId: rewardingActionId,
           onCompleteNextLesson: onCompleteNextLesson,
         ),
@@ -282,7 +363,7 @@ class _AcademyContent extends StatelessWidget {
               'Apprendre à partir des anciens projets, de leurs impacts et de leurs difficultés.',
         ),
         const SizedBox(height: 12),
-        _CaseStudiesGrid(caseStudies: data.caseStudies),
+        _CaseStudiesGrid(caseStudies: _filteredCaseStudies),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Quiz rapides',
@@ -426,6 +507,147 @@ class _ProgressMeter extends StatelessWidget {
   }
 }
 
+class _AcademyFiltersCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String levelFilter;
+  final String categoryFilter;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onLevelChanged;
+  final ValueChanged<String> onCategoryChanged;
+
+  const _AcademyFiltersCard({
+    required this.controller,
+    required this.levelFilter,
+    required this.categoryFilter,
+    required this.onChanged,
+    required this.onLevelChanged,
+    required this.onCategoryChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 820;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: InputDecoration(
+                labelText: 'Rechercher cours, quiz, cas pratique',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: controller.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          controller.clear();
+                          onChanged();
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Effacer',
+                      ),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _AcademyChoiceChip(
+                  label: 'Tous niveaux',
+                  selected: levelFilter == 'all',
+                  onSelected: () => onLevelChanged('all'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'Débutant',
+                  selected: levelFilter == 'debutant',
+                  onSelected: () => onLevelChanged('debutant'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'Intermédiaire',
+                  selected: levelFilter == 'intermediaire',
+                  onSelected: () => onLevelChanged('intermediaire'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'Avancé',
+                  selected: levelFilter == 'avance',
+                  onSelected: () => onLevelChanged('avance'),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Catégorie',
+                  onSelected: onCategoryChanged,
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'all', child: Text('Toutes')),
+                    PopupMenuItem(
+                      value: 'culture_enactus',
+                      child: Text('Culture Enactus'),
+                    ),
+                    PopupMenuItem(value: 'impact', child: Text('Impact')),
+                    PopupMenuItem(
+                      value: 'business_principles',
+                      child: Text('Business Principles'),
+                    ),
+                    PopupMenuItem(
+                      value: 'competition',
+                      child: Text('Compétition'),
+                    ),
+                    PopupMenuItem(
+                      value: 'leadership',
+                      child: Text('Leadership'),
+                    ),
+                  ],
+                  child: Chip(
+                    avatar: const Icon(Icons.tune_rounded, size: 16),
+                    label: Text(_academyCategoryLabel(categoryFilter)),
+                  ),
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AcademyChoiceChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _AcademyChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
 class _PathGrid extends StatelessWidget {
   final List<AcademyPathModel> paths;
 
@@ -497,6 +719,12 @@ class _CourseGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (courses.isEmpty) {
+      return const _AcademyEmptyCard(
+        message: 'Aucun cours ne correspond aux filtres.',
+      );
+    }
+
     return _ResponsiveWrap(
       minWidth: 300,
       children: [
@@ -648,6 +876,12 @@ class _CaseStudiesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (caseStudies.isEmpty) {
+      return const _AcademyEmptyCard(
+        message: 'Aucun cas pratique ne correspond à la recherche.',
+      );
+    }
+
     return _ResponsiveWrap(
       minWidth: 300,
       children: [
@@ -992,6 +1226,24 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+class _AcademyEmptyCard extends StatelessWidget {
+  final String message;
+
+  const _AcademyEmptyCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text(message, style: const TextStyle(color: Colors.black54)),
+        ),
+      ),
+    );
+  }
+}
+
 class _AcademyErrorCard extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -1043,4 +1295,44 @@ IconData _badgeIcon(String name) {
     default:
       return Icons.workspace_premium_rounded;
   }
+}
+
+String _academyCategoryLabel(String value) {
+  switch (value) {
+    case 'culture_enactus':
+      return 'Culture Enactus';
+    case 'impact':
+      return 'Impact';
+    case 'business_principles':
+      return 'Business Principles';
+    case 'competition':
+      return 'Compétition';
+    case 'leadership':
+      return 'Leadership';
+    default:
+      return 'Toutes catégories';
+  }
+}
+
+String _academyKey(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll('Ã©', 'e')
+      .replaceAll('Ã¨', 'e')
+      .replaceAll('Ãª', 'e')
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('à', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('Ã ', 'a')
+      .replaceAll('Ã¢', 'a')
+      .replaceAll('î', 'i')
+      .replaceAll('ï', 'i')
+      .replaceAll('Ã®', 'i')
+      .replaceAll('ô', 'o')
+      .replaceAll('Ã´', 'o')
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_');
 }
