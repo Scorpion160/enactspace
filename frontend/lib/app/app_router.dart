@@ -3,6 +3,7 @@ import '../core/auth/auth_service.dart';
 import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
 import '../features/alumni/screens/alumni_screen.dart';
+import '../features/archives/screens/archives_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
@@ -127,6 +128,10 @@ class AppRouter {
           GoRoute(
             path: '/academy',
             builder: (context, state) => const AcademyHomeScreen(),
+          ),
+          GoRoute(
+            path: '/archives',
+            builder: (context, state) => const ArchivesScreen(),
           ),
           GoRoute(
             path: '/impact',

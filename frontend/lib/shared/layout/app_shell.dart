@@ -323,6 +323,11 @@ class _SideMenu extends StatelessWidget {
                     path: '/documents',
                   ),
                   _MenuItem(
+                    label: 'Archives',
+                    icon: Icons.history_edu_rounded,
+                    path: '/archives',
+                  ),
+                  _MenuItem(
                     label: 'Alumni',
                     icon: Icons.school_rounded,
                     path: '/alumni',
@@ -690,6 +695,12 @@ class _MobileBottomNavigation extends StatelessWidget {
         selectedIcon: Icons.folder_rounded,
         path: '/documents',
       ),
+      _MobileDestination(
+        label: 'Archives',
+        icon: Icons.history_edu_outlined,
+        selectedIcon: Icons.history_edu_rounded,
+        path: '/archives',
+      ),
     ];
     final destinations = preferred
         .where((item) => allowedRoutes.contains(item.path))
@@ -841,6 +852,7 @@ String _navigationTitle(String currentPath) {
     '/tasks': 'Tâches',
     '/finance': 'Finance',
     '/documents': 'Documents',
+    '/archives': 'Archives & Mémoire collective',
     '/alumni': 'Alumni',
     '/recruitment': 'Recrutement',
     '/notifications': 'Notifications',
