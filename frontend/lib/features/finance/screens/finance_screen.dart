@@ -17,9 +17,12 @@ class FinanceScreen extends StatefulWidget {
 class _FinanceScreenState extends State<FinanceScreen> {
   final FinanceService _financeService = FinanceService();
   final MembersService _membersService = MembersService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
+  String _paymentFilter = 'all';
+  String _accountFilter = 'all';
 
   List<MemberModel> _members = [];
   List<FinancialAccountModel> _accounts = [];
@@ -30,6 +33,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
   void initState() {
     super.initState();
     _loadFinance();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFinance() async {
@@ -99,6 +108,71 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return _payments
         .where((payment) => payment.status == 'validated')
         .fold(0, (sum, payment) => sum + payment.amount);
+  }
+
+  List<FinancialAccountModel> get _filteredAccounts {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return _accounts.where((account) {
+      final member = _memberName(account.userId).toLowerCase();
+      final matchesQuery = query.isEmpty || member.contains(query);
+      final matchesFilter = switch (_accountFilter) {
+        'debt' => account.balanceDue > 0,
+        'clear' => account.balanceDue <= 0,
+        _ => true,
+      };
+
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  List<FeeModel> get _filteredFees {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return _fees.where((fee) {
+      final member = _memberName(fee.userId).toLowerCase();
+      final searchable = [
+        member,
+        fee.label,
+        fee.typeLabel,
+        fee.statusLabel,
+      ].join(' ').toLowerCase();
+
+      return query.isEmpty || searchable.contains(query);
+    }).toList();
+  }
+
+  List<PaymentModel> get _filteredPayments {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return _payments.where((payment) {
+      final member = _memberName(payment.userId).toLowerCase();
+      final searchable = [
+        member,
+        payment.methodLabel,
+        payment.statusLabel,
+        payment.reference ?? '',
+      ].join(' ').toLowerCase();
+      final matchesQuery = query.isEmpty || searchable.contains(query);
+      final matchesFilter =
+          _paymentFilter == 'all' || payment.status == _paymentFilter;
+
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  int get _debtorsCount {
+    return _accounts.where((account) => account.balanceDue > 0).length;
+  }
+
+  int get _pendingPaymentCount {
+    return _payments.where((payment) => payment.status == 'pending').length;
+  }
+
+  double get _collectionRate {
+    final total = _totalPaid + _totalDue;
+    if (total <= 0) return 0;
+    return (_totalPaid / total).clamp(0.0, 1.0);
   }
 
   Future<void> _openCreatePaymentDialog() async {
@@ -216,12 +290,36 @@ class _FinanceScreenState extends State<FinanceScreen> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _loadFinance)
           else ...[
-            _AccountsCard(accounts: _accounts, memberName: _memberName),
+            _FinanceRiskPanel(
+              debtorsCount: _debtorsCount,
+              pendingPaymentCount: _pendingPaymentCount,
+              collectionRate: _collectionRate,
+              totalDue: _totalDue,
+            ),
             const SizedBox(height: 18),
-            _FeesCard(fees: _fees, memberName: _memberName),
+            _FinanceFiltersCard(
+              controller: _searchController,
+              paymentFilter: _paymentFilter,
+              accountFilter: _accountFilter,
+              onChanged: () => setState(() {}),
+              onPaymentFilterChanged: (value) {
+                setState(() {
+                  _paymentFilter = value;
+                });
+              },
+              onAccountFilterChanged: (value) {
+                setState(() {
+                  _accountFilter = value;
+                });
+              },
+            ),
+            const SizedBox(height: 18),
+            _AccountsCard(accounts: _filteredAccounts, memberName: _memberName),
+            const SizedBox(height: 18),
+            _FeesCard(fees: _filteredFees, memberName: _memberName),
             const SizedBox(height: 18),
             _PaymentsCard(
-              payments: _payments,
+              payments: _filteredPayments,
               memberName: _memberName,
               onValidate: _validatePayment,
               onCancel: _cancelPayment,
@@ -471,6 +569,247 @@ class _FinanceStatItem {
   final IconData icon;
 
   const _FinanceStatItem(this.label, this.amount, this.icon);
+}
+
+class _FinanceRiskPanel extends StatelessWidget {
+  final int debtorsCount;
+  final int pendingPaymentCount;
+  final double collectionRate;
+  final double totalDue;
+
+  const _FinanceRiskPanel({
+    required this.debtorsCount,
+    required this.pendingPaymentCount,
+    required this.collectionRate,
+    required this.totalDue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 820;
+            final summary = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Pilotage financier',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: collectionRate,
+                    minHeight: 10,
+                    color: AppTheme.enactusYellow,
+                    backgroundColor: Colors.black12,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Taux d’encaissement ${(collectionRate * 100).round()}% • dette ${_money(totalDue)}',
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            );
+            final alerts = Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _FinanceAlertChip(
+                  icon: Icons.warning_rounded,
+                  label: '$debtorsCount membre(s) débiteur(s)',
+                  color: debtorsCount > 0
+                      ? Colors.red.shade700
+                      : Colors.green.shade700,
+                ),
+                _FinanceAlertChip(
+                  icon: Icons.pending_actions_rounded,
+                  label: '$pendingPaymentCount paiement(s) à valider',
+                  color: pendingPaymentCount > 0
+                      ? Colors.orange.shade800
+                      : Colors.green.shade700,
+                ),
+                const _FinanceAlertChip(
+                  icon: Icons.verified_user_rounded,
+                  label: 'Validation financier',
+                  color: AppTheme.softBlack,
+                ),
+                const _FinanceAlertChip(
+                  icon: Icons.lock_rounded,
+                  label: 'Données confidentielles',
+                  color: AppTheme.softBlack,
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: summary),
+                  const SizedBox(width: 18),
+                  Flexible(child: alerts),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [summary, const SizedBox(height: 16), alerts],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FinanceAlertChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _FinanceAlertChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(label),
+      backgroundColor: color.withAlpha(20),
+      side: BorderSide(color: color.withAlpha(80)),
+    );
+  }
+}
+
+class _FinanceFiltersCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String paymentFilter;
+  final String accountFilter;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onPaymentFilterChanged;
+  final ValueChanged<String> onAccountFilterChanged;
+
+  const _FinanceFiltersCard({
+    required this.controller,
+    required this.paymentFilter,
+    required this.accountFilter,
+    required this.onChanged,
+    required this.onPaymentFilterChanged,
+    required this.onAccountFilterChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 820;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Rechercher membre, frais, référence',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FinanceChoiceChip(
+                  label: 'Tous paiements',
+                  selected: paymentFilter == 'all',
+                  onSelected: () => onPaymentFilterChanged('all'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'À valider',
+                  selected: paymentFilter == 'pending',
+                  onSelected: () => onPaymentFilterChanged('pending'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'Validés',
+                  selected: paymentFilter == 'validated',
+                  onSelected: () => onPaymentFilterChanged('validated'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'Annulés',
+                  selected: paymentFilter == 'cancelled',
+                  onSelected: () => onPaymentFilterChanged('cancelled'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'Tous comptes',
+                  selected: accountFilter == 'all',
+                  onSelected: () => onAccountFilterChanged('all'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'Débiteurs',
+                  selected: accountFilter == 'debt',
+                  onSelected: () => onAccountFilterChanged('debt'),
+                ),
+                _FinanceChoiceChip(
+                  label: 'Soldés',
+                  selected: accountFilter == 'clear',
+                  onSelected: () => onAccountFilterChanged('clear'),
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FinanceChoiceChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _FinanceChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      onSelected: (_) => onSelected(),
+    );
+  }
 }
 
 class _AccountsCard extends StatelessWidget {
