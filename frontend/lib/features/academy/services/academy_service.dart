@@ -303,6 +303,167 @@ class AcademyService {
           unlocked: false,
         ),
       ],
+      caseStudies: [
+        _caseStudy(
+          id: 'case-dimbali',
+          projectName: 'DIMBALI',
+          title: 'Cas Dimbali: nutrition, revenus et reboisement',
+          context:
+              'Projet historique combinant impact social, économique et environnemental.',
+          problem:
+              'Malnutrition, revenus faibles et pression sur les ressources locales.',
+          solution:
+              'Valoriser des ressources locales, structurer des activités génératrices de revenus et planter des arbres.',
+          impact:
+              'Vies impactées, emplois créés, arbres plantés et apprentissage fort sur la preuve terrain.',
+          difficulties:
+              'Mesurer précisément les effets et maintenir la dynamique communautaire dans le temps.',
+          lessons: [
+            'Relier impact social et modèle économique',
+            'Documenter les preuves dès le départ',
+            'Former des relais locaux',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-deconaane',
+          projectName: 'DECONAANE',
+          title: 'Cas Deconaane: eau sûre, moringa et santé',
+          context:
+              'Projet orienté santé publique et création de revenus communautaires.',
+          problem:
+              'Accès insuffisant à une eau sûre et manque d’éducation préventive.',
+          solution:
+              'Associer sensibilisation, solutions locales et produits à base de moringa.',
+          impact:
+              'Prévention sanitaire, revenus, emplois et meilleure confiance communautaire.',
+          difficulties:
+              'Convaincre les utilisateurs et garantir une utilisation correcte.',
+          lessons: [
+            'La pédagogie d’usage est essentielle',
+            'Le produit seul ne suffit pas',
+            'La confiance locale accélère l’adoption',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-javelisel',
+          projectName: 'JAVELISEL',
+          title: 'Cas Javelisel: hygiène et prévention',
+          context:
+              'Projet de santé publique centré sur l’eau de javel et les gestes d’hygiène.',
+          problem:
+              'Risques sanitaires liés à une hygiène insuffisante et à l’eau non traitée.',
+          solution:
+              'Développer une solution accessible, accompagnée de sensibilisation terrain.',
+          impact:
+              'Prévention de maladies, sensibilisation et adoption de pratiques plus sûres.',
+          difficulties:
+              'Sécurité produit, dosage, emballage et pédagogie continue.',
+          lessons: [
+            'La sécurité doit guider le design',
+            'Un message simple se diffuse mieux',
+            'La mesure d’usage est aussi importante que la vente',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-mobigel',
+          projectName: 'MOBIGEL',
+          title: 'Cas Mobigel: innovation rapide Covid-19',
+          context:
+              'Projet né d’un besoin urgent pendant la crise sanitaire Covid-19.',
+          problem:
+              'Besoin d’hygiène mobile, rapide et accessible dans les espaces publics.',
+          solution:
+              'Prototype mobile, test utilisateur et communication préventive.',
+          impact:
+              'Réponse rapide, sensibilisation et démonstration de capacité d’innovation.',
+          difficulties:
+              'Agir vite sans perdre la rigueur de test et de sécurité.',
+          lessons: [
+            'Tester vite vaut mieux que supposer longtemps',
+            'L’urgence peut stimuler l’innovation',
+            'Un prototype doit rester mesurable',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-meune-nagn',
+          projectName: 'MEUNE NAGN',
+          title: 'Cas Meune Nagn: coopérative et chaîne de valeur',
+          context:
+              'Projet en Casamance autour de la structuration et de la valorisation locale.',
+          problem:
+              'Chaînes de valeur peu structurées et revenus instables pour les producteurs.',
+          solution:
+              'Organisation coopérative, transformation et amélioration des débouchés.',
+          impact:
+              'Création de valeur locale, revenus plus stables et apprentissage sur la gouvernance.',
+          difficulties:
+              'Aligner les acteurs, clarifier les responsabilités et maintenir la qualité.',
+          lessons: [
+            'La gouvernance est une condition d’impact',
+            'La chaîne complète doit être pensée',
+            'Les producteurs doivent co-construire la solution',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-soukhali',
+          projectName: 'SOUKHALI',
+          title: 'Cas Soukhali: ressources locales transformées',
+          context:
+              'Projet autour du Neem, de la mangue, du Madd et des pertes post-récolte.',
+          problem:
+              'Ressources locales sous-valorisées et pertes de production.',
+          solution:
+              'Transformation, branding, vente pilote et création de débouchés.',
+          impact:
+              'Valorisation économique, réduction de pertes et apprentissage produit-marché.',
+          difficulties:
+              'Packaging, conservation, régularité de l’approvisionnement et positionnement.',
+          lessons: [
+            'Le marché valide la solution',
+            'Le design produit crée la confiance',
+            'Les pertes peuvent devenir une opportunité',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-kong-serve',
+          projectName: 'KONG’SERVE',
+          title: 'Cas Kong’Serve: conservation et valeur',
+          context:
+              'Projet sur la conservation alimentaire et la transformation locale.',
+          problem: 'Pertes alimentaires et durée de conservation limitée.',
+          solution:
+              'Méthodes de conservation accessibles et produits transformés.',
+          impact:
+              'Réduction des pertes, meilleure valeur commerciale et apprentissage terrain.',
+          difficulties:
+              'Tester la conservation, rassurer les clients et maîtriser les coûts.',
+          lessons: [
+            'La conservation doit rester simple',
+            'Le coût doit être compatible avec le marché',
+            'La preuve produit est indispensable',
+          ],
+        ),
+        _caseStudy(
+          id: 'case-sukhalii-gokh',
+          projectName: 'SUKHALII GOKH',
+          title: 'Cas Sukhalii Gokh: quartier et action locale',
+          context:
+              'Projet d’amélioration locale basé sur la participation communautaire.',
+          problem:
+              'Besoins locaux dispersés et manque de coordination dans le quartier.',
+          solution:
+              'Diagnostic participatif, micro-actions et suivi communautaire.',
+          impact:
+              'Mobilisation locale, apprentissage citoyen et amélioration de proximité.',
+          difficulties:
+              'Prioriser les actions et documenter des impacts parfois diffus.',
+          lessons: [
+            'La communauté connaît ses priorités',
+            'Les petits actes doivent être suivis',
+            'La mémoire collective évite de recommencer à zéro',
+          ],
+        ),
+      ],
       progress: AcademyProgressModel(
         completedLessons: completedLessons,
         totalLessons: totalLessons,
@@ -365,6 +526,56 @@ class AcademyService {
       points: 60,
       label: 'Quiz réussi',
       syncedWithGamification: synced,
+    );
+  }
+
+  AcademyCaseStudyModel _caseStudy({
+    required String id,
+    required String projectName,
+    required String title,
+    required String context,
+    required String problem,
+    required String solution,
+    required String impact,
+    required String difficulties,
+    required List<String> lessons,
+  }) {
+    return AcademyCaseStudyModel(
+      id: id,
+      title: title,
+      projectName: projectName,
+      context: context,
+      problem: problem,
+      solution: solution,
+      impact: impact,
+      difficulties: difficulties,
+      lessons: lessons,
+      reflectionQuestions: [
+        'Quelle preuve aurait rendu ce projet plus solide ?',
+        'Quel indicateur People, Planet ou Prosperity faut-il suivre ?',
+        'Comment adapter ce projet à une nouvelle saison Enactus ESP ?',
+      ],
+      quiz: AcademyQuizModel(
+        id: '$id-quiz',
+        title: 'Mini quiz $projectName',
+        category: 'Étude de cas',
+        level: 'Intermédiaire',
+        timeLimitMinutes: 5,
+        questions: [
+          AcademyQuestionModel(
+            question: 'Quel est le meilleur réflexe après un cas pratique ?',
+            choices: [
+              'Identifier les preuves et les leçons réutilisables',
+              'Copier le projet sans adaptation',
+              'Ignorer les difficultés',
+              'Ne regarder que les prix obtenus',
+            ],
+            correctIndex: 0,
+            explanation:
+                'Un cas pratique sert surtout à apprendre, adapter et mieux mesurer.',
+          ),
+        ],
+      ),
     );
   }
 

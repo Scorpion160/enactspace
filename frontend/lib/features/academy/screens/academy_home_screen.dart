@@ -277,6 +277,14 @@ class _AcademyContent extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         const _SectionTitle(
+          title: 'Études de cas Enactus ESP',
+          subtitle:
+              'Apprendre à partir des anciens projets, de leurs impacts et de leurs difficultés.',
+        ),
+        const SizedBox(height: 12),
+        _CaseStudiesGrid(caseStudies: data.caseStudies),
+        const SizedBox(height: 22),
+        const _SectionTitle(
           title: 'Quiz rapides',
           subtitle: 'Questions, bonnes réponses, explications et niveaux.',
         ),
@@ -627,6 +635,256 @@ class _QuizStrip extends StatelessWidget {
                       tooltip: 'Valider le quiz',
                     ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaseStudiesGrid extends StatelessWidget {
+  final List<AcademyCaseStudyModel> caseStudies;
+
+  const _CaseStudiesGrid({required this.caseStudies});
+
+  @override
+  Widget build(BuildContext context) {
+    return _ResponsiveWrap(
+      minWidth: 300,
+      children: [
+        for (final item in caseStudies) _CaseStudyCard(caseStudy: item),
+      ],
+    );
+  }
+}
+
+class _CaseStudyCard extends StatelessWidget {
+  final AcademyCaseStudyModel caseStudy;
+
+  const _CaseStudyCard({required this.caseStudy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: () => _showCaseStudy(context),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppTheme.enactusYellow,
+                    foregroundColor: AppTheme.softBlack,
+                    child: Text(
+                      caseStudy.projectName.characters.first,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      caseStudy.projectName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                caseStudy.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                caseStudy.context,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.black54, height: 1.35),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(label: Text('${caseStudy.lessons.length} leçons')),
+                  Chip(label: Text('${caseStudy.quiz.questions.length} quiz')),
+                  const Chip(label: Text('Cas pratique')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCaseStudy(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _CaseStudyDetails(caseStudy: caseStudy),
+    );
+  }
+}
+
+class _CaseStudyDetails extends StatelessWidget {
+  final AcademyCaseStudyModel caseStudy;
+
+  const _CaseStudyDetails({required this.caseStudy});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.88,
+      minChildSize: 0.55,
+      maxChildSize: 0.96,
+      builder: (context, controller) {
+        return SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    caseStudy.title,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    caseStudy.context,
+                    style: const TextStyle(color: Colors.black54, height: 1.4),
+                  ),
+                  const SizedBox(height: 18),
+                  _CaseDetailTile(
+                    title: 'Problème',
+                    body: caseStudy.problem,
+                    icon: Icons.report_problem_rounded,
+                  ),
+                  _CaseDetailTile(
+                    title: 'Solution',
+                    body: caseStudy.solution,
+                    icon: Icons.lightbulb_rounded,
+                  ),
+                  _CaseDetailTile(
+                    title: 'Impact',
+                    body: caseStudy.impact,
+                    icon: Icons.insights_rounded,
+                  ),
+                  _CaseDetailTile(
+                    title: 'Difficultés',
+                    body: caseStudy.difficulties,
+                    icon: Icons.terrain_rounded,
+                  ),
+                  _CaseChipBlock(
+                    title: 'Leçons apprises',
+                    items: caseStudy.lessons,
+                  ),
+                  _CaseChipBlock(
+                    title: 'Questions de réflexion',
+                    items: caseStudy.reflectionQuestions,
+                  ),
+                  _CaseChipBlock(
+                    title: caseStudy.quiz.title,
+                    items: [
+                      for (final question in caseStudy.quiz.questions)
+                        question.question,
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.check_rounded),
+                      label: const Text('Compris'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CaseDetailTile extends StatelessWidget {
+  final String title;
+  final String body;
+  final IconData icon;
+
+  const _CaseDetailTile({
+    required this.title,
+    required this.body,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.22),
+          foregroundColor: AppTheme.softBlack,
+          child: Icon(icon),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+        subtitle: Text(body),
+      ),
+    );
+  }
+}
+
+class _CaseChipBlock extends StatelessWidget {
+  final String title;
+  final List<String> items;
+
+  const _CaseChipBlock({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [for (final item in items) Chip(label: Text(item))],
+          ),
         ],
       ),
     );

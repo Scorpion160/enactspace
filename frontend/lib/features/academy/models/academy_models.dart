@@ -88,6 +88,34 @@ class AcademyBadgeModel {
   });
 }
 
+class AcademyCaseStudyModel {
+  final String id;
+  final String title;
+  final String projectName;
+  final String context;
+  final String problem;
+  final String solution;
+  final String impact;
+  final String difficulties;
+  final List<String> lessons;
+  final List<String> reflectionQuestions;
+  final AcademyQuizModel quiz;
+
+  const AcademyCaseStudyModel({
+    required this.id,
+    required this.title,
+    required this.projectName,
+    required this.context,
+    required this.problem,
+    required this.solution,
+    required this.impact,
+    required this.difficulties,
+    required this.lessons,
+    required this.reflectionQuestions,
+    required this.quiz,
+  });
+}
+
 class AcademyPathModel {
   final String id;
   final String title;
@@ -138,12 +166,14 @@ class AcademyHomeData {
   final List<AcademyCourseModel> courses;
   final List<AcademyPathModel> paths;
   final List<AcademyBadgeModel> badges;
+  final List<AcademyCaseStudyModel> caseStudies;
   final AcademyProgressModel progress;
 
   const AcademyHomeData({
     required this.courses,
     required this.paths,
     required this.badges,
+    required this.caseStudies,
     required this.progress,
   });
 }
