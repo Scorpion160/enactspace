@@ -260,6 +260,11 @@ class _SideMenu extends StatelessWidget {
                     icon: Icons.workspace_premium_rounded,
                     path: '/gamification',
                   ),
+                  _MenuItem(
+                    label: 'Impact',
+                    icon: Icons.insights_rounded,
+                    path: '/impact',
+                  ),
                 ],
               ),
               _MenuSection(
@@ -644,6 +649,12 @@ class _MobileBottomNavigation extends StatelessWidget {
         path: '/gamification',
       ),
       _MobileDestination(
+        label: 'Impact',
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights_rounded,
+        path: '/impact',
+      ),
+      _MobileDestination(
         label: 'Alertes',
         icon: Icons.notifications_outlined,
         selectedIcon: Icons.notifications_rounded,
@@ -825,6 +836,7 @@ String _navigationTitle(String currentPath) {
     '/posts': 'Communication',
     '/chat': 'Chat',
     '/gamification': 'Gamification',
+    '/impact': 'Impact & Performance',
   };
 
   return sections.entries

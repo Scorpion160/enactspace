@@ -65,6 +65,7 @@ class UserExperience {
   bool get canViewFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
       isAdmin || isTeamLeader || isSecretary || isEnacchef;
+  bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
   bool get canManageAttendance => isEnacchef;
 
@@ -142,6 +143,10 @@ class UserExperience {
 
     if (user.canViewRecruitment) {
       routes.add('/recruitment');
+    }
+
+    if (user.canViewImpact) {
+      routes.add('/impact');
     }
 
     if (user.isAdmin ||
