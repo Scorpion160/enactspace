@@ -623,6 +623,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   threads: _threads,
                                   selectedThread: _selectedThread,
                                   pinnedThreadIds: _pinnedThreadIds,
+                                  currentUserId: _user?.id,
                                   onSelect: _selectThread,
                                 ),
                               ),
@@ -639,6 +640,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   threads: _threads,
                                   selectedThread: _selectedThread,
                                   pinnedThreadIds: _pinnedThreadIds,
+                                  currentUserId: _user?.id,
                                   onSelect: _selectThread,
                                 ),
                               )
@@ -663,6 +665,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           _ConversationHeader(
             thread: _selectedThread,
+            currentUserId: _user?.id,
             showBack: showBack,
             pinned: _selectedThread == null
                 ? false
@@ -820,21 +823,43 @@ class _LocalCacheChip extends StatelessWidget {
   }
 }
 
-class _ThreadsPanel extends StatelessWidget {
+class _ThreadsPanel extends StatefulWidget {
   final List<ChatThreadModel> threads;
   final ChatThreadModel? selectedThread;
   final Set<String> pinnedThreadIds;
+  final String? currentUserId;
   final ValueChanged<ChatThreadModel> onSelect;
 
   const _ThreadsPanel({
     required this.threads,
     required this.selectedThread,
     required this.pinnedThreadIds,
+    required this.currentUserId,
     required this.onSelect,
   });
 
   @override
+  State<_ThreadsPanel> createState() => _ThreadsPanelState();
+}
+
+class _ThreadsPanelState extends State<_ThreadsPanel> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filteredThreads = widget.threads.where((thread) {
+      final query = _query.trim().toLowerCase();
+      if (query.isEmpty) return true;
+      return _threadSearchText(thread, widget.currentUserId).contains(query);
+    }).toList();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -847,21 +872,34 @@ class _ThreadsPanel extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Rechercher une discussion',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 8),
             const Divider(height: 1),
             Expanded(
-              child: threads.isEmpty
+              child: widget.threads.isEmpty
                   ? const _EmptyThreads()
+                  : filteredThreads.isEmpty
+                  ? const _EmptySearchResult()
                   : ListView.builder(
-                      itemCount: threads.length,
+                      itemCount: filteredThreads.length,
                       itemBuilder: (context, index) {
-                        final thread = threads[index];
-                        final selected = thread.id == selectedThread?.id;
+                        final thread = filteredThreads[index];
+                        final selected = thread.id == widget.selectedThread?.id;
 
                         return _ThreadTile(
                           thread: thread,
                           selected: selected,
-                          pinned: pinnedThreadIds.contains(thread.id),
-                          onTap: () => onSelect(thread),
+                          pinned: widget.pinnedThreadIds.contains(thread.id),
+                          currentUserId: widget.currentUserId,
+                          onTap: () => widget.onSelect(thread),
                         );
                       },
                     ),
@@ -877,17 +915,21 @@ class _ThreadTile extends StatelessWidget {
   final ChatThreadModel thread;
   final bool selected;
   final bool pinned;
+  final String? currentUserId;
   final VoidCallback onTap;
 
   const _ThreadTile({
     required this.thread,
     required this.selected,
     required this.pinned,
+    required this.currentUserId,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final title = _threadDisplayTitle(thread, currentUserId);
+
     return Container(
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
@@ -899,18 +941,18 @@ class _ThreadTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: _ChatAvatar(
-          title: thread.displayTitle,
-          imageUrl: thread.absoluteAvatarUrl,
+          title: title,
+          imageUrl: _threadAvatarUrl(thread, currentUserId),
           selected: selected,
           icon: thread.threadType == 'direct' ? Icons.person : Icons.groups,
         ),
         title: Text(
-          thread.displayTitle,
+          title,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         subtitle: Text(
-          thread.lastMessage ?? '${thread.participantsCount} participant(s)',
+          thread.lastMessage ?? _threadSubtitle(thread, currentUserId),
           overflow: TextOverflow.ellipsis,
         ),
         trailing: Column(
@@ -967,6 +1009,7 @@ class _ChatAvatar extends StatelessWidget {
 
 class _ConversationHeader extends StatelessWidget {
   final ChatThreadModel? thread;
+  final String? currentUserId;
   final bool showBack;
   final bool pinned;
   final VoidCallback onBack;
@@ -975,6 +1018,7 @@ class _ConversationHeader extends StatelessWidget {
 
   const _ConversationHeader({
     required this.thread,
+    required this.currentUserId,
     required this.showBack,
     required this.pinned,
     required this.onBack,
@@ -984,6 +1028,10 @@ class _ConversationHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = thread == null
+        ? 'Sélectionne une conversation'
+        : _threadDisplayTitle(thread!, currentUserId);
+
     return ListTile(
       leading: showBack
           ? IconButton(
@@ -991,19 +1039,21 @@ class _ConversationHeader extends StatelessWidget {
               icon: const Icon(Icons.arrow_back_rounded),
             )
           : _ChatAvatar(
-              title: thread?.displayTitle ?? 'Chat',
-              imageUrl: thread?.absoluteAvatarUrl,
+              title: title,
+              imageUrl: thread == null
+                  ? null
+                  : _threadAvatarUrl(thread!, currentUserId),
               selected: true,
               icon: Icons.chat_bubble_rounded,
             ),
       title: Text(
-        thread?.displayTitle ?? 'Sélectionne une conversation',
+        title,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w900),
       ),
       subtitle: thread == null
           ? const Text('Tes messages apparaîtront ici.')
-          : Text(_threadSubtitle(thread!)),
+          : Text(_threadSubtitle(thread!, currentUserId)),
       trailing: thread == null
           ? null
           : PopupMenuButton<String>(
@@ -1355,6 +1405,8 @@ class _ConversationInfoDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = _threadDisplayTitle(thread, currentUserId);
+
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Infos'),
@@ -1367,8 +1419,8 @@ class _ConversationInfoDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _ChatAvatar(
-                title: thread.displayTitle,
-                imageUrl: thread.absoluteAvatarUrl,
+                title: title,
+                imageUrl: _threadAvatarUrl(thread, currentUserId),
                 selected: true,
                 icon: thread.threadType == 'direct'
                     ? Icons.person_rounded
@@ -1376,7 +1428,7 @@ class _ConversationInfoDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                thread.displayTitle,
+                title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
@@ -1385,7 +1437,7 @@ class _ConversationInfoDialog extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                _threadSubtitle(thread),
+                _threadSubtitle(thread, currentUserId),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.black54),
               ),
@@ -2403,6 +2455,24 @@ class _EmptyThreads extends StatelessWidget {
   }
 }
 
+class _EmptySearchResult extends StatelessWidget {
+  const _EmptySearchResult();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Text(
+          'Aucune discussion trouvée.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black54),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyConversation extends StatelessWidget {
   const _EmptyConversation();
 
@@ -2479,7 +2549,71 @@ String _initials(String name) {
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
 }
 
-String _threadSubtitle(ChatThreadModel thread) {
+String _threadDisplayTitle(ChatThreadModel thread, String? currentUserId) {
+  final directParticipant = _directParticipant(thread, currentUserId);
+  if (directParticipant != null) return directParticipant.displayName;
+  return thread.displayTitle;
+}
+
+String? _threadAvatarUrl(ChatThreadModel thread, String? currentUserId) {
+  final directParticipant = _directParticipant(thread, currentUserId);
+  if (directParticipant != null) {
+    return _absoluteUrl(directParticipant.photoUrl);
+  }
+  return thread.absoluteAvatarUrl;
+}
+
+String _threadSearchText(ChatThreadModel thread, String? currentUserId) {
+  final participants = thread.participantsPreview
+      .expand(
+        (participant) => [
+          participant.displayName,
+          participant.email,
+          participant.status,
+          participant.participantRole,
+        ],
+      )
+      .join(' ');
+
+  return [
+    _threadDisplayTitle(thread, currentUserId),
+    _threadSubtitle(thread, currentUserId),
+    thread.lastMessage ?? '',
+    thread.threadType,
+    thread.scopeType ?? '',
+    participants,
+  ].join(' ').toLowerCase();
+}
+
+ChatThreadMemberModel? _directParticipant(
+  ChatThreadModel thread,
+  String? currentUserId,
+) {
+  if (thread.threadType != 'direct') return null;
+  if (thread.participantsPreview.isEmpty) return null;
+  if (currentUserId == null || currentUserId.trim().isEmpty) {
+    return thread.participantsPreview.length == 1
+        ? thread.participantsPreview.first
+        : null;
+  }
+
+  final others = thread.participantsPreview.where((participant) {
+    return participant.userId.isNotEmpty && participant.userId != currentUserId;
+  });
+
+  return others.firstOrNull ?? thread.participantsPreview.first;
+}
+
+String _threadSubtitle(ChatThreadModel thread, String? currentUserId) {
+  final directParticipant = _directParticipant(thread, currentUserId);
+  if (directParticipant != null) {
+    final email = directParticipant.email.trim();
+    final status = directParticipant.status.trim();
+    if (email.isNotEmpty && status.isNotEmpty) return '$email · $status';
+    if (email.isNotEmpty) return email;
+    return 'Discussion privée';
+  }
+
   final names = thread.participantsPreview
       .map((participant) => participant.displayName)
       .where((name) => name.trim().isNotEmpty)
