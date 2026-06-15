@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -85,7 +86,7 @@ class _PostsScreenState extends State<PostsScreen> {
       if (!mounted) return;
 
       setState(() {
-        _posts = posts;
+        _posts = _sortPosts(posts);
         _user = user;
         _membersById = {for (final member in members) member.id: member};
         _statsByPostId = {for (final stat in stats) stat.postId: stat};
@@ -243,8 +244,15 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Future<void> _react(PostModel post) async {
+    await _reactWith(post, 'like');
+  }
+
+  Future<void> _reactWith(PostModel post, String reactionType) async {
     try {
-      await _postsService.createReaction(postId: post.id, reactionType: 'like');
+      await _postsService.createReaction(
+        postId: post.id,
+        reactionType: reactionType,
+      );
       final stat = await _loadStatsSafely(post);
 
       if (!mounted) return;
@@ -254,6 +262,22 @@ class _PostsScreenState extends State<PostsScreen> {
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
+  }
+
+  List<PostModel> _sortPosts(List<PostModel> posts) {
+    final sorted = [...posts];
+    sorted.sort((a, b) {
+      final pinnedCompare = (b.isPinned ? 1 : 0).compareTo(a.isPinned ? 1 : 0);
+      if (pinnedCompare != 0) return pinnedCompare;
+
+      final officialCompare = (b.isOfficial ? 1 : 0).compareTo(
+        a.isOfficial ? 1 : 0,
+      );
+      if (officialCompare != 0) return officialCompare;
+
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return sorted;
   }
 
   Future<void> _togglePostPin(PostModel post) async {
@@ -310,6 +334,22 @@ class _PostsScreenState extends State<PostsScreen> {
 
     if (post.authorId.length <= 8) return post.authorId;
     return '${post.authorId.substring(0, 8)}...';
+  }
+
+  String _authorSubtitle(PostModel post) {
+    final member = _membersById[post.authorId];
+    if (member == null) return 'Membre Enactus';
+
+    final roles = member.rolesLabel == 'Aucun rôle' ? null : member.rolesLabel;
+    final department = member.departmentLabel == 'Non défini'
+        ? null
+        : member.departmentLabel;
+
+    return [?roles, ?department, member.statusLabel].join(' · ');
+  }
+
+  String? _authorPhotoUrl(PostModel post) {
+    return _absoluteUrl(_membersById[post.authorId]?.photoUrl);
   }
 
   void _showError(String message) {
@@ -454,6 +494,8 @@ class _PostsScreenState extends State<PostsScreen> {
             child: _PostCard(
               post: post,
               authorName: _authorName(post),
+              authorSubtitle: _authorSubtitle(post),
+              authorPhotoUrl: _authorPhotoUrl(post),
               stats: _statsByPostId[post.id],
               comments: _commentsByPostId[post.id] ?? const [],
               commentsExpanded: _expandedPosts.contains(post.id),
@@ -462,6 +504,8 @@ class _PostsScreenState extends State<PostsScreen> {
               onToggleComments: () => _toggleComments(post),
               onCreateComment: () => _createComment(post),
               onReact: () => _react(post),
+              onReactionSelected: (reactionType) =>
+                  _reactWith(post, reactionType),
               canModerate: _user?.isEnacchef ?? false,
               onTogglePin: () => _togglePostPin(post),
               onDelete: () => _deletePost(post),
@@ -852,6 +896,8 @@ class _PostFilters extends StatelessWidget {
 class _PostCard extends StatelessWidget {
   final PostModel post;
   final String authorName;
+  final String authorSubtitle;
+  final String? authorPhotoUrl;
   final PostStatsModel? stats;
   final List<PostCommentModel> comments;
   final bool commentsExpanded;
@@ -860,6 +906,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onToggleComments;
   final VoidCallback onCreateComment;
   final VoidCallback onReact;
+  final ValueChanged<String> onReactionSelected;
   final bool canModerate;
   final VoidCallback onTogglePin;
   final VoidCallback onDelete;
@@ -867,6 +914,8 @@ class _PostCard extends StatelessWidget {
   const _PostCard({
     required this.post,
     required this.authorName,
+    required this.authorSubtitle,
+    required this.authorPhotoUrl,
     required this.stats,
     required this.comments,
     required this.commentsExpanded,
@@ -875,6 +924,7 @@ class _PostCard extends StatelessWidget {
     required this.onToggleComments,
     required this.onCreateComment,
     required this.onReact,
+    required this.onReactionSelected,
     required this.canModerate,
     required this.onTogglePin,
     required this.onDelete,
@@ -892,13 +942,33 @@ class _PostCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (post.isPinned || post.isOfficial) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (post.isPinned)
+                    const _MetaChip(
+                      label: 'Épinglée',
+                      icon: Icons.push_pin_rounded,
+                      highlighted: true,
+                    ),
+                  if (post.isOfficial)
+                    const _MetaChip(
+                      label: 'Officielle',
+                      icon: Icons.verified_rounded,
+                      highlighted: true,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  backgroundColor: AppTheme.enactusYellow,
-                  foregroundColor: AppTheme.softBlack,
-                  child: Text(_initials(authorName)),
+                _PostAuthorAvatar(
+                  authorName: authorName,
+                  photoUrl: authorPhotoUrl,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -954,9 +1024,20 @@ class _PostCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '$authorName • $date',
+                        '$authorName · $date',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Colors.black54),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        authorSubtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.black.withValues(alpha: 0.46),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
@@ -996,6 +1077,7 @@ class _PostCard extends StatelessWidget {
                   icon: const Icon(Icons.thumb_up_alt_outlined),
                   label: Text('$reactionsCount réaction(s)'),
                 ),
+                _ReactionPicker(onSelected: onReactionSelected),
                 TextButton.icon(
                   onPressed: onToggleComments,
                   icon: Icon(
@@ -1047,6 +1129,62 @@ class _PostCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PostAuthorAvatar extends StatelessWidget {
+  final String authorName;
+  final String? photoUrl;
+
+  const _PostAuthorAvatar({required this.authorName, required this.photoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = photoUrl;
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(
+        radius: 23,
+        backgroundColor: Colors.black12,
+        backgroundImage: NetworkImage(url),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 23,
+      backgroundColor: AppTheme.enactusYellow,
+      foregroundColor: AppTheme.softBlack,
+      child: Text(
+        _initials(authorName),
+        style: const TextStyle(fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+}
+
+class _ReactionPicker extends StatelessWidget {
+  final ValueChanged<String> onSelected;
+
+  const _ReactionPicker({required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Réagir',
+      onSelected: onSelected,
+      itemBuilder: (context) => const [
+        PopupMenuItem(value: 'bravo', child: Text('👏 Bravo')),
+        PopupMenuItem(value: 'idee', child: Text('💡 Idée')),
+        PopupMenuItem(value: 'important', child: Text('⭐ Important')),
+        PopupMenuItem(value: 'merci', child: Text('🙏 Merci')),
+        PopupMenuItem(value: 'soutien', child: Text('💛 Soutien')),
+      ],
+      child: Chip(
+        avatar: const Icon(Icons.add_reaction_outlined, size: 16),
+        label: const Text('Réagir'),
+        backgroundColor: Colors.white,
+        side: BorderSide(color: AppTheme.enactusYellow.withValues(alpha: 0.52)),
       ),
     );
   }
@@ -1202,6 +1340,12 @@ double _responsiveControlWidth(BuildContext context, double preferred) {
   if (screenWidth >= 560) return preferred;
 
   return (screenWidth - 92).clamp(180.0, preferred).toDouble();
+}
+
+String? _absoluteUrl(String? url) {
+  if (url == null || url.trim().isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return '${ApiClient.serverUrl}$url';
 }
 
 String _initials(String name) {

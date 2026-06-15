@@ -10,6 +10,7 @@ class MemberModel {
   final String? corePoleId;
   final List<String> roles;
   final String? department;
+  final String? photoUrl;
 
   const MemberModel({
     required this.id,
@@ -23,6 +24,7 @@ class MemberModel {
     this.corePoleId,
     this.roles = const [],
     this.department,
+    this.photoUrl,
   });
 
   factory MemberModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,10 @@ class MemberModel {
       corePoleId: json['core_pole_id']?.toString(),
       roles: _parseRoles(json['roles']),
       department: json['department']?.toString(),
+      photoUrl:
+          json['photo_url']?.toString() ??
+          json['avatar_url']?.toString() ??
+          json['profile_photo_url']?.toString(),
     );
   }
 
