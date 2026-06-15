@@ -358,7 +358,7 @@ class _ArchiveProjectCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _ArchiveProjectLogo(project: project, size: 46),
+                  _ArchiveProjectLogo(project: project, size: 54),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -455,7 +455,7 @@ class _ArchiveProjectDetails extends StatelessWidget {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      _ArchiveProjectLogo(project: project, size: 68),
+                      _ArchiveProjectLogo(project: project, size: 76),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(
@@ -554,7 +554,13 @@ class _ArchiveProjectLogo extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        color: AppTheme.enactusYellow.withValues(alpha: 0.24),
+        padding: EdgeInsets.all(size * 0.08),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(
+            color: AppTheme.enactusYellow.withValues(alpha: 0.36),
+          ),
+        ),
         child: asset == null
             ? Center(
                 child: Text(
@@ -568,7 +574,7 @@ class _ArchiveProjectLogo extends StatelessWidget {
               )
             : Image.asset(
                 asset,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Center(
                     child: Text(
@@ -913,23 +919,26 @@ class _HallOfFameTile extends StatelessWidget {
                     const SizedBox(height: 12),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(
-                        item.imageAsset!,
+                      child: Container(
+                        height: 220,
                         width: double.infinity,
-                        height: 156,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 96,
-                            alignment: Alignment.center,
-                            color: AppTheme.enactusYellow.withValues(
-                              alpha: 0.16,
-                            ),
-                            child: const Icon(
-                              Icons.image_not_supported_rounded,
-                            ),
-                          );
-                        },
+                        padding: const EdgeInsets.all(10),
+                        color: Colors.white,
+                        child: Image.asset(
+                          item.imageAsset!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              alignment: Alignment.center,
+                              color: AppTheme.enactusYellow.withValues(
+                                alpha: 0.16,
+                              ),
+                              child: const Icon(
+                                Icons.image_not_supported_rounded,
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],

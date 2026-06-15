@@ -908,19 +908,22 @@ class _BrandMark extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(size * 0.28),
       ),
-      child: Image.asset(
-        'assets/img/logo_enactus_esp.png',
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: AppTheme.enactusYellow,
-            child: Icon(
-              Icons.groups_2_rounded,
-              size: size * 0.56,
-              color: AppTheme.softBlack,
-            ),
-          );
-        },
+      child: Padding(
+        padding: EdgeInsets.all(size * 0.08),
+        child: Image.asset(
+          'assets/img/logo_enactus_esp.png',
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: AppTheme.enactusYellow,
+              child: Icon(
+                Icons.groups_2_rounded,
+                size: size * 0.56,
+                color: AppTheme.softBlack,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
