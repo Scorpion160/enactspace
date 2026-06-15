@@ -165,12 +165,12 @@ class _ArchivesContent extends StatelessWidget {
         _ArchiveProjectsGrid(projects: data.projects),
         const SizedBox(height: 22),
         const _SectionTitle(
-          title: 'Palmarès rapide',
+          title: 'Palmarès Enactus ESP',
           subtitle:
-              'Les distinctions complètes seront enrichies dans le Hall of Fame.',
+              'Prix, titres, compétition internationale et visibilité médiatique du club.',
         ),
         const SizedBox(height: 12),
-        _HallOfFamePreview(items: data.hallOfFame),
+        _HallOfFameSection(items: data.hallOfFame),
       ],
     );
   }
@@ -593,10 +593,10 @@ class _DetailChips extends StatelessWidget {
   }
 }
 
-class _HallOfFamePreview extends StatelessWidget {
+class HallOfFamePreview extends StatelessWidget {
   final List<HallOfFameItemModel> items;
 
-  const _HallOfFamePreview({required this.items});
+  const HallOfFamePreview({super.key, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -619,6 +619,269 @@ class _HallOfFamePreview extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _HallOfFameSection extends StatelessWidget {
+  final List<HallOfFameItemModel> items;
+
+  const _HallOfFameSection({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final titles = items.where((item) => item.type == 'Titre').length;
+    final competitions = items
+        .where(
+          (item) => item.type == 'Compétition' || item.type == 'International',
+        )
+        .length;
+    final media = items.where((item) => item.type == 'Média').length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 720;
+            final cards = [
+              _HallMetric(
+                label: 'Titres nationaux',
+                value: titles.toString(),
+                icon: Icons.workspace_premium_rounded,
+              ),
+              _HallMetric(
+                label: 'Compétitions',
+                value: competitions.toString(),
+                icon: Icons.emoji_events_rounded,
+              ),
+              _HallMetric(
+                label: 'Médias',
+                value: media.toString(),
+                icon: Icons.campaign_rounded,
+              ),
+            ];
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final card in cards)
+                  SizedBox(
+                    width: compact
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 24) / 3,
+                    child: _HallMetricCard(metric: card),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Column(
+            children: [
+              for (var index = 0; index < items.length; index++)
+                _HallOfFameTile(
+                  item: items[index],
+                  first: index == 0,
+                  last: index == items.length - 1,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppTheme.enactusYellow.withValues(
+                    alpha: 0.24,
+                  ),
+                  foregroundColor: AppTheme.softBlack,
+                  child: const Icon(Icons.menu_book_rounded),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Source mémoire',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Informations structurées depuis la présentation historique Enactus ESP et prêtes à être reliées aux documents officiels.',
+                        style: TextStyle(color: Colors.black54, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HallMetric {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _HallMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+}
+
+class _HallMetricCard extends StatelessWidget {
+  final _HallMetric metric;
+
+  const _HallMetricCard({required this.metric});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.24),
+              foregroundColor: AppTheme.softBlack,
+              child: Icon(metric.icon),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    metric.value,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    metric.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HallOfFameTile extends StatelessWidget {
+  final HallOfFameItemModel item;
+  final bool first;
+  final bool last;
+
+  const _HallOfFameTile({
+    required this.item,
+    required this.first,
+    required this.last,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 56,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: first
+                        ? Colors.transparent
+                        : AppTheme.enactusYellow.withValues(alpha: 0.55),
+                  ),
+                ),
+                CircleAvatar(
+                  radius: 17,
+                  backgroundColor: AppTheme.enactusYellow,
+                  foregroundColor: AppTheme.softBlack,
+                  child: Icon(_hallIcon(item.type), size: 19),
+                ),
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: last
+                        ? Colors.transparent
+                        : AppTheme.enactusYellow.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(label: Text(item.period)),
+                      Chip(label: Text(item.type)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    item.description,
+                    style: const TextStyle(color: Colors.black54, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _hallIcon(String type) {
+  switch (type) {
+    case 'Titre':
+      return Icons.workspace_premium_rounded;
+    case 'International':
+      return Icons.public_rounded;
+    case 'Média':
+      return Icons.campaign_rounded;
+    case 'Prix':
+      return Icons.star_rounded;
+    default:
+      return Icons.emoji_events_rounded;
   }
 }
 
