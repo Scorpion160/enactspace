@@ -179,12 +179,22 @@ class _LoginPanel extends StatelessWidget {
     showDialog(context: context, builder: (_) => const _ForgotPasswordDialog());
   }
 
-  void _showJoinRequestSheet(BuildContext context) {
+  void _showJoinRequestSheet(
+    BuildContext context, {
+    String profileType = 'enacteur',
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => const _JoinEnactusSheet(),
+      builder: (_) => _JoinEnactusSheet(initialProfileType: profileType),
+    );
+  }
+
+  void _showRecruitmentDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => const _RecruitmentAccessDialog(),
     );
   }
 
@@ -297,6 +307,28 @@ class _LoginPanel extends StatelessWidget {
                                   : () => _showJoinRequestSheet(context),
                               icon: const Icon(Icons.person_add_alt_1_rounded),
                               label: const Text('Rejoindre Enactus ESP'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: loading
+                                  ? null
+                                  : () => _showJoinRequestSheet(
+                                      context,
+                                      profileType: 'alumni',
+                                    ),
+                              icon: const Icon(Icons.workspace_premium_rounded),
+                              label: const Text('Rejoindre comme Alumni'),
+                            ),
+                            TextButton.icon(
+                              onPressed: loading
+                                  ? null
+                                  : () => _showJoinRequestSheet(context),
+                              icon: const Icon(Icons.app_registration_rounded),
+                              label: const Text('Créer un compte'),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _showRecruitmentDialog(context),
+                              icon: const Icon(Icons.how_to_reg_rounded),
+                              label: const Text('Candidature recrutement'),
                             ),
                             TextButton.icon(
                               onPressed: () => _showGuideDialog(context),
@@ -499,7 +531,9 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
 }
 
 class _JoinEnactusSheet extends StatefulWidget {
-  const _JoinEnactusSheet();
+  final String initialProfileType;
+
+  const _JoinEnactusSheet({required this.initialProfileType});
 
   @override
   State<_JoinEnactusSheet> createState() => _JoinEnactusSheetState();
@@ -510,13 +544,24 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _photoController = TextEditingController();
   final _departmentController = TextEditingController();
   final _levelController = TextEditingController();
+  final _promotionController = TextEditingController();
   final _skillsController = TextEditingController();
+  final _linkedinController = TextEditingController();
+  final _githubController = TextEditingController();
+  final _portfolioController = TextEditingController();
   final _motivationController = TextEditingController();
 
-  String _profileType = 'enacteur';
+  late String _profileType;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileType = widget.initialProfileType;
+  }
 
   @override
   void dispose() {
@@ -524,9 +569,14 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _photoController.dispose();
     _departmentController.dispose();
     _levelController.dispose();
+    _promotionController.dispose();
     _skillsController.dispose();
+    _linkedinController.dispose();
+    _githubController.dispose();
+    _portfolioController.dispose();
     _motivationController.dispose();
     super.dispose();
   }
@@ -655,6 +705,13 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                               width: fieldWidth,
                             ),
                             _JoinField(
+                              controller: _photoController,
+                              label: 'Photo de profil (lien)',
+                              icon: Icons.add_a_photo_outlined,
+                              keyboardType: TextInputType.url,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
                               controller: _departmentController,
                               label: 'Filière / école',
                               icon: Icons.account_balance_outlined,
@@ -663,9 +720,36 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                             _JoinField(
                               controller: _levelController,
                               label: _profileType == 'alumni'
-                                  ? 'Promotion'
+                                  ? 'Dernier niveau'
                                   : 'Niveau',
                               icon: Icons.timeline_rounded,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _promotionController,
+                              label: 'Promotion',
+                              icon: Icons.groups_3_outlined,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _linkedinController,
+                              label: 'LinkedIn',
+                              icon: Icons.link_rounded,
+                              keyboardType: TextInputType.url,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _githubController,
+                              label: 'GitHub',
+                              icon: Icons.code_rounded,
+                              keyboardType: TextInputType.url,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
+                              controller: _portfolioController,
+                              label: 'Portfolio',
+                              icon: Icons.language_rounded,
+                              keyboardType: TextInputType.url,
                               width: fieldWidth,
                             ),
                           ],
@@ -750,6 +834,93 @@ class _JoinField extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       ),
+    );
+  }
+}
+
+class _RecruitmentAccessDialog extends StatelessWidget {
+  const _RecruitmentAccessDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Candidature recrutement'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ce parcours permettra aux candidats de postuler sans compte quand une campagne est active.',
+                style: TextStyle(color: Colors.black54, height: 1.4),
+              ),
+              SizedBox(height: 14),
+              _RecruitmentStep(
+                icon: Icons.campaign_rounded,
+                title: 'Campagne active',
+                body: 'Le pôle Veille publie les besoins RH validés.',
+              ),
+              _RecruitmentStep(
+                icon: Icons.assignment_ind_rounded,
+                title: 'Formulaire candidat',
+                body:
+                    'Identité, niveau, motivation, compétences et disponibilité.',
+              ),
+              _RecruitmentStep(
+                icon: Icons.visibility_off_rounded,
+                title: 'Anonymisation possible',
+                body:
+                    'Les évaluateurs peuvent travailler avec des codes candidat.',
+              ),
+              _RecruitmentStep(
+                icon: Icons.mark_email_read_rounded,
+                title: 'Suivi et emails',
+                body:
+                    'Statut, entretien, acceptation ou refus seront notifiés.',
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.how_to_reg_rounded),
+          label: const Text('Parcours prêt'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RecruitmentStep extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _RecruitmentStep({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.2),
+        foregroundColor: AppTheme.softBlack,
+        child: Icon(icon),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+      subtitle: Text(body),
     );
   }
 }
