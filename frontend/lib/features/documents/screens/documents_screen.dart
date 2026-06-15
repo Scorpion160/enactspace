@@ -555,32 +555,30 @@ class _DocumentsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth >= 1200
+        final columns = constraints.maxWidth >= 1200
             ? 3
             : constraints.maxWidth >= 760
             ? 2
             : 1;
+        final spacing = 14.0;
+        final cardWidth =
+            (constraints.maxWidth - (spacing * (columns - 1))) / columns;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: documents.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.45,
-          ),
-          itemBuilder: (context, index) {
-            final document = documents[index];
-
-            return _DocumentCard(
-              document: document,
-              onValidate: onValidate,
-              onUnvalidate: onUnvalidate,
-              onDelete: onDelete,
-            );
-          },
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final document in documents)
+              SizedBox(
+                width: cardWidth,
+                child: _DocumentCard(
+                  document: document,
+                  onValidate: onValidate,
+                  onUnvalidate: onUnvalidate,
+                  onDelete: onDelete,
+                ),
+              ),
+          ],
         );
       },
     );
