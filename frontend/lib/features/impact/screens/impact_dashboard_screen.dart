@@ -207,6 +207,10 @@ class _ImpactContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (data.usesDemoData) ...[
+          const _DemoDataNotice(),
+          const SizedBox(height: 16),
+        ],
         _OrganizationScoreCard(organization: organization),
         const SizedBox(height: 16),
         _HistoricalImpactSection(impact: data.historicalImpact),
@@ -280,6 +284,36 @@ class _ImpactContent extends StatelessWidget {
         const SizedBox(height: 22),
         const _ScoreFrameworkCard(),
       ],
+    );
+  }
+}
+
+class _DemoDataNotice extends StatelessWidget {
+  const _DemoDataNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.42),
+        ),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppTheme.softBlack),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Données de démonstration affichées. Le module basculera automatiquement sur les données backend dès qu’elles seront disponibles.',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

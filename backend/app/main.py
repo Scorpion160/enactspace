@@ -22,6 +22,7 @@ from app.api.routes import (
     alumni,
     notifications,
     gamification,
+    impact,
     audit,
     seed,
 )
@@ -89,5 +90,6 @@ app.include_router(recruitment.router, prefix="/api")
 app.include_router(alumni.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(gamification.router, prefix="/api")
+app.include_router(impact.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
