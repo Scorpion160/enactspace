@@ -1504,12 +1504,12 @@ class CreateApplicationDialog extends StatefulWidget {
 class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  final _firstNameController = TextEditingController(text: 'Alioune');
-  final _lastNameController = TextEditingController(text: 'DIOP');
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _departmentController = TextEditingController(text: 'Gestion');
-  final _studyLevelController = TextEditingController(text: 'DIC1');
+  final _departmentController = TextEditingController();
+  final _studyLevelController = TextEditingController();
   final _motivationController = TextEditingController();
   final _knownFromController = TextEditingController();
   final _knowledgeController = TextEditingController();
@@ -1529,8 +1529,6 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   void initState() {
     super.initState();
     _campaignId = widget.campaigns.isEmpty ? null : widget.campaigns.first.id;
-    _emailController.text =
-        'candidat${DateTime.now().millisecondsSinceEpoch}@example.com';
   }
 
   @override
@@ -1603,6 +1601,20 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
     }
   }
 
+  String? _requiredText(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Obligatoire.';
+    return null;
+  }
+
+  String? _emailValidator(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return 'Obligatoire.';
+    if (!email.contains('@') || !email.contains('.')) {
+      return 'Email invalide.';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -1614,8 +1626,15 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_error != null) _DialogError(message: _error!),
+                const _ApplicationSectionHeader(
+                  icon: Icons.flag_rounded,
+                  title: 'Campagne',
+                  subtitle:
+                      'Associez la candidature a la bonne campagne active.',
+                ),
                 DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: _campaignId,
@@ -1641,8 +1660,14 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
-                Row(
+                const SizedBox(height: 18),
+                const _ApplicationSectionHeader(
+                  icon: Icons.badge_rounded,
+                  title: 'Identite',
+                  subtitle:
+                      'Ces informations servent au suivi, puis seront masquees en mode anonymise.',
+                ),
+                _AdaptiveFieldRow(
                   children: [
                     Expanded(
                       child: TextFormField(
@@ -1678,22 +1703,26 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_rounded),
                   ),
-                  validator: (value) {
-                    if (value == null || !value.contains('@')) {
-                      return 'Email invalide.';
-                    }
-                    return null;
-                  },
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _emailValidator,
                 ),
-                const SizedBox(height: 14),
-                Row(
+                const SizedBox(height: 18),
+                const _ApplicationSectionHeader(
+                  icon: Icons.school_rounded,
+                  title: 'Parcours',
+                  subtitle:
+                      'Le niveau aide a constituer une equipe stable et durable.',
+                ),
+                _AdaptiveFieldRow(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: _phoneController,
+                        keyboardType: TextInputType.phone,
                         decoration: const InputDecoration(
                           labelText: 'Téléphone',
                         ),
+                        validator: _requiredText,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1703,6 +1732,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                         decoration: const InputDecoration(
                           labelText: 'Département',
                         ),
+                        validator: _requiredText,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1710,11 +1740,18 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                       child: TextFormField(
                         controller: _studyLevelController,
                         decoration: const InputDecoration(labelText: 'Niveau'),
+                        validator: _requiredText,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
+                const _ApplicationSectionHeader(
+                  icon: Icons.psychology_rounded,
+                  title: 'Motivation',
+                  subtitle:
+                      'Des reponses completes facilitent le tri objectif et la preparation des entretiens.',
+                ),
                 TextFormField(
                   controller: _motivationController,
                   minLines: 2,
@@ -1723,6 +1760,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                     labelText: 'Motivation',
                     prefixIcon: Icon(Icons.psychology_rounded),
                   ),
+                  validator: _requiredText,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -1732,6 +1770,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Contribution possible',
                   ),
+                  validator: _requiredText,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -1748,10 +1787,12 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Comment a-t-il connu Enactus ?',
                   ),
+                  validator: _requiredText,
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _knowledgeController,
+                  validator: _requiredText,
                   decoration: const InputDecoration(
                     labelText: 'Connaissance d’Enactus',
                   ),
@@ -1768,9 +1809,16 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                     labelText: 'Profil leadership',
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
+                const _ApplicationSectionHeader(
+                  icon: Icons.attach_file_rounded,
+                  title: 'Documents',
+                  subtitle:
+                      'Optionnel maintenant, utile si le pole veille veut approfondir le dossier.',
+                ),
                 TextFormField(
                   controller: _cvUrlController,
+                  keyboardType: TextInputType.url,
                   decoration: const InputDecoration(
                     labelText: 'Lien CV',
                     prefixIcon: Icon(Icons.link_rounded),
@@ -1779,6 +1827,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _motivationLetterUrlController,
+                  keyboardType: TextInputType.url,
                   decoration: const InputDecoration(
                     labelText: 'Lien lettre de motivation',
                     prefixIcon: Icon(Icons.link_rounded),
@@ -1809,6 +1858,96 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
+    );
+  }
+}
+
+class _ApplicationSectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _ApplicationSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.22),
+            foregroundColor: AppTheme.softBlack,
+            child: Icon(icon, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdaptiveFieldRow extends StatelessWidget {
+  final List<Widget> children;
+
+  const _AdaptiveFieldRow({required this.children});
+
+  Widget _unwrapFlex(Widget child) {
+    if (child is Expanded) return child.child;
+    if (child is Flexible) return child.child;
+    return child;
+  }
+
+  bool _isHorizontalSpacer(Widget child) {
+    return child is SizedBox && child.width != null && child.height == null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        if (!compact) return Row(children: children);
+
+        final fields = children
+            .where((child) => !_isHorizontalSpacer(child))
+            .map(_unwrapFlex)
+            .toList();
+
+        return Column(
+          children: [
+            for (var index = 0; index < fields.length; index++) ...[
+              if (index > 0) const SizedBox(height: 12),
+              fields[index],
+            ],
+          ],
+        );
+      },
     );
   }
 }
