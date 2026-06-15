@@ -147,3 +147,15 @@ class AcademyHomeData {
     required this.progress,
   });
 }
+
+class AcademyRewardResult {
+  final int points;
+  final String label;
+  final bool syncedWithGamification;
+
+  const AcademyRewardResult({
+    required this.points,
+    required this.label,
+    required this.syncedWithGamification,
+  });
+}

@@ -1,6 +1,24 @@
 import '../models/academy_models.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../gamification/services/gamification_service.dart';
 
 class AcademyService {
+  final AuthService _authService;
+  final GamificationService _gamificationService;
+
+  final Set<String> _completedLessonIds = {'l1', 'l2', 'l4', 'l11'};
+  final Set<String> _passedQuizIds = {
+    'discover-enactus-quiz',
+    'leadership-collaboration-quiz',
+  };
+  int _academyPoints = 340;
+
+  AcademyService({
+    AuthService? authService,
+    GamificationService? gamificationService,
+  }) : _authService = authService ?? AuthService(),
+       _gamificationService = gamificationService ?? GamificationService();
+
   Future<AcademyHomeData> getHome() async {
     await Future<void>.delayed(const Duration(milliseconds: 240));
 
@@ -18,14 +36,14 @@ class AcademyService {
             title: 'Qu’est-ce que Enactus ?',
             summary: 'Comprendre l’entrepreneuriat social par l’action.',
             durationMinutes: 8,
-            completed: true,
+            completed: false,
           ),
           AcademyLessonModel(
             id: 'l2',
             title: 'People, Planet, Prosperity',
             summary: 'Lire un projet avec les trois piliers Enactus.',
             durationMinutes: 10,
-            completed: true,
+            completed: false,
           ),
           AcademyLessonModel(
             id: 'l3',
@@ -64,7 +82,7 @@ class AcademyService {
             title: 'ODD / SDGs',
             summary: 'Choisir les ODD pertinents sans forcer l’alignement.',
             durationMinutes: 12,
-            completed: true,
+            completed: false,
           ),
           AcademyLessonModel(
             id: 'l5',
@@ -187,7 +205,7 @@ class AcademyService {
             title: 'Leadership entrepreneurial',
             summary: 'Prendre initiative sans écraser les autres.',
             durationMinutes: 9,
-            completed: true,
+            completed: false,
           ),
           AcademyLessonModel(
             id: 'l12',
@@ -215,18 +233,20 @@ class AcademyService {
       ),
     ];
 
-    final totalLessons = courses.fold<int>(
+    final personalizedCourses = courses.map(_applyProgress).toList();
+
+    final totalLessons = personalizedCourses.fold<int>(
       0,
       (sum, course) => sum + course.lessonCount,
     );
-    final completedLessons = courses.fold<int>(
+    final completedLessons = personalizedCourses.fold<int>(
       0,
       (sum, course) =>
           sum + course.lessons.where((lesson) => lesson.completed).length,
     );
 
     return AcademyHomeData(
-      courses: courses,
+      courses: personalizedCourses,
       paths: const [
         AcademyPathModel(
           id: 'onboarding',
@@ -286,12 +306,65 @@ class AcademyService {
       progress: AcademyProgressModel(
         completedLessons: completedLessons,
         totalLessons: totalLessons,
-        passedQuizzes: 2,
-        totalQuizzes: courses.length,
-        points: 340,
+        passedQuizzes: _passedQuizIds.length,
+        totalQuizzes: personalizedCourses.length,
+        points: _academyPoints,
         rank: 6,
         monthlyProgress: 58,
       ),
+    );
+  }
+
+  Future<AcademyRewardResult> completeLesson({
+    required AcademyCourseModel course,
+    required AcademyLessonModel lesson,
+  }) async {
+    if (_completedLessonIds.contains(lesson.id)) {
+      return const AcademyRewardResult(
+        points: 0,
+        label: 'Leçon déjà terminée',
+        syncedWithGamification: true,
+      );
+    }
+
+    _completedLessonIds.add(lesson.id);
+    _academyPoints += 40;
+
+    final synced = await _awardGamificationPoints(
+      points: 40,
+      reason: 'Academy - leçon terminée: ${course.title} / ${lesson.title}',
+    );
+
+    return AcademyRewardResult(
+      points: 40,
+      label: 'Leçon terminée',
+      syncedWithGamification: synced,
+    );
+  }
+
+  Future<AcademyRewardResult> passQuiz({
+    required AcademyCourseModel course,
+  }) async {
+    if (_passedQuizIds.contains(course.quiz.id)) {
+      return const AcademyRewardResult(
+        points: 0,
+        label: 'Quiz déjà validé',
+        syncedWithGamification: true,
+      );
+    }
+
+    _passedQuizIds.add(course.quiz.id);
+    _academyPoints += 60;
+
+    final synced = await _awardGamificationPoints(
+      points: 60,
+      reason: 'Academy - quiz réussi: ${course.quiz.title}',
+    );
+
+    return AcademyRewardResult(
+      points: 60,
+      label: 'Quiz réussi',
+      syncedWithGamification: synced,
     );
   }
 
@@ -326,5 +399,51 @@ class AcademyService {
         questions: questions,
       ),
     );
+  }
+
+  AcademyCourseModel _applyProgress(AcademyCourseModel course) {
+    return AcademyCourseModel(
+      id: course.id,
+      title: course.title,
+      category: course.category,
+      level: course.level,
+      description: course.description,
+      durationMinutes: course.durationMinutes,
+      points: course.points,
+      lessons: course.lessons
+          .map(
+            (lesson) => AcademyLessonModel(
+              id: lesson.id,
+              title: lesson.title,
+              summary: lesson.summary,
+              durationMinutes: lesson.durationMinutes,
+              completed: _completedLessonIds.contains(lesson.id),
+            ),
+          )
+          .toList(),
+      quiz: course.quiz,
+    );
+  }
+
+  Future<bool> _awardGamificationPoints({
+    required int points,
+    required String reason,
+  }) async {
+    try {
+      final user = await _authService.getCurrentUser();
+      final userId = user['id']?.toString();
+      if (userId == null || userId.isEmpty) return false;
+
+      await _gamificationService.createPoint(
+        userId: userId,
+        sourceType: 'manual',
+        points: points,
+        reason: reason,
+      );
+
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }

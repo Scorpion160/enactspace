@@ -15,6 +15,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
   final AcademyService _service = AcademyService();
 
   bool _loading = true;
+  String? _rewardingActionId;
   String? _error;
   AcademyHomeData? _data;
 
@@ -42,6 +43,70 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     }
   }
 
+  Future<void> _completeNextLesson(AcademyCourseModel course) async {
+    final pendingLessons = course.lessons
+        .where((lesson) => !lesson.completed)
+        .toList();
+    if (pendingLessons.isEmpty) {
+      _showRewardSnack(
+        const AcademyRewardResult(
+          points: 0,
+          label: 'Toutes les leçons sont déjà terminées',
+          syncedWithGamification: true,
+        ),
+      );
+      return;
+    }
+
+    final lesson = pendingLessons.first;
+    final actionId = 'lesson-${course.id}';
+    setState(() => _rewardingActionId = actionId);
+
+    final result = await _service.completeLesson(
+      course: course,
+      lesson: lesson,
+    );
+    final data = await _service.getHome();
+
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _rewardingActionId = null;
+    });
+    _showRewardSnack(result);
+  }
+
+  Future<void> _passQuiz(AcademyCourseModel course) async {
+    final actionId = 'quiz-${course.id}';
+    setState(() => _rewardingActionId = actionId);
+
+    final result = await _service.passQuiz(course: course);
+    final data = await _service.getHome();
+
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _rewardingActionId = null;
+    });
+    _showRewardSnack(result);
+  }
+
+  void _showRewardSnack(AcademyRewardResult result) {
+    final suffix = result.syncedWithGamification
+        ? 'Synchronisé avec Gamification.'
+        : 'Progression locale enregistrée, synchro Gamification à réessayer.';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.points > 0
+              ? '${result.label}: +${result.points} points. $suffix'
+              : '${result.label}. $suffix',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -61,7 +126,12 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
           else if (_error != null)
             _AcademyErrorCard(message: _error!, onRetry: _loadAcademy)
           else
-            _AcademyContent(data: _data!),
+            _AcademyContent(
+              data: _data!,
+              rewardingActionId: _rewardingActionId,
+              onCompleteNextLesson: _completeNextLesson,
+              onPassQuiz: _passQuiz,
+            ),
         ],
       ),
     );
@@ -168,8 +238,16 @@ class _HeaderCopy extends StatelessWidget {
 
 class _AcademyContent extends StatelessWidget {
   final AcademyHomeData data;
+  final String? rewardingActionId;
+  final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
 
-  const _AcademyContent({required this.data});
+  const _AcademyContent({
+    required this.data,
+    required this.rewardingActionId,
+    required this.onCompleteNextLesson,
+    required this.onPassQuiz,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -192,14 +270,22 @@ class _AcademyContent extends StatelessWidget {
               'Leçons courtes, quiz et points Academy connectables à la gamification.',
         ),
         const SizedBox(height: 12),
-        _CourseGrid(courses: data.courses),
+        _CourseGrid(
+          courses: data.courses,
+          rewardingActionId: rewardingActionId,
+          onCompleteNextLesson: onCompleteNextLesson,
+        ),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Quiz rapides',
           subtitle: 'Questions, bonnes réponses, explications et niveaux.',
         ),
         const SizedBox(height: 12),
-        _QuizStrip(courses: data.courses),
+        _QuizStrip(
+          courses: data.courses,
+          rewardingActionId: rewardingActionId,
+          onPassQuiz: onPassQuiz,
+        ),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Badges Academy',
@@ -392,26 +478,46 @@ class _PathCard extends StatelessWidget {
 
 class _CourseGrid extends StatelessWidget {
   final List<AcademyCourseModel> courses;
+  final String? rewardingActionId;
+  final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
 
-  const _CourseGrid({required this.courses});
+  const _CourseGrid({
+    required this.courses,
+    required this.rewardingActionId,
+    required this.onCompleteNextLesson,
+  });
 
   @override
   Widget build(BuildContext context) {
     return _ResponsiveWrap(
       minWidth: 300,
-      children: [for (final course in courses) _CourseCard(course: course)],
+      children: [
+        for (final course in courses)
+          _CourseCard(
+            course: course,
+            busy: rewardingActionId == 'lesson-${course.id}',
+            onCompleteNextLesson: onCompleteNextLesson,
+          ),
+      ],
     );
   }
 }
 
 class _CourseCard extends StatelessWidget {
   final AcademyCourseModel course;
+  final bool busy;
+  final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
 
-  const _CourseCard({required this.course});
+  const _CourseCard({
+    required this.course,
+    required this.busy,
+    required this.onCompleteNextLesson,
+  });
 
   @override
   Widget build(BuildContext context) {
     final completed = course.lessons.where((lesson) => lesson.completed).length;
+    final done = completed == course.lessonCount;
 
     return Card(
       child: Padding(
@@ -450,6 +556,25 @@ class _CourseCard extends StatelessWidget {
                 Chip(label: Text('$completed/${course.lessonCount} fait')),
               ],
             ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: busy || done
+                    ? null
+                    : () => onCompleteNextLesson(course),
+                icon: busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        done ? Icons.check_rounded : Icons.play_arrow_rounded,
+                      ),
+                label: Text(done ? 'Cours terminé' : 'Terminer une leçon'),
+              ),
+            ),
           ],
         ),
       ),
@@ -459,8 +584,14 @@ class _CourseCard extends StatelessWidget {
 
 class _QuizStrip extends StatelessWidget {
   final List<AcademyCourseModel> courses;
+  final String? rewardingActionId;
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
 
-  const _QuizStrip({required this.courses});
+  const _QuizStrip({
+    required this.courses,
+    required this.rewardingActionId,
+    required this.onPassQuiz,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -481,7 +612,20 @@ class _QuizStrip extends StatelessWidget {
               subtitle: Text(
                 '${course.quiz.level} • ${course.quiz.questions.length} question(s) • ${course.quiz.timeLimitMinutes} min',
               ),
-              trailing: const Icon(Icons.chevron_right_rounded),
+              trailing: rewardingActionId == 'quiz-${course.id}'
+                  ? const SizedBox(
+                      width: 34,
+                      height: 34,
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      onPressed: () => onPassQuiz(course),
+                      icon: const Icon(Icons.check_circle_rounded),
+                      tooltip: 'Valider le quiz',
+                    ),
             ),
         ],
       ),
