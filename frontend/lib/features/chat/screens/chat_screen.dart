@@ -1488,6 +1488,7 @@ class _ConversationInfoDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = _threadDisplayTitle(thread, currentUserId);
+    final directParticipant = _directParticipant(thread, currentUserId);
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1524,47 +1525,85 @@ class _ConversationInfoDialog extends StatelessWidget {
                 style: const TextStyle(color: Colors.black54),
               ),
               const SizedBox(height: 16),
-              Row(
+              _ConversationInfoGrid(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onTogglePin,
-                      icon: Icon(
-                        pinned
-                            ? Icons.push_pin_rounded
-                            : Icons.push_pin_outlined,
-                      ),
-                      label: Text(pinned ? 'Désépingler' : 'Épingler'),
-                    ),
+                  _ConversationInfoTile(
+                    icon: thread.threadType == 'direct'
+                        ? Icons.lock_person_rounded
+                        : Icons.groups_2_rounded,
+                    label: 'Type',
+                    value: _conversationTypeLabel(thread),
                   ),
-                  if (onAddMember != null) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onAddMember,
-                        icon: const Icon(Icons.person_add_alt_1_rounded),
-                        label: const Text('Ajouter'),
+                  if (directParticipant != null) ...[
+                    _ConversationInfoTile(
+                      icon: Icons.alternate_email_rounded,
+                      label: 'Email',
+                      value: directParticipant.email.isEmpty
+                          ? 'Non renseigné'
+                          : directParticipant.email,
+                    ),
+                    _ConversationInfoTile(
+                      icon: Icons.verified_user_rounded,
+                      label: 'Statut',
+                      value: _memberStatusLabel(directParticipant.status),
+                    ),
+                    _ConversationInfoTile(
+                      icon: Icons.badge_rounded,
+                      label: 'Rôle',
+                      value: _participantRoleLabel(
+                        directParticipant.participantRole,
                       ),
                     ),
-                  ],
-                  if (thread.threadType != 'direct') ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onLeave,
-                        icon: const Icon(Icons.logout_rounded),
-                        label: const Text('Quitter'),
-                      ),
+                  ] else ...[
+                    _ConversationInfoTile(
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Admins',
+                      value:
+                          '${thread.participantsPreview.where((participant) => participant.participantRole == 'owner' || participant.participantRole == 'admin').length}',
+                    ),
+                    _ConversationInfoTile(
+                      icon: Icons.hub_rounded,
+                      label: 'Portée',
+                      value: _conversationScopeLabel(thread),
+                    ),
+                    _ConversationInfoTile(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Votre rôle',
+                      value: _participantRoleLabel(thread.currentUserRole),
                     ),
                   ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  _ConversationActionButton(
+                    onPressed: onTogglePin,
+                    icon: pinned
+                        ? Icons.push_pin_rounded
+                        : Icons.push_pin_outlined,
+                    label: pinned ? 'Désépingler' : 'Épingler',
+                  ),
+                  if (onAddMember != null)
+                    _ConversationActionButton(
+                      onPressed: onAddMember,
+                      icon: Icons.person_add_alt_1_rounded,
+                      label: 'Ajouter',
+                    ),
+                  if (thread.threadType != 'direct')
+                    _ConversationActionButton(
+                      onPressed: onLeave,
+                      icon: Icons.logout_rounded,
+                      label: 'Quitter',
+                    ),
                   if (onDelete != null) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: const Text('Supprimer'),
-                      ),
+                    _ConversationActionButton(
+                      onPressed: onDelete,
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Supprimer',
                     ),
                   ],
                 ],
@@ -1588,7 +1627,11 @@ class _ConversationInfoDialog extends StatelessWidget {
                     icon: Icons.person_rounded,
                   ),
                   title: Text(participant.displayName),
-                  subtitle: Text(participant.email),
+                  subtitle: Text(
+                    _participantSubtitle(participant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: _ParticipantManagementMenu(
                     thread: thread,
                     participant: participant,
@@ -1608,6 +1651,110 @@ class _ConversationInfoDialog extends StatelessWidget {
           child: const Text('Fermer'),
         ),
       ],
+    );
+  }
+}
+
+class _ConversationInfoGrid extends StatelessWidget {
+  final List<Widget> children;
+
+  const _ConversationInfoGrid({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = constraints.maxWidth < 430
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 10) / 2;
+
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: children
+              .map((child) => SizedBox(width: itemWidth, child: child))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _ConversationInfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _ConversationInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppTheme.softBlack),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversationActionButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final IconData icon;
+  final String label;
+
+  const _ConversationActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 128),
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
     );
   }
 }
@@ -2820,6 +2967,77 @@ String _threadSubtitle(ChatThreadModel thread, String? currentUserId) {
   }
 
   return '${thread.participantsCount} participant(s)';
+}
+
+String _conversationTypeLabel(ChatThreadModel thread) {
+  switch (thread.threadType) {
+    case 'direct':
+      return 'Discussion privée';
+    case 'club':
+      return 'Canal club';
+    case 'pole':
+      return 'Discussion de pôle';
+    case 'project':
+      return 'Discussion de projet';
+    default:
+      return 'Groupe';
+  }
+}
+
+String _conversationScopeLabel(ChatThreadModel thread) {
+  final scope = thread.scopeType?.trim();
+  if (scope == null || scope.isEmpty) return 'Toute la communauté';
+
+  switch (scope) {
+    case 'pole':
+      return 'Pôle';
+    case 'project':
+      return 'Projet';
+    case 'enacchefs':
+      return 'Enacchefs';
+    case 'club':
+      return 'Club';
+    default:
+      return scope;
+  }
+}
+
+String _participantRoleLabel(String role) {
+  switch (role.trim().toLowerCase()) {
+    case 'owner':
+      return 'Propriétaire';
+    case 'admin':
+      return 'Administrateur';
+    case 'member':
+      return 'Membre';
+    default:
+      return role.trim().isEmpty ? 'Membre' : role;
+  }
+}
+
+String _memberStatusLabel(String status) {
+  switch (status.trim().toLowerCase()) {
+    case 'active':
+      return 'Actif';
+    case 'pending':
+      return 'En attente';
+    case 'inactive':
+      return 'Inactif';
+    case 'alumni':
+      return 'Alumni';
+    default:
+      return status.trim().isEmpty ? 'Non renseigné' : status;
+  }
+}
+
+String _participantSubtitle(ChatThreadMemberModel participant) {
+  final details = <String>[
+    if (participant.email.trim().isNotEmpty) participant.email.trim(),
+    _memberStatusLabel(participant.status),
+    _participantRoleLabel(participant.participantRole),
+  ];
+
+  return details.join(' · ');
 }
 
 String _messagePreview(ChatMessageModel message) {
