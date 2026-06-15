@@ -381,12 +381,14 @@ class _ForgotPasswordDialog extends StatefulWidget {
 }
 
 class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final AuthService _authService = AuthService();
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
   bool _codeSent = false;
+  bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
 
@@ -399,7 +401,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     super.dispose();
   }
 
-  void _sendCode() {
+  Future<void> _sendCode() async {
     final email = _emailController.text.trim();
     if (!email.contains('@') || email.length < 6) {
       setState(() => _error = 'Renseigne une adresse email valide.');
@@ -407,18 +409,34 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     }
 
     setState(() {
-      _codeSent = true;
+      _loading = true;
       _error = null;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Code OTP préparé. Le backend email reste à brancher.'),
-      ),
-    );
+    try {
+      final debugOtp = await _authService.requestPasswordResetOtp(email: email);
+      if (!mounted) return;
+      setState(() => _codeSent = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            debugOtp == null
+                ? 'Si ce compte existe, un code OTP a été préparé.'
+                : 'Code OTP de test: $debugOtp',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
-  void _confirmReset() {
+  Future<void> _confirmReset() async {
     if (_otpController.text.trim().length < 4) {
       setState(() => _error = 'Entre le code OTP reçu par email.');
       return;
@@ -435,12 +453,30 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       return;
     }
 
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Parcours prêt. API OTP/réinitialisation à connecter.'),
-      ),
-    );
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await _authService.confirmPasswordReset(
+        email: _emailController.text.trim(),
+        otp: _otpController.text.trim(),
+        newPassword: _passwordController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mot de passe réinitialisé.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -521,8 +557,14 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           child: const Text('Fermer'),
         ),
         ElevatedButton.icon(
-          onPressed: _codeSent ? _confirmReset : _sendCode,
-          icon: Icon(_codeSent ? Icons.check_rounded : Icons.mail_rounded),
+          onPressed: _loading ? null : (_codeSent ? _confirmReset : _sendCode),
+          icon: _loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(_codeSent ? Icons.check_rounded : Icons.mail_rounded),
           label: Text(_codeSent ? 'Valider' : 'Envoyer le code'),
         ),
       ],
@@ -540,6 +582,7 @@ class _JoinEnactusSheet extends StatefulWidget {
 }
 
 class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
+  final AuthService _authService = AuthService();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -555,6 +598,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
   final _motivationController = TextEditingController();
 
   late String _profileType;
+  bool _loading = false;
   String? _error;
 
   @override
@@ -581,7 +625,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final requiredFields = [
       _firstNameController.text.trim(),
       _lastNameController.text.trim(),
@@ -594,14 +638,47 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
       return;
     }
 
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Demande préparée. Validation SG, Team Leader, Veille ou admin à brancher.',
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final temporaryPassword = await _authService.submitJoinRequest(
+        profileType: _profileType,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        photoUrl: _photoController.text.trim(),
+        department: _departmentController.text.trim(),
+        level: _levelController.text.trim(),
+        promotion: _promotionController.text.trim(),
+        skills: _skillsController.text.trim(),
+        linkedinUrl: _linkedinController.text.trim(),
+        githubUrl: _githubController.text.trim(),
+        portfolioUrl: _portfolioController.text.trim(),
+        motivation: _motivationController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            temporaryPassword == null
+                ? 'Demande envoyée. Validation par les responsables autorisés.'
+                : 'Demande envoyée. Mot de passe test: $temporaryPassword',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -785,15 +862,25 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: _loading
+                                ? null
+                                : () => Navigator.of(context).pop(),
                             child: const Text('Annuler'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _submit,
-                            icon: const Icon(Icons.send_rounded),
+                            onPressed: _loading ? null : _submit,
+                            icon: _loading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.send_rounded),
                             label: const Text('Envoyer'),
                           ),
                         ),

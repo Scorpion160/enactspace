@@ -34,11 +34,17 @@ class AuthService {
     return prefs.getString(_tokenKey);
   }
 
-  Future<void> requestPasswordResetOtp({required String email}) async {
-    await _apiClient.postJson(
+  Future<String?> requestPasswordResetOtp({required String email}) async {
+    final response = await _apiClient.postJson(
       '/auth/password-reset/request',
       data: {'email': email},
     );
+
+    if (response is Map<String, dynamic>) {
+      return response['debug_otp']?.toString();
+    }
+
+    return null;
   }
 
   Future<void> confirmPasswordReset({
@@ -52,18 +58,23 @@ class AuthService {
     );
   }
 
-  Future<void> submitJoinRequest({
+  Future<String?> submitJoinRequest({
     required String profileType,
     required String firstName,
     required String lastName,
     required String email,
     String? phone,
+    String? photoUrl,
     String? department,
     String? level,
+    String? promotion,
     String? skills,
+    String? linkedinUrl,
+    String? githubUrl,
+    String? portfolioUrl,
     String? motivation,
   }) async {
-    await _apiClient.postJson(
+    final response = await _apiClient.postJson(
       '/auth/join-requests',
       data: {
         'profile_type': profileType,
@@ -71,14 +82,27 @@ class AuthService {
         'last_name': lastName,
         'email': email,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (photoUrl != null && photoUrl.isNotEmpty) 'photo_url': photoUrl,
         if (department != null && department.isNotEmpty)
           'department': department,
         if (level != null && level.isNotEmpty) 'level': level,
+        if (promotion != null && promotion.isNotEmpty) 'promotion': promotion,
         if (skills != null && skills.isNotEmpty) 'skills': skills,
+        if (linkedinUrl != null && linkedinUrl.isNotEmpty)
+          'linkedin_url': linkedinUrl,
+        if (githubUrl != null && githubUrl.isNotEmpty) 'github_url': githubUrl,
+        if (portfolioUrl != null && portfolioUrl.isNotEmpty)
+          'portfolio_url': portfolioUrl,
         if (motivation != null && motivation.isNotEmpty)
           'motivation': motivation,
       },
     );
+
+    if (response is Map<String, dynamic>) {
+      return response['debug_temporary_password']?.toString();
+    }
+
+    return null;
   }
 
   Future<bool> isLoggedIn() async {

@@ -1,6 +1,6 @@
 from app.db.database import Base
 from app.db.types import GUID
-from app.models.user import User
+from app.models.user import User, PasswordResetOtp
 from app.models.role import Role, UserRole
 from app.models.season import Season
 from app.models.pole import Pole, PoleMember
