@@ -100,6 +100,25 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     _showRewardSnack(result);
   }
 
+  Future<void> _openQuiz(AcademyCourseModel course) async {
+    final passed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _AcademyQuizDialog(course: course),
+    );
+
+    if (!mounted || passed == null) return;
+    if (passed) {
+      await _passQuiz(course);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Quiz a reprendre. Tu peux retenter quand tu veux.'),
+      ),
+    );
+  }
+
   void _showRewardSnack(AcademyRewardResult result) {
     final suffix = result.syncedWithGamification
         ? 'Synchronisé avec Gamification.'
@@ -147,7 +166,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
               },
               rewardingActionId: _rewardingActionId,
               onCompleteNextLesson: _completeNextLesson,
-              onPassQuiz: _passQuiz,
+              onPassQuiz: _openQuiz,
             ),
         ],
       ),
@@ -859,11 +878,334 @@ class _QuizStrip extends StatelessWidget {
                     )
                   : IconButton(
                       onPressed: () => onPassQuiz(course),
-                      icon: const Icon(Icons.check_circle_rounded),
-                      tooltip: 'Valider le quiz',
+                      icon: const Icon(Icons.play_circle_fill_rounded),
+                      tooltip: 'Commencer le quiz',
                     ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _AcademyQuizDialog extends StatefulWidget {
+  final AcademyCourseModel course;
+
+  const _AcademyQuizDialog({required this.course});
+
+  @override
+  State<_AcademyQuizDialog> createState() => _AcademyQuizDialogState();
+}
+
+class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
+  final Map<int, int> _answers = {};
+  bool _submitted = false;
+
+  int get _correctAnswers {
+    var total = 0;
+    final questions = widget.course.quiz.questions;
+    for (var index = 0; index < questions.length; index++) {
+      if (_answers[index] == questions[index].correctIndex) {
+        total++;
+      }
+    }
+    return total;
+  }
+
+  int get _score {
+    final total = widget.course.quiz.questions.length;
+    if (total == 0) return 0;
+    return ((_correctAnswers / total) * 100).round();
+  }
+
+  bool get _passed => _score >= 60;
+
+  void _submit() {
+    if (_answers.length < widget.course.quiz.questions.length) return;
+    setState(() => _submitted = true);
+  }
+
+  void _retry() {
+    setState(() {
+      _answers.clear();
+      _submitted = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quiz = widget.course.quiz;
+    final canSubmit = _answers.length == quiz.questions.length;
+
+    return AlertDialog(
+      insetPadding: const EdgeInsets.all(16),
+      titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      title: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.24),
+            foregroundColor: AppTheme.softBlack,
+            child: const Icon(Icons.quiz_rounded),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              quiz.title,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${quiz.level} • ${quiz.questions.length} question(s) • ${quiz.timeLimitMinutes} min',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_submitted) _QuizResultBanner(score: _score, passed: _passed),
+              if (_submitted) const SizedBox(height: 14),
+              for (var index = 0; index < quiz.questions.length; index++)
+                _QuizQuestionBlock(
+                  index: index,
+                  question: quiz.questions[index],
+                  selectedIndex: _answers[index],
+                  submitted: _submitted,
+                  onChanged: (value) {
+                    if (_submitted || value == null) return;
+                    setState(() => _answers[index] = value);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+        if (_submitted && !_passed)
+          TextButton.icon(
+            onPressed: _retry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reprendre'),
+          ),
+        if (_submitted)
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(_passed),
+            icon: Icon(_passed ? Icons.check_rounded : Icons.close_rounded),
+            label: Text(_passed ? 'Terminer' : 'Quitter'),
+          )
+        else
+          FilledButton.icon(
+            onPressed: canSubmit ? _submit : null,
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Valider'),
+          ),
+      ],
+    );
+  }
+}
+
+class _QuizResultBanner extends StatelessWidget {
+  final int score;
+  final bool passed;
+
+  const _QuizResultBanner({required this.score, required this.passed});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = passed ? Colors.green.shade700 : Colors.orange.shade800;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            passed ? Icons.verified_rounded : Icons.school_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              passed
+                  ? 'Score $score%. Quiz reussi, les points vont etre ajoutes.'
+                  : 'Score $score%. Relis les corrections puis retente.',
+              style: TextStyle(color: color, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizQuestionBlock extends StatelessWidget {
+  final int index;
+  final AcademyQuestionModel question;
+  final int? selectedIndex;
+  final bool submitted;
+  final ValueChanged<int?> onChanged;
+
+  const _QuizQuestionBlock({
+    required this.index,
+    required this.question,
+    required this.selectedIndex,
+    required this.submitted,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCorrect = selectedIndex == question.correctIndex;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${index + 1}. ${question.question}',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          for (
+            var choiceIndex = 0;
+            choiceIndex < question.choices.length;
+            choiceIndex++
+          )
+            _QuizChoiceTile(
+              label: question.choices[choiceIndex],
+              value: choiceIndex,
+              groupValue: selectedIndex,
+              submitted: submitted,
+              correctIndex: question.correctIndex,
+              onChanged: onChanged,
+            ),
+          if (submitted) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  selectedCorrect
+                      ? Icons.check_circle_rounded
+                      : Icons.info_rounded,
+                  color: selectedCorrect
+                      ? Colors.green.shade700
+                      : Colors.orange.shade800,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    question.explanation,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizChoiceTile extends StatelessWidget {
+  final String label;
+  final int value;
+  final int? groupValue;
+  final bool submitted;
+  final int correctIndex;
+  final ValueChanged<int?> onChanged;
+
+  const _QuizChoiceTile({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+    required this.submitted,
+    required this.correctIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = groupValue == value;
+    final correct = correctIndex == value;
+    final color = submitted && correct
+        ? Colors.green.shade700
+        : submitted && selected
+        ? Colors.orange.shade800
+        : AppTheme.softBlack;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: submitted ? null : () => onChanged(value),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected || (submitted && correct)
+                ? color.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.02),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected || (submitted && correct)
+                  ? color.withValues(alpha: 0.45)
+                  : Colors.black.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                submitted && correct
+                    ? Icons.check_circle_rounded
+                    : selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: color,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: selected || (submitted && correct)
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
