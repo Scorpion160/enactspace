@@ -21,9 +21,11 @@ class _AttendanceSessionDetailScreenState
     extends State<AttendanceSessionDetailScreen> {
   final AttendanceService _attendanceService = AttendanceService();
   final MembersService _membersService = MembersService();
+  final TextEditingController _memberSearchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
+  String _statusFilter = 'all';
 
   List<MemberModel> _members = [];
   List<AttendanceExpectedMemberModel> _expectedMembers = [];
@@ -33,6 +35,12 @@ class _AttendanceSessionDetailScreenState
   void initState() {
     super.initState();
     _loadDetails();
+  }
+
+  @override
+  void dispose() {
+    _memberSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDetails() async {
@@ -239,6 +247,10 @@ class _AttendanceSessionDetailScreenState
     final expectedMembers = _members
         .where((member) => expectedIds.contains(member.id))
         .toList();
+    final filteredExpectedMembers = _filterExpectedMembers(
+      expectedMembers,
+      recordByUserId,
+    );
 
     final availableMembers = _members
         .where((member) => !expectedIds.contains(member.id))
@@ -263,6 +275,13 @@ class _AttendanceSessionDetailScreenState
               totalPenaltyAmount: _totalPenaltyAmount,
             ),
             const SizedBox(height: 20),
+            _SessionActionPanel(
+              session: widget.session,
+              expectedCount: _expectedMembers.length,
+              recordedCount: _records.length,
+              completionRate: _completionRate,
+            ),
+            const SizedBox(height: 20),
             if (_loading)
               const Center(
                 child: Padding(
@@ -278,10 +297,22 @@ class _AttendanceSessionDetailScreenState
                 onAdd: _addExpectedMember,
               ),
               const SizedBox(height: 18),
+              _AttendanceMemberFiltersCard(
+                controller: _memberSearchController,
+                statusFilter: _statusFilter,
+                onChanged: () => setState(() {}),
+                onStatusChanged: (value) {
+                  setState(() {
+                    _statusFilter = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
               _ExpectedMembersCard(
-                members: expectedMembers,
+                members: filteredExpectedMembers,
                 recordByUserId: recordByUserId,
                 onMarkAttendance: _markAttendance,
+                sessionClosed: widget.session.status == 'closed',
               ),
             ],
           ],
@@ -320,6 +351,44 @@ class _AttendanceSessionDetailScreenState
       0,
       (sum, record) => sum + (record.penaltyAmount ?? 0),
     );
+  }
+
+  double get _completionRate {
+    if (_expectedMembers.isEmpty) return 0;
+    return (_records.length / _expectedMembers.length).clamp(0.0, 1.0);
+  }
+
+  List<MemberModel> _filterExpectedMembers(
+    List<MemberModel> members,
+    Map<String, AttendanceRecordModel> recordByUserId,
+  ) {
+    final query = _memberSearchController.text.trim().toLowerCase();
+
+    return members.where((member) {
+      final record = recordByUserId[member.id];
+      final matchesQuery =
+          query.isEmpty ||
+          member.displayName.toLowerCase().contains(query) ||
+          member.email.toLowerCase().contains(query) ||
+          member.rolesLabel.toLowerCase().contains(query) ||
+          member.departmentLabel.toLowerCase().contains(query);
+
+      final matchesStatus = switch (_statusFilter) {
+        'all' => true,
+        'not_filled' => record == null,
+        'present' => record?.status == 'present',
+        'late' => record?.status == 'retard',
+        'justified' =>
+          record?.status == 'absent_justifie' ||
+              record?.status == 'absence_justifiee',
+        'unjustified' =>
+          record?.status == 'absent_non_justifie' ||
+              record?.status == 'absence_non_justifiee',
+        _ => true,
+      };
+
+      return matchesQuery && matchesStatus;
+    }).toList();
   }
 }
 
@@ -385,6 +454,133 @@ class _SessionHeader extends StatelessWidget {
   }
 }
 
+class _SessionActionPanel extends StatelessWidget {
+  final AttendanceSessionModel session;
+  final int expectedCount;
+  final int recordedCount;
+  final double completionRate;
+
+  const _SessionActionPanel({
+    required this.session,
+    required this.expectedCount,
+    required this.recordedCount,
+    required this.completionRate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final missing = (expectedCount - recordedCount).clamp(0, expectedCount);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 820;
+            final progress = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Pilotage de la session',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${(completionRate * 100).round()}%',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: completionRate,
+                    minHeight: 10,
+                    color: AppTheme.enactusYellow,
+                    backgroundColor: Colors.black12,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '$recordedCount/$expectedCount saisie(s) • $missing membre(s) à traiter',
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            );
+            final actions = Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _ActionChip(
+                  icon: Icons.qr_code_2_rounded,
+                  label: session.qrToken == null || session.qrToken!.isEmpty
+                      ? 'QR à générer'
+                      : 'QR disponible',
+                ),
+                const _ActionChip(
+                  icon: Icons.notifications_active_rounded,
+                  label: 'Relancer absents',
+                ),
+                const _ActionChip(
+                  icon: Icons.ios_share_rounded,
+                  label: 'Exporter rapport',
+                ),
+                const _ActionChip(
+                  icon: Icons.privacy_tip_rounded,
+                  label: 'Visibilité SG',
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: progress),
+                  const SizedBox(width: 18),
+                  Flexible(child: actions),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [progress, const SizedBox(height: 16), actions],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _ActionChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      backgroundColor: AppTheme.enactusYellow.withAlpha(40),
+      side: BorderSide(color: AppTheme.enactusYellow.withAlpha(120)),
+    );
+  }
+}
+
 class _AddExpectedMemberCard extends StatelessWidget {
   final List<MemberModel> availableMembers;
   final ValueChanged<MemberModel> onAdd;
@@ -399,15 +595,9 @@ class _AddExpectedMemberCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Membres attendus',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-              ),
-            ),
-            ElevatedButton.icon(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final button = ElevatedButton.icon(
               onPressed: availableMembers.isEmpty
                   ? null
                   : () async {
@@ -422,8 +612,37 @@ class _AddExpectedMemberCard extends StatelessWidget {
                     },
               icon: const Icon(Icons.person_add_alt_1_rounded),
               label: const Text('Ajouter attendu'),
-            ),
-          ],
+            );
+
+            if (constraints.maxWidth >= 560) {
+              return Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Membres attendus',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  button,
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Membres attendus',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 12),
+                button,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -477,6 +696,123 @@ class _SelectMemberDialog extends StatelessWidget {
   }
 }
 
+class _AttendanceMemberFiltersCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String statusFilter;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onStatusChanged;
+
+  const _AttendanceMemberFiltersCard({
+    required this.controller,
+    required this.statusFilter,
+    required this.onChanged,
+    required this.onStatusChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 760;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Rechercher un membre',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _StatusFilterChip(
+                  label: 'Tous',
+                  value: 'all',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+                _StatusFilterChip(
+                  label: 'Présents',
+                  value: 'present',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+                _StatusFilterChip(
+                  label: 'Retards',
+                  value: 'late',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+                _StatusFilterChip(
+                  label: 'Justifiées',
+                  value: 'justified',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+                _StatusFilterChip(
+                  label: 'Non justifiées',
+                  value: 'unjustified',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+                _StatusFilterChip(
+                  label: 'Non saisis',
+                  value: 'not_filled',
+                  current: statusFilter,
+                  onSelected: onStatusChanged,
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusFilterChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final String current;
+  final ValueChanged<String> onSelected;
+
+  const _StatusFilterChip({
+    required this.label,
+    required this.value,
+    required this.current,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: current == value,
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      onSelected: (_) => onSelected(value),
+    );
+  }
+}
+
 class _ExpectedMembersCard extends StatelessWidget {
   final List<MemberModel> members;
   final Map<String, AttendanceRecordModel> recordByUserId;
@@ -485,11 +821,13 @@ class _ExpectedMembersCard extends StatelessWidget {
     required String status,
   })
   onMarkAttendance;
+  final bool sessionClosed;
 
   const _ExpectedMembersCard({
     required this.members,
     required this.recordByUserId,
     required this.onMarkAttendance,
+    required this.sessionClosed,
   });
 
   @override
@@ -552,33 +890,46 @@ class _ExpectedMembersCard extends StatelessWidget {
                         label: Text(record.statusLabel),
                         backgroundColor: Colors.green.shade50,
                       );
+                final recordDetails = _RecordDetails(record: record);
 
                 final actions = Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
                     OutlinedButton(
-                      onPressed: () =>
-                          onMarkAttendance(member: member, status: 'present'),
+                      onPressed: sessionClosed
+                          ? null
+                          : () => onMarkAttendance(
+                              member: member,
+                              status: 'present',
+                            ),
                       child: const Text('Présent'),
                     ),
                     OutlinedButton(
-                      onPressed: () =>
-                          onMarkAttendance(member: member, status: 'retard'),
+                      onPressed: sessionClosed
+                          ? null
+                          : () => onMarkAttendance(
+                              member: member,
+                              status: 'retard',
+                            ),
                       child: const Text('Retard'),
                     ),
                     OutlinedButton(
-                      onPressed: () => onMarkAttendance(
-                        member: member,
-                        status: 'absent_justifie',
-                      ),
+                      onPressed: sessionClosed
+                          ? null
+                          : () => onMarkAttendance(
+                              member: member,
+                              status: 'absent_justifie',
+                            ),
                       child: const Text('Abs. justifiée'),
                     ),
                     OutlinedButton(
-                      onPressed: () => onMarkAttendance(
-                        member: member,
-                        status: 'absent_non_justifie',
-                      ),
+                      onPressed: sessionClosed
+                          ? null
+                          : () => onMarkAttendance(
+                              member: member,
+                              status: 'absent_non_justifie',
+                            ),
                       child: const Text('Abs. non justifiée'),
                     ),
                   ],
@@ -589,7 +940,12 @@ class _ExpectedMembersCard extends StatelessWidget {
                     children: [
                       Expanded(flex: 2, child: identity),
                       const SizedBox(width: 12),
-                      statusChip,
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [statusChip, recordDetails],
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(flex: 3, child: actions),
                     ],
@@ -602,6 +958,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                     identity,
                     const SizedBox(height: 12),
                     statusChip,
+                    recordDetails,
                     const SizedBox(height: 12),
                     actions,
                   ],
@@ -611,6 +968,72 @@ class _ExpectedMembersCard extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _RecordDetails extends StatelessWidget {
+  final AttendanceRecordModel? record;
+
+  const _RecordDetails({required this.record});
+
+  @override
+  Widget build(BuildContext context) {
+    if (record == null) return const SizedBox.shrink();
+
+    final details = <Widget>[
+      if ((record!.justification ?? '').trim().isNotEmpty)
+        _RecordDetailLine(
+          icon: Icons.edit_note_rounded,
+          text: record!.justification!.trim(),
+        ),
+      if ((record!.penaltyAmount ?? 0) > 0)
+        _RecordDetailLine(
+          icon: Icons.payments_rounded,
+          text: '${record!.penaltyAmount} FCFA',
+        ),
+    ];
+
+    if (details.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: details,
+      ),
+    );
+  }
+}
+
+class _RecordDetailLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _RecordDetailLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.black45),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

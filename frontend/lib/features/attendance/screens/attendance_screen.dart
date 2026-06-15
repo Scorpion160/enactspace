@@ -13,15 +13,24 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   final AttendanceService _attendanceService = AttendanceService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   List<AttendanceSessionModel> _sessions = [];
+  String _statusFilter = 'all';
+  String _typeFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     _loadSessions();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSessions() async {
@@ -82,6 +91,36 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return _sessions.where((s) => s.status == 'closed').length;
   }
 
+  int get _scheduledSoonCount {
+    final now = DateTime.now();
+    final limit = now.add(const Duration(days: 7));
+
+    return _sessions.where((session) {
+      final date = _sessionDate(session);
+      if (date == null) return false;
+      return date.isAfter(now.subtract(const Duration(hours: 2))) &&
+          date.isBefore(limit);
+    }).length;
+  }
+
+  List<AttendanceSessionModel> get _filteredSessions {
+    final query = _searchController.text.trim().toLowerCase();
+
+    return _sessions.where((session) {
+      final matchesQuery =
+          query.isEmpty ||
+          session.title.toLowerCase().contains(query) ||
+          (session.description ?? '').toLowerCase().contains(query) ||
+          session.typeLabel.toLowerCase().contains(query);
+      final matchesStatus =
+          _statusFilter == 'all' || session.status == _statusFilter;
+      final matchesType =
+          _typeFilter == 'all' || session.sessionType == _typeFilter;
+
+      return matchesQuery && matchesStatus && matchesType;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -93,10 +132,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             total: _sessions.length,
             open: _openCount,
             closed: _closedCount,
+            scheduledSoon: _scheduledSoonCount,
             onRefresh: _loadSessions,
             onCreate: _openCreateSessionDialog,
           ),
           const SizedBox(height: 22),
+          _AttendanceFiltersCard(
+            controller: _searchController,
+            statusFilter: _statusFilter,
+            typeFilter: _typeFilter,
+            onChanged: () => setState(() {}),
+            onStatusChanged: (value) {
+              setState(() {
+                _statusFilter = value;
+              });
+            },
+            onTypeChanged: (value) {
+              setState(() {
+                _typeFilter = value;
+              });
+            },
+          ),
+          const SizedBox(height: 18),
           if (_loading)
             const Center(
               child: Padding(
@@ -108,8 +165,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             _ErrorCard(message: _error!, onRetry: _loadSessions)
           else if (_sessions.isEmpty)
             const _EmptySessionsCard()
+          else if (_filteredSessions.isEmpty)
+            const _NoSessionMatchCard()
           else
-            _SessionsList(sessions: _sessions),
+            _SessionsList(sessions: _filteredSessions),
         ],
       ),
     );
@@ -120,6 +179,7 @@ class _AttendanceHeader extends StatelessWidget {
   final int total;
   final int open;
   final int closed;
+  final int scheduledSoon;
   final VoidCallback onRefresh;
   final VoidCallback onCreate;
 
@@ -127,6 +187,7 @@ class _AttendanceHeader extends StatelessWidget {
     required this.total,
     required this.open,
     required this.closed,
+    required this.scheduledSoon,
     required this.onRefresh,
     required this.onCreate,
   });
@@ -161,10 +222,15 @@ class _AttendanceHeader extends StatelessWidget {
       child: isWide
           ? Row(
               children: [
-                _HeaderIcon(),
+                const _HeaderIcon(),
                 const SizedBox(width: 18),
                 Expanded(
-                  child: _HeaderText(total: total, open: open, closed: closed),
+                  child: _HeaderText(
+                    total: total,
+                    open: open,
+                    closed: closed,
+                    scheduledSoon: scheduledSoon,
+                  ),
                 ),
                 actions,
               ],
@@ -174,13 +240,14 @@ class _AttendanceHeader extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _HeaderIcon(),
+                    const _HeaderIcon(),
                     const SizedBox(width: 18),
                     Expanded(
                       child: _HeaderText(
                         total: total,
                         open: open,
                         closed: closed,
+                        scheduledSoon: scheduledSoon,
                       ),
                     ),
                   ],
@@ -194,6 +261,8 @@ class _AttendanceHeader extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
+  const _HeaderIcon();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -216,11 +285,13 @@ class _HeaderText extends StatelessWidget {
   final int total;
   final int open;
   final int closed;
+  final int scheduledSoon;
 
   const _HeaderText({
     required this.total,
     required this.open,
     required this.closed,
+    required this.scheduledSoon,
   });
 
   @override
@@ -238,10 +309,138 @@ class _HeaderText extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          '$total session(s) • $open ouverte(s) • $closed clôturée(s)',
+          '$total session(s) • $open ouverte(s) • $closed clôturée(s) • $scheduledSoon à venir',
           style: const TextStyle(color: Colors.white70, height: 1.4),
         ),
       ],
+    );
+  }
+}
+
+class _AttendanceFiltersCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String statusFilter;
+  final String typeFilter;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onTypeChanged;
+
+  const _AttendanceFiltersCard({
+    required this.controller,
+    required this.statusFilter,
+    required this.typeFilter,
+    required this.onChanged,
+    required this.onStatusChanged,
+    required this.onTypeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 760;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: const InputDecoration(
+                labelText: 'Rechercher une session',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _FilterChoice(
+                  label: 'Toutes',
+                  selected: statusFilter == 'all',
+                  onSelected: () => onStatusChanged('all'),
+                ),
+                _FilterChoice(
+                  label: 'Ouvertes',
+                  selected: statusFilter == 'open',
+                  onSelected: () => onStatusChanged('open'),
+                ),
+                _FilterChoice(
+                  label: 'Clôturées',
+                  selected: statusFilter == 'closed',
+                  onSelected: () => onStatusChanged('closed'),
+                ),
+                _FilterChoice(
+                  label: 'Planifiées',
+                  selected: statusFilter == 'scheduled',
+                  onSelected: () => onStatusChanged('scheduled'),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Filtrer par type',
+                  onSelected: onTypeChanged,
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'all', child: Text('Tous les types')),
+                    PopupMenuItem(
+                      value: 'general_meeting',
+                      child: Text('Réunions générales'),
+                    ),
+                    PopupMenuItem(
+                      value: 'pole_meeting',
+                      child: Text('Réunions pôle'),
+                    ),
+                    PopupMenuItem(
+                      value: 'project_meeting',
+                      child: Text('Réunions projet'),
+                    ),
+                    PopupMenuItem(value: 'training', child: Text('Formations')),
+                    PopupMenuItem(value: 'activity', child: Text('Activités')),
+                  ],
+                  child: Chip(
+                    avatar: const Icon(Icons.tune_rounded, size: 16),
+                    label: Text(_typeFilterLabel(typeFilter)),
+                  ),
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChoice extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _FilterChoice({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
     );
   }
 }
@@ -257,18 +456,27 @@ class _SessionsList extends StatelessWidget {
       children: sessions.map((session) {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppTheme.enactusYellow,
-                  foregroundColor: AppTheme.softBlack,
-                  child: const Icon(Icons.event_available_rounded),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      AttendanceSessionDetailScreen(session: session),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 720;
+                  final leading = CircleAvatar(
+                    backgroundColor: _sessionStatusColor(session).withAlpha(35),
+                    foregroundColor: AppTheme.softBlack,
+                    child: Icon(_sessionTypeIcon(session.sessionType)),
+                  );
+                  final content = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -297,30 +505,60 @@ class _SessionsList extends StatelessWidget {
                           _InfoChip(
                             label: session.statusLabel,
                             icon: Icons.circle_rounded,
+                            color: _sessionStatusColor(session),
                           ),
                           _InfoChip(
                             label: session.dateLabel,
                             icon: Icons.schedule_rounded,
                           ),
+                          _InfoChip(
+                            label: _sessionReadinessLabel(session),
+                            icon: Icons.insights_rounded,
+                          ),
                         ],
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                IconButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            AttendanceSessionDetailScreen(session: session),
-                      ),
+                  );
+
+                  if (isWide) {
+                    return Row(
+                      children: [
+                        leading,
+                        const SizedBox(width: 14),
+                        Expanded(child: content),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.arrow_forward_rounded),
+                      ],
                     );
-                  },
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  tooltip: 'Ouvrir',
-                ),
-              ],
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          leading,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              session.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      content,
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         );
@@ -332,12 +570,18 @@ class _SessionsList extends StatelessWidget {
 class _InfoChip extends StatelessWidget {
   final String label;
   final IconData icon;
+  final Color? color;
 
-  const _InfoChip({required this.label, required this.icon});
+  const _InfoChip({required this.label, required this.icon, this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Chip(avatar: Icon(icon, size: 16), label: Text(label));
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(label),
+      backgroundColor: color?.withAlpha(24),
+      side: color == null ? null : BorderSide(color: color!.withAlpha(80)),
+    );
   }
 }
 
@@ -553,15 +797,15 @@ class _CreateAttendanceSessionDialogState
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: Row(
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Icon(Icons.schedule_rounded),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _datePreview,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                        Text(
+                          _datePreview,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         TextButton(
                           onPressed: _loading ? null : _pickDate,
@@ -666,4 +910,90 @@ class _EmptySessionsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NoSessionMatchCard extends StatelessWidget {
+  const _NoSessionMatchCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(26),
+        child: Center(
+          child: Text(
+            'Aucune session ne correspond aux filtres.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _typeFilterLabel(String value) {
+  switch (value) {
+    case 'general_meeting':
+      return 'Réunions générales';
+    case 'pole_meeting':
+      return 'Réunions pôle';
+    case 'project_meeting':
+      return 'Réunions projet';
+    case 'training':
+      return 'Formations';
+    case 'activity':
+      return 'Activités';
+    default:
+      return 'Tous les types';
+  }
+}
+
+IconData _sessionTypeIcon(String? type) {
+  switch (type) {
+    case 'training':
+      return Icons.school_rounded;
+    case 'activity':
+      return Icons.volunteer_activism_rounded;
+    case 'pole_meeting':
+      return Icons.hub_rounded;
+    case 'project_meeting':
+      return Icons.rocket_launch_rounded;
+    default:
+      return Icons.event_available_rounded;
+  }
+}
+
+Color _sessionStatusColor(AttendanceSessionModel session) {
+  switch (session.status) {
+    case 'open':
+      return Colors.green.shade700;
+    case 'closed':
+      return Colors.blueGrey.shade600;
+    case 'scheduled':
+      return Colors.orange.shade700;
+    default:
+      return Colors.black45;
+  }
+}
+
+String _sessionReadinessLabel(AttendanceSessionModel session) {
+  final date = _sessionDate(session);
+  if (session.status == 'closed') return 'Rapport prêt';
+  if (session.status == 'open') return 'Pointage actif';
+  if (date == null) return 'À planifier';
+
+  final hours = date.difference(DateTime.now()).inHours;
+  if (hours < 0) return 'En retard';
+  if (hours <= 24) return 'Aujourd’hui';
+  if (hours <= 168) return 'Cette semaine';
+  return 'À venir';
+}
+
+DateTime? _sessionDate(AttendanceSessionModel session) {
+  final raw = session.scheduledAt ?? session.startTime;
+  if (raw == null || raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
 }
