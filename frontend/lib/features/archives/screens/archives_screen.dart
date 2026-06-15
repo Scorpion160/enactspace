@@ -13,15 +13,24 @@ class ArchivesScreen extends StatefulWidget {
 
 class _ArchivesScreenState extends State<ArchivesScreen> {
   final ArchivesService _service = ArchivesService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   ArchivesHomeData? _data;
+  String _statusFilter = 'all';
+  bool _expansionOnly = false;
 
   @override
   void initState() {
     super.initState();
     _loadArchives();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadArchives() async {
@@ -61,7 +70,19 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
           else if (_error != null)
             _ArchivesErrorCard(message: _error!, onRetry: _loadArchives)
           else
-            _ArchivesContent(data: _data!),
+            _ArchivesContent(
+              data: _data!,
+              searchController: _searchController,
+              statusFilter: _statusFilter,
+              expansionOnly: _expansionOnly,
+              onChanged: () => setState(() {}),
+              onStatusChanged: (value) {
+                setState(() => _statusFilter = value);
+              },
+              onExpansionChanged: (value) {
+                setState(() => _expansionOnly = value);
+              },
+            ),
         ],
       ),
     );
@@ -146,8 +167,48 @@ class _HeaderCopy extends StatelessWidget {
 
 class _ArchivesContent extends StatelessWidget {
   final ArchivesHomeData data;
+  final TextEditingController searchController;
+  final String statusFilter;
+  final bool expansionOnly;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<bool> onExpansionChanged;
 
-  const _ArchivesContent({required this.data});
+  const _ArchivesContent({
+    required this.data,
+    required this.searchController,
+    required this.statusFilter,
+    required this.expansionOnly,
+    required this.onChanged,
+    required this.onStatusChanged,
+    required this.onExpansionChanged,
+  });
+
+  List<ArchiveProjectModel> get _filteredProjects {
+    final query = searchController.text.trim().toLowerCase();
+
+    return data.projects.where((project) {
+      final searchable = [
+        project.name,
+        project.summary,
+        project.locality,
+        project.target,
+        project.problem,
+        project.solution,
+        project.status,
+        ...project.products,
+        ...project.sdgs,
+        ...project.awards,
+        ...project.lessons,
+      ].join(' ').toLowerCase();
+      final matchesQuery = query.isEmpty || searchable.contains(query);
+      final matchesStatus =
+          statusFilter == 'all' || project.status == statusFilter;
+      final matchesExpansion = !expansionOnly || project.expansionReady;
+
+      return matchesQuery && matchesStatus && matchesExpansion;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,13 +217,25 @@ class _ArchivesContent extends StatelessWidget {
       children: [
         _ArchiveSummaryGrid(summary: data.summary),
         const SizedBox(height: 22),
+        _ArchiveFiltersCard(
+          controller: searchController,
+          statusFilter: statusFilter,
+          expansionOnly: expansionOnly,
+          onChanged: onChanged,
+          onStatusChanged: onStatusChanged,
+          onExpansionChanged: onExpansionChanged,
+        ),
+        const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Projets historiques',
           subtitle:
               'Une base vivante pour apprendre, transmettre et relancer les meilleures initiatives.',
         ),
         const SizedBox(height: 12),
-        _ArchiveProjectsGrid(projects: data.projects),
+        if (_filteredProjects.isEmpty)
+          const _EmptyArchiveProjectsCard()
+        else
+          _ArchiveProjectsGrid(projects: _filteredProjects),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Palmarès Enactus ESP',
@@ -301,6 +374,145 @@ class _ArchiveMetricCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArchiveFiltersCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String statusFilter;
+  final bool expansionOnly;
+  final VoidCallback onChanged;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<bool> onExpansionChanged;
+
+  const _ArchiveFiltersCard({
+    required this.controller,
+    required this.statusFilter,
+    required this.expansionOnly,
+    required this.onChanged,
+    required this.onStatusChanged,
+    required this.onExpansionChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 760;
+            final search = TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              decoration: InputDecoration(
+                labelText: 'Rechercher projet, impact, prix',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: controller.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          controller.clear();
+                          onChanged();
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Effacer',
+                      ),
+              ),
+            );
+            final filters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ArchiveChoiceChip(
+                  label: 'Tous',
+                  selected: statusFilter == 'all',
+                  onSelected: () => onStatusChanged('all'),
+                ),
+                _ArchiveChoiceChip(
+                  label: 'Archivés',
+                  selected: statusFilter == 'archivé',
+                  onSelected: () => onStatusChanged('archivé'),
+                ),
+                _ArchiveChoiceChip(
+                  label: 'Terminés',
+                  selected: statusFilter == 'terminé',
+                  onSelected: () => onStatusChanged('terminé'),
+                ),
+                _ArchiveChoiceChip(
+                  label: 'Expansion',
+                  selected: statusFilter == 'expansion',
+                  onSelected: () => onStatusChanged('expansion'),
+                ),
+                FilterChip(
+                  label: const Text('Expansion possible'),
+                  avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+                  selected: expansionOnly,
+                  selectedColor: AppTheme.enactusYellow.withAlpha(120),
+                  onSelected: onExpansionChanged,
+                ),
+              ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: search),
+                  const SizedBox(width: 14),
+                  Flexible(child: filters),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [search, const SizedBox(height: 12), filters],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ArchiveChoiceChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _ArchiveChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _EmptyArchiveProjectsCard extends StatelessWidget {
+  const _EmptyArchiveProjectsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'Aucun projet historique ne correspond aux filtres.',
+            style: TextStyle(color: Colors.black54),
+          ),
         ),
       ),
     );
