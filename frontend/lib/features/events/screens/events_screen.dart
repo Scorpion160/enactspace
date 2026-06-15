@@ -401,17 +401,20 @@ class _EventsGrid extends StatelessWidget {
             ? 2
             : 1;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: events.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 1.55 : 1.08,
-          ),
-          itemBuilder: (context, index) => _EventCard(event: events[index]),
+        const spacing = 14.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final event in events)
+              SizedBox(
+                width: itemWidth,
+                child: _EventCard(event: event),
+              ),
+          ],
         );
       },
     );
@@ -507,7 +510,8 @@ class _EventCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(height: 1.4),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
+            _EventReadinessBar(event: event),
             const Divider(height: 26),
             Row(
               children: [
@@ -525,6 +529,15 @@ class _EventCard extends StatelessWidget {
                     style: const TextStyle(color: Colors.black54),
                   ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _showEventDetails(context, event),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Détail événement'),
+              ),
             ),
           ],
         ),
@@ -547,6 +560,389 @@ class _EventChip extends StatelessWidget {
       backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.14),
       side: BorderSide(color: AppTheme.enactusYellow.withValues(alpha: 0.34)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _EventReadinessBar extends StatelessWidget {
+  final EventModel event;
+
+  const _EventReadinessBar({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = _eventReadinessScore(event);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.fact_check_rounded, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Préparation',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Text(
+                '$score/100',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: score / 100,
+              minHeight: 8,
+              backgroundColor: Colors.white,
+              color: AppTheme.enactusYellow,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _showEventDetails(BuildContext context, EventModel event) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (context) => _EventDetailsSheet(event: event),
+  );
+}
+
+class _EventDetailsSheet extends StatelessWidget {
+  final EventModel event;
+
+  const _EventDetailsSheet({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final start = DateFormat('dd/MM/yyyy HH:mm').format(event.startTime);
+    final end = event.endTime == null
+        ? 'Fin à préciser'
+        : DateFormat('dd/MM/yyyy HH:mm').format(event.endTime!);
+    final readiness = _eventReadinessScore(event);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.86,
+      minChildSize: 0.52,
+      maxChildSize: 0.95,
+      builder: (context, controller) {
+        return SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 780),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: AppTheme.enactusYellow,
+                        foregroundColor: AppTheme.softBlack,
+                        child: Icon(_eventIcon(event.eventType)),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              event.title,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              '${event.typeLabel} · préparation $readiness/100',
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _EventDetailBlock(
+                    icon: Icons.description_rounded,
+                    title: 'Description',
+                    body: _safeText(
+                      event.description,
+                      fallback: 'Description à compléter.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _EventMetricCard(
+                        icon: Icons.schedule_rounded,
+                        title: 'Début',
+                        value: start,
+                      ),
+                      _EventMetricCard(
+                        icon: Icons.event_available_rounded,
+                        title: 'Fin',
+                        value: end,
+                      ),
+                      _EventMetricCard(
+                        icon: Icons.place_rounded,
+                        title: 'Lieu',
+                        value: _safeText(
+                          event.location,
+                          fallback: 'À préciser',
+                        ),
+                      ),
+                      _EventMetricCard(
+                        icon: Icons.payments_rounded,
+                        title: 'Budget',
+                        value: _money(event.budget),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _EventActionPanel(event: event),
+                  const SizedBox(height: 16),
+                  _EventReportPanel(event: event),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EventDetailBlock extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _EventDetailBlock({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(body, style: const TextStyle(height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventMetricCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _EventMetricCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: (MediaQuery.sizeOf(context).width - 72).clamp(240.0, 360.0),
+      child: Card(
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.enactusYellow,
+                foregroundColor: AppTheme.softBlack,
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EventActionPanel extends StatelessWidget {
+  final EventModel event;
+
+  const _EventActionPanel({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (event.requiresRegistration)
+          const _EventActionChip(
+            icon: Icons.how_to_reg_rounded,
+            label: 'Inscriptions',
+          ),
+        if (event.attendanceEnabled)
+          const _EventActionChip(
+            icon: Icons.fact_check_rounded,
+            label: 'Présence liée',
+          ),
+        const _EventActionChip(
+          icon: Icons.groups_rounded,
+          label: 'Participants',
+        ),
+        const _EventActionChip(
+          icon: Icons.description_rounded,
+          label: 'Documents',
+        ),
+        const _EventActionChip(icon: Icons.payments_rounded, label: 'Budget'),
+        const _EventActionChip(
+          icon: Icons.notifications_active_rounded,
+          label: 'Rappels',
+        ),
+      ],
+    );
+  }
+}
+
+class _EventActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _EventActionChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      backgroundColor: Colors.white,
+      side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _EventReportPanel extends StatelessWidget {
+  final EventModel event;
+
+  const _EventReportPanel({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      if (event.reportUrl != null && event.reportUrl!.trim().isNotEmpty)
+        'Rapport disponible: ${event.reportUrl}'
+      else
+        'Rapport après événement à produire.',
+      'Rappel automatique J-1 et H-2 à brancher côté notifications.',
+      'Documents, budget réel, présences et synthèse impact à relier.',
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Suivi après événement',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppTheme.enactusYellow,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -872,6 +1268,42 @@ List<DropdownMenuItem<String>> _eventTypeItems({required bool includeAll}) {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+int _eventReadinessScore(EventModel event) {
+  var score = 20;
+
+  if ((event.description ?? '').trim().length >= 40) score += 15;
+  if ((event.location ?? '').trim().isNotEmpty) score += 10;
+  if (event.endTime != null) score += 10;
+  if (event.budget > 0) score += 10;
+  if (event.maxParticipants != null && event.maxParticipants! > 0) score += 10;
+  if (event.requiresRegistration) score += 10;
+  if (event.attendanceEnabled) score += 10;
+  if ((event.reportUrl ?? '').trim().isNotEmpty) score += 15;
+
+  return score.clamp(0, 100);
+}
+
+IconData _eventIcon(String eventType) {
+  switch (eventType) {
+    case 'training':
+      return Icons.school_rounded;
+    case 'competition':
+      return Icons.emoji_events_rounded;
+    case 'field_trip':
+      return Icons.terrain_rounded;
+    case 'travel':
+      return Icons.flight_takeoff_rounded;
+    case 'campaign':
+      return Icons.campaign_rounded;
+    case 'presentation':
+      return Icons.slideshow_rounded;
+    case 'social':
+      return Icons.diversity_3_rounded;
+    default:
+      return Icons.event_available_rounded;
+  }
 }
 
 String _money(double value) {
