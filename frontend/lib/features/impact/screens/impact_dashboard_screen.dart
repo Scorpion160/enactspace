@@ -209,6 +209,8 @@ class _ImpactContent extends StatelessWidget {
       children: [
         _OrganizationScoreCard(organization: organization),
         const SizedBox(height: 16),
+        _HistoricalImpactSection(impact: data.historicalImpact),
+        const SizedBox(height: 22),
         _KpiGrid(
           items: [
             _KpiItem(
@@ -358,6 +360,190 @@ class _OrganizationScoreCard extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _HistoricalImpactSection extends StatelessWidget {
+  final HistoricalImpactModel impact;
+
+  const _HistoricalImpactSection({required this.impact});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppTheme.enactusYellow.withValues(
+                    alpha: 0.24,
+                  ),
+                  foregroundColor: AppTheme.softBlack,
+                  child: const Icon(Icons.history_edu_rounded),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Impact historique Enactus ESP',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Mémoire des réalisations et base de préparation compétition.',
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final count = constraints.maxWidth >= 1000
+                    ? 4
+                    : constraints.maxWidth >= 650
+                    ? 2
+                    : 1;
+                const spacing = 12.0;
+                final width =
+                    (constraints.maxWidth - spacing * (count - 1)) / count;
+                final cards = [
+                  _HistoricalPillar(
+                    title: 'People',
+                    value: '+${impact.impactedLives}',
+                    subtitle:
+                        '${impact.createdJobs} emplois • ${impact.savedLives} vies sauvées',
+                    icon: Icons.groups_2_rounded,
+                  ),
+                  _HistoricalPillar(
+                    title: 'Planet',
+                    value: impact.plantedTrees.toString(),
+                    subtitle: 'arbres plantés et ressources valorisées',
+                    icon: Icons.park_rounded,
+                  ),
+                  _HistoricalPillar(
+                    title: 'Prosperity',
+                    value: _money(impact.cumulativeFcfaGains),
+                    subtitle:
+                        '${impact.cumulativeUsdGains.toStringAsFixed(1)} USD de gains cumulés',
+                    icon: Icons.trending_up_rounded,
+                  ),
+                  _HistoricalPillar(
+                    title: 'Innovation',
+                    value: impact.developedProducts.toString(),
+                    subtitle:
+                        '${impact.createdProjects} projets créés • ${impact.touchedSdgs} ODD',
+                    icon: Icons.auto_awesome_rounded,
+                  ),
+                ];
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final card in cards)
+                      SizedBox(width: width, child: card),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final project in impact.emblematicProjects)
+                  Chip(label: Text(project)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final distinction in impact.distinctions)
+                  Chip(
+                    avatar: const Icon(Icons.emoji_events_rounded, size: 18),
+                    label: Text(distinction),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoricalPillar extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+
+  const _HistoricalPillar({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.25),
+            foregroundColor: AppTheme.softBlack,
+            child: Icon(icon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

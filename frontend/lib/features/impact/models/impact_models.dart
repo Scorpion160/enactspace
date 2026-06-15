@@ -251,14 +251,46 @@ class OrganizationPerformanceModel {
   }
 }
 
+class HistoricalImpactModel {
+  final int createdProjects;
+  final int developingProjects;
+  final int developedProducts;
+  final int touchedSdgs;
+  final int createdJobs;
+  final int savedLives;
+  final int plantedTrees;
+  final double cumulativeUsdGains;
+  final double cumulativeFcfaGains;
+  final int impactedLives;
+  final List<String> emblematicProjects;
+  final List<String> distinctions;
+
+  const HistoricalImpactModel({
+    required this.createdProjects,
+    required this.developingProjects,
+    required this.developedProducts,
+    required this.touchedSdgs,
+    required this.createdJobs,
+    required this.savedLives,
+    required this.plantedTrees,
+    required this.cumulativeUsdGains,
+    required this.cumulativeFcfaGains,
+    required this.impactedLives,
+    required this.emblematicProjects,
+    required this.distinctions,
+  });
+}
+
 class ImpactDashboardData {
   final OrganizationPerformanceModel organization;
+  final HistoricalImpactModel historicalImpact;
   final List<ProjectImpactMetricModel> projects;
   final List<EnacteurPerformanceModel> enacteurs;
   final List<PolePerformanceModel> poles;
 
   const ImpactDashboardData({
     required this.organization,
+    required this.historicalImpact,
     required this.projects,
     required this.enacteurs,
     required this.poles,
