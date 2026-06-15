@@ -1507,9 +1507,13 @@ class _ConversationInfoDialog extends StatelessWidget {
                   ),
                   title: Text(participant.displayName),
                   subtitle: Text(participant.email),
-                  trailing: participant.participantRole == 'member'
-                      ? null
-                      : Chip(label: Text(participant.participantRole)),
+                  trailing: _ParticipantManagementMenu(
+                    thread: thread,
+                    participant: participant,
+                    currentUserId: currentUserId,
+                    chatService: chatService,
+                    onChanged: onChanged,
+                  ),
                 );
               }),
             ],
@@ -1522,6 +1526,107 @@ class _ConversationInfoDialog extends StatelessWidget {
           child: const Text('Fermer'),
         ),
       ],
+    );
+  }
+}
+
+class _ParticipantManagementMenu extends StatelessWidget {
+  final ChatThreadModel thread;
+  final ChatThreadMemberModel participant;
+  final String? currentUserId;
+  final ChatService chatService;
+  final Future<void> Function() onChanged;
+
+  const _ParticipantManagementMenu({
+    required this.thread,
+    required this.participant,
+    required this.currentUserId,
+    required this.chatService,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final role = participant.participantRole;
+    final canManage =
+        thread.canManageMembers &&
+        thread.threadType != 'direct' &&
+        participant.userId != currentUserId &&
+        role != 'owner';
+
+    if (!canManage) {
+      return role == 'member'
+          ? const SizedBox.shrink()
+          : Chip(label: Text(role));
+    }
+
+    return PopupMenuButton<String>(
+      tooltip: 'Gérer ce membre',
+      onSelected: (value) async {
+        try {
+          if (value == 'admin' || value == 'member') {
+            await chatService.updateParticipantRole(
+              threadId: thread.id,
+              userId: participant.userId,
+              participantRole: value,
+            );
+          }
+          if (value == 'remove') {
+            await chatService.removeParticipant(
+              threadId: thread.id,
+              userId: participant.userId,
+            );
+          }
+          await onChanged();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Conversation mise à jour.')),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                backgroundColor: Colors.red.shade700,
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+              ),
+            );
+          }
+        }
+      },
+      itemBuilder: (context) => [
+        if (role != 'admin')
+          const PopupMenuItem(
+            value: 'admin',
+            child: ListTile(
+              leading: Icon(Icons.admin_panel_settings_rounded),
+              title: Text('Promouvoir admin'),
+            ),
+          ),
+        if (role == 'admin')
+          const PopupMenuItem(
+            value: 'member',
+            child: ListTile(
+              leading: Icon(Icons.person_rounded),
+              title: Text('Retirer admin'),
+            ),
+          ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'remove',
+          child: ListTile(
+            leading: Icon(Icons.person_remove_alt_1_rounded),
+            title: Text('Retirer du groupe'),
+          ),
+        ),
+      ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (role != 'member') Chip(label: Text(role)),
+          const Icon(Icons.more_vert_rounded),
+        ],
+      ),
     );
   }
 }
