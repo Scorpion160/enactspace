@@ -4,9 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../academy/models/academy_models.dart';
+import '../../academy/services/academy_service.dart';
 import '../../attendance/services/attendance_service.dart';
 import '../../documents/services/documents_service.dart';
 import '../../finance/services/finance_service.dart';
+import '../../impact/models/impact_models.dart';
+import '../../impact/services/impact_service.dart';
 import '../../members/services/members_service.dart';
 import '../../notifications/services/notifications_service.dart';
 import '../../recruitment/services/recruitment_service.dart';
@@ -61,11 +65,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DocumentsService _documentsService = DocumentsService();
   final RecruitmentService _recruitmentService = RecruitmentService();
   final NotificationsService _notificationsService = NotificationsService();
+  final AcademyService _academyService = AcademyService();
+  final ImpactService _impactService = ImpactService();
 
   bool _loading = true;
   String? _error;
   _DashboardStats? _stats;
   UserExperience? _userExperience;
+  AcademyHomeData? _academyData;
+  ImpactDashboardData? _impactData;
 
   @override
   void initState() {
@@ -103,6 +111,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         () => _notificationsService.getUnreadCount(),
         0,
       );
+      AcademyHomeData? academyData;
+      ImpactDashboardData? impactData;
+
+      try {
+        academyData = await _academyService.getHome();
+      } catch (_) {
+        academyData = null;
+      }
+
+      if (user.canViewImpact) {
+        try {
+          impactData = await _impactService.getDashboard();
+        } catch (_) {
+          impactData = null;
+        }
+      }
 
       final totalDue = accounts.fold<double>(
         0,
@@ -122,6 +146,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       setState(() {
         _userExperience = user;
+        _academyData = academyData;
+        _impactData = impactData;
         _stats = _DashboardStats(
           members: members.length,
           sessions: sessions.length,
@@ -201,6 +227,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _DashboardContent(
                           stats: _stats!,
                           userExperience: _userExperience,
+                          academyData: _academyData,
+                          impactData: _impactData,
                         ),
                     ],
                   ),
@@ -217,8 +245,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _DashboardContent extends StatelessWidget {
   final _DashboardStats stats;
   final UserExperience? userExperience;
+  final AcademyHomeData? academyData;
+  final ImpactDashboardData? impactData;
 
-  const _DashboardContent({required this.stats, required this.userExperience});
+  const _DashboardContent({
+    required this.stats,
+    required this.userExperience,
+    required this.academyData,
+    required this.impactData,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +271,10 @@ class _DashboardContent extends StatelessWidget {
                   children: [
                     _PriorityGrid(stats: stats, userExperience: userExperience),
                     const SizedBox(height: 22),
+                    if (impactData != null) ...[
+                      _DashboardImpactPanel(data: impactData!),
+                      const SizedBox(height: 22),
+                    ],
                     _QuickAccessGrid(userExperience: userExperience),
                   ],
                 ),
@@ -250,6 +289,10 @@ class _DashboardContent extends StatelessWidget {
                       userExperience: userExperience,
                     ),
                     const SizedBox(height: 22),
+                    if (academyData != null) ...[
+                      _DashboardAcademyCard(data: academyData!),
+                      const SizedBox(height: 22),
+                    ],
                     _MomentumCard(stats: stats, userExperience: userExperience),
                   ],
                 ),
@@ -262,6 +305,14 @@ class _DashboardContent extends StatelessWidget {
           children: [
             _PriorityGrid(stats: stats, userExperience: userExperience),
             const SizedBox(height: 22),
+            if (impactData != null) ...[
+              _DashboardImpactPanel(data: impactData!),
+              const SizedBox(height: 22),
+            ],
+            if (academyData != null) ...[
+              _DashboardAcademyCard(data: academyData!),
+              const SizedBox(height: 22),
+            ],
             _QuickAccessGrid(userExperience: userExperience),
             const SizedBox(height: 22),
             _QuickInsights(stats: stats, userExperience: userExperience),
@@ -495,6 +546,21 @@ class _PriorityGrid extends StatelessWidget {
         route: '/gamification',
       ),
       const _StatItem(
+        title: 'Academy',
+        value: 'Cours',
+        subtitle: 'leçons, quiz et badges',
+        icon: Icons.school_rounded,
+        route: '/academy',
+      ),
+      if (user?.canViewImpact == true)
+        const _StatItem(
+          title: 'Impact',
+          value: 'Score',
+          subtitle: 'performance projets',
+          icon: Icons.insights_rounded,
+          route: '/impact',
+        ),
+      const _StatItem(
         title: 'Communication',
         value: 'Fil',
         subtitle: 'posts et annonces',
@@ -631,6 +697,269 @@ class _StatCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DashboardImpactPanel extends StatelessWidget {
+  final ImpactDashboardData data;
+
+  const _DashboardImpactPanel({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final organization = data.organization;
+    final topProject = [...data.projects]
+      ..sort((a, b) => b.projectImpactScore.compareTo(a.projectImpactScore));
+    final alerts = data.projects
+        .where((project) => project.needsEvidence || project.needsSdg)
+        .length;
+
+    return Card(
+      child: InkWell(
+        onTap: () => context.go('/impact'),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppTheme.enactusYellow.withValues(
+                      alpha: 0.24,
+                    ),
+                    foregroundColor: AppTheme.softBlack,
+                    child: const Icon(Icons.insights_rounded),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Impact & Performance',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_rounded),
+                ],
+              ),
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 640;
+                  final items = [
+                    _MiniMetric(
+                      label: 'Health score',
+                      value:
+                          '${organization.organizationHealthScore.toStringAsFixed(0)}/100',
+                    ),
+                    _MiniMetric(
+                      label: 'Impact direct',
+                      value: organization.directImpactTotal.toString(),
+                    ),
+                    _MiniMetric(
+                      label: 'Reach',
+                      value: organization.reachTotal.toString(),
+                    ),
+                    _MiniMetric(
+                      label: 'Surplus',
+                      value: _money(organization.surplusTotal),
+                    ),
+                  ];
+
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final item in items)
+                        SizedBox(
+                          width: compact
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 10) / 2,
+                          child: _MiniMetricTile(item: item),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (topProject.isNotEmpty)
+                    Chip(label: Text('Top: ${topProject.first.projectName}')),
+                  Chip(label: Text('$alerts alerte(s) preuve/ODD')),
+                  Chip(
+                    label: Text(
+                      '${organization.competitionReadiness.toStringAsFixed(0)}% compétition',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardAcademyCard extends StatelessWidget {
+  final AcademyHomeData data;
+
+  const _DashboardAcademyCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = data.progress;
+
+    return Card(
+      child: InkWell(
+        onTap: () => context.go('/academy'),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: AppTheme.enactusYellow.withValues(
+                      alpha: 0.24,
+                    ),
+                    foregroundColor: AppTheme.softBlack,
+                    child: const Icon(Icons.school_rounded),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Academy Progress',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_rounded),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _DashboardProgressLine(
+                label: 'Leçons',
+                value: progress.lessonsProgress,
+                detail: '${progress.completedLessons}/${progress.totalLessons}',
+              ),
+              const SizedBox(height: 12),
+              _DashboardProgressLine(
+                label: 'Quiz',
+                value: progress.quizProgress,
+                detail: '${progress.passedQuizzes}/${progress.totalQuizzes}',
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(label: Text('${progress.points} points')),
+                  Chip(
+                    label: Text(
+                      '${data.badges.where((b) => b.unlocked).length} badge(s)',
+                    ),
+                  ),
+                  Chip(label: Text('Rang #${progress.rank}')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardProgressLine extends StatelessWidget {
+  final String label;
+  final double value;
+  final String detail;
+
+  const _DashboardProgressLine({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            Text(detail, style: const TextStyle(color: Colors.black54)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: value.clamp(0.0, 1.0),
+          minHeight: 8,
+          borderRadius: BorderRadius.circular(99),
+          color: AppTheme.enactusYellow,
+          backgroundColor: Colors.black.withValues(alpha: 0.08),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniMetric {
+  final String label;
+  final String value;
+
+  const _MiniMetric({required this.label, required this.value});
+}
+
+class _MiniMetricTile extends StatelessWidget {
+  final _MiniMetric item;
+
+  const _MiniMetricTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ],
       ),
     );
   }
