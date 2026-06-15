@@ -40,6 +40,8 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessageModel> _messages = [];
   Set<String> _pinnedThreadIds = {};
   Set<String> _pinnedMessageIds = {};
+  final Map<String, String> _messageReactions = {};
+  final Set<String> _hiddenMessageIds = {};
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
 
@@ -424,7 +426,22 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _reactToMessage(ChatMessageModel message, String emoji) {
-    _showInfo('$emoji réaction ajoutée localement.');
+    setState(() {
+      _messageReactions[message.id] = emoji;
+    });
+    _showInfo('$emoji réaction ajoutée.');
+  }
+
+  void _deleteMessageForMe(ChatMessageModel message) {
+    setState(() {
+      _hiddenMessageIds.add(message.id);
+      _messageReactions.remove(message.id);
+      _pinnedMessageIds.remove(message.id);
+      if (_replyingToMessage?.id == message.id) {
+        _replyingToMessage = null;
+      }
+    });
+    _showInfo('Message supprimé pour vous.');
   }
 
   Future<void> _openMessageActions(ChatMessageModel message) async {
@@ -464,6 +481,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   onTap: () {
                     Navigator.of(context).pop();
                     _toggleMessagePin(message);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Supprimer pour moi'),
+                  subtitle: const Text(
+                    'Retire seulement ce message de cet appareil.',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _deleteMessageForMe(message);
                   },
                 ),
                 const Divider(),
@@ -681,9 +709,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 : _selectedThread == null
                 ? const _EmptyConversation()
                 : _MessagesList(
-                    messages: _messages,
+                    messages: _messages
+                        .where(
+                          (message) => !_hiddenMessageIds.contains(message.id),
+                        )
+                        .toList(),
                     currentUserId: _user?.id,
                     pinnedMessageIds: _pinnedMessageIds,
+                    messageReactions: _messageReactions,
                     onMessageLongPress: _openMessageActions,
                   ),
           ),
@@ -1088,12 +1121,14 @@ class _MessagesList extends StatelessWidget {
   final List<ChatMessageModel> messages;
   final String? currentUserId;
   final Set<String> pinnedMessageIds;
+  final Map<String, String> messageReactions;
   final ValueChanged<ChatMessageModel> onMessageLongPress;
 
   const _MessagesList({
     required this.messages,
     required this.currentUserId,
     required this.pinnedMessageIds,
+    required this.messageReactions,
     required this.onMessageLongPress,
   });
 
@@ -1115,6 +1150,7 @@ class _MessagesList extends StatelessWidget {
         final message = messages[index];
         final mine = message.authorId == currentUserId;
         final pinned = pinnedMessageIds.contains(message.id);
+        final reaction = messageReactions[message.id];
 
         return Align(
           alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -1143,6 +1179,28 @@ class _MessagesList extends StatelessWidget {
                       child: Icon(Icons.push_pin_rounded, size: 14),
                     ),
                   _MessageBody(message: message),
+                  if (reaction != null) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: mine
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.06),
+                          ),
+                        ),
+                        child: Text(reaction),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1157,10 +1215,13 @@ class _MessagesList extends StatelessWidget {
                       ),
                       if (mine) ...[
                         const SizedBox(width: 5),
-                        Icon(
-                          Icons.done_all_rounded,
-                          size: 15,
-                          color: Colors.black.withValues(alpha: 0.48),
+                        Tooltip(
+                          message: 'Envoyé',
+                          child: Icon(
+                            Icons.done_all_rounded,
+                            size: 15,
+                            color: Colors.black.withValues(alpha: 0.48),
+                          ),
                         ),
                       ],
                     ],
@@ -1343,6 +1404,22 @@ class _MessageComposer extends StatelessWidget {
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
+              ),
+            ),
+          ],
+          if (sending) ...[
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Envoi en cours...',
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],
