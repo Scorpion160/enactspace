@@ -733,6 +733,10 @@ class _ProjectDetailsSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  if (_isTerrasenProject(project)) ...[
+                    const _TerrasenReferenceCard(),
+                    const SizedBox(height: 16),
+                  ],
                   const _ProjectActionPanel(),
                   const SizedBox(height: 16),
                   _ProjectLogPreview(project: project),
@@ -742,6 +746,136 @@ class _ProjectDetailsSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TerrasenReferenceCard extends StatelessWidget {
+  const _TerrasenReferenceCard();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (
+        Icons.agriculture_rounded,
+        'Volets',
+        'Production, transformation, conservation et distribution.',
+      ),
+      (
+        Icons.groups_2_rounded,
+        'Cibles',
+        'Yeumbeul, Passy, Khaffe, Ngayenne Sabakh, vendeuses de legumes, COUD et UCAD.',
+      ),
+      (
+        Icons.memory_rounded,
+        'Innovation',
+        'Arrosage automatise ESP32, capteur humidite, relais, pompe et controle Wi-Fi.',
+      ),
+      (
+        Icons.verified_rounded,
+        'Preuves',
+        'Transferts 2024, immersions terrain, recettes produits et budget documente.',
+      ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_stories_rounded, color: AppTheme.enactusYellow),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Repères document TERRASEN',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth >= 620
+                  ? (constraints.maxWidth - 12) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final item in items)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _TerrasenReferenceItem(
+                        icon: item.$1,
+                        title: item.$2,
+                        body: item.$3,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TerrasenReferenceItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _TerrasenReferenceItem({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 17,
+          backgroundColor: AppTheme.enactusYellow,
+          foregroundColor: AppTheme.softBlack,
+          child: Icon(icon, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: const TextStyle(color: Colors.white70, height: 1.35),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1361,6 +1495,10 @@ int _projectReadinessScore(ProjectModel project) {
   if (project.endedAt != null) score += 5;
 
   return score.clamp(0, 100);
+}
+
+bool _isTerrasenProject(ProjectModel project) {
+  return project.name.trim().toLowerCase().contains('terrasen');
 }
 
 String _money(double value) {
