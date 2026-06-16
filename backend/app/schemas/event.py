@@ -20,6 +20,22 @@ class EventCreate(BaseModel):
     attendance_enabled: bool = True
 
 
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    event_type: Optional[str] = None
+    location: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    pole_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    budget: Optional[float] = None
+    max_participants: Optional[int] = None
+    requires_registration: Optional[bool] = None
+    attendance_enabled: Optional[bool] = None
+    report_url: Optional[str] = None
+
+
 class EventRead(BaseModel):
     id: UUID
     season_id: Optional[UUID]

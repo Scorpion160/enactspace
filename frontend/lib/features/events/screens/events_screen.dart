@@ -89,6 +89,14 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
+  void _replaceEvent(EventModel updated) {
+    setState(() {
+      _events = [
+        for (final event in _events) event.id == updated.id ? updated : event,
+      ];
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -136,7 +144,11 @@ class _EventsScreenState extends State<EventsScreen> {
                       else if (_filteredEvents.isEmpty)
                         const _EmptyEventsCard()
                       else
-                        _EventsGrid(events: _filteredEvents),
+                        _EventsGrid(
+                          events: _filteredEvents,
+                          service: _service,
+                          onEventChanged: _replaceEvent,
+                        ),
                     ],
                   ),
                 ),
@@ -388,8 +400,14 @@ class _EventsToolbar extends StatelessWidget {
 
 class _EventsGrid extends StatelessWidget {
   final List<EventModel> events;
+  final EventsService service;
+  final ValueChanged<EventModel> onEventChanged;
 
-  const _EventsGrid({required this.events});
+  const _EventsGrid({
+    required this.events,
+    required this.service,
+    required this.onEventChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +430,11 @@ class _EventsGrid extends StatelessWidget {
             for (final event in events)
               SizedBox(
                 width: itemWidth,
-                child: _EventCard(event: event),
+                child: _EventCard(
+                  event: event,
+                  service: service,
+                  onEventChanged: onEventChanged,
+                ),
               ),
           ],
         );
@@ -423,8 +445,14 @@ class _EventsGrid extends StatelessWidget {
 
 class _EventCard extends StatelessWidget {
   final EventModel event;
+  final EventsService service;
+  final ValueChanged<EventModel> onEventChanged;
 
-  const _EventCard({required this.event});
+  const _EventCard({
+    required this.event,
+    required this.service,
+    required this.onEventChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -534,7 +562,8 @@ class _EventCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => _showEventDetails(context, event),
+                onPressed: () =>
+                    _showEventDetails(context, event, service, onEventChanged),
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Détail événement'),
               ),
@@ -613,20 +642,35 @@ class _EventReadinessBar extends StatelessWidget {
   }
 }
 
-void _showEventDetails(BuildContext context, EventModel event) {
+void _showEventDetails(
+  BuildContext context,
+  EventModel event,
+  EventsService service,
+  ValueChanged<EventModel> onEventChanged,
+) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (context) => _EventDetailsSheet(event: event),
+    builder: (context) => _EventDetailsSheet(
+      event: event,
+      service: service,
+      onEventChanged: onEventChanged,
+    ),
   );
 }
 
 class _EventDetailsSheet extends StatelessWidget {
   final EventModel event;
+  final EventsService service;
+  final ValueChanged<EventModel> onEventChanged;
 
-  const _EventDetailsSheet({required this.event});
+  const _EventDetailsSheet({
+    required this.event,
+    required this.service,
+    required this.onEventChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -722,7 +766,11 @@ class _EventDetailsSheet extends StatelessWidget {
                   const SizedBox(height: 16),
                   _EventActionPanel(event: event),
                   const SizedBox(height: 16),
-                  _EventReportPanel(event: event),
+                  _EventReportPanel(
+                    event: event,
+                    service: service,
+                    onEventChanged: onEventChanged,
+                  ),
                 ],
               ),
             ),
@@ -889,20 +937,79 @@ class _EventActionChip extends StatelessWidget {
   }
 }
 
-class _EventReportPanel extends StatelessWidget {
+class _EventReportPanel extends StatefulWidget {
   final EventModel event;
+  final EventsService service;
+  final ValueChanged<EventModel> onEventChanged;
 
-  const _EventReportPanel({required this.event});
+  const _EventReportPanel({
+    required this.event,
+    required this.service,
+    required this.onEventChanged,
+  });
+
+  @override
+  State<_EventReportPanel> createState() => _EventReportPanelState();
+}
+
+class _EventReportPanelState extends State<_EventReportPanel> {
+  late final TextEditingController _reportController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportController = TextEditingController(
+      text: widget.event.reportUrl?.trim() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _reportController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveReport() async {
+    setState(() => _saving = true);
+
+    try {
+      final updated = await widget.service.updateEvent(
+        eventId: widget.event.id,
+        reportUrl: _reportController.text,
+      );
+
+      widget.onEventChanged(updated);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rapport événement mis à jour.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final event = widget.event;
+    final hasReport = _reportController.text.trim().isNotEmpty;
     final items = [
-      if (event.reportUrl != null && event.reportUrl!.trim().isNotEmpty)
-        'Rapport disponible: ${event.reportUrl}'
+      if (hasReport)
+        'Rapport disponible et rattaché à la fiche événement.'
       else
         'Rapport après événement à produire.',
-      'Rappel automatique J-1 et H-2 à brancher côté notifications.',
-      'Documents, budget réel, présences et synthèse impact à relier.',
+      if (event.attendanceEnabled)
+        'Présence liée à consolider avec les participants présents.',
+      'Budget réel, documents, photos et synthèse impact à relier.',
     ];
 
     return Container(
@@ -941,6 +1048,47 @@ class _EventReportPanel extends StatelessWidget {
                 ],
               ),
             ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _reportController,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Lien du rapport ou dossier preuves',
+              labelStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(
+                Icons.link_rounded,
+                color: AppTheme.enactusYellow,
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.08),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.14),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: AppTheme.enactusYellow),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _saveReport,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_rounded),
+              label: const Text('Enregistrer le suivi'),
+            ),
+          ),
         ],
       ),
     );
@@ -1004,7 +1152,45 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
         time.hour,
         time.minute,
       );
+      if (_endTime != null && !_endTime!.isAfter(_startTime)) {
+        _endTime = null;
+      }
     });
+  }
+
+  Future<void> _pickEndTime() async {
+    final initialEnd = _endTime ?? _startTime.add(const Duration(hours: 2));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initialEnd,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initialEnd),
+    );
+    if (time == null) return;
+
+    final selected = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
+    if (!selected.isAfter(_startTime)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La fin doit être après le début.')),
+      );
+      return;
+    }
+
+    setState(() => _endTime = selected);
   }
 
   Future<void> _submit() async {
@@ -1117,6 +1303,29 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                   label: Text(
                     DateFormat('dd/MM/yyyy HH:mm').format(_startTime),
                   ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickEndTime,
+                      icon: const Icon(Icons.event_available_rounded),
+                      label: Text(
+                        _endTime == null
+                            ? 'Ajouter une fin'
+                            : 'Fin ${DateFormat('dd/MM/yyyy HH:mm').format(_endTime!)}',
+                      ),
+                    ),
+                    if (_endTime != null)
+                      IconButton.filledTonal(
+                        tooltip: 'Retirer la fin',
+                        onPressed: () => setState(() => _endTime = null),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

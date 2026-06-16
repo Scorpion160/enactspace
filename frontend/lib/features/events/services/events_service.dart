@@ -56,6 +56,28 @@ class EventsService {
     throw Exception('Réponse invalide lors de la création de l’événement.');
   }
 
+  Future<EventModel> updateEvent({
+    required String eventId,
+    String? reportUrl,
+    DateTime? endTime,
+  }) async {
+    final token = await _requireToken();
+    final response = await _apiClient.patchJson(
+      '/events/$eventId',
+      token: token,
+      data: {
+        if (reportUrl != null) 'report_url': _nullable(reportUrl),
+        if (endTime != null) 'end_time': endTime.toIso8601String(),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return EventModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la mise à jour de l’événement.');
+  }
+
   Future<String> _requireToken() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

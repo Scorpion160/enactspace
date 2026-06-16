@@ -1,14 +1,26 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.event import Event
 from app.models.user import User
-from app.schemas.event import EventCreate, EventRead
+from app.schemas.event import EventCreate, EventRead, EventUpdate
 from app.api.deps import get_current_user
 
 
 router = APIRouter(prefix="/events", tags=["Événements"])
+
+
+def get_event_or_404(db: Session, event_id: str) -> Event:
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Événement introuvable",
+        )
+    return event
 
 
 @router.post("/", response_model=EventRead)
@@ -47,3 +59,22 @@ def list_events(
     current_user: User = Depends(get_current_user),
 ):
     return db.query(Event).order_by(Event.start_time.desc()).all()
+
+
+@router.patch("/{event_id}", response_model=EventRead)
+def update_event(
+    event_id: str,
+    payload: EventUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    event = get_event_or_404(db, event_id)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(event, field, value)
+
+    event.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(event)
+
+    return event
