@@ -161,6 +161,7 @@ class ChatThreadMemberModel {
   final String status;
   final String? photoUrl;
   final String participantRole;
+  final DateTime? lastReadAt;
 
   const ChatThreadMemberModel({
     required this.userId,
@@ -170,6 +171,7 @@ class ChatThreadMemberModel {
     required this.status,
     required this.photoUrl,
     required this.participantRole,
+    required this.lastReadAt,
   });
 
   factory ChatThreadMemberModel.fromJson(Map<String, dynamic> json) {
@@ -181,6 +183,7 @@ class ChatThreadMemberModel {
       status: json['status']?.toString() ?? '',
       photoUrl: json['photo_url']?.toString(),
       participantRole: json['participant_role']?.toString() ?? 'member',
+      lastReadAt: DateTime.tryParse(json['last_read_at']?.toString() ?? ''),
     );
   }
 
@@ -193,6 +196,7 @@ class ChatThreadMemberModel {
       'status': status,
       'photo_url': photoUrl,
       'participant_role': participantRole,
+      'last_read_at': lastReadAt?.toIso8601String(),
     };
   }
 

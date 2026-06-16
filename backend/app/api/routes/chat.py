@@ -234,6 +234,7 @@ def participant_preview(participant: ChatParticipant) -> dict:
         "status": user.status if user else "",
         "photo_url": user.photo_url if user else None,
         "participant_role": participant.participant_role,
+        "last_read_at": participant.last_read_at,
     }
 
 

@@ -767,6 +767,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 : _selectedThread == null
                 ? const _EmptyConversation()
                 : _MessagesList(
+                    thread: _selectedThread!,
                     messages: _messages
                         .where(
                           (message) => !_hiddenMessageIds.contains(message.id),
@@ -1177,6 +1178,7 @@ class _ConversationHeader extends StatelessWidget {
 }
 
 class _MessagesList extends StatelessWidget {
+  final ChatThreadModel thread;
   final List<ChatMessageModel> messages;
   final String? currentUserId;
   final Set<String> pinnedMessageIds;
@@ -1185,6 +1187,7 @@ class _MessagesList extends StatelessWidget {
   final ValueChanged<ChatMessageModel> onMessageLongPress;
 
   const _MessagesList({
+    required this.thread,
     required this.messages,
     required this.currentUserId,
     required this.pinnedMessageIds,
@@ -1215,6 +1218,11 @@ class _MessagesList extends StatelessWidget {
           message,
           messageReactions[message.id],
           removedServerReactionIds.contains(message.id),
+        );
+        final readByOthers = _messageReadByOthers(
+          thread: thread,
+          message: message,
+          currentUserId: currentUserId,
         );
 
         return Align(
@@ -1281,11 +1289,31 @@ class _MessagesList extends StatelessWidget {
                       if (mine) ...[
                         const SizedBox(width: 5),
                         Tooltip(
-                          message: 'Envoyé',
-                          child: Icon(
-                            Icons.done_all_rounded,
-                            size: 15,
-                            color: Colors.black.withValues(alpha: 0.48),
+                          message: readByOthers ? 'Lu' : 'Envoyé',
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                readByOthers
+                                    ? Icons.done_all_rounded
+                                    : Icons.done_rounded,
+                                size: 15,
+                                color: readByOthers
+                                    ? Colors.blue.shade700
+                                    : Colors.black.withValues(alpha: 0.48),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                readByOthers ? 'Lu' : 'Envoyé',
+                                style: TextStyle(
+                                  color: readByOthers
+                                      ? Colors.blue.shade700
+                                      : Colors.black.withValues(alpha: 0.48),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -3168,6 +3196,21 @@ String? _messageReactionLabel(
       .join('  ');
 
   return visible.isEmpty ? null : visible;
+}
+
+bool _messageReadByOthers({
+  required ChatThreadModel thread,
+  required ChatMessageModel message,
+  required String? currentUserId,
+}) {
+  if (currentUserId == null || message.authorId != currentUserId) return false;
+
+  return thread.participantsPreview.any((participant) {
+    if (participant.userId == currentUserId) return false;
+    final lastReadAt = participant.lastReadAt;
+    if (lastReadAt == null) return false;
+    return !lastReadAt.isBefore(message.createdAt);
+  });
 }
 
 String? _optional(String value) {
