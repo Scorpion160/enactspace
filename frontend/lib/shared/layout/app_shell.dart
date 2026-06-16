@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,11 +27,22 @@ class _AppShellState extends State<AppShell> {
   int? _unreadNotifications;
   int? _lateTasks;
   UserExperience? _userExperience;
+  Timer? _metricsTimer;
+  bool _metricsLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadNavigationMetrics();
+    _metricsTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      _loadNavigationMetrics();
+    });
+  }
+
+  @override
+  void dispose() {
+    _metricsTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -42,36 +55,43 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _loadNavigationMetrics() async {
+    if (_metricsLoading) return;
+    _metricsLoading = true;
+
     int? unreadNotifications;
     int? lateTasks;
     UserExperience? userExperience;
 
     try {
-      final user = await _authService.getCurrentUser();
-      userExperience = UserExperience.fromJson(user);
-    } catch (_) {
-      userExperience = null;
+      try {
+        final user = await _authService.getCurrentUser();
+        userExperience = UserExperience.fromJson(user);
+      } catch (_) {
+        userExperience = null;
+      }
+
+      try {
+        unreadNotifications = await _notificationsService.getUnreadCount();
+      } catch (_) {
+        unreadNotifications = null;
+      }
+
+      try {
+        lateTasks = (await _tasksService.getLateTasks()).length;
+      } catch (_) {
+        lateTasks = null;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _unreadNotifications = unreadNotifications;
+        _lateTasks = lateTasks;
+        _userExperience = userExperience;
+      });
+    } finally {
+      _metricsLoading = false;
     }
-
-    try {
-      unreadNotifications = await _notificationsService.getUnreadCount();
-    } catch (_) {
-      unreadNotifications = null;
-    }
-
-    try {
-      lateTasks = (await _tasksService.getLateTasks()).length;
-    } catch (_) {
-      lateTasks = null;
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _unreadNotifications = unreadNotifications;
-      _lateTasks = lateTasks;
-      _userExperience = userExperience;
-    });
   }
 
   Future<void> _logout(BuildContext context) async {
