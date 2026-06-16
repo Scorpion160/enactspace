@@ -44,6 +44,9 @@ class AttendanceService {
     required String description,
     required String sessionType,
     required DateTime scheduledAt,
+    String? eventId,
+    String? poleId,
+    String? projectId,
   }) async {
     final token = await _authService.getToken();
 
@@ -59,9 +62,9 @@ class AttendanceService {
         'description': description.trim(),
         'session_type': sessionType,
         'scheduled_at': scheduledAt.toIso8601String(),
-        'event_id': null,
-        'pole_id': null,
-        'project_id': null,
+        'event_id': eventId,
+        'pole_id': poleId,
+        'project_id': projectId,
       },
     );
 

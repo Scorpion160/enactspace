@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../attendance/services/attendance_service.dart';
 import '../models/event_model.dart';
 import '../services/events_service.dart';
 
@@ -16,6 +17,7 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   final EventsService _service = EventsService();
+  final AttendanceService _attendanceService = AttendanceService();
   final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -164,6 +166,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         _EventsGrid(
                           events: _filteredEvents,
                           service: _service,
+                          attendanceService: _attendanceService,
                           canManage: canManage,
                           onEventChanged: _replaceEvent,
                         ),
@@ -419,12 +422,14 @@ class _EventsToolbar extends StatelessWidget {
 class _EventsGrid extends StatelessWidget {
   final List<EventModel> events;
   final EventsService service;
+  final AttendanceService attendanceService;
   final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventsGrid({
     required this.events,
     required this.service,
+    required this.attendanceService,
     required this.canManage,
     required this.onEventChanged,
   });
@@ -453,6 +458,7 @@ class _EventsGrid extends StatelessWidget {
                 child: _EventCard(
                   event: event,
                   service: service,
+                  attendanceService: attendanceService,
                   canManage: canManage,
                   onEventChanged: onEventChanged,
                 ),
@@ -467,12 +473,14 @@ class _EventsGrid extends StatelessWidget {
 class _EventCard extends StatelessWidget {
   final EventModel event;
   final EventsService service;
+  final AttendanceService attendanceService;
   final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventCard({
     required this.event,
     required this.service,
+    required this.attendanceService,
     required this.canManage,
     required this.onEventChanged,
   });
@@ -589,6 +597,7 @@ class _EventCard extends StatelessWidget {
                   context,
                   event,
                   service,
+                  attendanceService,
                   canManage,
                   onEventChanged,
                 ),
@@ -674,6 +683,7 @@ void _showEventDetails(
   BuildContext context,
   EventModel event,
   EventsService service,
+  AttendanceService attendanceService,
   bool canManage,
   ValueChanged<EventModel> onEventChanged,
 ) {
@@ -685,6 +695,7 @@ void _showEventDetails(
     builder: (context) => _EventDetailsSheet(
       event: event,
       service: service,
+      attendanceService: attendanceService,
       canManage: canManage,
       onEventChanged: onEventChanged,
     ),
@@ -694,15 +705,46 @@ void _showEventDetails(
 class _EventDetailsSheet extends StatelessWidget {
   final EventModel event;
   final EventsService service;
+  final AttendanceService attendanceService;
   final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventDetailsSheet({
     required this.event,
     required this.service,
+    required this.attendanceService,
     required this.canManage,
     required this.onEventChanged,
   });
+
+  Future<void> _createLinkedAttendanceSession(BuildContext context) async {
+    try {
+      await attendanceService.createSession(
+        title: 'Présence - ${event.title}',
+        description: event.description?.trim().isNotEmpty == true
+            ? event.description!.trim()
+            : 'Session de présence liée à ${event.title}.',
+        sessionType: 'activity',
+        scheduledAt: event.startTime,
+        eventId: event.id,
+        poleId: event.poleId,
+        projectId: event.projectId,
+      );
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Séance de présence liée créée.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -796,7 +838,12 @@ class _EventDetailsSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _EventActionPanel(event: event),
+                  _EventActionPanel(
+                    event: event,
+                    canManage: canManage,
+                    onCreateAttendance: () =>
+                        _createLinkedAttendanceSession(context),
+                  ),
                   const SizedBox(height: 16),
                   _EventReportPanel(
                     event: event,
@@ -915,8 +962,14 @@ class _EventMetricCard extends StatelessWidget {
 
 class _EventActionPanel extends StatelessWidget {
   final EventModel event;
+  final bool canManage;
+  final VoidCallback onCreateAttendance;
 
-  const _EventActionPanel({required this.event});
+  const _EventActionPanel({
+    required this.event,
+    required this.canManage,
+    required this.onCreateAttendance,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -930,9 +983,10 @@ class _EventActionPanel extends StatelessWidget {
             label: 'Inscriptions',
           ),
         if (event.attendanceEnabled)
-          const _EventActionChip(
+          _EventActionChip(
             icon: Icons.fact_check_rounded,
             label: 'Présence liée',
+            onTap: canManage ? onCreateAttendance : null,
           ),
         const _EventActionChip(
           icon: Icons.groups_rounded,
@@ -955,17 +1009,35 @@ class _EventActionPanel extends StatelessWidget {
 class _EventActionChip extends StatelessWidget {
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
-  const _EventActionChip({required this.icon, required this.label});
+  const _EventActionChip({required this.icon, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      avatar: Icon(icon, size: 16),
+    final chip = Chip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: onTap == null ? Colors.black45 : null,
+      ),
       label: Text(label),
-      backgroundColor: Colors.white,
+      backgroundColor: onTap == null
+          ? Colors.white.withValues(alpha: 0.78)
+          : Colors.white,
       side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      labelStyle: TextStyle(
+        color: onTap == null ? Colors.black54 : null,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+
+    if (onTap == null) return chip;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: chip,
     );
   }
 }
