@@ -107,6 +107,10 @@ class _PolesScreenState extends State<PolesScreen> {
     }
   }
 
+  Future<void> _reloadAfterMembershipChange() async {
+    await _loadPoles();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -151,8 +155,11 @@ class _PolesScreenState extends State<PolesScreen> {
                       else
                         _PolesGrid(
                           poles: _filteredPoles,
+                          allMembers: _members,
+                          polesService: _polesService,
                           memberCount: _memberCount,
                           membersForPole: _membersForPole,
+                          onMembershipChanged: _reloadAfterMembershipChange,
                         ),
                     ],
                   ),
@@ -339,13 +346,19 @@ class _PolesToolbar extends StatelessWidget {
 
 class _PolesGrid extends StatelessWidget {
   final List<PoleModel> poles;
+  final List<MemberModel> allMembers;
+  final PolesService polesService;
   final int Function(PoleModel pole) memberCount;
   final List<MemberModel> Function(PoleModel pole) membersForPole;
+  final Future<void> Function() onMembershipChanged;
 
   const _PolesGrid({
     required this.poles,
+    required this.allMembers,
+    required this.polesService,
     required this.memberCount,
     required this.membersForPole,
+    required this.onMembershipChanged,
   });
 
   @override
@@ -373,6 +386,9 @@ class _PolesGrid extends StatelessWidget {
                   pole: pole,
                   memberCount: memberCount(pole),
                   members: membersForPole(pole),
+                  allMembers: allMembers,
+                  polesService: polesService,
+                  onMembershipChanged: onMembershipChanged,
                 ),
               ),
           ],
@@ -386,11 +402,17 @@ class _PoleCard extends StatelessWidget {
   final PoleModel pole;
   final int memberCount;
   final List<MemberModel> members;
+  final List<MemberModel> allMembers;
+  final PolesService polesService;
+  final Future<void> Function() onMembershipChanged;
 
   const _PoleCard({
     required this.pole,
     required this.memberCount,
     required this.members,
+    required this.allMembers,
+    required this.polesService,
+    required this.onMembershipChanged,
   });
 
   @override
@@ -495,7 +517,14 @@ class _PoleCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => _showPoleDetails(context, pole, members),
+                onPressed: () => _showPoleDetails(
+                  context,
+                  pole,
+                  members,
+                  allMembers,
+                  polesService,
+                  onMembershipChanged,
+                ),
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Détail pôle'),
               ),
@@ -628,21 +657,39 @@ void _showPoleDetails(
   BuildContext context,
   PoleModel pole,
   List<MemberModel> members,
+  List<MemberModel> allMembers,
+  PolesService polesService,
+  Future<void> Function() onMembershipChanged,
 ) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (context) => _PoleDetailsSheet(pole: pole, members: members),
+    builder: (context) => _PoleDetailsSheet(
+      pole: pole,
+      members: members,
+      allMembers: allMembers,
+      polesService: polesService,
+      onMembershipChanged: onMembershipChanged,
+    ),
   );
 }
 
 class _PoleDetailsSheet extends StatelessWidget {
   final PoleModel pole;
   final List<MemberModel> members;
+  final List<MemberModel> allMembers;
+  final PolesService polesService;
+  final Future<void> Function() onMembershipChanged;
 
-  const _PoleDetailsSheet({required this.pole, required this.members});
+  const _PoleDetailsSheet({
+    required this.pole,
+    required this.members,
+    required this.allMembers,
+    required this.polesService,
+    required this.onMembershipChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -725,6 +772,14 @@ class _PoleDetailsSheet extends StatelessWidget {
                   const SizedBox(height: 16),
                   _GovernancePanel(leaders: leaders, deputies: deputies),
                   const SizedBox(height: 16),
+                  _PoleMembershipManager(
+                    pole: pole,
+                    members: members,
+                    allMembers: allMembers,
+                    service: polesService,
+                    onMembershipChanged: onMembershipChanged,
+                  ),
+                  const SizedBox(height: 16),
                   const _PoleActionLinks(),
                   const SizedBox(height: 16),
                   Text(
@@ -740,7 +795,28 @@ class _PoleDetailsSheet extends StatelessWidget {
                       style: TextStyle(color: Colors.black54),
                     )
                   else
-                    ...members.map((member) => _PoleMemberTile(member: member)),
+                    ...members.map(
+                      (member) => _PoleMemberTile(
+                        member: member,
+                        onRemove: () async {
+                          await polesService.removeMember(
+                            poleId: pole.id,
+                            userId: member.id,
+                          );
+                          await onMembershipChanged();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${member.displayName} a été retiré du pôle.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -881,6 +957,193 @@ class _GovernanceCard extends StatelessWidget {
   }
 }
 
+class _PoleMembershipManager extends StatefulWidget {
+  final PoleModel pole;
+  final List<MemberModel> members;
+  final List<MemberModel> allMembers;
+  final PolesService service;
+  final Future<void> Function() onMembershipChanged;
+
+  const _PoleMembershipManager({
+    required this.pole,
+    required this.members,
+    required this.allMembers,
+    required this.service,
+    required this.onMembershipChanged,
+  });
+
+  @override
+  State<_PoleMembershipManager> createState() => _PoleMembershipManagerState();
+}
+
+class _PoleMembershipManagerState extends State<_PoleMembershipManager> {
+  String? _selectedUserId;
+  String _position = 'membre';
+  bool _saving = false;
+
+  Future<void> _assign() async {
+    if (_selectedUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sélectionnez un membre à affecter.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      await widget.service.assignMember(
+        poleId: widget.pole.id,
+        userId: _selectedUserId!,
+        position: _position,
+      );
+      await widget.onMembershipChanged();
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Affectation pôle mise à jour.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeIds = widget.members.map((member) => member.id).toSet();
+    final sortedMembers = [...widget.allMembers]
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final fieldWidth = constraints.maxWidth >= 680
+              ? (constraints.maxWidth - 12) / 2
+              : constraints.maxWidth;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.group_add_rounded, color: AppTheme.enactusYellow),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Affectation au pôle',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedUserId,
+                      isExpanded: true,
+                      dropdownColor: Colors.white,
+                      decoration: const InputDecoration(
+                        labelText: 'Membre',
+                        prefixIcon: Icon(Icons.person_add_rounded),
+                      ),
+                      items: [
+                        for (final member in sortedMembers)
+                          DropdownMenuItem(
+                            value: member.id,
+                            child: Text(
+                              activeIds.contains(member.id)
+                                  ? '${member.displayName} · déjà rattaché'
+                                  : member.displayName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() => _selectedUserId = value),
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _position,
+                      isExpanded: true,
+                      dropdownColor: Colors.white,
+                      decoration: const InputDecoration(
+                        labelText: 'Position',
+                        prefixIcon: Icon(Icons.admin_panel_settings_rounded),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'membre',
+                          child: Text('Membre'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'adjoint_chef_pole',
+                          child: Text('Adjoint chef de pôle'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'chef_pole',
+                          child: Text('Chef de pôle'),
+                        ),
+                      ],
+                      onChanged: _saving
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _position = value);
+                              }
+                            },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: _saving ? null : _assign,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: const Text('Mettre à jour'),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _PoleActionLinks extends StatelessWidget {
   const _PoleActionLinks();
 
@@ -923,8 +1186,9 @@ class _PoleActionChip extends StatelessWidget {
 
 class _PoleMemberTile extends StatelessWidget {
   final MemberModel member;
+  final Future<void> Function()? onRemove;
 
-  const _PoleMemberTile({required this.member});
+  const _PoleMemberTile({required this.member, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -933,7 +1197,19 @@ class _PoleMemberTile extends StatelessWidget {
       leading: _MemberMiniAvatar(member: member),
       title: Text(member.displayName),
       subtitle: Text(member.email),
-      trailing: Chip(label: Text(_memberRoleLabel(member))),
+      trailing: Wrap(
+        spacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Chip(label: Text(_memberRoleLabel(member))),
+          if (onRemove != null)
+            IconButton(
+              tooltip: 'Retirer du pôle',
+              onPressed: onRemove,
+              icon: const Icon(Icons.person_remove_rounded),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1205,6 +1481,9 @@ int _poleHealthScore(PoleModel pole, int memberCount) {
 }
 
 bool _looksLikePoleLead(MemberModel member) {
+  final position = (member.polePosition ?? '').toLowerCase();
+  if (position == 'chef_pole') return true;
+
   final roles = member.roles.map((role) => role.toLowerCase()).join(' ');
   return roles.contains('chef') ||
       roles.contains('lead') ||
@@ -1212,6 +1491,9 @@ bool _looksLikePoleLead(MemberModel member) {
 }
 
 bool _looksLikeDeputy(MemberModel member) {
+  final position = (member.polePosition ?? '').toLowerCase();
+  if (position == 'adjoint_chef_pole') return true;
+
   final roles = member.roles.map((role) => role.toLowerCase()).join(' ');
   return roles.contains('adjoint') ||
       roles.contains('deputy') ||
@@ -1219,6 +1501,15 @@ bool _looksLikeDeputy(MemberModel member) {
 }
 
 String _memberRoleLabel(MemberModel member) {
+  switch (member.polePosition) {
+    case 'chef_pole':
+      return 'Chef de pôle';
+    case 'adjoint_chef_pole':
+      return 'Adjoint chef de pôle';
+    case 'membre':
+      return 'Membre du pôle';
+  }
+
   final roles = member.roles.where((role) => role.trim().isNotEmpty).toList();
   if (roles.isEmpty) return member.statusLabel;
   return roles.take(2).join(', ');

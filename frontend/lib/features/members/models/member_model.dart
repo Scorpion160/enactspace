@@ -8,6 +8,7 @@ class MemberModel {
   final bool? isActive;
   final bool? emailVerified;
   final String? corePoleId;
+  final String? polePosition;
   final List<String> roles;
   final String? department;
   final String? photoUrl;
@@ -22,6 +23,7 @@ class MemberModel {
     this.isActive,
     this.emailVerified,
     this.corePoleId,
+    this.polePosition,
     this.roles = const [],
     this.department,
     this.photoUrl,
@@ -43,6 +45,7 @@ class MemberModel {
           ? json['email_verified'] as bool
           : null,
       corePoleId: json['core_pole_id']?.toString(),
+      polePosition: json['pole_position']?.toString(),
       roles: _parseRoles(json['roles']),
       department: json['department']?.toString(),
       photoUrl:

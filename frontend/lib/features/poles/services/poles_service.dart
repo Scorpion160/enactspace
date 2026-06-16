@@ -46,6 +46,27 @@ class PolesService {
     throw Exception('Réponse invalide lors de la création du pôle.');
   }
 
+  Future<void> assignMember({
+    required String poleId,
+    required String userId,
+    required String position,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.postJson(
+      '/poles/$poleId/members',
+      token: token,
+      data: {'user_id': userId, 'position': position},
+    );
+  }
+
+  Future<void> removeMember({
+    required String poleId,
+    required String userId,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.delete('/poles/$poleId/members/$userId', token: token);
+  }
+
   Future<String> _requireToken() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

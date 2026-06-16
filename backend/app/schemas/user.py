@@ -52,6 +52,8 @@ class UserRoleAssign(BaseModel):
 class UserRead(UserBase):
     id: UUID
     photo_url: Optional[str] = None
+    core_pole_id: Optional[UUID] = None
+    pole_position: Optional[str] = None
     status: str
     email_verified: bool
     is_active: bool

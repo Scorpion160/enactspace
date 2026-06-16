@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.models.pole import PoleMember
 from app.models.user import User
 from app.models.role import Role, UserRole
 from app.schemas.user import (
@@ -156,6 +157,14 @@ def get_user_or_404(db: Session, user_id: str) -> User:
 def build_user_with_roles(db: Session, user: User) -> UserWithRolesRead:
     data = UserRead.model_validate(user).model_dump()
     data["roles"] = sorted(list(get_user_role_names(db, user.id)))
+    pole_member = (
+        db.query(PoleMember)
+        .filter(PoleMember.user_id == user.id, PoleMember.is_active.is_(True))
+        .order_by(PoleMember.joined_at.desc())
+        .first()
+    )
+    data["core_pole_id"] = pole_member.pole_id if pole_member else None
+    data["pole_position"] = pole_member.position if pole_member else None
     return UserWithRolesRead(**data)
 
 
