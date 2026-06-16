@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../members/models/member_model.dart';
+import '../../members/services/members_service.dart';
+import '../models/project_member_model.dart';
 import '../models/project_model.dart';
 import '../services/projects_service.dart';
 
@@ -14,12 +17,14 @@ class ProjectsScreen extends StatefulWidget {
 
 class _ProjectsScreenState extends State<ProjectsScreen> {
   final ProjectsService _service = ProjectsService();
+  final MembersService _membersService = MembersService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   String _status = 'all';
   List<ProjectModel> _projects = [];
+  List<MemberModel> _members = [];
 
   @override
   void initState() {
@@ -41,10 +46,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     try {
       final projects = await _service.getProjects();
+      final members = await _loadMembersSafely();
 
       if (!mounted) return;
       setState(() {
         _projects = projects;
+        _members = members;
       });
     } catch (e) {
       if (!mounted) return;
@@ -55,6 +62,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<List<MemberModel>> _loadMembersSafely() async {
+    try {
+      return await _membersService.getMembers();
+    } catch (_) {
+      return [];
     }
   }
 
@@ -151,6 +166,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         _ProjectsGrid(
                           projects: _filteredProjects,
                           service: _service,
+                          allMembers: _members,
                           onProjectChanged: _replaceProject,
                         ),
                     ],
@@ -382,11 +398,13 @@ class _ProjectsToolbar extends StatelessWidget {
 class _ProjectsGrid extends StatelessWidget {
   final List<ProjectModel> projects;
   final ProjectsService service;
+  final List<MemberModel> allMembers;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectsGrid({
     required this.projects,
     required this.service,
+    required this.allMembers,
     required this.onProjectChanged,
   });
 
@@ -414,6 +432,7 @@ class _ProjectsGrid extends StatelessWidget {
                 child: _ProjectCard(
                   project: project,
                   service: service,
+                  allMembers: allMembers,
                   onProjectChanged: onProjectChanged,
                 ),
               ),
@@ -427,11 +446,13 @@ class _ProjectsGrid extends StatelessWidget {
 class _ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final ProjectsService service;
+  final List<MemberModel> allMembers;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectCard({
     required this.project,
     required this.service,
+    required this.allMembers,
     required this.onProjectChanged,
   });
 
@@ -560,6 +581,7 @@ class _ProjectCard extends StatelessWidget {
                   context,
                   project,
                   service,
+                  allMembers,
                   onProjectChanged,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
@@ -665,6 +687,7 @@ void _showProjectDetails(
   BuildContext context,
   ProjectModel project,
   ProjectsService service,
+  List<MemberModel> allMembers,
   ValueChanged<ProjectModel> onProjectChanged,
 ) {
   showModalBottomSheet<void>(
@@ -675,6 +698,7 @@ void _showProjectDetails(
     builder: (context) => _ProjectDetailsSheet(
       project: project,
       service: service,
+      allMembers: allMembers,
       onProjectChanged: onProjectChanged,
     ),
   );
@@ -683,11 +707,13 @@ void _showProjectDetails(
 class _ProjectDetailsSheet extends StatefulWidget {
   final ProjectModel project;
   final ProjectsService service;
+  final List<MemberModel> allMembers;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectDetailsSheet({
     required this.project,
     required this.service,
+    required this.allMembers,
     required this.onProjectChanged,
   });
 
@@ -697,12 +723,96 @@ class _ProjectDetailsSheet extends StatefulWidget {
 
 class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
   late ProjectModel _project;
+  List<ProjectMemberModel> _projectMembers = [];
+  String? _selectedUserId;
+  String _memberPosition = 'membre';
   bool _updatingStatus = false;
+  bool _loadingMembers = true;
+  bool _savingMember = false;
 
   @override
   void initState() {
     super.initState();
     _project = widget.project;
+    _loadProjectMembers();
+  }
+
+  Future<void> _loadProjectMembers() async {
+    setState(() => _loadingMembers = true);
+
+    try {
+      final members = await widget.service.getProjectMembers(_project.id);
+      if (!mounted) return;
+      setState(() => _projectMembers = members);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _projectMembers = []);
+    } finally {
+      if (mounted) setState(() => _loadingMembers = false);
+    }
+  }
+
+  Future<void> _assignMember() async {
+    if (_selectedUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sélectionnez un membre projet.')),
+      );
+      return;
+    }
+
+    setState(() => _savingMember = true);
+
+    try {
+      await widget.service.assignMember(
+        projectId: _project.id,
+        userId: _selectedUserId!,
+        position: _memberPosition,
+      );
+      await _loadProjectMembers();
+
+      if (!mounted) return;
+      setState(() => _selectedUserId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Équipe projet mise à jour.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingMember = false);
+    }
+  }
+
+  Future<void> _removeMember(ProjectMemberModel member) async {
+    setState(() => _savingMember = true);
+
+    try {
+      await widget.service.removeMember(
+        projectId: _project.id,
+        userId: member.userId,
+      );
+      await _loadProjectMembers();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.displayName} retiré du projet.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingMember = false);
+    }
   }
 
   Future<void> _updateStatus(String status) async {
@@ -793,6 +903,21 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     project: project,
                     updating: _updatingStatus,
                     onStatusChanged: _updateStatus,
+                  ),
+                  const SizedBox(height: 16),
+                  _ProjectTeamPanel(
+                    allMembers: widget.allMembers,
+                    projectMembers: _projectMembers,
+                    selectedUserId: _selectedUserId,
+                    selectedPosition: _memberPosition,
+                    loading: _loadingMembers,
+                    saving: _savingMember,
+                    onUserChanged: (value) =>
+                        setState(() => _selectedUserId = value),
+                    onPositionChanged: (value) =>
+                        setState(() => _memberPosition = value),
+                    onAssign: _assignMember,
+                    onRemove: _removeMember,
                   ),
                   const SizedBox(height: 16),
                   Wrap(
@@ -934,6 +1059,179 @@ class _ProjectStatusPanel extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [summary, const SizedBox(height: 12), statusPicker],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProjectTeamPanel extends StatelessWidget {
+  final List<MemberModel> allMembers;
+  final List<ProjectMemberModel> projectMembers;
+  final String? selectedUserId;
+  final String selectedPosition;
+  final bool loading;
+  final bool saving;
+  final ValueChanged<String?> onUserChanged;
+  final ValueChanged<String> onPositionChanged;
+  final VoidCallback onAssign;
+  final ValueChanged<ProjectMemberModel> onRemove;
+
+  const _ProjectTeamPanel({
+    required this.allMembers,
+    required this.projectMembers,
+    required this.selectedUserId,
+    required this.selectedPosition,
+    required this.loading,
+    required this.saving,
+    required this.onUserChanged,
+    required this.onPositionChanged,
+    required this.onAssign,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedMembers = [...allMembers]
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+    final activeIds = projectMembers.map((member) => member.userId).toSet();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final fieldWidth = constraints.maxWidth >= 680
+              ? (constraints.maxWidth - 12) / 2
+              : constraints.maxWidth;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.groups_rounded, color: AppTheme.enactusYellow),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Équipe projet',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (loading)
+                const LinearProgressIndicator(minHeight: 4)
+              else if (projectMembers.isEmpty)
+                const Text(
+                  'Aucun membre projet rattaché.',
+                  style: TextStyle(color: Colors.white70),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final member in projectMembers)
+                      InputChip(
+                        avatar: const Icon(Icons.person_rounded, size: 16),
+                        label: Text(
+                          '${member.displayName} · ${member.positionLabel}',
+                        ),
+                        onDeleted: saving ? null : () => onRemove(member),
+                        backgroundColor: Colors.white,
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(selectedUserId),
+                      initialValue: selectedUserId,
+                      isExpanded: true,
+                      dropdownColor: Colors.white,
+                      decoration: const InputDecoration(
+                        labelText: 'Membre',
+                        prefixIcon: Icon(Icons.person_add_rounded),
+                      ),
+                      items: [
+                        for (final member in sortedMembers)
+                          DropdownMenuItem(
+                            value: member.id,
+                            child: Text(
+                              activeIds.contains(member.id)
+                                  ? '${member.displayName} · déjà dans l’équipe'
+                                  : member.displayName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: saving ? null : onUserChanged,
+                    ),
+                  ),
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: selectedPosition,
+                      isExpanded: true,
+                      dropdownColor: Colors.white,
+                      decoration: const InputDecoration(
+                        labelText: 'Position',
+                        prefixIcon: Icon(Icons.admin_panel_settings_rounded),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'membre',
+                          child: Text('Membre'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'adjoint_chef_projet',
+                          child: Text('Adjoint chef de projet'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'chef_projet',
+                          child: Text('Chef de projet'),
+                        ),
+                      ],
+                      onChanged: saving
+                          ? null
+                          : (value) {
+                              if (value != null) onPositionChanged(value);
+                            },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: saving ? null : onAssign,
+                  icon: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: const Text('Mettre à jour l’équipe'),
+                ),
+              ),
+            ],
           );
         },
       ),

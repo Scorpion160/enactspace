@@ -32,6 +32,23 @@ class ProjectUpdate(BaseModel):
     ended_at: Optional[date] = None
 
 
+class ProjectMemberAssign(BaseModel):
+    user_id: UUID
+    position: str = "membre"
+
+
+class ProjectMemberRead(BaseModel):
+    id: UUID
+    project_id: UUID
+    user_id: UUID
+    position: str
+    joined_at: date
+    left_at: Optional[date]
+    is_active: bool
+    display_name: str
+    email: str
+
+
 class ProjectRead(BaseModel):
     id: UUID
     season_id: Optional[UUID]

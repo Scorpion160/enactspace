@@ -1,5 +1,6 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../models/project_member_model.dart';
 import '../models/project_model.dart';
 
 class ProjectsService {
@@ -81,6 +82,43 @@ class ProjectsService {
     }
 
     throw Exception('Réponse invalide lors de la mise à jour du projet.');
+  }
+
+  Future<List<ProjectMemberModel>> getProjectMembers(String projectId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get(
+      '/projects/$projectId/members',
+      token: token,
+    );
+
+    return _extractList(response)
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectMemberModel.fromJson)
+        .toList();
+  }
+
+  Future<void> assignMember({
+    required String projectId,
+    required String userId,
+    required String position,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.postJson(
+      '/projects/$projectId/members',
+      token: token,
+      data: {'user_id': userId, 'position': position},
+    );
+  }
+
+  Future<void> removeMember({
+    required String projectId,
+    required String userId,
+  }) async {
+    final token = await _requireToken();
+    await _apiClient.delete(
+      '/projects/$projectId/members/$userId',
+      token: token,
+    );
   }
 
   Future<String> _requireToken() async {
