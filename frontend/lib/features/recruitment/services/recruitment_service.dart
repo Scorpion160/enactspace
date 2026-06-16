@@ -29,6 +29,17 @@ class RecruitmentService {
         .toList();
   }
 
+  Future<List<RecruitmentCampaignModel>> getPublicCampaigns() async {
+    final response = await _apiClient.get('/recruitment/campaigns/public');
+
+    final rawList = _extractList(response);
+
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(RecruitmentCampaignModel.fromJson)
+        .toList();
+  }
+
   Future<RecruitmentCampaignModel> createCampaign({
     required String title,
     String? description,

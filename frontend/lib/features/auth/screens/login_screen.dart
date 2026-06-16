@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../recruitment/screens/recruitment_screen.dart';
+import '../../recruitment/services/recruitment_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -247,11 +249,57 @@ class _LoginPanel extends StatelessWidget {
     );
   }
 
+  Future<void> _openRecruitmentApplication(BuildContext context) async {
+    final service = RecruitmentService();
+
+    try {
+      final campaigns = await service.getPublicCampaigns();
+      if (!context.mounted) return;
+
+      if (campaigns.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Aucune campagne active pour le moment. Envoie une demande d\'adhesion.',
+            ),
+          ),
+        );
+        _showJoinRequestSheet(context, profileType: 'enacteur');
+        return;
+      }
+
+      final created = await showDialog<bool>(
+        context: context,
+        builder: (_) =>
+            CreateApplicationDialog(service: service, campaigns: campaigns),
+      );
+
+      if (!context.mounted || created != true) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Candidature envoyee. Le pole Veille suivra le dossier.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Campagnes indisponibles: ${e.toString().replaceAll('Exception: ', '')}',
+          ),
+        ),
+      );
+      _showJoinRequestSheet(context, profileType: 'enacteur');
+    }
+  }
+
   void _showRecruitmentDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (_) => _RecruitmentAccessDialog(
-        onStart: () => _showJoinRequestSheet(context, profileType: 'enacteur'),
+        onStart: () => _openRecruitmentApplication(context),
       ),
     );
   }
