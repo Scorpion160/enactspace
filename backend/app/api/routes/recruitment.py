@@ -10,6 +10,8 @@ from app.models.recruitment import (
     Application,
     ApplicationReview,
 )
+from app.models.notification import Notification
+from app.models.role import Role, UserRole
 from app.models.user import User
 from app.core.security import hash_password
 from app.schemas.recruitment import (
@@ -43,6 +45,14 @@ VALID_RECOMMENDATIONS = {
     "favorable",
     "reserve",
     "defavorable",
+}
+
+RECRUITMENT_NOTIFICATION_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+    "chef_pole",
+    "adjoint_chef_pole",
 }
 
 
@@ -86,6 +96,46 @@ def recompute_application_score(db: Session, application: Application):
         application.final_score = round(float(avg_score), 2)
 
     application.updated_at = datetime.utcnow()
+
+
+def notify_recruitment_responsibles(
+    db: Session,
+    application: Application,
+    campaign: RecruitmentCampaign,
+) -> None:
+    recipients = (
+        db.query(User)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(
+            User.is_active == True,
+            Role.name.in_(RECRUITMENT_NOTIFICATION_ROLES),
+        )
+        .distinct()
+        .all()
+    )
+
+    if not recipients:
+        return
+
+    applicant_name = f"{application.first_name} {application.last_name}".strip()
+    title = "Nouvelle candidature reçue"
+    message = (
+        f"{applicant_name or application.email} a postulé à la campagne "
+        f"{campaign.title}."
+    )
+
+    for user in recipients:
+        db.add(
+            Notification(
+                user_id=user.id,
+                title=title,
+                message=message,
+                type="application_received",
+                related_type="application",
+                related_id=application.id,
+            )
+        )
 
 
 @router.post("/campaigns", response_model=RecruitmentCampaignRead)
@@ -226,6 +276,8 @@ def submit_application(
     )
 
     db.add(application)
+    db.flush()
+    notify_recruitment_responsibles(db, application, campaign)
     db.commit()
     db.refresh(application)
 
