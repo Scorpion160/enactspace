@@ -7,7 +7,7 @@ from app.db.database import get_db
 from app.models.event import Event
 from app.models.user import User
 from app.schemas.event import EventCreate, EventRead, EventUpdate
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_enacchef_or_admin
 
 
 router = APIRouter(prefix="/events", tags=["Événements"])
@@ -27,7 +27,7 @@ def get_event_or_404(db: Session, event_id: str) -> Event:
 def create_event(
     payload: EventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     event = Event(
         season_id=payload.season_id,
@@ -66,7 +66,7 @@ def update_event(
     event_id: str,
     payload: EventUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     event = get_event_or_404(db, event_id)
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/event_model.dart';
 import '../services/events_service.dart';
@@ -14,12 +16,14 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   final EventsService _service = EventsService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   String _type = 'all';
   String _period = 'upcoming';
+  UserExperience? _userExperience;
   List<EventModel> _events = [];
 
   @override
@@ -42,10 +46,12 @@ class _EventsScreenState extends State<EventsScreen> {
 
     try {
       final events = await _service.getEvents();
+      final userExperience = await _loadUserExperienceSafely();
 
       if (!mounted) return;
       setState(() {
         _events = events;
+        _userExperience = userExperience;
       });
     } catch (e) {
       if (!mounted) return;
@@ -54,6 +60,15 @@ class _EventsScreenState extends State<EventsScreen> {
       });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<UserExperience?> _loadUserExperienceSafely() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      return UserExperience.fromJson(user);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -99,6 +114,8 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = _userExperience?.canCreateOperationalWork ?? false;
+
     return RefreshIndicator(
       onRefresh: _loadEvents,
       child: LayoutBuilder(
@@ -123,7 +140,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         upcoming: _events
                             .where((event) => event.isUpcoming)
                             .length,
-                        onCreate: _openCreateSheet,
+                        onCreate: canManage ? _openCreateSheet : null,
                         onRefresh: _loadEvents,
                       ),
                       const SizedBox(height: 18),
@@ -147,6 +164,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         _EventsGrid(
                           events: _filteredEvents,
                           service: _service,
+                          canManage: canManage,
                           onEventChanged: _replaceEvent,
                         ),
                     ],
@@ -164,7 +182,7 @@ class _EventsScreenState extends State<EventsScreen> {
 class _EventsHeader extends StatelessWidget {
   final int total;
   final int upcoming;
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _EventsHeader({
@@ -270,7 +288,7 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _HeaderActions({required this.onCreate, required this.onRefresh});
@@ -401,11 +419,13 @@ class _EventsToolbar extends StatelessWidget {
 class _EventsGrid extends StatelessWidget {
   final List<EventModel> events;
   final EventsService service;
+  final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventsGrid({
     required this.events,
     required this.service,
+    required this.canManage,
     required this.onEventChanged,
   });
 
@@ -433,6 +453,7 @@ class _EventsGrid extends StatelessWidget {
                 child: _EventCard(
                   event: event,
                   service: service,
+                  canManage: canManage,
                   onEventChanged: onEventChanged,
                 ),
               ),
@@ -446,11 +467,13 @@ class _EventsGrid extends StatelessWidget {
 class _EventCard extends StatelessWidget {
   final EventModel event;
   final EventsService service;
+  final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventCard({
     required this.event,
     required this.service,
+    required this.canManage,
     required this.onEventChanged,
   });
 
@@ -562,8 +585,13 @@ class _EventCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () =>
-                    _showEventDetails(context, event, service, onEventChanged),
+                onPressed: () => _showEventDetails(
+                  context,
+                  event,
+                  service,
+                  canManage,
+                  onEventChanged,
+                ),
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Détail événement'),
               ),
@@ -646,6 +674,7 @@ void _showEventDetails(
   BuildContext context,
   EventModel event,
   EventsService service,
+  bool canManage,
   ValueChanged<EventModel> onEventChanged,
 ) {
   showModalBottomSheet<void>(
@@ -656,6 +685,7 @@ void _showEventDetails(
     builder: (context) => _EventDetailsSheet(
       event: event,
       service: service,
+      canManage: canManage,
       onEventChanged: onEventChanged,
     ),
   );
@@ -664,11 +694,13 @@ void _showEventDetails(
 class _EventDetailsSheet extends StatelessWidget {
   final EventModel event;
   final EventsService service;
+  final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventDetailsSheet({
     required this.event,
     required this.service,
+    required this.canManage,
     required this.onEventChanged,
   });
 
@@ -769,6 +801,7 @@ class _EventDetailsSheet extends StatelessWidget {
                   _EventReportPanel(
                     event: event,
                     service: service,
+                    canManage: canManage,
                     onEventChanged: onEventChanged,
                   ),
                 ],
@@ -940,11 +973,13 @@ class _EventActionChip extends StatelessWidget {
 class _EventReportPanel extends StatefulWidget {
   final EventModel event;
   final EventsService service;
+  final bool canManage;
   final ValueChanged<EventModel> onEventChanged;
 
   const _EventReportPanel({
     required this.event,
     required this.service,
+    required this.canManage,
     required this.onEventChanged,
   });
 
@@ -1051,6 +1086,7 @@ class _EventReportPanelState extends State<_EventReportPanel> {
           const SizedBox(height: 10),
           TextField(
             controller: _reportController,
+            enabled: widget.canManage,
             onChanged: (_) => setState(() {}),
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
@@ -1078,7 +1114,7 @@ class _EventReportPanelState extends State<_EventReportPanel> {
           Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
-              onPressed: _saving ? null : _saveReport,
+              onPressed: !widget.canManage || _saving ? null : _saveReport,
               icon: _saving
                   ? const SizedBox(
                       width: 18,

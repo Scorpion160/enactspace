@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -18,11 +20,13 @@ class ProjectsScreen extends StatefulWidget {
 class _ProjectsScreenState extends State<ProjectsScreen> {
   final ProjectsService _service = ProjectsService();
   final MembersService _membersService = MembersService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   String _status = 'all';
+  UserExperience? _userExperience;
   List<ProjectModel> _projects = [];
   List<MemberModel> _members = [];
 
@@ -47,11 +51,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final projects = await _service.getProjects();
       final members = await _loadMembersSafely();
+      final userExperience = await _loadUserExperienceSafely();
 
       if (!mounted) return;
       setState(() {
         _projects = projects;
         _members = members;
+        _userExperience = userExperience;
       });
     } catch (e) {
       if (!mounted) return;
@@ -62,6 +68,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<UserExperience?> _loadUserExperienceSafely() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      return UserExperience.fromJson(user);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -115,6 +130,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = _userExperience?.canCreateOperationalWork ?? false;
+
     return RefreshIndicator(
       onRefresh: _loadProjects,
       child: LayoutBuilder(
@@ -143,7 +160,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   project.status != 'suspendu',
                             )
                             .length,
-                        onCreate: _openCreateSheet,
+                        onCreate: canManage ? _openCreateSheet : null,
                         onRefresh: _loadProjects,
                       ),
                       const SizedBox(height: 18),
@@ -167,6 +184,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           projects: _filteredProjects,
                           service: _service,
                           allMembers: _members,
+                          canManage: canManage,
                           onProjectChanged: _replaceProject,
                         ),
                     ],
@@ -184,7 +202,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 class _ProjectsHeader extends StatelessWidget {
   final int total;
   final int active;
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _ProjectsHeader({
@@ -290,7 +308,7 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _HeaderActions({required this.onCreate, required this.onRefresh});
@@ -399,12 +417,14 @@ class _ProjectsGrid extends StatelessWidget {
   final List<ProjectModel> projects;
   final ProjectsService service;
   final List<MemberModel> allMembers;
+  final bool canManage;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectsGrid({
     required this.projects,
     required this.service,
     required this.allMembers,
+    required this.canManage,
     required this.onProjectChanged,
   });
 
@@ -433,6 +453,7 @@ class _ProjectsGrid extends StatelessWidget {
                   project: project,
                   service: service,
                   allMembers: allMembers,
+                  canManage: canManage,
                   onProjectChanged: onProjectChanged,
                 ),
               ),
@@ -447,12 +468,14 @@ class _ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final ProjectsService service;
   final List<MemberModel> allMembers;
+  final bool canManage;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectCard({
     required this.project,
     required this.service,
     required this.allMembers,
+    required this.canManage,
     required this.onProjectChanged,
   });
 
@@ -582,6 +605,7 @@ class _ProjectCard extends StatelessWidget {
                   project,
                   service,
                   allMembers,
+                  canManage,
                   onProjectChanged,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
@@ -688,6 +712,7 @@ void _showProjectDetails(
   ProjectModel project,
   ProjectsService service,
   List<MemberModel> allMembers,
+  bool canManage,
   ValueChanged<ProjectModel> onProjectChanged,
 ) {
   showModalBottomSheet<void>(
@@ -699,6 +724,7 @@ void _showProjectDetails(
       project: project,
       service: service,
       allMembers: allMembers,
+      canManage: canManage,
       onProjectChanged: onProjectChanged,
     ),
   );
@@ -708,12 +734,14 @@ class _ProjectDetailsSheet extends StatefulWidget {
   final ProjectModel project;
   final ProjectsService service;
   final List<MemberModel> allMembers;
+  final bool canManage;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectDetailsSheet({
     required this.project,
     required this.service,
     required this.allMembers,
+    required this.canManage,
     required this.onProjectChanged,
   });
 
@@ -901,6 +929,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                   const SizedBox(height: 12),
                   _ProjectStatusPanel(
                     project: project,
+                    canManage: widget.canManage,
                     updating: _updatingStatus,
                     onStatusChanged: _updateStatus,
                   ),
@@ -910,6 +939,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     projectMembers: _projectMembers,
                     selectedUserId: _selectedUserId,
                     selectedPosition: _memberPosition,
+                    canManage: widget.canManage,
                     loading: _loadingMembers,
                     saving: _savingMember,
                     onUserChanged: (value) =>
@@ -978,11 +1008,13 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
 
 class _ProjectStatusPanel extends StatelessWidget {
   final ProjectModel project;
+  final bool canManage;
   final bool updating;
   final ValueChanged<String> onStatusChanged;
 
   const _ProjectStatusPanel({
     required this.project,
+    required this.canManage,
     required this.updating,
     required this.onStatusChanged,
   });
@@ -1018,7 +1050,7 @@ class _ProjectStatusPanel extends StatelessWidget {
               prefixIcon: Icon(Icons.timeline_rounded),
             ),
             items: _statusItems(includeAll: false),
-            onChanged: updating
+            onChanged: !canManage || updating
                 ? null
                 : (value) {
                     if (value != null && value != project.status) {
@@ -1071,6 +1103,7 @@ class _ProjectTeamPanel extends StatelessWidget {
   final List<ProjectMemberModel> projectMembers;
   final String? selectedUserId;
   final String selectedPosition;
+  final bool canManage;
   final bool loading;
   final bool saving;
   final ValueChanged<String?> onUserChanged;
@@ -1083,6 +1116,7 @@ class _ProjectTeamPanel extends StatelessWidget {
     required this.projectMembers,
     required this.selectedUserId,
     required this.selectedPosition,
+    required this.canManage,
     required this.loading,
     required this.saving,
     required this.onUserChanged,
@@ -1147,7 +1181,9 @@ class _ProjectTeamPanel extends StatelessWidget {
                         label: Text(
                           '${member.displayName} · ${member.positionLabel}',
                         ),
-                        onDeleted: saving ? null : () => onRemove(member),
+                        onDeleted: !canManage || saving
+                            ? null
+                            : () => onRemove(member),
                         backgroundColor: Colors.white,
                       ),
                   ],
@@ -1180,7 +1216,7 @@ class _ProjectTeamPanel extends StatelessWidget {
                             ),
                           ),
                       ],
-                      onChanged: saving ? null : onUserChanged,
+                      onChanged: !canManage || saving ? null : onUserChanged,
                     ),
                   ),
                   SizedBox(
@@ -1207,7 +1243,7 @@ class _ProjectTeamPanel extends StatelessWidget {
                           child: Text('Chef de projet'),
                         ),
                       ],
-                      onChanged: saving
+                      onChanged: !canManage || saving
                           ? null
                           : (value) {
                               if (value != null) onPositionChanged(value);
@@ -1220,7 +1256,7 @@ class _ProjectTeamPanel extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton.icon(
-                  onPressed: saving ? null : onAssign,
+                  onPressed: !canManage || saving ? null : onAssign,
                   icon: saving
                       ? const SizedBox(
                           width: 18,

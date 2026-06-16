@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -17,10 +19,12 @@ class PolesScreen extends StatefulWidget {
 class _PolesScreenState extends State<PolesScreen> {
   final PolesService _polesService = PolesService();
   final MembersService _membersService = MembersService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
+  UserExperience? _userExperience;
   List<PoleModel> _poles = [];
   List<MemberModel> _members = [];
 
@@ -45,12 +49,14 @@ class _PolesScreenState extends State<PolesScreen> {
     try {
       final poles = await _polesService.getPoles();
       final members = await _loadMembersSafely();
+      final userExperience = await _loadUserExperienceSafely();
 
       if (!mounted) return;
 
       setState(() {
         _poles = poles;
         _members = members;
+        _userExperience = userExperience;
       });
     } catch (e) {
       if (!mounted) return;
@@ -62,6 +68,15 @@ class _PolesScreenState extends State<PolesScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<UserExperience?> _loadUserExperienceSafely() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      return UserExperience.fromJson(user);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -113,6 +128,8 @@ class _PolesScreenState extends State<PolesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = _userExperience?.canCreateOperationalWork ?? false;
+
     return RefreshIndicator(
       onRefresh: _loadPoles,
       child: LayoutBuilder(
@@ -137,7 +154,7 @@ class _PolesScreenState extends State<PolesScreen> {
                         members: _members
                             .where((member) => member.corePoleId != null)
                             .length,
-                        onCreate: _openCreateSheet,
+                        onCreate: canManage ? _openCreateSheet : null,
                         onRefresh: _loadPoles,
                       ),
                       const SizedBox(height: 18),
@@ -157,6 +174,7 @@ class _PolesScreenState extends State<PolesScreen> {
                           poles: _filteredPoles,
                           allMembers: _members,
                           polesService: _polesService,
+                          canManage: canManage,
                           memberCount: _memberCount,
                           membersForPole: _membersForPole,
                           onMembershipChanged: _reloadAfterMembershipChange,
@@ -176,7 +194,7 @@ class _PolesScreenState extends State<PolesScreen> {
 class _PolesHeader extends StatelessWidget {
   final int total;
   final int members;
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _PolesHeader({
@@ -278,7 +296,7 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
   final VoidCallback onRefresh;
 
   const _HeaderActions({required this.onCreate, required this.onRefresh});
@@ -348,6 +366,7 @@ class _PolesGrid extends StatelessWidget {
   final List<PoleModel> poles;
   final List<MemberModel> allMembers;
   final PolesService polesService;
+  final bool canManage;
   final int Function(PoleModel pole) memberCount;
   final List<MemberModel> Function(PoleModel pole) membersForPole;
   final Future<void> Function() onMembershipChanged;
@@ -356,6 +375,7 @@ class _PolesGrid extends StatelessWidget {
     required this.poles,
     required this.allMembers,
     required this.polesService,
+    required this.canManage,
     required this.memberCount,
     required this.membersForPole,
     required this.onMembershipChanged,
@@ -388,6 +408,7 @@ class _PolesGrid extends StatelessWidget {
                   members: membersForPole(pole),
                   allMembers: allMembers,
                   polesService: polesService,
+                  canManage: canManage,
                   onMembershipChanged: onMembershipChanged,
                 ),
               ),
@@ -404,6 +425,7 @@ class _PoleCard extends StatelessWidget {
   final List<MemberModel> members;
   final List<MemberModel> allMembers;
   final PolesService polesService;
+  final bool canManage;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleCard({
@@ -412,6 +434,7 @@ class _PoleCard extends StatelessWidget {
     required this.members,
     required this.allMembers,
     required this.polesService,
+    required this.canManage,
     required this.onMembershipChanged,
   });
 
@@ -523,6 +546,7 @@ class _PoleCard extends StatelessWidget {
                   members,
                   allMembers,
                   polesService,
+                  canManage,
                   onMembershipChanged,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
@@ -659,6 +683,7 @@ void _showPoleDetails(
   List<MemberModel> members,
   List<MemberModel> allMembers,
   PolesService polesService,
+  bool canManage,
   Future<void> Function() onMembershipChanged,
 ) {
   showModalBottomSheet<void>(
@@ -671,6 +696,7 @@ void _showPoleDetails(
       members: members,
       allMembers: allMembers,
       polesService: polesService,
+      canManage: canManage,
       onMembershipChanged: onMembershipChanged,
     ),
   );
@@ -681,6 +707,7 @@ class _PoleDetailsSheet extends StatelessWidget {
   final List<MemberModel> members;
   final List<MemberModel> allMembers;
   final PolesService polesService;
+  final bool canManage;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleDetailsSheet({
@@ -688,6 +715,7 @@ class _PoleDetailsSheet extends StatelessWidget {
     required this.members,
     required this.allMembers,
     required this.polesService,
+    required this.canManage,
     required this.onMembershipChanged,
   });
 
@@ -777,6 +805,7 @@ class _PoleDetailsSheet extends StatelessWidget {
                     members: members,
                     allMembers: allMembers,
                     service: polesService,
+                    canManage: canManage,
                     onMembershipChanged: onMembershipChanged,
                   ),
                   const SizedBox(height: 16),
@@ -798,23 +827,25 @@ class _PoleDetailsSheet extends StatelessWidget {
                     ...members.map(
                       (member) => _PoleMemberTile(
                         member: member,
-                        onRemove: () async {
-                          await polesService.removeMember(
-                            poleId: pole.id,
-                            userId: member.id,
-                          );
-                          await onMembershipChanged();
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${member.displayName} a été retiré du pôle.',
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                        onRemove: canManage
+                            ? () async {
+                                await polesService.removeMember(
+                                  poleId: pole.id,
+                                  userId: member.id,
+                                );
+                                await onMembershipChanged();
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${member.displayName} a été retiré du pôle.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
                       ),
                     ),
                 ],
@@ -962,6 +993,7 @@ class _PoleMembershipManager extends StatefulWidget {
   final List<MemberModel> members;
   final List<MemberModel> allMembers;
   final PolesService service;
+  final bool canManage;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleMembershipManager({
@@ -969,6 +1001,7 @@ class _PoleMembershipManager extends StatefulWidget {
     required this.members,
     required this.allMembers,
     required this.service,
+    required this.canManage,
     required this.onMembershipChanged,
   });
 
@@ -1081,7 +1114,7 @@ class _PoleMembershipManagerState extends State<_PoleMembershipManager> {
                             ),
                           ),
                       ],
-                      onChanged: _saving
+                      onChanged: !widget.canManage || _saving
                           ? null
                           : (value) => setState(() => _selectedUserId = value),
                     ),
@@ -1110,7 +1143,7 @@ class _PoleMembershipManagerState extends State<_PoleMembershipManager> {
                           child: Text('Chef de pôle'),
                         ),
                       ],
-                      onChanged: _saving
+                      onChanged: !widget.canManage || _saving
                           ? null
                           : (value) {
                               if (value != null) {
@@ -1125,7 +1158,7 @@ class _PoleMembershipManagerState extends State<_PoleMembershipManager> {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _assign,
+                  onPressed: !widget.canManage || _saving ? null : _assign,
                   icon: _saving
                       ? const SizedBox(
                           width: 18,
