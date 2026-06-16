@@ -2325,6 +2325,30 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_error != null) _DialogError(message: _error!),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.enactusYellow.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.enactusYellow.withValues(alpha: 0.32),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.attach_file_rounded),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Choisis ton fichier, ajoute une légende si besoin, puis envoie. Le type et l’upload sont gérés automatiquement.',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: _picking || _uploading ? null : _pickFile,
                 icon: _picking
@@ -2411,24 +2435,27 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _showAdvanced = !_showAdvanced;
-                    });
-                  },
-                  icon: Icon(
-                    _showAdvanced
-                        ? Icons.expand_less_rounded
-                        : Icons.tune_rounded,
-                  ),
-                  label: Text(
-                    _showAdvanced ? 'Masquer les options' : 'Options avancées',
+              if (_showAdvanced)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showAdvanced = !_showAdvanced;
+                      });
+                    },
+                    icon: Icon(
+                      _showAdvanced
+                          ? Icons.expand_less_rounded
+                          : Icons.tune_rounded,
+                    ),
+                    label: Text(
+                      _showAdvanced
+                          ? 'Masquer les options'
+                          : 'Options avancées',
+                    ),
                   ),
                 ),
-              ),
               if (_showAdvanced) const SizedBox(height: 8),
               if (_showAdvanced)
                 TextField(
