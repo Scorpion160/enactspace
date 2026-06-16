@@ -1053,6 +1053,31 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
     }
   }
 
+  void _prefillTerrasenFromDocument() {
+    setState(() {
+      _nameController.text = 'TERRASEN';
+      _status = 'deploiement';
+      _descriptionController.text =
+          'Projet integre agriculture et elevage concu par Enactus ESP pour renforcer l’autonomie alimentaire des menages vulnerables au Senegal. Il articule micro-jardinage sur table, irrigation, transformation agroalimentaire, conservation et distribution.';
+      _problemController.text =
+          'L’insecurite alimentaire, la dependance aux importations, la rarete des terres cultivables, les variations climatiques et le cout eleve des intrants fragilisent les menages ruraux et periurbains ainsi que les petits producteurs.';
+      _solutionController.text =
+          'Deployement de micro-jardins sur table, systeme goutte-a-goutte, arrosage automatise ESP32, transformation de produits locaux (sirop de menthe, jus betterave-carotte, the de bissap, confiture, sauce verte, conserves), conservation par sechage solaire/sacs thermiques et distribution ciblee.';
+      _objectivesController.text =
+          'Former les beneficiaires, transferer des technologies simples, produire localement, reduire les pertes post-recolte, creer de la valeur economique et structurer une chaine production-transformation-conservation-distribution reproductible.';
+      _impactController.text =
+          'Cibles documentees: GIE Anddeu takku ligueye a Yeumbeul (10 a 15 personnes), GIE Waar wi a Passy (35 personnes dont 20 femmes), Khaffe, Ngayenne Sabakh, Passy, vendeuses de legumes, personnels du COUD et etudiants UCAD. ODD: 8, 11, 12, 13 et 15.';
+      _budgetController.text = '1406820';
+      _startedAt = DateTime(2024, 8);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Fiche TERRASEN pre-remplie depuis le document projet.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1074,6 +1099,12 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                   const Text(
                     'Créer un projet',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _prefillTerrasenFromDocument,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: const Text('Préremplir TERRASEN'),
                   ),
                   const SizedBox(height: 18),
                   TextFormField(
