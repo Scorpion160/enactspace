@@ -89,6 +89,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
+  void _replaceProject(ProjectModel updated) {
+    setState(() {
+      _projects = [
+        for (final project in _projects)
+          project.id == updated.id ? updated : project,
+      ];
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -139,7 +148,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       else if (_filteredProjects.isEmpty)
                         const _EmptyProjectsCard()
                       else
-                        _ProjectsGrid(projects: _filteredProjects),
+                        _ProjectsGrid(
+                          projects: _filteredProjects,
+                          service: _service,
+                          onProjectChanged: _replaceProject,
+                        ),
                     ],
                   ),
                 ),
@@ -368,8 +381,14 @@ class _ProjectsToolbar extends StatelessWidget {
 
 class _ProjectsGrid extends StatelessWidget {
   final List<ProjectModel> projects;
+  final ProjectsService service;
+  final ValueChanged<ProjectModel> onProjectChanged;
 
-  const _ProjectsGrid({required this.projects});
+  const _ProjectsGrid({
+    required this.projects,
+    required this.service,
+    required this.onProjectChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +411,11 @@ class _ProjectsGrid extends StatelessWidget {
             for (final project in projects)
               SizedBox(
                 width: itemWidth,
-                child: _ProjectCard(project: project),
+                child: _ProjectCard(
+                  project: project,
+                  service: service,
+                  onProjectChanged: onProjectChanged,
+                ),
               ),
           ],
         );
@@ -403,8 +426,14 @@ class _ProjectsGrid extends StatelessWidget {
 
 class _ProjectCard extends StatelessWidget {
   final ProjectModel project;
+  final ProjectsService service;
+  final ValueChanged<ProjectModel> onProjectChanged;
 
-  const _ProjectCard({required this.project});
+  const _ProjectCard({
+    required this.project,
+    required this.service,
+    required this.onProjectChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -527,7 +556,12 @@ class _ProjectCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => _showProjectDetails(context, project),
+                onPressed: () => _showProjectDetails(
+                  context,
+                  project,
+                  service,
+                  onProjectChanged,
+                ),
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Détail projet'),
               ),
@@ -627,23 +661,84 @@ class _ProjectReadinessBar extends StatelessWidget {
   }
 }
 
-void _showProjectDetails(BuildContext context, ProjectModel project) {
+void _showProjectDetails(
+  BuildContext context,
+  ProjectModel project,
+  ProjectsService service,
+  ValueChanged<ProjectModel> onProjectChanged,
+) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (context) => _ProjectDetailsSheet(project: project),
+    builder: (context) => _ProjectDetailsSheet(
+      project: project,
+      service: service,
+      onProjectChanged: onProjectChanged,
+    ),
   );
 }
 
-class _ProjectDetailsSheet extends StatelessWidget {
+class _ProjectDetailsSheet extends StatefulWidget {
   final ProjectModel project;
+  final ProjectsService service;
+  final ValueChanged<ProjectModel> onProjectChanged;
 
-  const _ProjectDetailsSheet({required this.project});
+  const _ProjectDetailsSheet({
+    required this.project,
+    required this.service,
+    required this.onProjectChanged,
+  });
+
+  @override
+  State<_ProjectDetailsSheet> createState() => _ProjectDetailsSheetState();
+}
+
+class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
+  late ProjectModel _project;
+  bool _updatingStatus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _project = widget.project;
+  }
+
+  Future<void> _updateStatus(String status) async {
+    setState(() => _updatingStatus = true);
+
+    try {
+      final updated = await widget.service.updateProject(
+        projectId: _project.id,
+        status: status,
+        endedAt: status == 'termine' ? DateTime.now() : null,
+        clearEndedAt: status != 'termine' && _project.endedAt != null,
+      );
+
+      widget.onProjectChanged(updated);
+
+      if (!mounted) return;
+      setState(() => _project = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Projet passé en ${updated.statusLabel}.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingStatus = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final project = _project;
     final statusColor = _statusColor(project.status);
     final readiness = _projectReadinessScore(project);
 
@@ -693,6 +788,12 @@ class _ProjectDetailsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   _ProgressLine(progress: project.progress, color: statusColor),
+                  const SizedBox(height: 12),
+                  _ProjectStatusPanel(
+                    project: project,
+                    updating: _updatingStatus,
+                    onStatusChanged: _updateStatus,
+                  ),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 12,
@@ -746,6 +847,96 @@ class _ProjectDetailsSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProjectStatusPanel extends StatelessWidget {
+  final ProjectModel project;
+  final bool updating;
+  final ValueChanged<String> onStatusChanged;
+
+  const _ProjectStatusPanel({
+    required this.project,
+    required this.updating,
+    required this.onStatusChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final started = project.startedAt == null
+        ? 'Début à préciser'
+        : 'Début ${DateFormat('dd/MM/yyyy').format(project.startedAt!)}';
+    final ended = project.endedAt == null
+        ? 'Fin non définie'
+        : 'Fin ${DateFormat('dd/MM/yyyy').format(project.endedAt!)}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.34),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 620;
+          final statusPicker = DropdownButtonFormField<String>(
+            key: ValueKey(project.status),
+            initialValue: project.status,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Changer le statut',
+              prefixIcon: Icon(Icons.timeline_rounded),
+            ),
+            items: _statusItems(includeAll: false),
+            onChanged: updating
+                ? null
+                : (value) {
+                    if (value != null && value != project.status) {
+                      onStatusChanged(value);
+                    }
+                  },
+          );
+
+          final summary = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilotage projet',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${project.statusLabel} · ${project.progress}% · $started · $ended',
+                style: const TextStyle(color: Colors.black54, height: 1.35),
+              ),
+              if (updating) ...[
+                const SizedBox(height: 10),
+                const LinearProgressIndicator(minHeight: 4),
+              ],
+            ],
+          );
+
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: summary),
+                const SizedBox(width: 14),
+                SizedBox(width: 260, child: statusPicker),
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [summary, const SizedBox(height: 12), statusPicker],
+          );
+        },
+      ),
     );
   }
 }

@@ -56,6 +56,33 @@ class ProjectsService {
     throw Exception('Réponse invalide lors de la création du projet.');
   }
 
+  Future<ProjectModel> updateProject({
+    required String projectId,
+    String? status,
+    DateTime? startedAt,
+    DateTime? endedAt,
+    bool clearEndedAt = false,
+  }) async {
+    final token = await _requireToken();
+    final data = <String, dynamic>{};
+    if (status != null) data['status'] = status;
+    if (startedAt != null) data['started_at'] = _dateOnly(startedAt);
+    if (endedAt != null) data['ended_at'] = _dateOnly(endedAt);
+    if (clearEndedAt) data['ended_at'] = null;
+
+    final response = await _apiClient.patchJson(
+      '/projects/$projectId',
+      token: token,
+      data: data,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ProjectModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la mise à jour du projet.');
+  }
+
   Future<String> _requireToken() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

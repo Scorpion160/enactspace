@@ -18,6 +18,20 @@ class ProjectCreate(BaseModel):
     ended_at: Optional[date] = None
 
 
+class ProjectUpdate(BaseModel):
+    season_id: Optional[UUID] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    problem_statement: Optional[str] = None
+    solution: Optional[str] = None
+    objectives: Optional[str] = None
+    expected_impact: Optional[str] = None
+    budget_estimated: Optional[float] = None
+    status: Optional[str] = None
+    started_at: Optional[date] = None
+    ended_at: Optional[date] = None
+
+
 class ProjectRead(BaseModel):
     id: UUID
     season_id: Optional[UUID]
