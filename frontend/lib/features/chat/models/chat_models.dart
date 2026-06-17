@@ -132,6 +132,33 @@ class ChatThreadModel {
     };
   }
 
+  ChatThreadModel copyWith({
+    int? unreadCount,
+    DateTime? updatedAt,
+    DateTime? lastMessageAt,
+    String? lastMessage,
+    List<ChatThreadMemberModel>? participantsPreview,
+  }) {
+    return ChatThreadModel(
+      id: id,
+      title: title,
+      serverDisplayTitle: serverDisplayTitle,
+      avatarUrl: avatarUrl,
+      threadType: threadType,
+      scopeType: scopeType,
+      scopeId: scopeId,
+      createdBy: createdBy,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      participantsCount: participantsCount,
+      unreadCount: unreadCount ?? this.unreadCount,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      currentUserRole: currentUserRole,
+      participantsPreview: participantsPreview ?? this.participantsPreview,
+    );
+  }
+
   String get displayTitle {
     if (serverDisplayTitle != null && serverDisplayTitle!.trim().isNotEmpty) {
       return serverDisplayTitle!.trim();

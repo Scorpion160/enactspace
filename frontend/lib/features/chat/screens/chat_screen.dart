@@ -169,6 +169,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _markThreadLocallyRead(String threadId) {
+    _threads = _threads
+        .map(
+          (thread) =>
+              thread.id == threadId ? thread.copyWith(unreadCount: 0) : thread,
+        )
+        .toList();
+    if (_selectedThread?.id == threadId) {
+      _selectedThread = _selectedThread!.copyWith(unreadCount: 0);
+    }
+  }
+
   Future<void> _selectThread(
     ChatThreadModel thread, {
     bool silent = false,
@@ -219,6 +231,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _pinnedMessageIds = pinnedMessageIds;
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
+        _markThreadLocallyRead(thread.id);
       });
       if (userId != null) {
         await _chatService.cacheMessages(
@@ -402,6 +415,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (messages != null) {
           _messages = messages;
           _mergeServerReactions(messages);
+          _markThreadLocallyRead(selectedThread!.id);
         } else if (selectedId != null && selectedThread == null) {
           _messages = [];
         }
