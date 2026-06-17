@@ -1,10 +1,19 @@
 import '../models/archive_models.dart';
+import '../../documents/models/document_model.dart';
+import '../../documents/services/documents_service.dart';
 
 class ArchivesService {
+  final DocumentsService _documentsService;
+
+  ArchivesService({DocumentsService? documentsService})
+    : _documentsService = documentsService ?? DocumentsService();
+
   Future<ArchivesHomeData> getArchives() async {
     await Future<void>.delayed(const Duration(milliseconds: 240));
 
-    return const ArchivesHomeData(
+    final officialDocuments = await _loadOfficialDocuments();
+
+    return ArchivesHomeData(
       summary: ArchiveImpactSummaryModel(
         createdProjects: 5,
         developingProjects: 4,
@@ -347,6 +356,32 @@ class ArchivesService {
           type: 'Média',
         ),
       ],
+      officialDocuments: officialDocuments,
+    );
+  }
+
+  Future<List<ArchiveOfficialDocumentModel>> _loadOfficialDocuments() async {
+    try {
+      final documents = await _documentsService.getDocuments(isOfficial: true);
+      return documents.map(_officialDocumentFromDocument).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  ArchiveOfficialDocumentModel _officialDocumentFromDocument(
+    DocumentModel document,
+  ) {
+    return ArchiveOfficialDocumentModel(
+      id: document.id,
+      title: document.title,
+      category: document.categoryLabel,
+      visibility: document.visibilityLabel,
+      fileUrl: document.fileUrl,
+      projectId: document.projectId,
+      poleId: document.poleId,
+      eventId: document.eventId,
+      createdAtLabel: document.createdAtLabel,
     );
   }
 }

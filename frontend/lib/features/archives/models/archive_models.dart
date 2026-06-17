@@ -107,10 +107,36 @@ class ArchivesHomeData {
   final ArchiveImpactSummaryModel summary;
   final List<ArchiveProjectModel> projects;
   final List<HallOfFameItemModel> hallOfFame;
+  final List<ArchiveOfficialDocumentModel> officialDocuments;
 
   const ArchivesHomeData({
     required this.summary,
     required this.projects,
     required this.hallOfFame,
+    this.officialDocuments = const [],
+  });
+}
+
+class ArchiveOfficialDocumentModel {
+  final String id;
+  final String title;
+  final String category;
+  final String visibility;
+  final String? fileUrl;
+  final String? projectId;
+  final String? poleId;
+  final String? eventId;
+  final String createdAtLabel;
+
+  const ArchiveOfficialDocumentModel({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.visibility,
+    required this.fileUrl,
+    required this.projectId,
+    required this.poleId,
+    required this.eventId,
+    required this.createdAtLabel,
   });
 }

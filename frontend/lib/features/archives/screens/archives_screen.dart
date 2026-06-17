@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/archive_models.dart';
@@ -217,6 +218,10 @@ class _ArchivesContent extends StatelessWidget {
       children: [
         _ArchiveSummaryGrid(summary: data.summary),
         const SizedBox(height: 22),
+        if (data.officialDocuments.isNotEmpty) ...[
+          _OfficialArchiveDocuments(documents: data.officialDocuments),
+          const SizedBox(height: 22),
+        ],
         _ArchiveFiltersCard(
           controller: searchController,
           statusFilter: statusFilter,
@@ -375,6 +380,145 @@ class _ArchiveMetricCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _OfficialArchiveDocuments extends StatelessWidget {
+  final List<ArchiveOfficialDocumentModel> documents;
+
+  const _OfficialArchiveDocuments({required this.documents});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleDocuments = documents.take(6).toList();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppTheme.enactusYellow.withValues(
+                    alpha: 0.24,
+                  ),
+                  foregroundColor: AppTheme.softBlack,
+                  child: const Icon(Icons.verified_rounded),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Documents officiels',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Livrables validés à conserver dans la mémoire collective.',
+                        style: TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                Chip(label: Text('${documents.length}')),
+              ],
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 900
+                    ? 3
+                    : constraints.maxWidth >= 620
+                    ? 2
+                    : 1;
+                const spacing = 10.0;
+                final width =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final document in visibleDocuments)
+                      SizedBox(
+                        width: width,
+                        child: _OfficialArchiveDocumentTile(document: document),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OfficialArchiveDocumentTile extends StatelessWidget {
+  final ArchiveOfficialDocumentModel document;
+
+  const _OfficialArchiveDocumentTile({required this.document});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            document.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              Chip(label: Text(document.category)),
+              Chip(label: Text(document.visibility)),
+              Chip(label: Text(document.createdAtLabel)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: document.fileUrl == null || document.fileUrl!.isEmpty
+                  ? null
+                  : () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: document.fileUrl!),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Lien du document copie.'),
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.content_copy_rounded),
+              label: const Text('Copier'),
+            ),
+          ),
+        ],
       ),
     );
   }
