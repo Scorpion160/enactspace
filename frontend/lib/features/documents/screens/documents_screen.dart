@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../events/models/event_model.dart';
+import '../../events/services/events_service.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/document_model.dart';
 import '../services/documents_service.dart';
 
@@ -12,12 +19,18 @@ class DocumentsScreen extends StatefulWidget {
 
 class _DocumentsScreenState extends State<DocumentsScreen> {
   final DocumentsService _documentsService = DocumentsService();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
+  final EventsService _eventsService = EventsService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
 
   List<DocumentModel> _documents = [];
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
+  List<EventModel> _events = [];
   String _category = 'all';
   String _visibility = 'all';
   bool? _officialFilter;
@@ -25,6 +38,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadReferenceData();
     _loadDocuments();
   }
 
@@ -68,11 +82,42 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
+  Future<void> _loadReferenceData() async {
+    try {
+      final results = await Future.wait([
+        _polesService.getPoles(),
+        _projectsService.getProjects(),
+        _eventsService.getEvents(),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _poles = results[0] as List<PoleModel>;
+        _projects = results[1] as List<ProjectModel>;
+        _events = results[2] as List<EventModel>;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _poles = [];
+        _projects = [];
+        _events = [];
+      });
+    }
+  }
+
   Future<void> _openCreateDocumentDialog() async {
     final created = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return CreateDocumentDialog(documentsService: _documentsService);
+        return CreateDocumentDialog(
+          documentsService: _documentsService,
+          poles: _poles,
+          projects: _projects,
+          events: _events,
+        );
       },
     );
 
@@ -230,6 +275,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           else
             _DocumentsGrid(
               documents: _documents,
+              poleNames: {for (final pole in _poles) pole.id: pole.name},
+              projectNames: {
+                for (final project in _projects) project.id: project.name,
+              },
+              eventNames: {for (final event in _events) event.id: event.title},
               onValidate: _validateDocument,
               onUnvalidate: _unvalidateDocument,
               onDelete: _deleteDocument,
@@ -540,12 +590,18 @@ class _DocumentsFilters extends StatelessWidget {
 
 class _DocumentsGrid extends StatelessWidget {
   final List<DocumentModel> documents;
+  final Map<String, String> poleNames;
+  final Map<String, String> projectNames;
+  final Map<String, String> eventNames;
   final ValueChanged<DocumentModel> onValidate;
   final ValueChanged<DocumentModel> onUnvalidate;
   final ValueChanged<DocumentModel> onDelete;
 
   const _DocumentsGrid({
     required this.documents,
+    required this.poleNames,
+    required this.projectNames,
+    required this.eventNames,
     required this.onValidate,
     required this.onUnvalidate,
     required this.onDelete,
@@ -573,6 +629,9 @@ class _DocumentsGrid extends StatelessWidget {
                 width: cardWidth,
                 child: _DocumentCard(
                   document: document,
+                  poleNames: poleNames,
+                  projectNames: projectNames,
+                  eventNames: eventNames,
                   onValidate: onValidate,
                   onUnvalidate: onUnvalidate,
                   onDelete: onDelete,
@@ -587,12 +646,18 @@ class _DocumentsGrid extends StatelessWidget {
 
 class _DocumentCard extends StatelessWidget {
   final DocumentModel document;
+  final Map<String, String> poleNames;
+  final Map<String, String> projectNames;
+  final Map<String, String> eventNames;
   final ValueChanged<DocumentModel> onValidate;
   final ValueChanged<DocumentModel> onUnvalidate;
   final ValueChanged<DocumentModel> onDelete;
 
   const _DocumentCard({
     required this.document,
+    required this.poleNames,
+    required this.projectNames,
+    required this.eventNames,
     required this.onValidate,
     required this.onUnvalidate,
     required this.onDelete,
@@ -600,6 +665,8 @@ class _DocumentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scopeLabel = _scopeLabel();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -640,7 +707,7 @@ class _DocumentCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.black54),
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -648,6 +715,11 @@ class _DocumentCard extends StatelessWidget {
                 Chip(label: Text(document.categoryLabel)),
                 Chip(label: Text(document.visibilityLabel)),
                 Chip(label: Text(document.fileTypeLabel)),
+                if (scopeLabel != null)
+                  Chip(
+                    avatar: const Icon(Icons.account_tree_rounded, size: 18),
+                    label: Text(scopeLabel),
+                  ),
                 if (document.isTemplate) const Chip(label: Text('Modèle')),
                 if (document.isOfficial) const Chip(label: Text('Officiel')),
               ],
@@ -666,15 +738,19 @@ class _DocumentCard extends StatelessWidget {
                   onPressed:
                       document.fileUrl == null || document.fileUrl!.isEmpty
                       ? null
-                      : () {
+                      : () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: document.fileUrl!),
+                          );
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Lien : ${document.fileUrl}'),
+                            const SnackBar(
+                              content: Text('Lien du document copie.'),
                             ),
                           );
                         },
-                  icon: const Icon(Icons.link_rounded),
-                  label: const Text('Lien'),
+                  icon: const Icon(Icons.content_copy_rounded),
+                  label: const Text('Copier le lien'),
                 ),
                 if (!document.isOfficial)
                   ElevatedButton.icon(
@@ -701,12 +777,37 @@ class _DocumentCard extends StatelessWidget {
       ),
     );
   }
+
+  String? _scopeLabel() {
+    if (document.poleId != null && document.poleId!.isNotEmpty) {
+      return 'Pole : ${poleNames[document.poleId] ?? 'lie'}';
+    }
+
+    if (document.projectId != null && document.projectId!.isNotEmpty) {
+      return 'Projet : ${projectNames[document.projectId] ?? 'lie'}';
+    }
+
+    if (document.eventId != null && document.eventId!.isNotEmpty) {
+      return 'Evenement : ${eventNames[document.eventId] ?? 'lie'}';
+    }
+
+    return null;
+  }
 }
 
 class CreateDocumentDialog extends StatefulWidget {
   final DocumentsService documentsService;
+  final List<PoleModel> poles;
+  final List<ProjectModel> projects;
+  final List<EventModel> events;
 
-  const CreateDocumentDialog({super.key, required this.documentsService});
+  const CreateDocumentDialog({
+    super.key,
+    required this.documentsService,
+    required this.poles,
+    required this.projects,
+    required this.events,
+  });
 
   @override
   State<CreateDocumentDialog> createState() => _CreateDocumentDialogState();
@@ -722,6 +823,10 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
 
   String _category = 'general';
   String _visibility = 'internal';
+  String _scopeType = 'none';
+  String? _selectedPoleId;
+  String? _selectedProjectId;
+  String? _selectedEventId;
   bool _isTemplate = false;
 
   bool _loading = false;
@@ -739,6 +844,21 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_scopeType == 'pole' && _selectedPoleId == null) {
+      setState(() => _error = 'Selectionnez le pole concerne.');
+      return;
+    }
+
+    if (_scopeType == 'project' && _selectedProjectId == null) {
+      setState(() => _error = 'Selectionnez le projet concerne.');
+      return;
+    }
+
+    if (_scopeType == 'event' && _selectedEventId == null) {
+      setState(() => _error = 'Selectionnez l evenement concerne.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -752,6 +872,9 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
         fileType: _fileTypeController.text,
         category: _category,
         visibility: _visibility,
+        poleId: _scopeType == 'pole' ? _selectedPoleId : null,
+        projectId: _scopeType == 'project' ? _selectedProjectId : null,
+        eventId: _scopeType == 'event' ? _selectedEventId : null,
         isTemplate: _isTemplate,
       );
 
@@ -899,13 +1022,14 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
+                  key: ValueKey(_visibility),
                   initialValue: _visibility,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Visibilité',
                     prefixIcon: Icon(Icons.visibility_rounded),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Toutes')),
                     DropdownMenuItem(value: 'public_club', child: Text('Club')),
                     DropdownMenuItem(value: 'internal', child: Text('Interne')),
                     DropdownMenuItem(
@@ -929,6 +1053,105 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                           setState(() => _visibility = value);
                         },
                 ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _scopeType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Rattachement',
+                    prefixIcon: Icon(Icons.account_tree_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'none',
+                      child: Text('Aucun rattachement'),
+                    ),
+                    DropdownMenuItem(value: 'pole', child: Text('Pole')),
+                    DropdownMenuItem(value: 'project', child: Text('Projet')),
+                    DropdownMenuItem(value: 'event', child: Text('Evenement')),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _scopeType = value;
+                            _selectedPoleId = null;
+                            _selectedProjectId = null;
+                            _selectedEventId = null;
+                            if (value == 'pole') _visibility = 'pole_only';
+                            if (value == 'project') {
+                              _visibility = 'project_only';
+                            }
+                            if (value == 'none' || value == 'event') {
+                              _visibility = 'internal';
+                            }
+                          });
+                        },
+                ),
+                if (_scopeType == 'pole') ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedPoleId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Pole concerne',
+                      prefixIcon: Icon(Icons.hub_rounded),
+                    ),
+                    items: [
+                      for (final pole in widget.poles)
+                        DropdownMenuItem(
+                          value: pole.id,
+                          child: Text(pole.name),
+                        ),
+                    ],
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(() => _selectedPoleId = value),
+                  ),
+                ],
+                if (_scopeType == 'project') ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedProjectId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Projet concerne',
+                      prefixIcon: Icon(Icons.workspaces_rounded),
+                    ),
+                    items: [
+                      for (final project in widget.projects)
+                        DropdownMenuItem(
+                          value: project.id,
+                          child: Text(project.name),
+                        ),
+                    ],
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(() => _selectedProjectId = value),
+                  ),
+                ],
+                if (_scopeType == 'event') ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedEventId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Evenement concerne',
+                      prefixIcon: Icon(Icons.event_rounded),
+                    ),
+                    items: [
+                      for (final event in widget.events)
+                        DropdownMenuItem(
+                          value: event.id,
+                          child: Text(event.title),
+                        ),
+                    ],
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(() => _selectedEventId = value),
+                  ),
+                ],
                 SwitchListTile(
                   value: _isTemplate,
                   title: const Text('Modèle de document'),

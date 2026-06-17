@@ -14,6 +14,9 @@ class DocumentsService {
     String? search,
     String? category,
     String? visibility,
+    String? poleId,
+    String? projectId,
+    String? eventId,
     bool? isTemplate,
     bool? isOfficial,
   }) async {
@@ -32,6 +35,18 @@ class DocumentsService {
 
     if (visibility != null && visibility.isNotEmpty && visibility != 'all') {
       params['visibility'] = visibility;
+    }
+
+    if (poleId != null && poleId.isNotEmpty && poleId != 'all') {
+      params['pole_id'] = poleId;
+    }
+
+    if (projectId != null && projectId.isNotEmpty && projectId != 'all') {
+      params['project_id'] = projectId;
+    }
+
+    if (eventId != null && eventId.isNotEmpty && eventId != 'all') {
+      params['event_id'] = eventId;
     }
 
     if (isTemplate != null) {
@@ -68,6 +83,10 @@ class DocumentsService {
     required String fileType,
     required String category,
     required String visibility,
+    String? poleId,
+    String? projectId,
+    String? eventId,
+    String? seasonId,
     bool isTemplate = false,
   }) async {
     final token = await _authService.getToken();
@@ -83,10 +102,10 @@ class DocumentsService {
         'file_type': fileType.trim(),
         'category': category,
         'visibility': visibility,
-        'pole_id': null,
-        'project_id': null,
-        'event_id': null,
-        'season_id': null,
+        'pole_id': _nullableId(poleId),
+        'project_id': _nullableId(projectId),
+        'event_id': _nullableId(eventId),
+        'season_id': _nullableId(seasonId),
         'is_template': isTemplate,
       },
     );
@@ -148,5 +167,10 @@ class DocumentsService {
       return response['items'] as List;
     }
     return [];
+  }
+
+  String? _nullableId(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty || trimmed == 'all' ? null : trimmed;
   }
 }
