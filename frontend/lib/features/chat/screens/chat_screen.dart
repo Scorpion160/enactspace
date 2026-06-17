@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -33,8 +34,11 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _messagesLoading = false;
   bool _sending = false;
+  bool _backgroundSyncing = false;
   bool _usingLocalCache = false;
   String? _error;
+  Timer? _syncTimer;
+  DateTime? _lastSyncedAt;
   UserExperience? _user;
   List<ChatThreadModel> _threads = [];
   List<ChatMessageModel> _messages = [];
@@ -50,10 +54,16 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadChat();
+    _syncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (mounted && !_loading && !_messagesLoading && !_sending) {
+        _syncActiveChat();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _syncTimer?.cancel();
     _messageController.dispose();
     super.dispose();
   }
@@ -97,6 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _threads = _sortThreads(threads, pinnedThreadIds);
         _selectedThread = threads.isNotEmpty ? threads.first : null;
         _usingLocalCache = false;
+        _lastSyncedAt = DateTime.now();
       });
 
       if (threads.isNotEmpty) {
@@ -199,6 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final messages = await _chatService.getMessages(thread.id);
+      await _chatService.markThreadAsRead(thread.id);
       if (!mounted) return;
       setState(() {
         _selectedThread = thread;
@@ -206,6 +218,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _mergeServerReactions(messages);
         _pinnedMessageIds = pinnedMessageIds;
         _usingLocalCache = false;
+        _lastSyncedAt = DateTime.now();
       });
       if (userId != null) {
         await _chatService.cacheMessages(
@@ -345,7 +358,68 @@ class _ChatScreenState extends State<ChatScreen> {
             .where((thread) => thread.id == _selectedThread!.id)
             .firstOrNull;
       }
+      _lastSyncedAt = DateTime.now();
     });
+  }
+
+  Future<void> _syncActiveChat() async {
+    if (_backgroundSyncing) return;
+
+    final user = _user;
+    final selectedId = _selectedThread?.id;
+
+    setState(() {
+      _backgroundSyncing = true;
+    });
+
+    try {
+      final threads = await _chatService.getThreads();
+      if (user != null) {
+        await _chatService.cacheThreads(userId: user.id, threads: threads);
+      }
+
+      final selectedThread = selectedId == null
+          ? null
+          : threads.where((thread) => thread.id == selectedId).firstOrNull;
+
+      List<ChatMessageModel>? messages;
+      if (selectedThread != null) {
+        messages = await _chatService.getMessages(selectedThread.id);
+        if (user != null) {
+          await _chatService.cacheMessages(
+            userId: user.id,
+            threadId: selectedThread.id,
+            messages: messages,
+          );
+          await _chatService.markThreadAsRead(selectedThread.id);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _threads = _sortThreads(threads, _pinnedThreadIds);
+        _selectedThread = selectedId == null ? _selectedThread : selectedThread;
+        if (messages != null) {
+          _messages = messages;
+          _mergeServerReactions(messages);
+        } else if (selectedId != null && selectedThread == null) {
+          _messages = [];
+        }
+        _usingLocalCache = false;
+        _lastSyncedAt = DateTime.now();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _usingLocalCache = true;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _backgroundSyncing = false;
+        });
+      }
+    }
   }
 
   List<ChatThreadModel> _sortThreads(
@@ -756,6 +830,8 @@ class _ChatScreenState extends State<ChatScreen> {
             pinned: _selectedThread == null
                 ? false
                 : _pinnedThreadIds.contains(_selectedThread!.id),
+            syncing: _backgroundSyncing,
+            lastSyncedAt: _lastSyncedAt,
             onBack: () => setState(() => _selectedThread = null),
             onInfo: _openConversationInfo,
             onTogglePin: _toggleSelectedThreadPin,
@@ -1105,6 +1181,8 @@ class _ConversationHeader extends StatelessWidget {
   final String? currentUserId;
   final bool showBack;
   final bool pinned;
+  final bool syncing;
+  final DateTime? lastSyncedAt;
   final VoidCallback onBack;
   final VoidCallback onInfo;
   final VoidCallback onTogglePin;
@@ -1114,6 +1192,8 @@ class _ConversationHeader extends StatelessWidget {
     required this.currentUserId,
     required this.showBack,
     required this.pinned,
+    required this.syncing,
+    required this.lastSyncedAt,
     required this.onBack,
     required this.onInfo,
     required this.onTogglePin,
@@ -1146,7 +1226,12 @@ class _ConversationHeader extends StatelessWidget {
       ),
       subtitle: thread == null
           ? const Text('Tes messages apparaîtront ici.')
-          : Text(_threadSubtitle(thread!, currentUserId)),
+          : _ConversationSubtitle(
+              thread: thread!,
+              currentUserId: currentUserId,
+              syncing: syncing,
+              lastSyncedAt: lastSyncedAt,
+            ),
       trailing: thread == null
           ? null
           : PopupMenuButton<String>(
@@ -1173,6 +1258,35 @@ class _ConversationHeader extends StatelessWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _ConversationSubtitle extends StatelessWidget {
+  final ChatThreadModel thread;
+  final String? currentUserId;
+  final bool syncing;
+  final DateTime? lastSyncedAt;
+
+  const _ConversationSubtitle({
+    required this.thread,
+    required this.currentUserId,
+    required this.syncing,
+    required this.lastSyncedAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final syncLabel = syncing
+        ? 'synchro...'
+        : lastSyncedAt == null
+        ? null
+        : 'sync ${DateFormat('HH:mm').format(lastSyncedAt!)}';
+
+    return Text(
+      [_threadSubtitle(thread, currentUserId), ?syncLabel].join(' • '),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
