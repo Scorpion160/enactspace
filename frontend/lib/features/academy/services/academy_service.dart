@@ -546,6 +546,7 @@ class AcademyService {
 
   Future<AcademyRewardResult> passQuiz({
     required AcademyCourseModel course,
+    List<int>? answers,
   }) async {
     if (_passedQuizIds.contains(course.quiz.id)) {
       return const AcademyRewardResult(
@@ -555,16 +556,30 @@ class AcademyService {
       );
     }
 
+    final backendResult = answers == null
+        ? null
+        : await _submitQuiz(quizId: course.quiz.id, answers: answers);
+
+    if (backendResult != null && !backendResult.passed) {
+      return AcademyRewardResult(
+        points: 0,
+        label:
+            'Quiz non validé côté Academy (${backendResult.score.toStringAsFixed(0)}%)',
+        syncedWithGamification: false,
+      );
+    }
+
+    final awardedPoints = backendResult?.points ?? 60;
     _passedQuizIds.add(course.quiz.id);
-    _academyPoints += 60;
+    _academyPoints += awardedPoints;
 
     final synced = await _awardGamificationPoints(
-      points: 60,
+      points: awardedPoints,
       reason: 'Academy - quiz réussi: ${course.quiz.title}',
     );
 
     return AcademyRewardResult(
-      points: 60,
+      points: awardedPoints,
       label: 'Quiz réussi',
       syncedWithGamification: synced,
     );
@@ -781,6 +796,32 @@ class AcademyService {
 
   double _double(dynamic value, {double fallback = 0}) {
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  Future<({bool passed, int points, double score})?> _submitQuiz({
+    required String quizId,
+    required List<int> answers,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final response = await _apiClient.postJson(
+        '/academy/quizzes/$quizId/submit',
+        token: token,
+        data: {'answers': answers},
+      );
+
+      if (response is! Map<String, dynamic>) return null;
+
+      return (
+        passed: response['passed'] == true,
+        points: _int(response['points'], fallback: 60),
+        score: _double(response['score']),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> _awardGamificationPoints({

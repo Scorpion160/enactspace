@@ -85,11 +85,14 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     _showRewardSnack(result);
   }
 
-  Future<void> _passQuiz(AcademyCourseModel course) async {
+  Future<void> _passQuiz(
+    AcademyCourseModel course, {
+    List<int>? answers,
+  }) async {
     final actionId = 'quiz-${course.id}';
     setState(() => _rewardingActionId = actionId);
 
-    final result = await _service.passQuiz(course: course);
+    final result = await _service.passQuiz(course: course, answers: answers);
     final data = await _service.getHome();
 
     if (!mounted) return;
@@ -101,14 +104,14 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
   }
 
   Future<void> _openQuiz(AcademyCourseModel course) async {
-    final passed = await showDialog<bool>(
+    final attempt = await showDialog<_AcademyQuizAttemptResult>(
       context: context,
       builder: (context) => _AcademyQuizDialog(course: course),
     );
 
-    if (!mounted || passed == null) return;
-    if (passed) {
-      await _passQuiz(course);
+    if (!mounted || attempt == null) return;
+    if (attempt.passed) {
+      await _passQuiz(course, answers: attempt.answers);
       return;
     }
 
@@ -897,6 +900,16 @@ class _AcademyQuizDialog extends StatefulWidget {
   State<_AcademyQuizDialog> createState() => _AcademyQuizDialogState();
 }
 
+class _AcademyQuizAttemptResult {
+  final bool passed;
+  final List<int> answers;
+
+  const _AcademyQuizAttemptResult({
+    required this.passed,
+    required this.answers,
+  });
+}
+
 class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
   final Map<int, int> _answers = {};
   bool _submitted = false;
@@ -930,6 +943,15 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
       _answers.clear();
       _submitted = false;
     });
+  }
+
+  _AcademyQuizAttemptResult _result() {
+    final answers = [
+      for (var index = 0; index < widget.course.quiz.questions.length; index++)
+        _answers[index] ?? -1,
+    ];
+
+    return _AcademyQuizAttemptResult(passed: _passed, answers: answers);
   }
 
   @override
@@ -1003,7 +1025,7 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
           ),
         if (_submitted)
           FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(_passed),
+            onPressed: () => Navigator.of(context).pop(_result()),
             icon: Icon(_passed ? Icons.check_rounded : Icons.close_rounded),
             label: Text(_passed ? 'Terminer' : 'Quitter'),
           )
