@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -17,6 +19,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   bool _loading = true;
   String? _error;
+  Timer? _refreshTimer;
+  DateTime? _lastSyncedAt;
 
   List<NotificationModel> _notifications = [];
   final Set<String> _busyNotificationIds = {};
@@ -29,19 +33,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _loadNotifications();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      if (!_loading && mounted) {
+        _loadNotifications(showLoading: false);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadNotifications({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final notifications = await _service.getNotifications(
@@ -55,6 +67,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _notifications = notifications;
         _unreadCount = unreadCount;
+        _lastSyncedAt = DateTime.now();
       });
     } catch (e) {
       if (!mounted) return;
@@ -65,7 +78,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _loading = false;
+          if (showLoading) _loading = false;
         });
       }
     }
@@ -235,6 +248,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             total: _notifications.length,
             unread: _unreadCount,
             read: _readCount,
+            lastSyncedAt: _lastSyncedAt,
             onRefresh: _loadNotifications,
             onMarkAllRead: _markAllAsRead,
           ),
@@ -288,6 +302,7 @@ class _NotificationsHeader extends StatelessWidget {
   final int total;
   final int unread;
   final int read;
+  final DateTime? lastSyncedAt;
   final VoidCallback onRefresh;
   final VoidCallback onMarkAllRead;
 
@@ -295,6 +310,7 @@ class _NotificationsHeader extends StatelessWidget {
     required this.total,
     required this.unread,
     required this.read,
+    required this.lastSyncedAt,
     required this.onRefresh,
     required this.onMarkAllRead,
   });
@@ -332,7 +348,12 @@ class _NotificationsHeader extends StatelessWidget {
                 _HeaderIcon(unread: unread),
                 const SizedBox(width: 18),
                 Expanded(
-                  child: _HeaderText(total: total, unread: unread, read: read),
+                  child: _HeaderText(
+                    total: total,
+                    unread: unread,
+                    read: read,
+                    lastSyncedAt: lastSyncedAt,
+                  ),
                 ),
                 actions,
               ],
@@ -349,6 +370,7 @@ class _NotificationsHeader extends StatelessWidget {
                         total: total,
                         unread: unread,
                         read: read,
+                        lastSyncedAt: lastSyncedAt,
                       ),
                     ),
                   ],
@@ -392,11 +414,13 @@ class _HeaderText extends StatelessWidget {
   final int total;
   final int unread;
   final int read;
+  final DateTime? lastSyncedAt;
 
   const _HeaderText({
     required this.total,
     required this.unread,
     required this.read,
+    required this.lastSyncedAt,
   });
 
   @override
@@ -417,6 +441,13 @@ class _HeaderText extends StatelessWidget {
           '$total notification(s) affichée(s) • $unread non lue(s) • $read lue(s)',
           style: const TextStyle(color: Colors.white70, height: 1.4),
         ),
+        if (lastSyncedAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Synchronisation auto ${_timeLabel(lastSyncedAt!)}',
+            style: const TextStyle(color: Colors.white60, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
@@ -483,22 +514,53 @@ class _NotificationsFilters extends StatelessWidget {
                         child: Text('Échéance proche'),
                       ),
                       DropdownMenuItem(
+                        value: 'task_late',
+                        child: Text('Tache en retard'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'new_announcement',
+                        child: Text('Annonce'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'event_scheduled',
+                        child: Text('Evenement'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'absence_recorded',
+                        child: Text('Absence'),
+                      ),
+                      DropdownMenuItem(
                         value: 'attendance',
                         child: Text('Présence'),
                       ),
                       DropdownMenuItem(
-                        value: 'payment',
+                        value: 'fee_due',
+                        child: Text('Cotisation'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'payment_validated',
                         child: Text('Paiement'),
                       ),
                       DropdownMenuItem(
-                        value: 'document',
+                        value: 'document_shared',
                         child: Text('Document'),
                       ),
                       DropdownMenuItem(
-                        value: 'recruitment',
+                        value: 'application_received',
+                        child: Text('Candidature'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'recruitment_update',
                         child: Text('Recrutement'),
                       ),
-                      DropdownMenuItem(value: 'system', child: Text('Système')),
+                      DropdownMenuItem(
+                        value: 'mentorship_assigned',
+                        child: Text('Mentorat'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'general',
+                        child: Text('General'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) onTypeChanged(value);
@@ -707,6 +769,26 @@ class _NotificationCard extends StatelessWidget {
         return Icons.task_alt_rounded;
       case 'deadline_near':
         return Icons.timer_rounded;
+      case 'task_late':
+        return Icons.warning_amber_rounded;
+      case 'new_announcement':
+        return Icons.campaign_rounded;
+      case 'event_scheduled':
+        return Icons.event_rounded;
+      case 'absence_recorded':
+        return Icons.person_off_rounded;
+      case 'fee_due':
+        return Icons.account_balance_wallet_rounded;
+      case 'payment_validated':
+        return Icons.verified_rounded;
+      case 'application_received':
+        return Icons.assignment_ind_rounded;
+      case 'recruitment_update':
+        return Icons.how_to_reg_rounded;
+      case 'document_shared':
+        return Icons.description_rounded;
+      case 'mentorship_assigned':
+        return Icons.diversity_3_rounded;
       case 'attendance':
         return Icons.fact_check_rounded;
       case 'payment':
@@ -802,4 +884,10 @@ class _ErrorCard extends StatelessWidget {
 DateTime _notificationDate(NotificationModel notification) {
   return DateTime.tryParse(notification.createdAt ?? '') ??
       DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+String _timeLabel(DateTime date) {
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }

@@ -62,14 +62,20 @@ class NotificationModel {
     if (source.contains('attendance') || source.contains('presence')) {
       return '/attendance';
     }
-    if (source.contains('payment') || source.contains('finance')) {
+    if (source.contains('absence')) return '/attendance';
+    if (source.contains('payment') ||
+        source.contains('finance') ||
+        source.contains('fee')) {
       return '/finance';
     }
     if (source.contains('document')) return '/documents';
-    if (source.contains('recruitment')) return '/recruitment';
+    if (source.contains('recruitment') || source.contains('application')) {
+      return '/recruitment';
+    }
     if (source.contains('post') || source.contains('communication')) {
       return '/posts';
     }
+    if (source.contains('announcement')) return '/posts';
     if (source.contains('chat') || source.contains('message')) return '/chat';
     if (source.contains('event')) return '/events';
     if (source.contains('project')) return '/projects';
@@ -84,6 +90,26 @@ class NotificationModel {
         return 'Tâche assignée';
       case 'deadline_near':
         return 'Échéance proche';
+      case 'task_late':
+        return 'Tache en retard';
+      case 'new_announcement':
+        return 'Annonce';
+      case 'event_scheduled':
+        return 'Evenement';
+      case 'absence_recorded':
+        return 'Absence';
+      case 'fee_due':
+        return 'Cotisation';
+      case 'payment_validated':
+        return 'Paiement valide';
+      case 'application_received':
+        return 'Candidature recue';
+      case 'recruitment_update':
+        return 'Recrutement';
+      case 'document_shared':
+        return 'Document partage';
+      case 'mentorship_assigned':
+        return 'Mentorat';
       case 'attendance':
         return 'Présence';
       case 'payment':
