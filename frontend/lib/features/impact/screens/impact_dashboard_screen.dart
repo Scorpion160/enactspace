@@ -780,96 +780,365 @@ class _ProjectImpactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
-            final score = _RadialScore(
-              score: project.projectImpactScore,
-              label: 'Project Impact',
-            );
-            final details = Column(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showProjectImpactDetails(context, project),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 760;
+              final score = _RadialScore(
+                score: project.projectImpactScore,
+                label: 'Project Impact',
+              );
+              final details = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          project.projectName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Chip(label: Text(project.status)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${project.poleName} • ${project.projectLead} / ${project.deputyLead}',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    project.solution,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text('${project.directImpact} direct')),
+                      Chip(label: Text('${project.indirectImpact} indirect')),
+                      Chip(label: Text('${project.reach} reach')),
+                      Chip(label: Text('${project.evidenceCount} preuves')),
+                      for (final sdg in project.sdgs) Chip(label: Text(sdg)),
+                      if (project.sdgs.isEmpty)
+                        const Chip(label: Text('ODD à définir')),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: (project.progress / 100).clamp(0.0, 1.0),
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(99),
+                    backgroundColor: Colors.black.withValues(alpha: 0.08),
+                    color: AppTheme.enactusYellow,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${project.progress.toStringAsFixed(0)}% avancement • ${project.completedTasks} tâches terminées • ${project.lateTasks} en retard',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                ],
+              );
+
+              if (wide) {
+                return Row(
+                  children: [
+                    score,
+                    const SizedBox(width: 18),
+                    Expanded(child: details),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: score),
+                  const SizedBox(height: 14),
+                  details,
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(Icons.expand_more_rounded),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showProjectImpactDetails(
+  BuildContext context,
+  ProjectImpactMetricModel project,
+) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => _ProjectImpactDetailSheet(project: project),
+  );
+}
+
+class _ProjectImpactDetailSheet extends StatelessWidget {
+  final ProjectImpactMetricModel project;
+
+  const _ProjectImpactDetailSheet({required this.project});
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height;
+
+    return SizedBox(
+      height: height * 0.92,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 980),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        project.projectName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            project.projectName,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${project.poleName} • ${project.status} • ${project.projectLead} / ${project.deputyLead}',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Chip(label: Text(project.status)),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Fermer',
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${project.poleName} • ${project.projectLead} / ${project.deputyLead}',
-                  style: const TextStyle(color: Colors.black54),
+                const SizedBox(height: 18),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 760;
+                    final score = _RadialScore(
+                      score: project.projectImpactScore,
+                      label: 'Impact',
+                    );
+                    final metrics = _KpiGrid(
+                      items: [
+                        _KpiItem(
+                          label: 'Impact direct',
+                          value: project.directImpact.toString(),
+                          icon: Icons.volunteer_activism_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Impact indirect',
+                          value: project.indirectImpact.toString(),
+                          icon: Icons.groups_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Reach',
+                          value: project.reach.toString(),
+                          icon: Icons.public_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Revenus',
+                          value: _money(project.revenue),
+                          icon: Icons.trending_up_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Surplus',
+                          value: _money(project.surplus),
+                          icon: Icons.savings_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Preuves',
+                          value: project.evidenceCount.toString(),
+                          icon: Icons.verified_rounded,
+                        ),
+                      ],
+                    );
+
+                    if (!wide) {
+                      return Column(
+                        children: [score, const SizedBox(height: 16), metrics],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        score,
+                        const SizedBox(width: 20),
+                        Expanded(child: metrics),
+                      ],
+                    );
+                  },
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  project.solution,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(height: 1.35),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    Chip(label: Text('${project.directImpact} direct')),
-                    Chip(label: Text('${project.indirectImpact} indirect')),
-                    Chip(label: Text('${project.reach} reach')),
-                    Chip(label: Text('${project.evidenceCount} preuves')),
                     for (final sdg in project.sdgs) Chip(label: Text(sdg)),
                     if (project.sdgs.isEmpty)
-                      const Chip(label: Text('ODD à définir')),
+                      const Chip(label: Text('ODD a definir')),
+                    Chip(
+                      label: Text('${project.documentsCount} document(s) lies'),
+                    ),
+                    Chip(
+                      label: Text(
+                        '${project.progress.toStringAsFixed(0)}% avancement',
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: (project.progress / 100).clamp(0.0, 1.0),
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(99),
-                  backgroundColor: Colors.black.withValues(alpha: 0.08),
-                  color: AppTheme.enactusYellow,
+                const SizedBox(height: 18),
+                _ProjectDetailBlock(
+                  title: 'Probleme',
+                  text: project.problem,
+                  icon: Icons.report_problem_rounded,
+                ),
+                _ProjectDetailBlock(
+                  title: 'Solution',
+                  text: project.solution,
+                  icon: Icons.lightbulb_rounded,
+                ),
+                _ProjectDetailBlock(
+                  title: 'Beneficiaires',
+                  text: project.targetBeneficiaries,
+                  icon: Icons.diversity_3_rounded,
+                ),
+                _ProjectDetailBlock(
+                  title: 'Methode de mesure',
+                  text: project.methodology,
+                  icon: Icons.fact_check_rounded,
+                ),
+                _ProjectDetailBlock(
+                  title: 'Hypotheses',
+                  text: project.assumptions,
+                  icon: Icons.rule_rounded,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '${project.progress.toStringAsFixed(0)}% avancement • ${project.completedTasks} tâches terminées • ${project.lateTasks} en retard',
-                  style: const TextStyle(color: Colors.black54),
-                ),
+                _ProjectScoreBreakdown(project: project),
               ],
-            );
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-            if (wide) {
-              return Row(
-                children: [
-                  score,
-                  const SizedBox(width: 18),
-                  Expanded(child: details),
-                ],
-              );
-            }
+class _ProjectDetailBlock extends StatelessWidget {
+  final String title;
+  final String text;
+  final IconData icon;
 
-            return Column(
+  const _ProjectDetailBlock({
+    required this.title,
+    required this.text,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.25),
+            foregroundColor: AppTheme.softBlack,
+            child: Icon(icon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(child: score),
-                const SizedBox(height: 14),
-                details,
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(text, style: const TextStyle(height: 1.4)),
               ],
-            );
-          },
-        ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectScoreBreakdown extends StatelessWidget {
+  final ProjectImpactMetricModel project;
+
+  const _ProjectScoreBreakdown({required this.project});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      ('Innovation', project.innovationScore),
+      ('Viabilite', project.businessViabilityScore),
+      ('Scalabilite', project.scalabilityScore),
+      ('Competition', project.competitionReadinessScore),
+      ('Planete', project.planetImpact),
+      ('Budget utilise', project.budgetUsed),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final item in items)
+            Chip(label: Text('${item.$1}: ${item.$2.toStringAsFixed(0)}')),
+        ],
       ),
     );
   }
