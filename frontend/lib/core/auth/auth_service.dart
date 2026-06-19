@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 
 class AuthService {
   static const String _tokenKey = 'enactspace_token';
+  static const String _userKey = 'enactspace_current_user';
 
   final ApiClient _apiClient;
 
@@ -119,11 +122,35 @@ class AuthService {
       throw Exception('Utilisateur non connecté.');
     }
 
-    return await _apiClient.get('/users/me', token: token);
+    try {
+      final user = await _apiClient.get('/users/me', token: token);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userKey, jsonEncode(user));
+      return user;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        await logout();
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCachedCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_userKey);
+    if (value == null || value.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(value);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      await prefs.remove(_userKey);
+      return null;
+    }
   }
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
+    await Future.wait([prefs.remove(_tokenKey), prefs.remove(_userKey)]);
   }
 }

@@ -44,10 +44,9 @@ class AppRouter {
       }
 
       if (loggedIn) {
-        try {
-          final user = UserExperience.fromJson(
-            await _authService.getCurrentUser(),
-          );
+        final cachedUser = await _authService.getCachedCurrentUser();
+        if (cachedUser != null) {
+          final user = UserExperience.fromJson(cachedUser);
           final visibleRoutes = UserExperience.visibleRoutesFor(user);
           final path = state.uri.path;
           final allowed = visibleRoutes.any(
@@ -55,8 +54,8 @@ class AppRouter {
           );
 
           if (!allowed) return '/dashboard';
-        } catch (_) {
-          return '/login';
+        } else {
+          return _offlineRedirect(state.uri.path);
         }
       }
 
@@ -149,4 +148,13 @@ class AppRouter {
       ),
     ],
   );
+
+  static String? _offlineRedirect(String path) {
+    final offlineRoutes = UserExperience.visibleRoutesFor(null);
+    final allowed = offlineRoutes.any(
+      (route) => path == route || path.startsWith('$route/'),
+    );
+
+    return allowed ? null : '/dashboard';
+  }
 }
