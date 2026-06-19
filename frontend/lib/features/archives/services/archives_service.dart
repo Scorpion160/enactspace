@@ -31,37 +31,49 @@ class ArchivesService {
           id: 'dimbali',
           name: 'DIMBALI',
           summary:
-              'Projet historique autour de la nutrition, du reboisement et de la création de revenus locaux.',
+              'Projet lancé à Ngayène Sabakh pour combattre la malnutrition et renforcer durablement les revenus des femmes.',
           launchYear: 2016,
           archiveYear: 2020,
-          locality: 'Sénégal',
-          target: 'Communautés vulnérables, femmes et jeunes',
+          locality: 'Ngayène Sabakh, Sénégal',
+          target: 'Enfants, femmes transformatrices et familles rurales',
           problem:
-              'Malnutrition, faibles revenus locaux et pression environnementale.',
+              'Un taux de malnutrition de 15,78 %, de faibles revenus et d’importantes pertes post-récolte.',
           solution:
-              'Valorisation de ressources locales, activités génératrices de revenus et actions environnementales.',
+              'Farine infantile fortifiée, séchage solaire et structuration du GIE FAVEC autour de produits locaux.',
           actions: [
-            'Structuration communautaire',
-            'Développement de produits',
-            'Sensibilisation nutritionnelle',
-            'Reboisement',
+            'Création et accompagnement du GIE FAVEC',
+            'Production de farine infantile fortifiée',
+            'Déploiement d’un séchoir solaire de 20 kg par cycle de 72 h',
+            'Suivi nutritionnel et développement commercial',
           ],
           sdgs: ['ODD 2', 'ODD 8', 'ODD 13'],
-          products: ['Produits nutritionnels', 'Produits locaux transformés'],
+          products: ['Farine infantile fortifiée', 'Produits locaux séchés'],
           revenue: 8600000,
           profit: 2100000,
-          jobs: 54,
+          jobs: 112,
           impactedLives: 4200,
           savedLives: 72,
           plantedTrees: 620,
-          partners: ['Communautés locales', 'Partenaires techniques'],
-          awards: ['Champion National 2017', 'Champion National 2018'],
-          documents: ['Présentation Enactus ESP 2020', 'Rapports impact'],
+          partners: [
+            'GIE FAVEC',
+            'Comité National de Lutte contre la Malnutrition',
+            'Communauté de Ngayène Sabakh',
+          ],
+          awards: [
+            'Champion National 2017',
+            'World Cup Enactus aux États-Unis en 2018',
+          ],
+          documents: [
+            'Présentation Enactus ESP 2020',
+            'Document officiel du projet Dimbali',
+            'Rapports impact',
+          ],
           members: ['Équipe projet Dimbali', 'Alumni Enactus ESP'],
           lessons: [
             'Mesurer tôt les preuves terrain',
             'Former les relais locaux',
             'Relier impact social et viabilité économique',
+            'Concevoir avec les bénéficiaires pour assurer la continuité',
           ],
           logoAsset: 'assets/img/logo_dimbali.png',
           status: 'archivé',
@@ -312,6 +324,13 @@ class ArchivesService {
       ],
       hallOfFame: [
         HallOfFameItemModel(
+          title: 'Création d’Enactus ESP',
+          period: '2015',
+          description:
+              'Naissance de l’équipe à l’École Supérieure Polytechnique de Dakar.',
+          type: 'Histoire',
+        ),
+        HallOfFameItemModel(
           title: 'Premier Prix d’Excellence Fondation Sonatel',
           period: 'Historique',
           description: 'Reconnaissance de l’excellence et de l’impact terrain.',
@@ -334,14 +353,16 @@ class ArchivesService {
         HallOfFameItemModel(
           title: 'Champion National',
           period: '2017',
-          description: 'Qualification au plus haut niveau national.',
+          description:
+              'Titre obtenu après audit des projets et qualification pour la World Cup de Londres.',
           type: 'Titre',
         ),
         HallOfFameItemModel(
-          title: 'Champion National',
+          title: 'Participation à la World Cup',
           period: '2018',
-          description: 'Confirmation de la dynamique d’excellence.',
-          type: 'Titre',
+          description:
+              'Enactus ESP représente le Sénégal lors de la compétition internationale aux États-Unis.',
+          type: 'International',
         ),
         HallOfFameItemModel(
           title: 'Demi-finaliste compétition internationale',
@@ -354,6 +375,13 @@ class ArchivesService {
           period: 'Historique',
           description: 'Visibilité médiatique et crédibilité publique du club.',
           type: 'Média',
+        ),
+        HallOfFameItemModel(
+          title: 'Retour à la compétition nationale',
+          period: '2022',
+          description:
+              'Reprise de la compétition après les années de consolidation et la période Covid-19.',
+          type: 'Compétition',
         ),
       ],
       officialDocuments: officialDocuments,

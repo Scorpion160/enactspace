@@ -350,19 +350,20 @@ class AcademyService {
           projectName: 'DIMBALI',
           title: 'Cas Dimbali: nutrition, revenus et reboisement',
           context:
-              'Projet historique combinant impact social, économique et environnemental.',
+              'Projet lancé à Ngayène Sabakh en 2016-2017 avec les femmes du GIE FAVEC.',
           problem:
-              'Malnutrition, revenus faibles et pression sur les ressources locales.',
+              'Un taux de malnutrition de 15,78 %, de faibles revenus et des pertes post-récolte.',
           solution:
-              'Valoriser des ressources locales, structurer des activités génératrices de revenus et planter des arbres.',
+              'Produire une farine infantile fortifiée et utiliser un séchoir solaire de 20 kg par cycle de 72 heures.',
           impact:
-              'Vies impactées, emplois créés, arbres plantés et apprentissage fort sur la preuve terrain.',
+              'Malnutrition ramenée à 0 %, revenus de 30 femmes augmentés de 98 % et 112 emplois créés.',
           difficulties:
-              'Mesurer précisément les effets et maintenir la dynamique communautaire dans le temps.',
+              'Maintenir la qualité nutritionnelle, sécuriser les débouchés et transmettre la gestion au GIE.',
           lessons: [
             'Relier impact social et modèle économique',
             'Documenter les preuves dès le départ',
             'Former des relais locaux',
+            'Co-construire la solution avec les bénéficiaires',
           ],
         ),
         _caseStudy(
