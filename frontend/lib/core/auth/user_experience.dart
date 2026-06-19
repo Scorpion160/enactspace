@@ -3,6 +3,8 @@ class UserExperience {
   final String email;
   final String displayName;
   final String status;
+  final String? gender;
+  final String profileType;
   final Set<String> roles;
 
   const UserExperience({
@@ -10,6 +12,8 @@ class UserExperience {
     required this.email,
     required this.displayName,
     required this.status,
+    required this.gender,
+    required this.profileType,
     required this.roles,
   });
 
@@ -27,6 +31,10 @@ class UserExperience {
       email: email,
       displayName: fullName.isNotEmpty ? fullName : email,
       status: json['status']?.toString() ?? 'active',
+      gender: json['gender']?.toString(),
+      profileType:
+          json['profile_type']?.toString() ??
+          (json['status']?.toString() == 'alumni' ? 'alumni' : 'enacteur'),
       roles: _parseRoles(json['roles']),
     );
   }
@@ -59,6 +67,8 @@ class UserExperience {
       hasAnyRole({'financier', 'finance', 'tresorier', 'treasurer'});
 
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
+  bool get isEnactrice => gender == 'femme';
+  String get memberLabel => isEnactrice ? 'Enactrice' : 'Enacteur';
 
   bool get isProjectOrPoleLead {
     return hasAnyRole({
@@ -121,12 +131,12 @@ class UserExperience {
     if (isFinance) return 'Finance';
     if (isProjectOrPoleLead) return 'Enacchef';
     if (isAlumni) return 'Alumni';
-    return 'Espace Enacteur';
+    return 'Espace $memberLabel';
   }
 
   String get dashboardTitle {
     if (isAlumni) return 'Espace alumni';
-    if (isMemberExperience) return 'Mon espace Enacteur';
+    if (isMemberExperience) return 'Mon espace $memberLabel';
     return 'Tableau de bord';
   }
 
@@ -151,6 +161,19 @@ class UserExperience {
       return const ['/dashboard', '/posts', '/tasks', '/notifications'];
     }
 
+    if (user.isAlumni) {
+      return const [
+        '/dashboard',
+        '/notifications',
+        '/posts',
+        '/chat',
+        '/events',
+        '/academy',
+        '/archives',
+        '/alumni',
+      ];
+    }
+
     final routes = <String>{
       '/dashboard',
       '/notifications',
@@ -164,16 +187,10 @@ class UserExperience {
       '/archives',
     };
 
-    if (!user.isAlumni) {
-      routes.addAll({'/poles', '/projects'});
-    }
+    routes.addAll({'/poles', '/projects'});
 
     if (user.canManageAttendance) {
       routes.add('/attendance');
-    }
-
-    if (user.isAlumni) {
-      routes.add('/alumni');
     }
 
     if (user.canViewMembersDirectory) {

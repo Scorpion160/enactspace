@@ -183,6 +183,8 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         last_name=payload.last_name,
         email=payload.email,
         phone=payload.phone,
+        gender=payload.gender,
+        profile_type=payload.profile_type,
         password_hash=hash_password(payload.password),
         department=payload.department,
         study_level=payload.study_level,
@@ -357,10 +359,25 @@ def approve_user(
         "email_verified": user.email_verified,
     }
 
-    user.status = "active"
+    is_alumni = user.profile_type == "alumni"
+    user.status = "alumni" if is_alumni else "active"
     user.email_verified = True
     user.is_active = True
     user.updated_at = datetime.utcnow()
+
+    role_name = "alumni" if is_alumni else BASE_ACTIVE_ROLE
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        role = Role(name=role_name, description=f"Rôle de base {role_name}")
+        db.add(role)
+        db.flush()
+
+    existing_role = db.query(UserRole).filter(
+        UserRole.user_id == user.id,
+        UserRole.role_id == role.id,
+    ).first()
+    if not existing_role:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
 
     create_audit_log(
         db=db,
@@ -468,7 +485,28 @@ def make_user_alumni(
     }
 
     user.status = "alumni"
+    user.profile_type = "alumni"
     user.updated_at = datetime.utcnow()
+
+    alumni_role = db.query(Role).filter(Role.name == "alumni").first()
+    if not alumni_role:
+        alumni_role = Role(name="alumni", description="Ancien membre Enactus")
+        db.add(alumni_role)
+        db.flush()
+
+    current_links = db.query(UserRole).filter(UserRole.user_id == user.id).all()
+    for link in current_links:
+        if link.role and (
+            link.role.name == BASE_ACTIVE_ROLE
+            or link.role.name in RESPONSIBILITY_ROLES
+        ):
+            db.delete(link)
+
+    has_alumni_role = any(
+        link.role_id == alumni_role.id for link in current_links
+    )
+    if not has_alumni_role:
+        db.add(UserRole(user_id=user.id, role_id=alumni_role.id))
 
     create_audit_log(
         db=db,

@@ -443,11 +443,7 @@ class _LoginPanel extends StatelessWidget {
                         const SizedBox(height: 10),
                         _AccountRequestActions(
                           loading: loading,
-                          onJoinEnacteur: () => _showJoinRequestSheet(context),
-                          onJoinAlumni: () => _showJoinRequestSheet(
-                            context,
-                            profileType: 'alumni',
-                          ),
+                          onCreateAccount: () => _showJoinRequestSheet(context),
                         ),
                         const SizedBox(height: 16),
                         const Divider(height: 1),
@@ -509,47 +505,22 @@ class _LoginSectionLabel extends StatelessWidget {
 
 class _AccountRequestActions extends StatelessWidget {
   final bool loading;
-  final VoidCallback onJoinEnacteur;
-  final VoidCallback onJoinAlumni;
+  final VoidCallback onCreateAccount;
 
   const _AccountRequestActions({
     required this.loading,
-    required this.onJoinEnacteur,
-    required this.onJoinAlumni,
+    required this.onCreateAccount,
   });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoColumns = constraints.maxWidth >= 430;
-        final buttonWidth = twoColumns
-            ? (constraints.maxWidth - 10) / 2
-            : constraints.maxWidth;
-
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SizedBox(
-              width: buttonWidth,
-              child: OutlinedButton.icon(
-                onPressed: loading ? null : onJoinEnacteur,
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Rejoindre Enactus ESP'),
-              ),
-            ),
-            SizedBox(
-              width: buttonWidth,
-              child: OutlinedButton.icon(
-                onPressed: loading ? null : onJoinAlumni,
-                icon: const Icon(Icons.workspace_premium_rounded),
-                label: const Text('Rejoindre comme Alumni'),
-              ),
-            ),
-          ],
-        );
-      },
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: loading ? null : onCreateAccount,
+        icon: const Icon(Icons.person_add_alt_1_rounded),
+        label: const Text('Créer un compte'),
+      ),
     );
   }
 }
@@ -812,6 +783,8 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _photoController = TextEditingController();
   final _departmentController = TextEditingController();
@@ -824,7 +797,9 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
   final _motivationController = TextEditingController();
 
   late String _profileType;
+  String _gender = 'homme';
   bool _loading = false;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -838,6 +813,8 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _phoneController.dispose();
     _photoController.dispose();
     _departmentController.dispose();
@@ -863,6 +840,16 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
       setState(() => _error = 'Complète au moins identité, email et filière.');
       return;
     }
+    if (_passwordController.text.length < 8) {
+      setState(
+        () => _error = 'Le mot de passe doit contenir au moins 8 caractères.',
+      );
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      setState(() => _error = 'Les mots de passe ne correspondent pas.');
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -870,11 +857,13 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     });
 
     try {
-      final temporaryPassword = await _authService.submitJoinRequest(
+      await _authService.submitJoinRequest(
         profileType: _profileType,
+        gender: _gender,
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
+        password: _passwordController.text,
         phone: _phoneController.text.trim(),
         photoUrl: _photoController.text.trim(),
         department: _departmentController.text.trim(),
@@ -889,11 +878,9 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            temporaryPassword == null
-                ? 'Demande envoyée. Validation par les responsables autorisés.'
-                : 'Demande envoyée. Mot de passe test: $temporaryPassword',
+            'Compte créé. Vous pourrez vous connecter après validation.',
           ),
         ),
       );
@@ -956,7 +943,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                       segments: const [
                         ButtonSegment(
                           value: 'enacteur',
-                          label: Text('Enacteur'),
+                          label: Text('Enacteur / Enactrice'),
                           icon: Icon(Icons.school_rounded),
                         ),
                         ButtonSegment(
@@ -971,6 +958,25 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                       },
                     ),
                     const SizedBox(height: 18),
+                    DropdownButtonFormField<String>(
+                      initialValue: _gender,
+                      decoration: const InputDecoration(
+                        labelText: 'Genre',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'homme', child: Text('Homme')),
+                        DropdownMenuItem(value: 'femme', child: Text('Femme')),
+                      ],
+                      onChanged: _loading
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _gender = value);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final twoColumns = constraints.maxWidth >= 560;
@@ -1058,6 +1064,38 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                           ],
                         );
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
+                          },
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscurePassword,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: const InputDecoration(
+                        labelText: 'Confirmer le mot de passe',
+                        prefixIcon: Icon(Icons.verified_user_outlined),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(

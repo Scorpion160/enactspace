@@ -28,6 +28,8 @@ class User(Base):
     )
 
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    profile_type: Mapped[str] = mapped_column(String(30), default="enacteur")
 
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 

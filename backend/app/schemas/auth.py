@@ -28,9 +28,11 @@ class PasswordResetRequestRead(BaseModel):
 
 class JoinRequestCreate(BaseModel):
     profile_type: str = "enacteur"
+    gender: str
     first_name: str
     last_name: str
     email: EmailStr
+    password: str
     phone: str | None = None
     photo_url: str | None = None
     department: str | None = None
@@ -46,4 +48,3 @@ class JoinRequestCreate(BaseModel):
 class JoinRequestRead(BaseModel):
     message: str
     user_id: str
-    debug_temporary_password: str | None = None

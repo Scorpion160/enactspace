@@ -9,6 +9,8 @@ class UserBase(BaseModel):
     last_name: str
     email: EmailStr
     phone: Optional[str] = None
+    gender: Optional[str] = None
+    profile_type: str = "enacteur"
     department: Optional[str] = None
     study_level: Optional[str] = None
     promotion: Optional[str] = None

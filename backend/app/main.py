@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.db.database import ensure_compatibility_columns
 from app.api.routes import (
     auth,
     users,
@@ -33,6 +34,11 @@ app = FastAPI(
     title=settings.APP_NAME,
     debug=settings.APP_DEBUG,
 )
+
+
+@app.on_event("startup")
+def ensure_database_compatibility() -> None:
+    ensure_compatibility_columns()
 
 UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)

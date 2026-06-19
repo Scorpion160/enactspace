@@ -58,11 +58,13 @@ class AuthService {
     );
   }
 
-  Future<String?> submitJoinRequest({
+  Future<void> submitJoinRequest({
     required String profileType,
+    required String gender,
     required String firstName,
     required String lastName,
     required String email,
+    required String password,
     String? phone,
     String? photoUrl,
     String? department,
@@ -78,9 +80,11 @@ class AuthService {
       '/auth/join-requests',
       data: {
         'profile_type': profileType,
+        'gender': gender,
         'first_name': firstName,
         'last_name': lastName,
         'email': email,
+        'password': password,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
         if (photoUrl != null && photoUrl.isNotEmpty) 'photo_url': photoUrl,
         if (department != null && department.isNotEmpty)
@@ -98,11 +102,9 @@ class AuthService {
       },
     );
 
-    if (response is Map<String, dynamic>) {
-      return response['debug_temporary_password']?.toString();
+    if (response is! Map<String, dynamic>) {
+      throw Exception('Réponse invalide lors de la création du compte.');
     }
-
-    return null;
   }
 
   Future<bool> isLoggedIn() async {

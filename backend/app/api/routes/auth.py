@@ -36,7 +36,6 @@ def optional_text(value: str | None) -> str | None:
 
 def join_request_bio(payload: JoinRequestCreate) -> str | None:
     parts = [
-        f"Profil demandé: {payload.profile_type}",
         f"Compétences: {payload.skills.strip()}" if optional_text(payload.skills) else None,
         f"Motivation: {payload.motivation.strip()}" if optional_text(payload.motivation) else None,
     ]
@@ -110,6 +109,17 @@ def create_join_request(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de profil invalide",
         )
+    gender = payload.gender.strip().lower()
+    if gender not in {"homme", "femme"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Genre invalide",
+        )
+    if len(payload.password.strip()) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe doit contenir au moins 8 caractères",
+        )
 
     first_name = payload.first_name.strip()
     last_name = payload.last_name.strip()
@@ -127,13 +137,14 @@ def create_join_request(
             detail="Un compte existe déjà avec cet email",
         )
 
-    temporary_password = secrets.token_urlsafe(12)
     user = User(
         first_name=first_name,
         last_name=last_name,
         email=payload.email,
         phone=optional_text(payload.phone),
-        password_hash=hash_password(temporary_password),
+        gender=gender,
+        profile_type=profile_type,
+        password_hash=hash_password(payload.password.strip()),
         photo_url=optional_text(payload.photo_url),
         department=department,
         study_level=optional_text(payload.level),
@@ -157,9 +168,6 @@ def create_join_request(
             "responsables autorisés."
         ),
         user_id=str(user.id),
-        debug_temporary_password=(
-            temporary_password if settings.APP_ENV != "production" else None
-        ),
     )
 
 
