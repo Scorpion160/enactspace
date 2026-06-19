@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -200,6 +202,7 @@ class _MembersScreenState extends State<MembersScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredMembers = _filteredMembers;
+    final canManageMembers = _userExperience?.canManageMembers == true;
     final horizontalPadding = MediaQuery.sizeOf(context).width < 560
         ? 14.0
         : 24.0;
@@ -227,7 +230,7 @@ class _MembersScreenState extends State<MembersScreen> {
                 _search = value;
               });
             },
-            onAdd: _openAddMemberDialog,
+            onAdd: canManageMembers ? _openAddMemberDialog : null,
           ),
           const SizedBox(height: 20),
           if (_loading)
@@ -244,6 +247,7 @@ class _MembersScreenState extends State<MembersScreen> {
           else
             _MembersList(
               members: filteredMembers,
+              canManageMembers: canManageMembers,
               onApprove: _approveMember,
               onAssignRole: _openAssignRoleDialog,
               onAssignDepartment: _openAssignDepartmentDialog,
@@ -324,7 +328,7 @@ class _MembersHeader extends StatelessWidget {
 
 class _SearchAndActions extends StatelessWidget {
   final ValueChanged<String> onChanged;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   const _SearchAndActions({required this.onChanged, required this.onAdd});
 
@@ -341,13 +345,15 @@ class _SearchAndActions extends StatelessWidget {
       ),
     );
 
-    final addButton = ElevatedButton.icon(
-      onPressed: onAdd,
-      icon: const Icon(Icons.person_add_alt_1_rounded),
-      label: const Text('Ajouter'),
-    );
+    final addButton = onAdd == null
+        ? null
+        : ElevatedButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            label: const Text('Ajouter'),
+          );
 
-    if (isWide) {
+    if (isWide && addButton != null) {
       return Row(
         children: [
           Expanded(child: searchField),
@@ -356,6 +362,8 @@ class _SearchAndActions extends StatelessWidget {
         ],
       );
     }
+
+    if (addButton == null) return searchField;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -366,12 +374,14 @@ class _SearchAndActions extends StatelessWidget {
 
 class _MembersList extends StatelessWidget {
   final List<MemberModel> members;
+  final bool canManageMembers;
   final ValueChanged<MemberModel> onApprove;
   final ValueChanged<MemberModel> onAssignRole;
   final ValueChanged<MemberModel> onAssignDepartment;
 
   const _MembersList({
     required this.members,
+    required this.canManageMembers,
     required this.onApprove,
     required this.onAssignRole,
     required this.onAssignDepartment,
@@ -463,31 +473,7 @@ class _MembersList extends StatelessWidget {
                               icon: const Icon(Icons.visibility_rounded),
                               tooltip: 'Voir',
                             ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
-                              ),
-                              padding: EdgeInsets.zero,
-                              onPressed: () => onAssignRole(member),
-                              icon: const Icon(
-                                Icons.admin_panel_settings_rounded,
-                              ),
-                              tooltip: 'Assigner rôle',
-                            ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
-                              ),
-                              padding: EdgeInsets.zero,
-                              onPressed: () => onAssignDepartment(member),
-                              icon: const Icon(Icons.account_tree_rounded),
-                              tooltip: 'Assigner pôle cœur',
-                            ),
-                            if (member.status == 'pending')
+                            if (canManageMembers) ...[
                               IconButton(
                                 visualDensity: VisualDensity.compact,
                                 constraints: const BoxConstraints(
@@ -495,11 +481,37 @@ class _MembersList extends StatelessWidget {
                                   minHeight: 36,
                                 ),
                                 padding: EdgeInsets.zero,
-                                onPressed: () => onApprove(member),
-                                icon: const Icon(Icons.verified_user_rounded),
-                                tooltip: 'Approuver',
-                                color: Colors.green,
+                                onPressed: () => onAssignRole(member),
+                                icon: const Icon(
+                                  Icons.admin_panel_settings_rounded,
+                                ),
+                                tooltip: 'Assigner rôle',
                               ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => onAssignDepartment(member),
+                                icon: const Icon(Icons.account_tree_rounded),
+                                tooltip: 'Assigner pôle cœur',
+                              ),
+                              if (member.status == 'pending')
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => onApprove(member),
+                                  icon: const Icon(Icons.verified_user_rounded),
+                                  tooltip: 'Approuver',
+                                  color: Colors.green,
+                                ),
+                            ],
                           ],
                         ),
                       ),
@@ -529,6 +541,7 @@ class _MembersList extends StatelessWidget {
                 width: cardWidth,
                 child: _MemberCard(
                   member: member,
+                  canManageMembers: canManageMembers,
                   onDetails: () => _showMemberDetails(context, member),
                   onApprove: member.status == 'pending'
                       ? () => onApprove(member)
@@ -598,7 +611,7 @@ class _MemberIdentity extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _Avatar(name: member.displayName),
+        _Avatar(name: member.displayName, photoUrl: member.photoUrl),
         const SizedBox(width: 10),
         Text(
           member.displayName,
@@ -611,6 +624,7 @@ class _MemberIdentity extends StatelessWidget {
 
 class _MemberCard extends StatelessWidget {
   final MemberModel member;
+  final bool canManageMembers;
   final VoidCallback onDetails;
   final VoidCallback? onApprove;
   final VoidCallback onAssignRole;
@@ -618,6 +632,7 @@ class _MemberCard extends StatelessWidget {
 
   const _MemberCard({
     required this.member,
+    required this.canManageMembers,
     required this.onDetails,
     required this.onApprove,
     required this.onAssignRole,
@@ -626,6 +641,8 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 700;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -634,7 +651,7 @@ class _MemberCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _Avatar(name: member.displayName),
+                _Avatar(name: member.displayName, photoUrl: member.photoUrl),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -656,6 +673,62 @@ class _MemberCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (isCompact)
+                  PopupMenuButton<_MemberAction>(
+                    tooltip: 'Actions du membre',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _MemberAction.details:
+                          onDetails();
+                          break;
+                        case _MemberAction.assignRole:
+                          onAssignRole();
+                          break;
+                        case _MemberAction.assignDepartment:
+                          onAssignDepartment();
+                          break;
+                        case _MemberAction.approve:
+                          onApprove?.call();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: _MemberAction.details,
+                        child: ListTile(
+                          leading: Icon(Icons.visibility_rounded),
+                          title: Text('Voir le profil'),
+                        ),
+                      ),
+                      if (canManageMembers) ...[
+                        const PopupMenuItem(
+                          value: _MemberAction.assignRole,
+                          child: ListTile(
+                            leading: Icon(Icons.admin_panel_settings_rounded),
+                            title: Text('Assigner un rôle'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _MemberAction.assignDepartment,
+                          child: ListTile(
+                            leading: Icon(Icons.account_tree_rounded),
+                            title: Text('Assigner le pôle cœur'),
+                          ),
+                        ),
+                        if (onApprove != null)
+                          const PopupMenuItem(
+                            value: _MemberAction.approve,
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.verified_user_rounded,
+                                color: Colors.green,
+                              ),
+                              title: Text('Approuver'),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -669,35 +742,39 @@ class _MemberCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Divider(height: 20),
-            Wrap(
-              spacing: 4,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                IconButton(
-                  onPressed: onDetails,
-                  icon: const Icon(Icons.visibility_rounded),
-                  tooltip: 'Voir',
-                ),
-                IconButton(
-                  onPressed: onAssignRole,
-                  icon: const Icon(Icons.admin_panel_settings_rounded),
-                  tooltip: 'Assigner rôle',
-                ),
-                IconButton(
-                  onPressed: onAssignDepartment,
-                  icon: const Icon(Icons.account_tree_rounded),
-                  tooltip: 'Assigner pôle cœur',
-                ),
-                if (onApprove != null)
-                  FilledButton.icon(
-                    onPressed: onApprove,
-                    icon: const Icon(Icons.verified_user_rounded),
-                    label: const Text('Approuver'),
+            if (!isCompact) ...[
+              const Divider(height: 20),
+              Wrap(
+                spacing: 4,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: onDetails,
+                    icon: const Icon(Icons.visibility_rounded),
+                    tooltip: 'Voir',
                   ),
-              ],
-            ),
+                  if (canManageMembers) ...[
+                    IconButton(
+                      onPressed: onAssignRole,
+                      icon: const Icon(Icons.admin_panel_settings_rounded),
+                      tooltip: 'Assigner rôle',
+                    ),
+                    IconButton(
+                      onPressed: onAssignDepartment,
+                      icon: const Icon(Icons.account_tree_rounded),
+                      tooltip: 'Assigner pôle cœur',
+                    ),
+                    if (onApprove != null)
+                      FilledButton.icon(
+                        onPressed: onApprove,
+                        icon: const Icon(Icons.verified_user_rounded),
+                        label: const Text('Approuver'),
+                      ),
+                  ],
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -707,19 +784,33 @@ class _MemberCard extends StatelessWidget {
 
 class _Avatar extends StatelessWidget {
   final String name;
+  final String? photoUrl;
 
-  const _Avatar({required this.name});
+  const _Avatar({required this.name, this.photoUrl});
 
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+    final imageUrl = _absoluteMemberPhotoUrl(photoUrl);
 
     return CircleAvatar(
       backgroundColor: AppTheme.enactusYellow,
       foregroundColor: AppTheme.softBlack,
-      child: Text(initial, style: const TextStyle(fontWeight: FontWeight.w900)),
+      backgroundImage: imageUrl == null ? null : NetworkImage(imageUrl),
+      child: imageUrl == null
+          ? Text(initial, style: const TextStyle(fontWeight: FontWeight.w900))
+          : null,
     );
   }
+}
+
+enum _MemberAction { details, assignRole, assignDepartment, approve }
+
+String? _absoluteMemberPhotoUrl(String? value) {
+  final url = value?.trim();
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return '${ApiClient.serverUrl}${url.startsWith('/') ? '' : '/'}$url';
 }
 
 class _StatusChip extends StatelessWidget {
