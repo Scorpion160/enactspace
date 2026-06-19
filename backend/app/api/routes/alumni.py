@@ -1,7 +1,8 @@
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import get_db
 from app.models.alumni import AlumniProfile, Mentorship
@@ -14,7 +15,11 @@ from app.schemas.alumni import (
     MentorshipUpdate,
     MentorshipRead,
 )
-from app.api.deps import get_current_user
+from app.api.deps import (
+    get_current_active_validated_user,
+    get_user_role_names,
+    require_enacchef_or_admin,
+)
 
 
 router = APIRouter(prefix="/alumni", tags=["Alumni & Mentorat"])
@@ -33,6 +38,58 @@ VALID_MENTORSHIP_STATUSES = {
     "completed",
     "cancelled",
 }
+
+ALUMNI_MANAGER_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+}
+
+ALUMNI_ENACCHEF_ROLES = ALUMNI_MANAGER_ROLES | {
+    "financier",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+    "faculty_advisor",
+}
+
+
+def can_manage_alumni(db: Session, user: User) -> bool:
+    return bool(get_user_role_names(db, user.id).intersection(ALUMNI_MANAGER_ROLES))
+
+
+def can_view_profile(db: Session, user: User, profile: AlumniProfile) -> bool:
+    if profile.user_id == user.id or can_manage_alumni(db, user):
+        return True
+    if profile.visibility == "private":
+        return False
+    if profile.visibility == "enacchef_only":
+        return bool(
+            get_user_role_names(db, user.id).intersection(ALUMNI_ENACCHEF_ROLES)
+        )
+    if profile.visibility == "alumni_only":
+        return user.status == "alumni"
+    return True
+
+
+def ensure_profile_access(
+    db: Session,
+    user: User,
+    profile: AlumniProfile,
+    *,
+    manage: bool = False,
+) -> None:
+    allowed = (
+        profile.user_id == user.id or can_manage_alumni(db, user)
+        if manage
+        else can_view_profile(db, user, profile)
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès non autorisé à ce profil alumni",
+        )
 
 
 def get_alumni_profile_or_404(db: Session, profile_id: str) -> AlumniProfile:
@@ -67,12 +124,27 @@ def get_mentorship_or_404(db: Session, mentorship_id: str) -> Mentorship:
 def create_alumni_profile(
     payload: AlumniProfileCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     if payload.visibility not in VALID_ALUMNI_VISIBILITIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Visibilité invalide",
+        )
+
+    if str(current_user.id) != str(payload.user_id) and not can_manage_alumni(
+        db, current_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez créer que votre propre profil alumni",
+        )
+
+    target_user = db.query(User).filter(User.id == payload.user_id).first()
+    if not target_user or target_user.status != "alumni":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le profil doit être rattaché à un compte Alumni validé",
         )
 
     existing = db.query(AlumniProfile).filter(
@@ -109,13 +181,32 @@ def create_alumni_profile(
 @router.get("/profiles", response_model=list[AlumniProfileRead])
 def list_alumni_profiles(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     search: str | None = Query(default=None),
     domain: str | None = Query(default=None),
     graduation_year: int | None = Query(default=None),
     available_for_mentoring: bool | None = Query(default=None),
 ):
-    query = db.query(AlumniProfile)
+    query = (
+        db.query(AlumniProfile)
+        .join(User, User.id == AlumniProfile.user_id)
+        .options(joinedload(AlumniProfile.user))
+    )
+
+    if not can_manage_alumni(db, current_user):
+        visible = ["internal"]
+        if current_user.status == "alumni":
+            visible.append("alumni_only")
+        if get_user_role_names(db, current_user.id).intersection(
+            ALUMNI_ENACCHEF_ROLES
+        ):
+            visible.append("enacchef_only")
+        query = query.filter(
+            or_(
+                AlumniProfile.user_id == current_user.id,
+                AlumniProfile.visibility.in_(visible),
+            )
+        )
 
     if search:
         pattern = f"%{search}%"
@@ -124,7 +215,9 @@ def list_alumni_profiles(
             (AlumniProfile.current_position.ilike(pattern)) |
             (AlumniProfile.domain.ilike(pattern)) |
             (AlumniProfile.skills.ilike(pattern)) |
-            (AlumniProfile.experience_summary.ilike(pattern))
+            (AlumniProfile.experience_summary.ilike(pattern)) |
+            (User.first_name.ilike(pattern)) |
+            (User.last_name.ilike(pattern))
         )
 
     if domain:
@@ -148,11 +241,14 @@ def list_alumni_profiles(
 def get_alumni_profile_by_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
-    profile = db.query(AlumniProfile).filter(
-        AlumniProfile.user_id == user_id
-    ).first()
+    profile = (
+        db.query(AlumniProfile)
+        .options(joinedload(AlumniProfile.user))
+        .filter(AlumniProfile.user_id == user_id)
+        .first()
+    )
 
     if not profile:
         raise HTTPException(
@@ -160,6 +256,7 @@ def get_alumni_profile_by_user(
             detail="Profil alumni introuvable pour cet utilisateur",
         )
 
+    ensure_profile_access(db, current_user, profile)
     return profile
 
 
@@ -167,9 +264,11 @@ def get_alumni_profile_by_user(
 def get_alumni_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
-    return get_alumni_profile_or_404(db, profile_id)
+    profile = get_alumni_profile_or_404(db, profile_id)
+    ensure_profile_access(db, current_user, profile)
+    return profile
 
 
 @router.patch("/profiles/{profile_id}", response_model=AlumniProfileRead)
@@ -177,9 +276,10 @@ def update_alumni_profile(
     profile_id: str,
     payload: AlumniProfileUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     profile = get_alumni_profile_or_404(db, profile_id)
+    ensure_profile_access(db, current_user, profile, manage=True)
 
     if payload.visibility is not None:
         if payload.visibility not in VALID_ALUMNI_VISIBILITIES:
@@ -218,9 +318,10 @@ def update_alumni_profile(
 def delete_alumni_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     profile = get_alumni_profile_or_404(db, profile_id)
+    ensure_profile_access(db, current_user, profile, manage=True)
 
     db.delete(profile)
     db.commit()
@@ -235,7 +336,7 @@ def delete_alumni_profile(
 def create_mentorship(
     payload: MentorshipCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     if payload.status not in VALID_MENTORSHIP_STATUSES:
         raise HTTPException(
@@ -247,6 +348,15 @@ def create_mentorship(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le mentorat doit être lié à un projet ou à un pôle",
+        )
+
+    alumni_profile = db.query(AlumniProfile).filter(
+        AlumniProfile.user_id == payload.alumni_id
+    ).first()
+    if not alumni_profile:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mentor doit posséder un profil Alumni validé",
         )
 
     mentorship = Mentorship(
@@ -271,7 +381,7 @@ def create_mentorship(
 @router.get("/mentorships", response_model=list[MentorshipRead])
 def list_mentorships(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     alumni_id: str | None = Query(default=None),
     project_id: str | None = Query(default=None),
     pole_id: str | None = Query(default=None),
@@ -298,7 +408,7 @@ def list_mentorships(
 def get_mentorship(
     mentorship_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     return get_mentorship_or_404(db, mentorship_id)
 
@@ -308,7 +418,7 @@ def update_mentorship(
     mentorship_id: str,
     payload: MentorshipUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     mentorship = get_mentorship_or_404(db, mentorship_id)
 
@@ -350,7 +460,7 @@ def update_mentorship(
 def complete_mentorship(
     mentorship_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     mentorship = get_mentorship_or_404(db, mentorship_id)
 
@@ -368,7 +478,7 @@ def complete_mentorship(
 def delete_mentorship(
     mentorship_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     mentorship = get_mentorship_or_404(db, mentorship_id)
 

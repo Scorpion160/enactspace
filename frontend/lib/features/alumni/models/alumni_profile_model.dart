@@ -11,6 +11,8 @@ class AlumniProfileModel {
   final String? linkedinUrl;
   final String? portfolioUrl;
   final String visibility;
+  final String displayName;
+  final String? photoUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +29,8 @@ class AlumniProfileModel {
     required this.linkedinUrl,
     required this.portfolioUrl,
     required this.visibility,
+    required this.displayName,
+    required this.photoUrl,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -45,6 +49,8 @@ class AlumniProfileModel {
       linkedinUrl: json['linkedin_url']?.toString(),
       portfolioUrl: json['portfolio_url']?.toString(),
       visibility: json['visibility']?.toString() ?? 'internal',
+      displayName: json['display_name']?.toString() ?? 'Alumni',
+      photoUrl: json['photo_url']?.toString(),
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),

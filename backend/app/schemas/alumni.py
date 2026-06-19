@@ -44,6 +44,8 @@ class AlumniProfileRead(BaseModel):
     linkedin_url: Optional[str]
     portfolio_url: Optional[str]
     visibility: str
+    display_name: str
+    photo_url: Optional[str]
     created_at: datetime
     updated_at: datetime
 

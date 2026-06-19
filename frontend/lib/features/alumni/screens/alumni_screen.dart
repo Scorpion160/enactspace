@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -21,6 +24,7 @@ class AlumniScreen extends StatefulWidget {
 
 class _AlumniScreenState extends State<AlumniScreen> {
   final AlumniService _alumniService = AlumniService();
+  final AuthService _authService = AuthService();
   final MembersService _membersService = MembersService();
   final ProjectsService _projectsService = ProjectsService();
   final PolesService _polesService = PolesService();
@@ -30,6 +34,8 @@ class _AlumniScreenState extends State<AlumniScreen> {
   String? _error;
   bool _mentorsOnly = false;
   String _mentorshipStatus = 'all';
+  int _selectedTab = 0;
+  UserExperience? _userExperience;
 
   List<AlumniProfileModel> _profiles = [];
   List<MentorshipModel> _mentorships = [];
@@ -56,6 +62,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
     });
 
     try {
+      final user = UserExperience.fromJson(await _authService.getCurrentUser());
       final profiles = await _alumniService.getProfiles(
         search: _searchController.text,
         availableForMentoring: _mentorsOnly ? true : null,
@@ -64,13 +71,20 @@ class _AlumniScreenState extends State<AlumniScreen> {
         status: _mentorshipStatus,
       );
 
-      final members = await _safe(() => _membersService.getMembers());
-      final projects = await _safe(() => _projectsService.getProjects());
-      final poles = await _safe(() => _polesService.getPoles());
+      final members = user.canViewMembersDirectory
+          ? await _safe(() => _membersService.getMembers())
+          : <MemberModel>[];
+      final projects = user.canViewOperations
+          ? await _safe(() => _projectsService.getProjects())
+          : <ProjectModel>[];
+      final poles = user.canViewOperations
+          ? await _safe(() => _polesService.getPoles())
+          : <PoleModel>[];
 
       if (!mounted) return;
 
       setState(() {
+        _userExperience = user;
         _profiles = profiles;
         _mentorships = mentorships;
         _members = members;
@@ -120,12 +134,30 @@ class _AlumniScreenState extends State<AlumniScreen> {
           service: _alumniService,
           members: _members,
           existingProfiles: _profiles,
+          currentUserId: _userExperience?.id,
+          canSelectUser: _canManageAlumni,
         );
       },
     );
 
     if (created == true) await _loadAlumni();
   }
+
+  bool get _canManageAlumni {
+    final user = _userExperience;
+    return user?.isAdmin == true ||
+        user?.isTeamLeader == true ||
+        user?.isSecretary == true;
+  }
+
+  bool get _canCreateOwnProfile {
+    final user = _userExperience;
+    if (user?.isAlumni != true) return false;
+    return !_profiles.any((profile) => profile.userId == user!.id);
+  }
+
+  bool get _canCreateProfile => _canManageAlumni || _canCreateOwnProfile;
+  bool get _canCreateMentorship => _userExperience?.isEnacchef == true;
 
   Future<void> _openCreateMentorshipSheet() async {
     final created = await showModalBottomSheet<bool>(
@@ -181,6 +213,8 @@ class _AlumniScreenState extends State<AlumniScreen> {
                               .length,
                           onCreateProfile: _openCreateProfileSheet,
                           onCreateMentorship: _openCreateMentorshipSheet,
+                          canCreateProfile: _canCreateProfile,
+                          canCreateMentorship: _canCreateMentorship,
                           onRefresh: _loadAlumni,
                         ),
                         const SizedBox(height: 18),
@@ -199,8 +233,11 @@ class _AlumniScreenState extends State<AlumniScreen> {
                           },
                         ),
                         const SizedBox(height: 18),
-                        const Card(
+                        Card(
                           child: TabBar(
+                            onTap: (index) {
+                              setState(() => _selectedTab = index);
+                            },
                             tabs: [
                               Tab(
                                 icon: Icon(Icons.school_rounded),
@@ -218,27 +255,18 @@ class _AlumniScreenState extends State<AlumniScreen> {
                           const _LoadingCard()
                         else if (_error != null)
                           _ErrorCard(message: _error!, onRetry: _loadAlumni)
+                        else if (_selectedTab == 0)
+                          _ProfilesGrid(
+                            profiles: _profiles,
+                            membersById: _membersById,
+                          )
                         else
-                          SizedBox(
-                            height: _tabHeight(
-                              context,
-                              _profiles.length,
-                              _mentorships.length,
-                            ),
-                            child: TabBarView(
-                              children: [
-                                _ProfilesGrid(
-                                  profiles: _profiles,
-                                  membersById: _membersById,
-                                ),
-                                _MentorshipsGrid(
-                                  mentorships: _mentorships,
-                                  membersById: _membersById,
-                                  projectsById: _projectsById,
-                                  polesById: _polesById,
-                                ),
-                              ],
-                            ),
+                          _MentorshipsGrid(
+                            mentorships: _mentorships,
+                            membersById: _membersById,
+                            profiles: _profiles,
+                            projectsById: _projectsById,
+                            polesById: _polesById,
                           ),
                       ],
                     ),
@@ -260,6 +288,8 @@ class _AlumniHeader extends StatelessWidget {
   final VoidCallback onCreateProfile;
   final VoidCallback onCreateMentorship;
   final VoidCallback onRefresh;
+  final bool canCreateProfile;
+  final bool canCreateMentorship;
 
   const _AlumniHeader({
     required this.total,
@@ -268,6 +298,8 @@ class _AlumniHeader extends StatelessWidget {
     required this.onCreateProfile,
     required this.onCreateMentorship,
     required this.onRefresh,
+    required this.canCreateProfile,
+    required this.canCreateMentorship,
   });
 
   @override
@@ -297,6 +329,8 @@ class _AlumniHeader extends StatelessWidget {
                   onCreateProfile: onCreateProfile,
                   onCreateMentorship: onCreateMentorship,
                   onRefresh: onRefresh,
+                  canCreateProfile: canCreateProfile,
+                  canCreateMentorship: canCreateMentorship,
                 ),
               ],
             )
@@ -315,6 +349,8 @@ class _AlumniHeader extends StatelessWidget {
                   onCreateProfile: onCreateProfile,
                   onCreateMentorship: onCreateMentorship,
                   onRefresh: onRefresh,
+                  canCreateProfile: canCreateProfile,
+                  canCreateMentorship: canCreateMentorship,
                 ),
               ],
             ),
@@ -391,11 +427,15 @@ class _HeaderActions extends StatelessWidget {
   final VoidCallback onCreateProfile;
   final VoidCallback onCreateMentorship;
   final VoidCallback onRefresh;
+  final bool canCreateProfile;
+  final bool canCreateMentorship;
 
   const _HeaderActions({
     required this.onCreateProfile,
     required this.onCreateMentorship,
     required this.onRefresh,
+    required this.canCreateProfile,
+    required this.canCreateMentorship,
   });
 
   @override
@@ -409,16 +449,18 @@ class _HeaderActions extends StatelessWidget {
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
         ),
-        ElevatedButton.icon(
-          onPressed: onCreateProfile,
-          icon: const Icon(Icons.person_add_alt_rounded),
-          label: const Text('Profil alumni'),
-        ),
-        ElevatedButton.icon(
-          onPressed: onCreateMentorship,
-          icon: const Icon(Icons.handshake_rounded),
-          label: const Text('Mentorat'),
-        ),
+        if (canCreateProfile)
+          ElevatedButton.icon(
+            onPressed: onCreateProfile,
+            icon: const Icon(Icons.person_add_alt_rounded),
+            label: const Text('Profil alumni'),
+          ),
+        if (canCreateMentorship)
+          ElevatedButton.icon(
+            onPressed: onCreateMentorship,
+            icon: const Icon(Icons.handshake_rounded),
+            label: const Text('Mentorat'),
+          ),
       ],
     );
   }
@@ -553,23 +595,23 @@ class _ProfilesGrid extends StatelessWidget {
             ? 2
             : 1;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: profiles.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 0.88 : 0.82,
-          ),
-          itemBuilder: (context, index) {
-            final profile = profiles[index];
-            return _ProfileCard(
-              profile: profile,
-              member: membersById[profile.userId],
-            );
-          },
+        const spacing = 14.0;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final profile in profiles)
+              SizedBox(
+                width: cardWidth,
+                child: _ProfileCard(
+                  profile: profile,
+                  member: membersById[profile.userId],
+                ),
+              ),
+          ],
         );
       },
     );
@@ -584,113 +626,123 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = member?.displayName ?? 'Alumni';
+    final name = member?.displayName ?? profile.displayName;
     final skills = _splitSkills(profile.skills);
+    final photoUrl = _absoluteUrl(member?.photoUrl ?? profile.photoUrl);
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppTheme.enactusYellow,
-                  foregroundColor: AppTheme.softBlack,
-                  child: Text(_initials(name)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+      child: InkWell(
+        onTap: () => _showAlumniDetails(context, profile, name, photoUrl),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppTheme.enactusYellow,
+                    foregroundColor: AppTheme.softBlack,
+                    backgroundImage: photoUrl == null
+                        ? null
+                        : NetworkImage(photoUrl),
+                    child: photoUrl == null ? Text(_initials(name)) : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _safeText(
-                          profile.currentPosition,
-                          fallback: 'Position à préciser',
+                        Text(
+                          _safeText(
+                            profile.currentPosition,
+                            fallback: 'Position à préciser',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.black54),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _SoftChip(
-                  icon: Icons.business_rounded,
-                  label: _safeText(
-                    profile.currentCompany,
-                    fallback: 'Entreprise',
-                  ),
-                ),
-                if (profile.graduationYear != null)
-                  _SoftChip(
-                    icon: Icons.school_rounded,
-                    label: 'Promo ${profile.graduationYear}',
-                  ),
-                if (profile.availableForMentoring)
-                  const _SoftChip(
-                    icon: Icons.handshake_rounded,
-                    label: 'Mentorat',
-                    highlighted: true,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _safeText(
-                profile.experienceSummary,
-                fallback: 'Parcours à compléter.',
+                ],
               ),
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(height: 1.4),
-            ),
-            const SizedBox(height: 14),
-            if (skills.isNotEmpty)
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: skills.take(5).map((skill) {
-                  return Chip(label: Text(skill));
-                }).toList(),
-              ),
-            const SizedBox(height: 16),
-            const Divider(height: 26),
-            Row(
-              children: [
-                const Icon(Icons.public_rounded, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _safeText(profile.domain, fallback: 'Domaine à préciser'),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                children: [
+                  _SoftChip(
+                    icon: Icons.business_rounded,
+                    label: _safeText(
+                      profile.currentCompany,
+                      fallback: 'Entreprise',
+                    ),
                   ),
+                  if (profile.graduationYear != null)
+                    _SoftChip(
+                      icon: Icons.school_rounded,
+                      label: 'Promo ${profile.graduationYear}',
+                    ),
+                  if (profile.availableForMentoring)
+                    const _SoftChip(
+                      icon: Icons.handshake_rounded,
+                      label: 'Mentorat',
+                      highlighted: true,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _safeText(
+                  profile.experienceSummary,
+                  fallback: 'Parcours à compléter.',
                 ),
-                Text(
-                  profile.visibilityLabel,
-                  style: const TextStyle(color: Colors.black54),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              if (skills.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: skills.take(5).map((skill) {
+                    return Chip(label: Text(skill));
+                  }).toList(),
                 ),
-              ],
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Divider(height: 26),
+              Row(
+                children: [
+                  const Icon(Icons.public_rounded, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _safeText(profile.domain, fallback: 'Domaine à préciser'),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  Text(
+                    profile.visibilityLabel,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right_rounded, size: 18),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -700,12 +752,14 @@ class _ProfileCard extends StatelessWidget {
 class _MentorshipsGrid extends StatelessWidget {
   final List<MentorshipModel> mentorships;
   final Map<String, MemberModel> membersById;
+  final List<AlumniProfileModel> profiles;
   final Map<String, ProjectModel> projectsById;
   final Map<String, PoleModel> polesById;
 
   const _MentorshipsGrid({
     required this.mentorships,
     required this.membersById,
+    required this.profiles,
     required this.projectsById,
     required this.polesById,
   });
@@ -724,28 +778,37 @@ class _MentorshipsGrid extends StatelessWidget {
             ? 2
             : 1;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: mentorships.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 1.15 : 0.95,
-          ),
-          itemBuilder: (context, index) {
-            final mentorship = mentorships[index];
-            return _MentorshipCard(
-              mentorship: mentorship,
-              alumniName:
-                  membersById[mentorship.alumniId]?.displayName ?? 'Alumni',
-              target: _targetName(mentorship, projectsById, polesById),
-            );
-          },
+        const spacing = 14.0;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final mentorship in mentorships)
+              SizedBox(
+                width: cardWidth,
+                child: _MentorshipCard(
+                  mentorship: mentorship,
+                  alumniName: _alumniName(mentorship.alumniId),
+                  target: _targetName(mentorship, projectsById, polesById),
+                ),
+              ),
+          ],
         );
       },
     );
+  }
+
+  String _alumniName(String userId) {
+    final member = membersById[userId];
+    if (member != null) return member.displayName;
+
+    for (final profile in profiles) {
+      if (profile.userId == userId) return profile.displayName;
+    }
+    return 'Alumni';
   }
 
   String _targetName(
@@ -854,11 +917,15 @@ class _CreateProfileSheet extends StatefulWidget {
   final AlumniService service;
   final List<MemberModel> members;
   final List<AlumniProfileModel> existingProfiles;
+  final String? currentUserId;
+  final bool canSelectUser;
 
   const _CreateProfileSheet({
     required this.service,
     required this.members,
     required this.existingProfiles,
+    required this.currentUserId,
+    required this.canSelectUser,
   });
 
   @override
@@ -882,6 +949,14 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (!widget.canSelectUser) {
+      _userId = widget.currentUserId;
+    }
+  }
+
+  @override
   void dispose() {
     _yearController.dispose();
     _companyController.dispose();
@@ -899,7 +974,9 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
         .map((profile) => profile.userId)
         .toSet();
     return widget.members
-        .where((member) => !usedIds.contains(member.id))
+        .where(
+          (member) => member.status == 'alumni' && !usedIds.contains(member.id),
+        )
         .toList();
   }
 
@@ -948,23 +1025,36 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DropdownButtonFormField<String>(
-              initialValue: _userId,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Utilisateur',
-                prefixIcon: Icon(Icons.person_rounded),
+            if (widget.canSelectUser)
+              DropdownButtonFormField<String>(
+                initialValue: _userId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Utilisateur Alumni',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+                items: _availableMembers.map((member) {
+                  return DropdownMenuItem(
+                    value: member.id,
+                    child: Text(member.displayName),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _userId = value),
+                validator: (value) =>
+                    value == null ? 'Choisis un utilisateur.' : null,
+              )
+            else
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.enactusYellow,
+                  child: Icon(Icons.person_rounded),
+                ),
+                title: Text('Mon profil Alumni'),
+                subtitle: Text(
+                  'Ce profil sera rattaché à votre compte validé.',
+                ),
               ),
-              items: _availableMembers.map((member) {
-                return DropdownMenuItem(
-                  value: member.id,
-                  child: Text(member.displayName),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _userId = value),
-              validator: (value) =>
-                  value == null ? 'Choisis un utilisateur.' : null,
-            ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _yearController,
@@ -1376,18 +1466,146 @@ class _EmptyCard extends StatelessWidget {
   }
 }
 
-double _tabHeight(BuildContext context, int profiles, int mentorships) {
-  final width = MediaQuery.sizeOf(context).width;
-  final maxItems = profiles > mentorships ? profiles : mentorships;
-  final columns = width >= 1120
-      ? 3
-      : width >= 740
-      ? 2
-      : 1;
-  final rows = (maxItems / columns).ceil().clamp(1, 20);
-  final cardHeight = width >= 740 ? 450.0 : 390.0;
+void _showAlumniDetails(
+  BuildContext context,
+  AlumniProfileModel profile,
+  String name,
+  String? photoUrl,
+) {
+  final skills = _splitSkills(profile.skills);
 
-  return rows * cardHeight + (rows - 1) * 14;
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (context) {
+      return _SheetFrame(
+        title: 'Profil Alumni',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 34,
+                  backgroundColor: AppTheme.enactusYellow,
+                  foregroundColor: AppTheme.softBlack,
+                  backgroundImage: photoUrl == null
+                      ? null
+                      : NetworkImage(photoUrl),
+                  child: photoUrl == null ? Text(_initials(name)) : null,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        _safeText(
+                          profile.currentPosition,
+                          fallback: 'Position à préciser',
+                        ),
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _SoftChip(
+                  icon: Icons.business_rounded,
+                  label: _safeText(
+                    profile.currentCompany,
+                    fallback: 'Entreprise à préciser',
+                  ),
+                ),
+                _SoftChip(
+                  icon: Icons.public_rounded,
+                  label: _safeText(
+                    profile.domain,
+                    fallback: 'Domaine à préciser',
+                  ),
+                ),
+                if (profile.graduationYear != null)
+                  _SoftChip(
+                    icon: Icons.school_rounded,
+                    label: 'Promotion ${profile.graduationYear}',
+                  ),
+                if (profile.availableForMentoring)
+                  const _SoftChip(
+                    icon: Icons.handshake_rounded,
+                    label: 'Disponible pour mentorat',
+                    highlighted: true,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Parcours',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _safeText(
+                profile.experienceSummary,
+                fallback: 'Parcours à compléter.',
+              ),
+              style: const TextStyle(height: 1.5),
+            ),
+            if (skills.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Expertises',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final skill in skills) Chip(label: Text(skill)),
+                ],
+              ),
+            ],
+            if ((profile.linkedinUrl ?? '').trim().isNotEmpty ||
+                (profile.portfolioUrl ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Liens professionnels',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              if ((profile.linkedinUrl ?? '').trim().isNotEmpty)
+                SelectableText(profile.linkedinUrl!.trim()),
+              if ((profile.portfolioUrl ?? '').trim().isNotEmpty)
+                SelectableText(profile.portfolioUrl!.trim()),
+            ],
+            const SizedBox(height: 24),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+String? _absoluteUrl(String? value) {
+  final url = value?.trim();
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return '${ApiClient.serverUrl}${url.startsWith('/') ? '' : '/'}$url';
 }
 
 String _safeText(String? value, {required String fallback}) {

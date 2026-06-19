@@ -4,7 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean
 from app.db.types import GUID
 
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
@@ -43,6 +43,16 @@ class AlumniProfile(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.user.first_name} {self.user.last_name}".strip()
+
+    @property
+    def photo_url(self) -> str | None:
+        return self.user.photo_url
 
 
 class Mentorship(Base):
