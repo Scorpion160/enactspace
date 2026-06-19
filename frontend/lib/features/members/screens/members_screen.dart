@@ -200,11 +200,19 @@ class _MembersScreenState extends State<MembersScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredMembers = _filteredMembers;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 560
+        ? 14.0
+        : 24.0;
 
     return RefreshIndicator(
       onRefresh: _loadMembers,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          20,
+          horizontalPadding,
+          28,
+        ),
         children: [
           _MembersHeader(
             total: _members.length,
@@ -508,29 +516,28 @@ class _MembersList extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final count = constraints.maxWidth >= 820 ? 2 : 1;
+        const spacing = 12.0;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: members.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: count == 1 ? 236 : 248,
-          ),
-          itemBuilder: (context, index) {
-            final member = members[index];
-            return _MemberCard(
-              member: member,
-              onDetails: () => _showMemberDetails(context, member),
-              onApprove: member.status == 'pending'
-                  ? () => onApprove(member)
-                  : null,
-              onAssignRole: () => onAssignRole(member),
-              onAssignDepartment: () => onAssignDepartment(member),
-            );
-          },
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final member in members)
+              SizedBox(
+                width: cardWidth,
+                child: _MemberCard(
+                  member: member,
+                  onDetails: () => _showMemberDetails(context, member),
+                  onApprove: member.status == 'pending'
+                      ? () => onApprove(member)
+                      : null,
+                  onAssignRole: () => onAssignRole(member),
+                  onAssignDepartment: () => onAssignDepartment(member),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -661,7 +668,7 @@ class _MemberCard extends StatelessWidget {
                 _DepartmentChip(department: member.departmentLabel),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             const Divider(height: 20),
             Wrap(
               spacing: 4,

@@ -594,19 +594,20 @@ class _PriorityGrid extends StatelessWidget {
             ? 2
             : 1;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            mainAxisExtent: count == 1 ? 132 : 174,
-          ),
-          itemBuilder: (context, index) {
-            return _StatCard(item: items[index]);
-          },
+        final spacing = 14.0;
+        final cardWidth =
+            (constraints.maxWidth - (spacing * (count - 1))) / count;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: cardWidth,
+                child: _StatCard(item: item),
+              ),
+          ],
         );
       },
     );
@@ -650,8 +651,8 @@ class _StatCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
@@ -669,6 +670,7 @@ class _StatCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 18),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

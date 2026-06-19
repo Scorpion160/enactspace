@@ -229,10 +229,19 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 560
+        ? 14.0
+        : 24.0;
+
     return RefreshIndicator(
       onRefresh: _loadRecruitment,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          20,
+          horizontalPadding,
+          28,
+        ),
         children: [
           _RecruitmentHeader(
             campaigns: _campaigns.length,
@@ -477,49 +486,52 @@ class _StatsGrid extends StatelessWidget {
             : constraints.maxWidth >= 760
             ? 3
             : 2;
+        const spacing = 10.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (count - 1)) / count;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: stats.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.7,
-          ),
-          itemBuilder: (context, index) {
-            final stat = stats[index];
-
-            return Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(stat.icon, color: AppTheme.enactusYellow),
-                  const SizedBox(height: 8),
-                  Text(
-                    stat.value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                    ),
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final stat in stats)
+              SizedBox(
+                width: itemWidth,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 116),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white10),
                   ),
-                  Text(
-                    stat.label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(stat.icon, color: AppTheme.enactusYellow),
+                      const SizedBox(height: 8),
+                      Text(
+                        stat.value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                      Text(
+                        stat.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            );
-          },
+          ],
         );
       },
     );

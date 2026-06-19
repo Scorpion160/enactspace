@@ -561,7 +561,7 @@ class _ProfilesGrid extends StatelessWidget {
             crossAxisCount: count,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 1.35 : 0.98,
+            childAspectRatio: count == 1 ? 0.88 : 0.82,
           ),
           itemBuilder: (context, index) {
             final profile = profiles[index];
@@ -671,7 +671,7 @@ class _ProfileCard extends StatelessWidget {
                   return Chip(label: Text(skill));
                 }).toList(),
               ),
-            const Spacer(),
+            const SizedBox(height: 16),
             const Divider(height: 26),
             Row(
               children: [
@@ -732,7 +732,7 @@ class _MentorshipsGrid extends StatelessWidget {
             crossAxisCount: count,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
-            childAspectRatio: count == 1 ? 1.65 : 1.12,
+            childAspectRatio: count == 1 ? 1.15 : 0.95,
           ),
           itemBuilder: (context, index) {
             final mentorship = mentorships[index];
@@ -1385,7 +1385,7 @@ double _tabHeight(BuildContext context, int profiles, int mentorships) {
       ? 2
       : 1;
   final rows = (maxItems / columns).ceil().clamp(1, 20);
-  final cardHeight = width >= 740 ? 380.0 : 330.0;
+  final cardHeight = width >= 740 ? 450.0 : 390.0;
 
   return rows * cardHeight + (rows - 1) * 14;
 }
