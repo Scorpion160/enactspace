@@ -1,4 +1,4 @@
-package com.example.frontend
+package sn.enactusesp.enactspace
 
 import io.flutter.embedding.android.FlutterActivity
 

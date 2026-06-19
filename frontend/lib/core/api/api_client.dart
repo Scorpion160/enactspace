@@ -1,9 +1,27 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  static const String serverUrl = 'http://127.0.0.1:8000';
-  static const String baseUrl = '$serverUrl/api';
+  static const String _configuredServerUrl = String.fromEnvironment(
+    'ENACTSPACE_API_URL',
+    defaultValue: '',
+  );
+
+  static String get serverUrl {
+    if (_configuredServerUrl.trim().isNotEmpty) {
+      return _configuredServerUrl.trim().replaceFirst(RegExp(r'/$'), '');
+    }
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
+
+    return 'http://127.0.0.1:8000';
+  }
+
+  static String get baseUrl => '$serverUrl/api';
 
   final http.Client _client;
 
