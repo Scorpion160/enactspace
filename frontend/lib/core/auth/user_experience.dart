@@ -180,6 +180,7 @@ class UserExperience {
       '/posts',
       '/chat',
       '/tasks',
+      '/attendance',
       '/documents',
       '/events',
       '/gamification',
@@ -188,10 +189,6 @@ class UserExperience {
     };
 
     routes.addAll({'/poles', '/projects'});
-
-    if (user.canManageAttendance) {
-      routes.add('/attendance');
-    }
 
     if (user.canViewMembersDirectory) {
       routes.add('/members');

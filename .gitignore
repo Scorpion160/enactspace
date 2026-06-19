@@ -14,6 +14,7 @@ env/
 
 # FastAPI / logs
 *.log
+*.err
 backend/uploads/
 
 # SQLite dev database

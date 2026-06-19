@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../models/attendance_record_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
 import 'attendance_session_detail_screen.dart';
@@ -12,12 +15,17 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
+  final AuthService _authService = AuthService();
   final AttendanceService _attendanceService = AttendanceService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
+  UserExperience? _user;
   List<AttendanceSessionModel> _sessions = [];
+  List<AttendanceRecordModel> _myRecords = [];
+  String _view = 'personal';
+  bool _viewInitialized = false;
   String _statusFilter = 'all';
   String _typeFilter = 'all';
 
@@ -40,12 +48,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     try {
-      final sessions = await _attendanceService.getSessions();
+      final cachedUser = await _authService.getCachedCurrentUser();
+      final results = await Future.wait([
+        _attendanceService.getSessions(),
+        _attendanceService.getMyRecords(),
+      ]);
 
       if (!mounted) return;
 
       setState(() {
-        _sessions = sessions;
+        _user = cachedUser == null ? null : UserExperience.fromJson(cachedUser);
+        _sessions = results[0] as List<AttendanceSessionModel>;
+        _myRecords = results[1] as List<AttendanceRecordModel>;
+        if (!_viewInitialized) {
+          _view = _user?.canManageAttendance == true
+              ? 'management'
+              : 'personal';
+          _viewInitialized = true;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -123,37 +143,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = _user?.canManageAttendance == true;
+
     return RefreshIndicator(
       onRefresh: _loadSessions,
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          _AttendanceHeader(
-            total: _sessions.length,
-            open: _openCount,
-            closed: _closedCount,
-            scheduledSoon: _scheduledSoonCount,
-            onRefresh: _loadSessions,
-            onCreate: _openCreateSessionDialog,
-          ),
-          const SizedBox(height: 22),
-          _AttendanceFiltersCard(
-            controller: _searchController,
-            statusFilter: _statusFilter,
-            typeFilter: _typeFilter,
-            onChanged: () => setState(() {}),
-            onStatusChanged: (value) {
-              setState(() {
-                _statusFilter = value;
-              });
-            },
-            onTypeChanged: (value) {
-              setState(() {
-                _typeFilter = value;
-              });
-            },
-          ),
-          const SizedBox(height: 18),
+          if (canManage) ...[
+            _AttendanceViewSwitch(
+              value: _view,
+              onChanged: (value) => setState(() => _view = value),
+            ),
+            const SizedBox(height: 18),
+          ],
           if (_loading)
             const Center(
               child: Padding(
@@ -163,16 +166,376 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             )
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _loadSessions)
-          else if (_sessions.isEmpty)
-            const _EmptySessionsCard()
-          else if (_filteredSessions.isEmpty)
-            const _NoSessionMatchCard()
+          else if (_view == 'personal')
+            _PersonalAttendanceView(
+              records: _myRecords,
+              sessions: _sessions,
+              onRefresh: _loadSessions,
+            )
           else
-            _SessionsList(sessions: _filteredSessions),
+            ..._buildManagementView(),
         ],
       ),
     );
   }
+
+  List<Widget> _buildManagementView() {
+    return [
+      _AttendanceHeader(
+        total: _sessions.length,
+        open: _openCount,
+        closed: _closedCount,
+        scheduledSoon: _scheduledSoonCount,
+        onRefresh: _loadSessions,
+        onCreate: _openCreateSessionDialog,
+      ),
+      const SizedBox(height: 22),
+      _AttendanceFiltersCard(
+        controller: _searchController,
+        statusFilter: _statusFilter,
+        typeFilter: _typeFilter,
+        onChanged: () => setState(() {}),
+        onStatusChanged: (value) => setState(() => _statusFilter = value),
+        onTypeChanged: (value) => setState(() => _typeFilter = value),
+      ),
+      const SizedBox(height: 18),
+      if (_sessions.isEmpty)
+        const _EmptySessionsCard()
+      else if (_filteredSessions.isEmpty)
+        const _NoSessionMatchCard()
+      else
+        _SessionsList(sessions: _filteredSessions),
+    ];
+  }
+}
+
+class _AttendanceViewSwitch extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _AttendanceViewSwitch({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(
+            value: 'management',
+            icon: Icon(Icons.groups_rounded),
+            label: Text('Gestion'),
+          ),
+          ButtonSegment(
+            value: 'personal',
+            icon: Icon(Icons.person_rounded),
+            label: Text('Mon suivi'),
+          ),
+        ],
+        selected: {value},
+        onSelectionChanged: (values) => onChanged(values.first),
+      ),
+    );
+  }
+}
+
+class _PersonalAttendanceView extends StatelessWidget {
+  final List<AttendanceRecordModel> records;
+  final List<AttendanceSessionModel> sessions;
+  final VoidCallback onRefresh;
+
+  const _PersonalAttendanceView({
+    required this.records,
+    required this.sessions,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final present = records
+        .where((record) => record.status == 'present')
+        .length;
+    final late = records.where((record) => record.status == 'retard').length;
+    final justified = records.where(_isJustifiedAbsence).length;
+    final absent = records.where(_isUnjustifiedAbsence).length;
+    final attended = present + late;
+    final rate = records.isEmpty
+        ? 0
+        : ((attended / records.length) * 100).round();
+    final sessionsById = {for (final session in sessions) session.id: session};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppTheme.softBlack,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: AppTheme.enactusYellow,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.fact_check_rounded,
+                      color: AppTheme.softBlack,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mon suivi de présence',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Mes présences, retards et absences uniquement.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onRefresh,
+                    tooltip: 'Actualiser',
+                    color: Colors.white,
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _PersonalMetric(label: 'Assiduité', value: '$rate%'),
+                  _PersonalMetric(label: 'Présences', value: '$present'),
+                  _PersonalMetric(label: 'Retards', value: '$late'),
+                  _PersonalMetric(label: 'Justifiées', value: '$justified'),
+                  _PersonalMetric(label: 'Absences', value: '$absent'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        const Text(
+          'Mon historique',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 12),
+        if (records.isEmpty)
+          const _EmptyPersonalAttendance()
+        else
+          ...records.map((record) {
+            final session = sessionsById[record.sessionId];
+            return _PersonalAttendanceTile(record: record, session: session);
+          }),
+      ],
+    );
+  }
+}
+
+class _PersonalMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PersonalMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 112),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppTheme.enactusYellow,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(label, style: const TextStyle(color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonalAttendanceTile extends StatelessWidget {
+  final AttendanceRecordModel record;
+  final AttendanceSessionModel? session;
+
+  const _PersonalAttendanceTile({required this.record, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _attendanceStatusColor(record.status);
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          session?.title ?? 'Session de présence',
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          session?.dateLabel ?? _recordDateLabel(record),
+          style: const TextStyle(color: Colors.black54),
+        ),
+        if (record.justification?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 8),
+          Text(
+            record.justification!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+    final status = Chip(
+      label: Text(record.statusLabel),
+      backgroundColor: color.withAlpha(24),
+      side: BorderSide(color: color.withAlpha(70)),
+      labelStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final avatar = CircleAvatar(
+              backgroundColor: color.withAlpha(28),
+              foregroundColor: color,
+              child: Icon(_attendanceStatusIcon(record.status)),
+            );
+
+            if (constraints.maxWidth >= 520) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  avatar,
+                  const SizedBox(width: 14),
+                  Expanded(child: details),
+                  const SizedBox(width: 10),
+                  status,
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    avatar,
+                    const SizedBox(width: 14),
+                    Expanded(child: details),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerLeft, child: status),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPersonalAttendance extends StatelessWidget {
+  const _EmptyPersonalAttendance();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(28),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.event_available_rounded, size: 42),
+              SizedBox(height: 10),
+              Text(
+                'Aucun pointage enregistré pour le moment.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isJustifiedAbsence(AttendanceRecordModel record) {
+  return record.status == 'absent_justifie' ||
+      record.status == 'absence_justifiee';
+}
+
+bool _isUnjustifiedAbsence(AttendanceRecordModel record) {
+  return record.status == 'absent_non_justifie' ||
+      record.status == 'absence_non_justifiee';
+}
+
+Color _attendanceStatusColor(String status) {
+  if (status == 'present') return Colors.green.shade700;
+  if (status == 'retard') return Colors.orange.shade800;
+  if (_isJustifiedStatus(status)) return Colors.blue.shade700;
+  return Colors.red.shade700;
+}
+
+IconData _attendanceStatusIcon(String status) {
+  if (status == 'present') return Icons.check_rounded;
+  if (status == 'retard') return Icons.schedule_rounded;
+  if (_isJustifiedStatus(status)) return Icons.verified_rounded;
+  return Icons.close_rounded;
+}
+
+bool _isJustifiedStatus(String status) {
+  return status == 'absent_justifie' || status == 'absence_justifiee';
+}
+
+String _recordDateLabel(AttendanceRecordModel record) {
+  final date = DateTime.tryParse(record.checkinTime ?? '');
+  if (date == null) return 'Date non disponible';
+
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '$day/$month/${date.year} à $hour:$minute';
 }
 
 class _AttendanceHeader extends StatelessWidget {

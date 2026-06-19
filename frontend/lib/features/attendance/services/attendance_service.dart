@@ -139,6 +139,25 @@ class AttendanceService {
         .toList();
   }
 
+  Future<List<AttendanceRecordModel>> getMyRecords() async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.get(
+      '/attendance/my-records',
+      token: token,
+    );
+
+    final rawList = response is List ? response : const <dynamic>[];
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceRecordModel.fromJson)
+        .toList();
+  }
+
   Future<void> addExpectedMember({
     required String sessionId,
     required String userId,
