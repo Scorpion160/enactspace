@@ -24,6 +24,7 @@ from app.api.deps import (
     get_user_role_names,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.notification_service import notify_user
 
 
 router = APIRouter(prefix="/users", tags=["Utilisateurs"])
@@ -379,6 +380,16 @@ def approve_user(
     if not existing_role:
         db.add(UserRole(user_id=user.id, role_id=role.id))
 
+    notify_user(
+        db,
+        user_id=user.id,
+        title="Compte EnactSpace validé",
+        message="Votre compte est validé. Vous pouvez maintenant vous connecter.",
+        notification_type="account_approved",
+        related_type="user",
+        related_id=user.id,
+    )
+
     create_audit_log(
         db=db,
         action="validation_compte",
@@ -415,6 +426,16 @@ def reject_user(
 
     user.status = "rejected"
     user.updated_at = datetime.utcnow()
+
+    notify_user(
+        db,
+        user_id=user.id,
+        title="Demande de compte non validée",
+        message="Votre demande EnactSpace n’a pas été validée.",
+        notification_type="account_rejected",
+        related_type="user",
+        related_id=user.id,
+    )
 
     create_audit_log(
         db=db,
@@ -508,6 +529,16 @@ def make_user_alumni(
     if not has_alumni_role:
         db.add(UserRole(user_id=user.id, role_id=alumni_role.id))
 
+    notify_user(
+        db,
+        user_id=user.id,
+        title="Passage au statut Alumni",
+        message="Votre espace EnactSpace est désormais adapté au parcours Alumni.",
+        notification_type="role_assigned",
+        related_type="user",
+        related_id=user.id,
+    )
+
     create_audit_log(
         db=db,
         action="passage_alumni",
@@ -589,6 +620,17 @@ def assign_roles_to_user(
     db.flush()
 
     new_roles = sorted(list(get_user_role_names(db, user.id)))
+
+    if new_roles != old_roles:
+        notify_user(
+            db,
+            user_id=user.id,
+            title="Responsabilités mises à jour",
+            message="Vos rôles EnactSpace ont été mis à jour.",
+            notification_type="role_assigned",
+            related_type="user",
+            related_id=user.id,
+        )
 
     create_audit_log(
         db=db,

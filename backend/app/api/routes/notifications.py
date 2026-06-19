@@ -13,7 +13,7 @@ from app.schemas.notification import (
     NotificationRead,
     NotificationCountRead,
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_enacchef_or_admin
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -21,6 +21,8 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 VALID_NOTIFICATION_TYPES = {
     "task_assigned",
+    "task_updated",
+    "task_validated",
     "deadline_near",
     "task_late",
     "new_announcement",
@@ -30,6 +32,9 @@ VALID_NOTIFICATION_TYPES = {
     "payment_validated",
     "application_received",
     "recruitment_update",
+    "account_approved",
+    "account_rejected",
+    "role_assigned",
     "document_shared",
     "mentorship_assigned",
     "general",
@@ -72,7 +77,7 @@ def create_notification_object(
 def create_notification(
     payload: NotificationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     if payload.type and payload.type not in VALID_NOTIFICATION_TYPES:
         raise HTTPException(
@@ -100,7 +105,7 @@ def create_notification(
 def create_bulk_notifications(
     payload: BulkNotificationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_enacchef_or_admin),
 ):
     if payload.type and payload.type not in VALID_NOTIFICATION_TYPES:
         raise HTTPException(

@@ -28,7 +28,9 @@ from app.schemas.task import (
 from app.api.deps import (
     get_current_active_validated_user,
     require_enacchef_or_admin,
+    user_has_any_role,
 )
+from app.services.notification_service import notify_user, notify_users
 
 router = APIRouter(prefix="/tasks", tags=["Tâches"])
 
@@ -47,6 +49,16 @@ VALID_TASK_PRIORITIES = {
     "normale",
     "haute",
     "urgente",
+}
+
+TASK_MANAGER_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
 }
 
 
@@ -70,6 +82,37 @@ def task_is_late(task: Task) -> bool:
         return False
 
     return datetime.utcnow() > task.due_date
+
+
+def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
+    is_manager = user_has_any_role(db, user.id, TASK_MANAGER_ROLES)
+    is_assignee = (
+        db.query(TaskAssignee.id)
+        .filter(
+            TaskAssignee.task_id == task.id,
+            TaskAssignee.user_id == user.id,
+        )
+        .first()
+        is not None
+    )
+
+    if not is_manager and not is_assignee:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action réservée aux responsables et aux membres assignés",
+        )
+    return is_manager
+
+
+def visible_tasks_query(db: Session, user: User):
+    query = db.query(Task)
+    if user_has_any_role(db, user.id, TASK_MANAGER_ROLES):
+        return query
+
+    task_ids = db.query(TaskAssignee.task_id).filter(
+        TaskAssignee.user_id == user.id
+    )
+    return query.filter(Task.id.in_(task_ids))
 
 
 @router.post("/", response_model=TaskRead)
@@ -107,6 +150,16 @@ def create_task(
         )
         db.add(assignee)
 
+    notify_users(
+        db,
+        user_ids=payload.assignee_ids,
+        title="Nouvelle tâche assignée",
+        message=f"Vous êtes assigné à la tâche « {task.title} ».",
+        notification_type="task_assigned",
+        related_type="task",
+        related_id=task.id,
+    )
+
     db.commit()
     db.refresh(task)
 
@@ -118,7 +171,9 @@ def list_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Task).order_by(Task.created_at.desc()).all()
+    return visible_tasks_query(db, current_user).order_by(
+        Task.created_at.desc()
+    ).all()
 
 
 @router.get("/my", response_model=list[TaskRead])
@@ -142,7 +197,7 @@ def list_late_tasks(
 ):
     now = datetime.utcnow()
 
-    return db.query(Task).filter(
+    return visible_tasks_query(db, current_user).filter(
         Task.due_date.isnot(None),
         Task.due_date < now,
         Task.status.notin_(["termine", "valide", "annule"]),
@@ -155,7 +210,7 @@ def list_project_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Task).filter(
+    return visible_tasks_query(db, current_user).filter(
         Task.project_id == project_id
     ).order_by(Task.created_at.desc()).all()
 
@@ -166,7 +221,7 @@ def list_pole_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Task).filter(
+    return visible_tasks_query(db, current_user).filter(
         Task.pole_id == pole_id
     ).order_by(Task.created_at.desc()).all()
 
@@ -177,7 +232,9 @@ def get_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return get_task_or_404(db, task_id)
+    task = get_task_or_404(db, task_id)
+    ensure_task_actor(db, task, current_user)
+    return task
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
@@ -231,6 +288,19 @@ def update_task(
 
     task.updated_at = datetime.utcnow()
 
+    assignee_ids = db.query(TaskAssignee.user_id).filter(
+        TaskAssignee.task_id == task.id
+    ).all()
+    notify_users(
+        db,
+        user_ids=[row[0] for row in assignee_ids],
+        title="Tâche mise à jour",
+        message=f"La tâche « {task.title} » a été modifiée.",
+        notification_type="task_updated",
+        related_type="task",
+        related_id=task.id,
+    )
+
     db.commit()
     db.refresh(task)
 
@@ -242,14 +312,25 @@ def change_task_status(
     task_id: str,
     payload: TaskStatusChange,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
+    is_manager = ensure_task_actor(db, task, current_user)
 
     if payload.status not in VALID_TASK_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut invalide",
+        )
+    if not is_manager and payload.status not in {
+        "a_faire",
+        "en_cours",
+        "bloque",
+        "termine",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ce statut doit être appliqué par un responsable",
         )
 
     if payload.status == "termine" and task.proof_required and not task.proof_url:
@@ -270,6 +351,19 @@ def change_task_status(
 
     task.updated_at = datetime.utcnow()
 
+    assignee_ids = db.query(TaskAssignee.user_id).filter(
+        TaskAssignee.task_id == task.id
+    ).all()
+    notify_users(
+        db,
+        user_ids=[row[0] for row in assignee_ids],
+        title="Statut de tâche modifié",
+        message=f"La tâche « {task.title} » est maintenant {task.status}.",
+        notification_type="task_updated",
+        related_type="task",
+        related_id=task.id,
+    )
+
     db.commit()
     db.refresh(task)
 
@@ -284,6 +378,7 @@ def submit_task_proof(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
+    ensure_task_actor(db, task, current_user)
 
     task.proof_url = payload.proof_url
     task.updated_at = datetime.utcnow()
@@ -318,6 +413,19 @@ def validate_task(
     task.validated_by = current_user.id
     task.validated_at = datetime.utcnow()
     task.updated_at = datetime.utcnow()
+
+    assignee_ids = db.query(TaskAssignee.user_id).filter(
+        TaskAssignee.task_id == task.id
+    ).all()
+    notify_users(
+        db,
+        user_ids=[row[0] for row in assignee_ids],
+        title="Tâche validée",
+        message=f"La tâche « {task.title} » a été validée.",
+        notification_type="task_validated",
+        related_type="task",
+        related_id=task.id,
+    )
 
     db.commit()
     db.refresh(task)
@@ -368,6 +476,15 @@ def add_task_assignees(
 
         db.add(assignee)
         created.append(assignee)
+        notify_user(
+            db,
+            user_id=user_id,
+            title="Nouvelle tâche assignée",
+            message=f"Vous êtes assigné à la tâche « {task.title} ».",
+            notification_type="task_assigned",
+            related_type="task",
+            related_id=task.id,
+        )
 
     db.commit()
 
@@ -383,7 +500,8 @@ def list_task_assignees(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_task_or_404(db, task_id)
+    task = get_task_or_404(db, task_id)
+    ensure_task_actor(db, task, current_user)
 
     return db.query(TaskAssignee).filter(
         TaskAssignee.task_id == task_id
@@ -444,7 +562,8 @@ def list_checklist_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_task_or_404(db, task_id)
+    task = get_task_or_404(db, task_id)
+    ensure_task_actor(db, task, current_user)
 
     return db.query(TaskChecklistItem).filter(
         TaskChecklistItem.task_id == task_id
@@ -513,7 +632,8 @@ def create_task_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_task_or_404(db, str(payload.task_id))
+    task = get_task_or_404(db, str(payload.task_id))
+    ensure_task_actor(db, task, current_user)
 
     comment = TaskComment(
         task_id=payload.task_id,
@@ -534,7 +654,8 @@ def list_task_comments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_task_or_404(db, task_id)
+    task = get_task_or_404(db, task_id)
+    ensure_task_actor(db, task, current_user)
 
     return db.query(TaskComment).filter(
         TaskComment.task_id == task_id
