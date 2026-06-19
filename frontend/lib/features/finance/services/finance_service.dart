@@ -26,6 +26,17 @@ class FinanceService {
         .toList();
   }
 
+  Future<FinancialAccountModel> getMyAccount() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get('/finance/accounts/me', token: token);
+    if (response is Map<String, dynamic>) {
+      return FinancialAccountModel.fromJson(response);
+    }
+    throw Exception('Réponse financière personnelle invalide.');
+  }
+
   Future<List<FeeModel>> getFees() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -40,6 +51,16 @@ class FinanceService {
         .toList();
   }
 
+  Future<List<FeeModel>> getMyFees() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get('/finance/fees/me', token: token);
+    return _extractList(
+      response,
+    ).whereType<Map<String, dynamic>>().map(FeeModel.fromJson).toList();
+  }
+
   Future<List<PaymentModel>> getPayments() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -52,6 +73,16 @@ class FinanceService {
         .whereType<Map<String, dynamic>>()
         .map(PaymentModel.fromJson)
         .toList();
+  }
+
+  Future<List<PaymentModel>> getMyPayments() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get('/finance/payments/me', token: token);
+    return _extractList(
+      response,
+    ).whereType<Map<String, dynamic>>().map(PaymentModel.fromJson).toList();
   }
 
   Future<PaymentModel> createPayment({

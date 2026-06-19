@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -16,6 +18,7 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   final FinanceService _financeService = FinanceService();
+  final AuthService _authService = AuthService();
   final MembersService _membersService = MembersService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -28,6 +31,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
   List<FinancialAccountModel> _accounts = [];
   List<FeeModel> _fees = [];
   List<PaymentModel> _payments = [];
+  UserExperience? _userExperience;
+
+  bool get _canManageFinance => _userExperience?.canManageFinance == true;
 
   @override
   void initState() {
@@ -48,20 +54,44 @@ class _FinanceScreenState extends State<FinanceScreen> {
     });
 
     try {
-      final results = await Future.wait([
-        _membersService.getMembers(),
-        _financeService.getAccounts(),
-        _financeService.getFees(),
-        _financeService.getPayments(),
-      ]);
+      final userJson = await _authService.getCurrentUser();
+      final user = UserExperience.fromJson(userJson);
+      final List<MemberModel> members;
+      final List<FinancialAccountModel> accounts;
+      final List<FeeModel> fees;
+      final List<PaymentModel> payments;
+
+      if (user.canManageFinance) {
+        final results = await Future.wait([
+          _membersService.getMembers(),
+          _financeService.getAccounts(),
+          _financeService.getFees(),
+          _financeService.getPayments(),
+        ]);
+        members = results[0] as List<MemberModel>;
+        accounts = results[1] as List<FinancialAccountModel>;
+        fees = results[2] as List<FeeModel>;
+        payments = results[3] as List<PaymentModel>;
+      } else {
+        final results = await Future.wait([
+          _financeService.getMyAccount(),
+          _financeService.getMyFees(),
+          _financeService.getMyPayments(),
+        ]);
+        members = [MemberModel.fromJson(userJson)];
+        accounts = [results[0] as FinancialAccountModel];
+        fees = results[1] as List<FeeModel>;
+        payments = results[2] as List<PaymentModel>;
+      }
 
       if (!mounted) return;
 
       setState(() {
-        _members = results[0] as List<MemberModel>;
-        _accounts = results[1] as List<FinancialAccountModel>;
-        _fees = results[2] as List<FeeModel>;
-        _payments = results[3] as List<PaymentModel>;
+        _userExperience = user;
+        _members = members;
+        _accounts = accounts;
+        _fees = fees;
+        _payments = payments;
       });
     } catch (e) {
       if (!mounted) return;
@@ -268,7 +298,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return RefreshIndicator(
       onRefresh: _loadFinance,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).width < 560 ? 14 : 24,
+        ),
         children: [
           _FinanceHeader(
             totalDue: _totalDue,
@@ -278,6 +310,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
             onRefresh: _loadFinance,
             onCreatePayment: _openCreatePaymentDialog,
             onCreateFee: _openCreateFeeDialog,
+            canCreateFee: _canManageFinance,
+            personalView: !_canManageFinance,
           ),
           const SizedBox(height: 22),
           if (_loading)
@@ -290,30 +324,32 @@ class _FinanceScreenState extends State<FinanceScreen> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _loadFinance)
           else ...[
-            _FinanceRiskPanel(
-              debtorsCount: _debtorsCount,
-              pendingPaymentCount: _pendingPaymentCount,
-              collectionRate: _collectionRate,
-              totalDue: _totalDue,
-            ),
-            const SizedBox(height: 18),
-            _FinanceFiltersCard(
-              controller: _searchController,
-              paymentFilter: _paymentFilter,
-              accountFilter: _accountFilter,
-              onChanged: () => setState(() {}),
-              onPaymentFilterChanged: (value) {
-                setState(() {
-                  _paymentFilter = value;
-                });
-              },
-              onAccountFilterChanged: (value) {
-                setState(() {
-                  _accountFilter = value;
-                });
-              },
-            ),
-            const SizedBox(height: 18),
+            if (_canManageFinance) ...[
+              _FinanceRiskPanel(
+                debtorsCount: _debtorsCount,
+                pendingPaymentCount: _pendingPaymentCount,
+                collectionRate: _collectionRate,
+                totalDue: _totalDue,
+              ),
+              const SizedBox(height: 18),
+              _FinanceFiltersCard(
+                controller: _searchController,
+                paymentFilter: _paymentFilter,
+                accountFilter: _accountFilter,
+                onChanged: () => setState(() {}),
+                onPaymentFilterChanged: (value) {
+                  setState(() {
+                    _paymentFilter = value;
+                  });
+                },
+                onAccountFilterChanged: (value) {
+                  setState(() {
+                    _accountFilter = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
+            ],
             _AccountsCard(accounts: _filteredAccounts, memberName: _memberName),
             const SizedBox(height: 18),
             _FeesCard(fees: _filteredFees, memberName: _memberName),
@@ -321,6 +357,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             _PaymentsCard(
               payments: _filteredPayments,
               memberName: _memberName,
+              canManage: _canManageFinance,
               onValidate: _validatePayment,
               onCancel: _cancelPayment,
             ),
@@ -339,6 +376,8 @@ class _FinanceHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCreatePayment;
   final VoidCallback onCreateFee;
+  final bool canCreateFee;
+  final bool personalView;
   const _FinanceHeader({
     required this.totalDue,
     required this.totalPaid,
@@ -347,6 +386,8 @@ class _FinanceHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onCreatePayment,
     required this.onCreateFee,
+    required this.canCreateFee,
+    required this.personalView,
   });
 
   @override
@@ -362,11 +403,12 @@ class _FinanceHeader extends StatelessWidget {
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
         ),
-        ElevatedButton.icon(
-          onPressed: onCreateFee,
-          icon: const Icon(Icons.receipt_long_rounded),
-          label: const Text('Nouveau frais'),
-        ),
+        if (canCreateFee)
+          ElevatedButton.icon(
+            onPressed: onCreateFee,
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('Nouveau frais'),
+          ),
         ElevatedButton.icon(
           onPressed: onCreatePayment,
           icon: const Icon(Icons.add_card_rounded),
@@ -389,7 +431,7 @@ class _FinanceHeader extends StatelessWidget {
                   children: [
                     _HeaderIcon(),
                     const SizedBox(width: 18),
-                    const Expanded(child: _HeaderText()),
+                    Expanded(child: _HeaderText(personalView: personalView)),
                     actions,
                   ],
                 )
@@ -400,7 +442,9 @@ class _FinanceHeader extends StatelessWidget {
                       children: [
                         _HeaderIcon(),
                         const SizedBox(width: 18),
-                        const Expanded(child: _HeaderText()),
+                        Expanded(
+                          child: _HeaderText(personalView: personalView),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -440,25 +484,29 @@ class _HeaderIcon extends StatelessWidget {
 }
 
 class _HeaderText extends StatelessWidget {
-  const _HeaderText();
+  final bool personalView;
+
+  const _HeaderText({required this.personalView});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Finance',
+          personalView ? 'Mes finances' : 'Finance',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
             fontWeight: FontWeight.w900,
           ),
         ),
-        SizedBox(height: 6),
+        const SizedBox(height: 6),
         Text(
-          'Cotisations, pénalités, paiements et suivi des soldes.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
+          personalView
+              ? 'Mes cotisations, pénalités et paiements.'
+              : 'Cotisations, pénalités, paiements et suivi des soldes.',
+          style: const TextStyle(color: Colors.white70, height: 1.4),
         ),
       ],
     );
@@ -894,12 +942,14 @@ class _FeesCard extends StatelessWidget {
 class _PaymentsCard extends StatelessWidget {
   final List<PaymentModel> payments;
   final String Function(String userId) memberName;
+  final bool canManage;
   final ValueChanged<PaymentModel> onValidate;
   final ValueChanged<PaymentModel> onCancel;
 
   const _PaymentsCard({
     required this.payments,
     required this.memberName,
+    required this.canManage,
     required this.onValidate,
     required this.onCancel,
   });
@@ -931,25 +981,42 @@ class _PaymentsCard extends StatelessWidget {
                     '${payment.methodLabel} • ${payment.statusLabel}'
                     '${payment.reference == null ? '' : ' • ${payment.reference}'}',
                   ),
-                  trailing: Wrap(
-                    spacing: 6,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         _money(payment.amount),
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      if (isPending)
-                        IconButton(
-                          onPressed: () => onValidate(payment),
-                          icon: const Icon(Icons.verified_rounded),
-                          tooltip: 'Valider',
-                        ),
-                      if (isPending)
-                        IconButton(
-                          onPressed: () => onCancel(payment),
-                          icon: const Icon(Icons.cancel_rounded),
-                          tooltip: 'Annuler',
-                          color: Colors.red,
+                      if (canManage && isPending)
+                        PopupMenuButton<String>(
+                          tooltip: 'Actions du paiement',
+                          onSelected: (action) {
+                            if (action == 'validate') {
+                              onValidate(payment);
+                            } else if (action == 'cancel') {
+                              onCancel(payment);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'validate',
+                              child: ListTile(
+                                leading: Icon(Icons.verified_rounded),
+                                title: Text('Valider'),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'cancel',
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.cancel_rounded,
+                                  color: Colors.red,
+                                ),
+                                title: Text('Annuler'),
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),

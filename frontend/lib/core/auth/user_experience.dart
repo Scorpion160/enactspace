@@ -197,7 +197,7 @@ class UserExperience {
       routes.add('/members');
     }
 
-    if (user.canViewFinance) {
+    if (!user.isAlumni) {
       routes.add('/finance');
     }
 
