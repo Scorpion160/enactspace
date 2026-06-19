@@ -27,7 +27,7 @@ from app.schemas.recruitment import (
     ApplicationReviewRead,
     ConvertApplicationToUserRequest,
 )
-from app.api.deps import get_current_user
+from app.api.deps import require_recruitment_access
 
 
 router = APIRouter(prefix="/recruitment", tags=["Recrutement"])
@@ -142,7 +142,7 @@ def notify_recruitment_responsibles(
 def create_campaign(
     payload: RecruitmentCampaignCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     campaign = RecruitmentCampaign(
         season_id=payload.season_id,
@@ -164,7 +164,7 @@ def create_campaign(
 @router.get("/campaigns", response_model=list[RecruitmentCampaignRead])
 def list_campaigns(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
     is_active: bool | None = Query(default=None),
 ):
     query = db.query(RecruitmentCampaign)
@@ -188,7 +188,7 @@ def list_public_active_campaigns(
 def get_campaign(
     campaign_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     return get_campaign_or_404(db, campaign_id)
 
@@ -198,7 +198,7 @@ def update_campaign(
     campaign_id: str,
     payload: RecruitmentCampaignUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     campaign = get_campaign_or_404(db, campaign_id)
 
@@ -229,7 +229,7 @@ def update_campaign(
 def delete_campaign(
     campaign_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     campaign = get_campaign_or_404(db, campaign_id)
 
@@ -287,7 +287,7 @@ def submit_application(
 @router.get("/applications", response_model=list[ApplicationRead])
 def list_applications(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
     campaign_id: str | None = Query(default=None),
     status_filter: str | None = Query(default=None),
     search: str | None = Query(default=None),
@@ -316,7 +316,7 @@ def list_applications(
 def get_application(
     application_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     return get_application_or_404(db, application_id)
 
@@ -326,7 +326,7 @@ def update_application(
     application_id: str,
     payload: ApplicationUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
 
@@ -371,7 +371,7 @@ def change_application_status(
     application_id: str,
     payload: ApplicationStatusChange,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
 
@@ -394,7 +394,7 @@ def change_application_status(
 def delete_application(
     application_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
 
@@ -411,7 +411,7 @@ def delete_application(
 def create_or_update_review(
     payload: ApplicationReviewCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     if payload.recommendation not in VALID_RECOMMENDATIONS:
         raise HTTPException(
@@ -461,7 +461,7 @@ def create_or_update_review(
 def list_application_reviews(
     application_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     get_application_or_404(db, application_id)
 
@@ -475,7 +475,7 @@ def update_review(
     review_id: str,
     payload: ApplicationReviewUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     review = db.query(ApplicationReview).filter(
         ApplicationReview.id == review_id
@@ -521,7 +521,7 @@ def update_review(
 def delete_review(
     review_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     review = db.query(ApplicationReview).filter(
         ApplicationReview.id == review_id
@@ -554,7 +554,7 @@ def convert_application_to_user(
     application_id: str,
     payload: ConvertApplicationToUserRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
 

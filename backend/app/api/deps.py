@@ -2,12 +2,14 @@ from typing import Iterable
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.models.role import Role, UserRole
+from app.models.pole import Pole, PoleMember
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -175,3 +177,47 @@ def require_finance_or_admin(
         )
 
     return current_user
+
+
+def require_recruitment_access(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+) -> User:
+    allowed_roles = {
+        "administrateur",
+        "team_leader",
+        "secretaire_generale",
+        "chef_pole",
+        "adjoint_chef_pole",
+        "chef_projet",
+        "adjoint_chef_projet",
+        "pole_veille",
+        "veille",
+        "chef_pole_veille",
+        "adjoint_pole_veille",
+        "recrutement",
+        "recruiter",
+    }
+
+    if user_has_any_role(db, current_user.id, allowed_roles):
+        return current_user
+
+    veille_membership = (
+        db.query(PoleMember.id)
+        .join(Pole, Pole.id == PoleMember.pole_id)
+        .filter(
+            PoleMember.user_id == current_user.id,
+            PoleMember.is_active == True,
+            PoleMember.left_at.is_(None),
+            func.lower(Pole.name) == "veille",
+        )
+        .first()
+    )
+
+    if veille_membership:
+        return current_user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Action réservée au pôle Veille et aux Enacchefs autorisés",
+    )
