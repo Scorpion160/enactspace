@@ -2,6 +2,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/application_model.dart';
 import '../models/application_review_model.dart';
+import '../models/application_tracking_model.dart';
 import '../models/recruitment_campaign_model.dart';
 
 class RecruitmentService {
@@ -158,6 +159,25 @@ class RecruitmentService {
     }
 
     throw Exception('Réponse invalide lors de la création de la candidature.');
+  }
+
+  Future<ApplicationTrackingModel> trackApplication({
+    required String applicationId,
+    required String email,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/recruitment/applications/track',
+      data: {
+        'application_id': applicationId.trim(),
+        'email': email.trim().toLowerCase(),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ApplicationTrackingModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du suivi de la candidature.');
   }
 
   Future<ApplicationModel> changeApplicationStatus({

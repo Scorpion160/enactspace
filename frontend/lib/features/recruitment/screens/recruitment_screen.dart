@@ -105,7 +105,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       return;
     }
 
-    final created = await showDialog<bool>(
+    final created = await showDialog<ApplicationModel>(
       context: context,
       builder: (context) {
         return CreateApplicationDialog(
@@ -115,7 +115,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       },
     );
 
-    if (created == true) {
+    if (created != null) {
       await _loadRecruitment();
 
       if (!mounted) return;
@@ -1579,7 +1579,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
     });
 
     try {
-      await widget.service.createApplication(
+      final application = await widget.service.createApplication(
         campaignId: _campaignId!,
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
@@ -1599,7 +1599,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
       );
 
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(application);
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');

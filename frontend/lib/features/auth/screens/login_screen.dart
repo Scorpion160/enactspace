@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../recruitment/models/application_model.dart';
 import '../../recruitment/screens/recruitment_screen.dart';
 import '../../recruitment/services/recruitment_service.dart';
 
@@ -268,18 +269,52 @@ class _LoginPanel extends StatelessWidget {
         return;
       }
 
-      final created = await showDialog<bool>(
+      final application = await showDialog<ApplicationModel>(
         context: context,
         builder: (_) =>
             CreateApplicationDialog(service: service, campaigns: campaigns),
       );
 
-      if (!context.mounted || created != true) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Candidature envoyee. Le pole Veille suivra le dossier.',
+      if (!context.mounted || application == null) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Candidature envoyée'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Conservez cette référence avec votre email pour suivre le dossier.',
+                ),
+                const SizedBox(height: 14),
+                SelectableText(
+                  application.id,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.softBlack,
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Fermer'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.go('/application-tracking');
+              },
+              icon: const Icon(Icons.route_rounded),
+              label: const Text('Suivre le dossier'),
+            ),
+          ],
         ),
       );
     } catch (e) {
@@ -419,6 +454,7 @@ class _LoginPanel extends StatelessWidget {
                         const SizedBox(height: 12),
                         _LoginSupportActions(
                           onRecruitment: () => _showRecruitmentDialog(context),
+                          onTracking: () => context.go('/application-tracking'),
                           onGuide: () => _showGuideDialog(context),
                           onBiometric: () => _showBiometricDialog(context),
                         ),
@@ -520,11 +556,13 @@ class _AccountRequestActions extends StatelessWidget {
 
 class _LoginSupportActions extends StatelessWidget {
   final VoidCallback onRecruitment;
+  final VoidCallback onTracking;
   final VoidCallback onGuide;
   final VoidCallback onBiometric;
 
   const _LoginSupportActions({
     required this.onRecruitment,
+    required this.onTracking,
     required this.onGuide,
     required this.onBiometric,
   });
@@ -539,7 +577,12 @@ class _LoginSupportActions extends StatelessWidget {
         TextButton.icon(
           onPressed: onRecruitment,
           icon: const Icon(Icons.how_to_reg_rounded),
-          label: const Text('Candidature recrutement'),
+          label: const Text('Postuler'),
+        ),
+        TextButton.icon(
+          onPressed: onTracking,
+          icon: const Icon(Icons.route_rounded),
+          label: const Text('Suivre ma candidature'),
         ),
         TextButton.icon(
           onPressed: onGuide,

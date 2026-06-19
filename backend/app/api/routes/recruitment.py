@@ -22,6 +22,8 @@ from app.schemas.recruitment import (
     ApplicationUpdate,
     ApplicationRead,
     ApplicationStatusChange,
+    ApplicationTrackingRequest,
+    ApplicationTrackingRead,
     ApplicationReviewCreate,
     ApplicationReviewUpdate,
     ApplicationReviewRead,
@@ -282,6 +284,49 @@ def submit_application(
     db.refresh(application)
 
     return application
+
+
+@router.post("/applications/track", response_model=ApplicationTrackingRead)
+def track_application(
+    payload: ApplicationTrackingRequest,
+    db: Session = Depends(get_db),
+):
+    application = (
+        db.query(Application)
+        .filter(
+            Application.id == payload.application_id,
+            func.lower(Application.email) == payload.email.lower(),
+        )
+        .first()
+    )
+
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucune candidature ne correspond à cette référence et cet email",
+        )
+
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    next_steps = {
+        "received": "Votre dossier a bien été reçu. Le pôle Veille prépare la présélection.",
+        "preselected": "Votre dossier est présélectionné. Surveillez votre email pour la suite.",
+        "interview": "Un entretien est prévu ou en préparation. Les détails seront communiqués par email.",
+        "accepted": "Votre candidature est acceptée. La création de votre compte EnactSpace va suivre.",
+        "rejected": "Le processus est terminé pour cette campagne. Merci pour votre candidature.",
+    }
+
+    return {
+        "application_id": application.id,
+        "campaign_title": campaign.title,
+        "status": application.status,
+        "submitted_at": application.created_at,
+        "updated_at": application.updated_at,
+        "next_step": next_steps.get(
+            application.status,
+            "Votre dossier est en cours de traitement.",
+        ),
+        "account_created": application.converted_user_id is not None,
+    }
 
 
 @router.get("/applications", response_model=list[ApplicationRead])

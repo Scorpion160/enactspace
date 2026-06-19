@@ -19,6 +19,7 @@ import '../features/poles/screens/poles_screen.dart';
 import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/projects_screen.dart';
 import '../features/recruitment/screens/recruitment_screen.dart';
+import '../features/recruitment/screens/application_tracking_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../shared/layout/app_shell.dart';
 
@@ -29,9 +30,12 @@ class AppRouter {
     initialLocation: '/login',
     redirect: (context, state) async {
       final loggedIn = await _authService.isLoggedIn();
+      final publicPath =
+          state.matchedLocation == '/login' ||
+          state.matchedLocation == '/application-tracking';
       final goingToLogin = state.matchedLocation == '/login';
 
-      if (!loggedIn && !goingToLogin) {
+      if (!loggedIn && !publicPath) {
         return '/login';
       }
 
@@ -60,6 +64,10 @@ class AppRouter {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/application-tracking',
+        builder: (context, state) => const ApplicationTrackingScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           return AppShell(currentPath: state.uri.path, child: child);

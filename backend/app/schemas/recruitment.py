@@ -104,6 +104,21 @@ class ApplicationStatusChange(BaseModel):
     status: str
 
 
+class ApplicationTrackingRequest(BaseModel):
+    application_id: UUID
+    email: EmailStr
+
+
+class ApplicationTrackingRead(BaseModel):
+    application_id: UUID
+    campaign_title: str
+    status: str
+    submitted_at: datetime
+    updated_at: datetime
+    next_step: str
+    account_created: bool
+
+
 class ApplicationReviewCreate(BaseModel):
     application_id: UUID
     score: Optional[float] = None
