@@ -13,7 +13,8 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with WidgetsBindingObserver {
   final NotificationsService _service = NotificationsService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -32,8 +33,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadNotifications();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!_loading && mounted) {
         _loadNotifications(showLoading: false);
       }
@@ -42,9 +44,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_loading) {
+      _loadNotifications(showLoading: false);
+    }
   }
 
   Future<void> _loadNotifications({bool showLoading = true}) async {

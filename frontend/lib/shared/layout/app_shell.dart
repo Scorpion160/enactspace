@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/user_experience.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/services/notifications_service.dart';
 import '../../features/tasks/services/tasks_service.dart';
 
@@ -19,7 +20,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final NotificationsService _notificationsService = NotificationsService();
   final TasksService _tasksService = TasksService();
@@ -28,21 +29,37 @@ class _AppShellState extends State<AppShell> {
   int? _lateTasks;
   UserExperience? _userExperience;
   Timer? _metricsTimer;
+  Timer? _notificationTimer;
   bool _metricsLoading = false;
+  bool _notificationLoading = false;
+  String? _lastPresentedNotificationId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadNavigationMetrics();
     _metricsTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _loadNavigationMetrics();
+    });
+    _notificationTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      _loadNotificationMetric();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _metricsTimer?.cancel();
+    _notificationTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadNavigationMetrics();
+    }
   }
 
   @override
@@ -58,22 +75,17 @@ class _AppShellState extends State<AppShell> {
     if (_metricsLoading) return;
     _metricsLoading = true;
 
-    int? unreadNotifications;
     int? lateTasks;
     UserExperience? userExperience;
 
     try {
+      await _loadNotificationMetric();
+
       try {
         final user = await _authService.getCurrentUser();
         userExperience = UserExperience.fromJson(user);
       } catch (_) {
         userExperience = null;
-      }
-
-      try {
-        unreadNotifications = await _notificationsService.getUnreadCount();
-      } catch (_) {
-        unreadNotifications = null;
       }
 
       try {
@@ -85,13 +97,79 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
 
       setState(() {
-        _unreadNotifications = unreadNotifications;
         _lateTasks = lateTasks;
         _userExperience = userExperience;
       });
     } finally {
       _metricsLoading = false;
     }
+  }
+
+  Future<void> _loadNotificationMetric() async {
+    if (_notificationLoading) return;
+    _notificationLoading = true;
+
+    try {
+      final unreadNotifications = await _notificationsService.getUnreadCount();
+      final previousUnread = _unreadNotifications;
+      NotificationModel? latestNotification;
+
+      if (previousUnread != null &&
+          unreadNotifications > previousUnread &&
+          widget.currentPath != '/notifications') {
+        final unreadItems = await _notificationsService.getNotifications(
+          unreadOnly: true,
+        );
+        if (unreadItems.isNotEmpty) {
+          latestNotification = unreadItems.first;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _unreadNotifications = unreadNotifications);
+
+      if (latestNotification != null) {
+        _presentNotification(latestNotification);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _unreadNotifications = null);
+      }
+    } finally {
+      _notificationLoading = false;
+    }
+  }
+
+  void _presentNotification(NotificationModel notification) {
+    if (_lastPresentedNotificationId == notification.id || !mounted) return;
+    _lastPresentedNotificationId = notification.id;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
+            content: Text(
+              notification.message?.trim().isNotEmpty == true
+                  ? '${notification.title}\n${notification.message}'
+                  : notification.title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            action: SnackBarAction(
+              label: 'Ouvrir',
+              onPressed: () {
+                context.go(notification.routePath ?? '/notifications');
+              },
+            ),
+          ),
+        );
+    });
   }
 
   Future<void> _logout(BuildContext context) async {
