@@ -1,6 +1,7 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/pole_model.dart';
+import '../../members/models/member_model.dart';
 
 class PolesService {
   final ApiClient _apiClient;
@@ -17,6 +18,18 @@ class PolesService {
     return _extractList(
       response,
     ).whereType<Map<String, dynamic>>().map(PoleModel.fromJson).toList();
+  }
+
+  Future<List<MemberModel>> getPoleMembers(String poleId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get(
+      '/poles/$poleId/members',
+      token: token,
+    );
+
+    return _extractList(
+      response,
+    ).whereType<Map<String, dynamic>>().map(MemberModel.fromJson).toList();
   }
 
   Future<PoleModel> createPole({

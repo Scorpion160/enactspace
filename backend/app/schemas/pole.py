@@ -43,3 +43,16 @@ class PoleMemberRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PoleMemberDirectoryRead(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    email: str
+    photo_url: Optional[str] = None
+    department: Optional[str] = None
+    status: str
+    core_pole_id: UUID
+    pole_position: str
+    roles: list[str] = []

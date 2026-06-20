@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -27,6 +29,7 @@ class _PolesScreenState extends State<PolesScreen> {
   UserExperience? _userExperience;
   List<PoleModel> _poles = [];
   List<MemberModel> _members = [];
+  Map<String, List<MemberModel>> _membersByPoleId = {};
 
   @override
   void initState() {
@@ -49,6 +52,9 @@ class _PolesScreenState extends State<PolesScreen> {
     try {
       final poles = await _polesService.getPoles();
       final members = await _loadMembersSafely();
+      final memberships = await Future.wait(
+        poles.map((pole) => _polesService.getPoleMembers(pole.id)),
+      );
       final userExperience = await _loadUserExperienceSafely();
 
       if (!mounted) return;
@@ -56,6 +62,10 @@ class _PolesScreenState extends State<PolesScreen> {
       setState(() {
         _poles = poles;
         _members = members;
+        _membersByPoleId = {
+          for (var index = 0; index < poles.length; index++)
+            poles[index].id: memberships[index],
+        };
         _userExperience = userExperience;
       });
     } catch (e) {
@@ -100,11 +110,33 @@ class _PolesScreenState extends State<PolesScreen> {
   }
 
   int _memberCount(PoleModel pole) {
-    return _members.where((member) => member.corePoleId == pole.id).length;
+    return _membersByPoleId[pole.id]?.length ?? 0;
   }
 
   List<MemberModel> _membersForPole(PoleModel pole) {
-    return _members.where((member) => member.corePoleId == pole.id).toList();
+    return _membersByPoleId[pole.id] ?? const <MemberModel>[];
+  }
+
+  bool get _canManageGlobally {
+    final user = _userExperience;
+    return user?.isAdmin == true ||
+        user?.isTeamLeader == true ||
+        user?.isSecretary == true;
+  }
+
+  bool _canManagePole(PoleModel pole) {
+    if (_canManageGlobally) return true;
+    final userId = _userExperience?.id;
+    if (userId == null) return false;
+
+    return _membersForPole(pole).any(
+      (member) =>
+          member.id == userId &&
+          const {
+            'chef_pole',
+            'adjoint_chef_pole',
+          }.contains(member.polePosition),
+    );
   }
 
   Future<void> _openCreateSheet() async {
@@ -128,8 +160,6 @@ class _PolesScreenState extends State<PolesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canManage = _userExperience?.canCreateOperationalWork ?? false;
-
     return RefreshIndicator(
       onRefresh: _loadPoles,
       child: LayoutBuilder(
@@ -151,10 +181,12 @@ class _PolesScreenState extends State<PolesScreen> {
                     children: [
                       _PolesHeader(
                         total: _poles.length,
-                        members: _members
-                            .where((member) => member.corePoleId != null)
+                        members: _membersByPoleId.values
+                            .expand((members) => members)
+                            .map((member) => member.id)
+                            .toSet()
                             .length,
-                        onCreate: canManage ? _openCreateSheet : null,
+                        onCreate: _canManageGlobally ? _openCreateSheet : null,
                         onRefresh: _loadPoles,
                       ),
                       const SizedBox(height: 18),
@@ -174,7 +206,8 @@ class _PolesScreenState extends State<PolesScreen> {
                           poles: _filteredPoles,
                           allMembers: _members,
                           polesService: _polesService,
-                          canManage: canManage,
+                          canManagePole: _canManagePole,
+                          canAssignLeadership: _canManageGlobally,
                           memberCount: _memberCount,
                           membersForPole: _membersForPole,
                           onMembershipChanged: _reloadAfterMembershipChange,
@@ -366,7 +399,8 @@ class _PolesGrid extends StatelessWidget {
   final List<PoleModel> poles;
   final List<MemberModel> allMembers;
   final PolesService polesService;
-  final bool canManage;
+  final bool Function(PoleModel pole) canManagePole;
+  final bool canAssignLeadership;
   final int Function(PoleModel pole) memberCount;
   final List<MemberModel> Function(PoleModel pole) membersForPole;
   final Future<void> Function() onMembershipChanged;
@@ -375,7 +409,8 @@ class _PolesGrid extends StatelessWidget {
     required this.poles,
     required this.allMembers,
     required this.polesService,
-    required this.canManage,
+    required this.canManagePole,
+    required this.canAssignLeadership,
     required this.memberCount,
     required this.membersForPole,
     required this.onMembershipChanged,
@@ -408,7 +443,8 @@ class _PolesGrid extends StatelessWidget {
                   members: membersForPole(pole),
                   allMembers: allMembers,
                   polesService: polesService,
-                  canManage: canManage,
+                  canManage: canManagePole(pole),
+                  canAssignLeadership: canAssignLeadership,
                   onMembershipChanged: onMembershipChanged,
                 ),
               ),
@@ -426,6 +462,7 @@ class _PoleCard extends StatelessWidget {
   final List<MemberModel> allMembers;
   final PolesService polesService;
   final bool canManage;
+  final bool canAssignLeadership;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleCard({
@@ -435,6 +472,7 @@ class _PoleCard extends StatelessWidget {
     required this.allMembers,
     required this.polesService,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.onMembershipChanged,
   });
 
@@ -547,6 +585,7 @@ class _PoleCard extends StatelessWidget {
                   allMembers,
                   polesService,
                   canManage,
+                  canAssignLeadership,
                   onMembershipChanged,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
@@ -665,14 +704,19 @@ class _MemberMiniAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final photoUrl = _absoluteMemberPhoto(member.photoUrl);
+
     return CircleAvatar(
       radius: 17,
       backgroundColor: AppTheme.enactusYellow,
       foregroundColor: AppTheme.softBlack,
-      child: Text(
-        _initials(member.displayName),
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
-      ),
+      backgroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
+      child: photoUrl == null
+          ? Text(
+              _initials(member.displayName),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+            )
+          : null,
     );
   }
 }
@@ -684,6 +728,7 @@ void _showPoleDetails(
   List<MemberModel> allMembers,
   PolesService polesService,
   bool canManage,
+  bool canAssignLeadership,
   Future<void> Function() onMembershipChanged,
 ) {
   showModalBottomSheet<void>(
@@ -697,6 +742,7 @@ void _showPoleDetails(
       allMembers: allMembers,
       polesService: polesService,
       canManage: canManage,
+      canAssignLeadership: canAssignLeadership,
       onMembershipChanged: onMembershipChanged,
     ),
   );
@@ -708,6 +754,7 @@ class _PoleDetailsSheet extends StatelessWidget {
   final List<MemberModel> allMembers;
   final PolesService polesService;
   final bool canManage;
+  final bool canAssignLeadership;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleDetailsSheet({
@@ -716,6 +763,7 @@ class _PoleDetailsSheet extends StatelessWidget {
     required this.allMembers,
     required this.polesService,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.onMembershipChanged,
   });
 
@@ -806,6 +854,7 @@ class _PoleDetailsSheet extends StatelessWidget {
                     allMembers: allMembers,
                     service: polesService,
                     canManage: canManage,
+                    canAssignLeadership: canAssignLeadership,
                     onMembershipChanged: onMembershipChanged,
                   ),
                   const SizedBox(height: 16),
@@ -994,6 +1043,7 @@ class _PoleMembershipManager extends StatefulWidget {
   final List<MemberModel> allMembers;
   final PolesService service;
   final bool canManage;
+  final bool canAssignLeadership;
   final Future<void> Function() onMembershipChanged;
 
   const _PoleMembershipManager({
@@ -1002,6 +1052,7 @@ class _PoleMembershipManager extends StatefulWidget {
     required this.allMembers,
     required this.service,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.onMembershipChanged,
   });
 
@@ -1129,19 +1180,21 @@ class _PoleMembershipManagerState extends State<_PoleMembershipManager> {
                         labelText: 'Position',
                         prefixIcon: Icon(Icons.admin_panel_settings_rounded),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'membre',
                           child: Text('Membre'),
                         ),
-                        DropdownMenuItem(
-                          value: 'adjoint_chef_pole',
-                          child: Text('Adjoint chef de pôle'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'chef_pole',
-                          child: Text('Chef de pôle'),
-                        ),
+                        if (widget.canAssignLeadership)
+                          DropdownMenuItem(
+                            value: 'adjoint_chef_pole',
+                            child: Text('Adjoint chef de pôle'),
+                          ),
+                        if (widget.canAssignLeadership)
+                          DropdownMenuItem(
+                            value: 'chef_pole',
+                            child: Text('Chef de pôle'),
+                          ),
                       ],
                       onChanged: !widget.canManage || _saving
                           ? null
@@ -1186,13 +1239,30 @@ class _PoleActionLinks extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: const [
-        _PoleActionChip(icon: Icons.task_alt_rounded, label: 'Tâches liées'),
-        _PoleActionChip(icon: Icons.description_rounded, label: 'Documents'),
-        _PoleActionChip(icon: Icons.campaign_rounded, label: 'Annonces'),
-        _PoleActionChip(icon: Icons.forum_rounded, label: 'Discussion pôle'),
+        _PoleActionChip(
+          icon: Icons.task_alt_rounded,
+          label: 'Tâches liées',
+          route: '/tasks',
+        ),
+        _PoleActionChip(
+          icon: Icons.description_rounded,
+          label: 'Documents',
+          route: '/documents',
+        ),
+        _PoleActionChip(
+          icon: Icons.campaign_rounded,
+          label: 'Annonces',
+          route: '/posts',
+        ),
+        _PoleActionChip(
+          icon: Icons.forum_rounded,
+          label: 'Discussion pôle',
+          route: '/chat',
+        ),
         _PoleActionChip(
           icon: Icons.summarize_rounded,
           label: 'Rapport mensuel',
+          route: '/impact',
         ),
       ],
     );
@@ -1202,14 +1272,24 @@ class _PoleActionLinks extends StatelessWidget {
 class _PoleActionChip extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String route;
 
-  const _PoleActionChip({required this.icon, required this.label});
+  const _PoleActionChip({
+    required this.icon,
+    required this.label,
+    required this.route,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
+    return ActionChip(
       avatar: Icon(icon, size: 16),
       label: Text(label),
+      onPressed: () {
+        final router = GoRouter.of(context);
+        Navigator.of(context).pop();
+        router.go(route);
+      },
       backgroundColor: Colors.white,
       side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -1499,6 +1579,12 @@ class _EmptyPolesCard extends StatelessWidget {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+String? _absoluteMemberPhoto(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return '${ApiClient.serverUrl}$value';
 }
 
 int _poleHealthScore(PoleModel pole, int memberCount) {
