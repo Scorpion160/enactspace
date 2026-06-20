@@ -36,6 +36,7 @@ from app.schemas.chat import (
     ChatMessageReactionCreate,
     ChatMessageReactionRead,
 )
+from app.services.notification_service import notify_users
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -784,6 +785,25 @@ def send_message(
     participant.last_read_at = datetime.utcnow()
 
     db.add(message)
+    recipient_ids = [
+        row[0]
+        for row in db.query(ChatParticipant.user_id).filter(
+            ChatParticipant.thread_id == thread_id,
+            ChatParticipant.user_id != current_user.id,
+        ).all()
+    ]
+    if recipient_ids:
+        sender_name = f"{current_user.first_name} {current_user.last_name}".strip()
+        notify_users(
+            db,
+            user_ids=recipient_ids,
+            title=f"Nouveau message de {sender_name}",
+            message=message_preview(message),
+            notification_type="chat_message",
+            related_type="chat_thread",
+            related_id=message.thread_id,
+        )
+
     db.commit()
     db.refresh(message)
 

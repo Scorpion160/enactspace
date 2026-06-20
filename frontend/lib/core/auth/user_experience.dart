@@ -113,6 +113,7 @@ class UserExperience {
   bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
   bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
+  bool get canManageGamification => isAdmin || isTeamLeader || isSecretary;
   bool get canViewMembersDirectory => !isAlumni || canManageMembers;
   bool get canViewOperations => !isAlumni;
 

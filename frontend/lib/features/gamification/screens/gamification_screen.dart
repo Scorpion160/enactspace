@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
@@ -17,12 +19,14 @@ class GamificationScreen extends StatefulWidget {
 }
 
 class _GamificationScreenState extends State<GamificationScreen> {
+  final AuthService _authService = AuthService();
   final GamificationService _gamificationService = GamificationService();
   final MembersService _membersService = MembersService();
   final PolesService _polesService = PolesService();
 
   bool _loading = true;
   String? _error;
+  UserExperience? _user;
 
   List<MemberModel> _members = [];
   List<PoleModel> _poles = [];
@@ -36,6 +40,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
 
   int get _month => DateTime.now().month;
   int get _year => DateTime.now().year;
+  bool get _canManage => _user?.canManageGamification == true;
 
   @override
   void initState() {
@@ -50,30 +55,38 @@ class _GamificationScreenState extends State<GamificationScreen> {
     });
 
     try {
+      final user = UserExperience.fromJson(await _authService.getCurrentUser());
       final results = await Future.wait<dynamic>([
-        _membersService.getMembers(),
         _polesService.getPoles(),
-        _gamificationService.getPoints(),
+        _gamificationService.getPoints(
+          userId: user.canManageGamification ? null : user.id,
+        ),
         _gamificationService.getBadges(),
-        _gamificationService.getUserBadges(),
+        _gamificationService.getUserBadges(
+          userId: user.canManageGamification ? null : user.id,
+        ),
         _gamificationService.getUserRanking(month: _month, year: _year),
         _gamificationService.getPoleRanking(month: _month, year: _year),
         _gamificationService.getMemberOfMonth(month: _month, year: _year),
         _gamificationService.getPoleOfMonth(month: _month, year: _year),
       ]);
+      final members = user.canManageGamification
+          ? await _membersService.getMembers()
+          : <MemberModel>[];
 
       if (!mounted) return;
 
       setState(() {
-        _members = results[0] as List<MemberModel>;
-        _poles = results[1] as List<PoleModel>;
-        _points = results[2] as List<EngagementPointModel>;
-        _badges = results[3] as List<BadgeModel>;
-        _userBadges = results[4] as List<UserBadgeModel>;
-        _userRanking = results[5] as List<UserRankingModel>;
-        _poleRanking = results[6] as List<PoleRankingModel>;
-        _memberOfMonth = results[7] as MonthlyWinnerModel;
-        _poleOfMonth = results[8] as MonthlyWinnerModel;
+        _user = user;
+        _members = members;
+        _poles = results[0] as List<PoleModel>;
+        _points = results[1] as List<EngagementPointModel>;
+        _badges = results[2] as List<BadgeModel>;
+        _userBadges = results[3] as List<UserBadgeModel>;
+        _userRanking = results[4] as List<UserRankingModel>;
+        _poleRanking = results[5] as List<PoleRankingModel>;
+        _memberOfMonth = results[6] as MonthlyWinnerModel;
+        _poleOfMonth = results[7] as MonthlyWinnerModel;
       });
     } catch (e) {
       if (!mounted) return;
@@ -141,6 +154,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
 
   String _memberName(String? userId) {
     if (userId == null || userId.isEmpty) return 'Aucun membre';
+    if (userId == _user?.id) return _user!.displayName;
     final member = _members.where((item) => item.id == userId).firstOrNull;
     return member?.displayName ?? _shortId(userId);
   }
@@ -159,6 +173,19 @@ class _GamificationScreenState extends State<GamificationScreen> {
     return _points
         .where((point) => point.points > 0)
         .fold(0, (sum, point) => sum + point.points);
+  }
+
+  int? get _rankingPosition {
+    final userId = _user?.id;
+    if (userId == null) return null;
+    final index = _userRanking.indexWhere((item) => item.userId == userId);
+    return index < 0 ? null : index + 1;
+  }
+
+  List<BadgeModel> get _displayBadges {
+    if (_canManage) return _badges;
+    final earnedIds = _userBadges.map((item) => item.badgeId).toSet();
+    return _badges.where((badge) => earnedIds.contains(badge.id)).toList();
   }
 
   @override
@@ -185,6 +212,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
                     children: [
                       _GamificationHeader(
                         monthLabel: _monthLabel(_month, _year),
+                        personal: !_canManage,
                         onRefresh: _loadGamification,
                         onAwardPoints: _openAwardPointsDialog,
                         onInitBadges: _initBadges,
@@ -196,6 +224,8 @@ class _GamificationScreenState extends State<GamificationScreen> {
                         _ErrorCard(message: _error!, onRetry: _loadGamification)
                       else ...[
                         _GamificationStats(
+                          personal: !_canManage,
+                          rankingPosition: _rankingPosition,
                           totalPoints: _totalPoints,
                           positivePoints: _positivePoints,
                           badges: _badges.length,
@@ -216,7 +246,10 @@ class _GamificationScreenState extends State<GamificationScreen> {
                           poleName: _poleName,
                         ),
                         const SizedBox(height: 18),
-                        _BadgesSection(badges: _badges),
+                        _BadgesSection(
+                          badges: _displayBadges,
+                          personal: !_canManage,
+                        ),
                         const SizedBox(height: 18),
                         _RecentPointsSection(
                           points: _points.take(12).toList(),
@@ -238,12 +271,14 @@ class _GamificationScreenState extends State<GamificationScreen> {
 
 class _GamificationHeader extends StatelessWidget {
   final String monthLabel;
+  final bool personal;
   final VoidCallback onRefresh;
   final VoidCallback onAwardPoints;
   final VoidCallback onInitBadges;
 
   const _GamificationHeader({
     required this.monthLabel,
+    required this.personal,
     required this.onRefresh,
     required this.onAwardPoints,
     required this.onInitBadges,
@@ -280,18 +315,20 @@ class _GamificationHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Engagement et reconnaissance',
-                  style: TextStyle(
+                Text(
+                  personal ? 'Mon parcours' : 'Engagement et reconnaissance',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Badges, points positifs et classements pour valoriser les contributions des Enacteurs.',
-                  style: TextStyle(color: Colors.white70, height: 1.45),
+                Text(
+                  personal
+                      ? 'Tes points, badges et progrès au sein de Enactus ESP.'
+                      : 'Badges, points positifs et classements pour valoriser les contributions des Enacteurs.',
+                  style: const TextStyle(color: Colors.white70, height: 1.45),
                 ),
               ],
             );
@@ -309,20 +346,22 @@ class _GamificationHeader extends StatelessWidget {
                     side: const BorderSide(color: Colors.white24),
                   ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: onInitBadges,
-                  icon: const Icon(Icons.workspace_premium_rounded),
-                  label: const Text('Badges par défaut'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
+                if (!personal) ...[
+                  OutlinedButton.icon(
+                    onPressed: onInitBadges,
+                    icon: const Icon(Icons.workspace_premium_rounded),
+                    label: const Text('Badges par défaut'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
                   ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: onAwardPoints,
-                  icon: const Icon(Icons.add_reaction_rounded),
-                  label: const Text('Attribuer points'),
-                ),
+                  ElevatedButton.icon(
+                    onPressed: onAwardPoints,
+                    icon: const Icon(Icons.add_reaction_rounded),
+                    label: const Text('Attribuer points'),
+                  ),
+                ],
               ],
             );
 
@@ -349,12 +388,16 @@ class _GamificationHeader extends StatelessWidget {
 }
 
 class _GamificationStats extends StatelessWidget {
+  final bool personal;
+  final int? rankingPosition;
   final int totalPoints;
   final int positivePoints;
   final int badges;
   final int awardedBadges;
 
   const _GamificationStats({
+    required this.personal,
+    required this.rankingPosition,
     required this.totalPoints,
     required this.positivePoints,
     required this.badges,
@@ -363,20 +406,47 @@ class _GamificationStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      _StatItem('Points totaux', totalPoints.toString(), Icons.bolt_rounded),
-      _StatItem(
-        'Points positifs',
-        positivePoints.toString(),
-        Icons.favorite_rounded,
-      ),
-      _StatItem('Badges', badges.toString(), Icons.workspace_premium_rounded),
-      _StatItem(
-        'Badges attribués',
-        awardedBadges.toString(),
-        Icons.verified_rounded,
-      ),
-    ];
+    final items = personal
+        ? [
+            _StatItem('Mes points', totalPoints.toString(), Icons.bolt_rounded),
+            _StatItem(
+              'Points positifs',
+              positivePoints.toString(),
+              Icons.favorite_rounded,
+            ),
+            _StatItem(
+              'Mes badges',
+              awardedBadges.toString(),
+              Icons.workspace_premium_rounded,
+            ),
+            _StatItem(
+              'Mon classement',
+              rankingPosition == null ? '-' : '#$rankingPosition',
+              Icons.leaderboard_rounded,
+            ),
+          ]
+        : [
+            _StatItem(
+              'Points totaux',
+              totalPoints.toString(),
+              Icons.bolt_rounded,
+            ),
+            _StatItem(
+              'Points positifs',
+              positivePoints.toString(),
+              Icons.favorite_rounded,
+            ),
+            _StatItem(
+              'Badges',
+              badges.toString(),
+              Icons.workspace_premium_rounded,
+            ),
+            _StatItem(
+              'Badges attribués',
+              awardedBadges.toString(),
+              Icons.verified_rounded,
+            ),
+          ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -714,8 +784,9 @@ class _RankingRow extends StatelessWidget {
 
 class _BadgesSection extends StatelessWidget {
   final List<BadgeModel> badges;
+  final bool personal;
 
-  const _BadgesSection({required this.badges});
+  const _BadgesSection({required this.badges, required this.personal});
 
   @override
   Widget build(BuildContext context) {
@@ -725,14 +796,16 @@ class _BadgesSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _SectionTitle(
+            _SectionTitle(
               icon: Icons.workspace_premium_rounded,
-              title: 'Badges disponibles',
+              title: personal ? 'Mes badges' : 'Badges disponibles',
             ),
             const Divider(height: 26),
             if (badges.isEmpty)
-              const _EmptyText(
-                'Aucun badge configuré. Initialise les badges par défaut pour commencer.',
+              _EmptyText(
+                personal
+                    ? 'Tu n’as pas encore obtenu de badge.'
+                    : 'Aucun badge configuré. Initialise les badges par défaut pour commencer.',
               )
             else
               LayoutBuilder(

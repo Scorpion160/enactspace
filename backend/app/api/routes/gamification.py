@@ -19,11 +19,20 @@ from app.schemas.gamification import (
     PoleRankingRead,
     MonthlyWinnerRead,
 )
-from app.api.deps import get_current_user
+from app.api.deps import (
+    get_current_active_validated_user,
+    require_sg_or_admin,
+    user_has_any_role,
+)
 
 
 router = APIRouter(prefix="/gamification", tags=["Gamification"])
 
+GAMIFICATION_MANAGERS = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+}
 
 VALID_POINT_SOURCES = {
     "task_validated",
@@ -110,7 +119,7 @@ def get_user_badge_or_404(db: Session, user_badge_id: str) -> UserBadge:
 def create_engagement_point(
     payload: EngagementPointCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     if payload.source_type not in VALID_POINT_SOURCES:
         raise HTTPException(
@@ -146,7 +155,7 @@ def create_engagement_point(
 @router.get("/points", response_model=list[EngagementPointRead])
 def list_engagement_points(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     user_id: str | None = Query(default=None),
     season_id: str | None = Query(default=None),
     pole_id: str | None = Query(default=None),
@@ -155,7 +164,10 @@ def list_engagement_points(
 ):
     query = db.query(EngagementPoint)
 
-    if user_id:
+    can_manage = user_has_any_role(db, current_user.id, GAMIFICATION_MANAGERS)
+    if not can_manage:
+        query = query.filter(EngagementPoint.user_id == current_user.id)
+    elif user_id:
         query = query.filter(EngagementPoint.user_id == user_id)
 
     if season_id:
@@ -176,7 +188,7 @@ def list_engagement_points(
 @router.get("/ranking/users", response_model=list[UserRankingRead])
 def get_user_ranking(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     season_id: str | None = Query(default=None),
     month: int | None = Query(default=None),
     year: int | None = Query(default=None),
@@ -209,7 +221,7 @@ def get_user_ranking(
 @router.get("/ranking/poles", response_model=list[PoleRankingRead])
 def get_pole_ranking(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     season_id: str | None = Query(default=None),
     month: int | None = Query(default=None),
     year: int | None = Query(default=None),
@@ -244,7 +256,7 @@ def get_member_of_month(
     month: int,
     year: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     season_id: str | None = Query(default=None),
 ):
     query = db.query(
@@ -278,7 +290,7 @@ def get_pole_of_month(
     month: int,
     year: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     season_id: str | None = Query(default=None),
 ):
     query = db.query(
@@ -312,7 +324,7 @@ def get_pole_of_month(
 def create_badge(
     payload: BadgeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     existing = db.query(Badge).filter(Badge.name == payload.name).first()
 
@@ -339,7 +351,7 @@ def create_badge(
 @router.post("/badges/init-defaults", response_model=list[BadgeRead])
 def init_default_badges(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     created_badges = []
 
@@ -369,7 +381,7 @@ def init_default_badges(
 @router.get("/badges", response_model=list[BadgeRead])
 def list_badges(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     return db.query(Badge).order_by(Badge.label.asc()).all()
 
@@ -378,7 +390,7 @@ def list_badges(
 def get_badge(
     badge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     return get_badge_or_404(db, badge_id)
 
@@ -388,7 +400,7 @@ def update_badge(
     badge_id: str,
     payload: BadgeUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     badge = get_badge_or_404(db, badge_id)
 
@@ -411,7 +423,7 @@ def update_badge(
 def delete_badge(
     badge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     badge = get_badge_or_404(db, badge_id)
 
@@ -428,7 +440,7 @@ def delete_badge(
 def award_badge_to_user(
     payload: UserBadgeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     get_badge_or_404(db, str(payload.badge_id))
 
@@ -458,13 +470,16 @@ def award_badge_to_user(
 @router.get("/user-badges", response_model=list[UserBadgeRead])
 def list_user_badges(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_validated_user),
     user_id: str | None = Query(default=None),
     season_id: str | None = Query(default=None),
 ):
     query = db.query(UserBadge)
 
-    if user_id:
+    can_manage = user_has_any_role(db, current_user.id, GAMIFICATION_MANAGERS)
+    if not can_manage:
+        query = query.filter(UserBadge.user_id == current_user.id)
+    elif user_id:
         query = query.filter(UserBadge.user_id == user_id)
 
     if season_id:
@@ -477,7 +492,7 @@ def list_user_badges(
 def remove_user_badge(
     user_badge_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     user_badge = get_user_badge_or_404(db, user_badge_id)
 

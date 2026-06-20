@@ -88,12 +88,9 @@ class _ChatScreenState extends State<ChatScreen> {
           _user = user;
           _pinnedThreadIds = pinnedThreadIds;
           _threads = _sortThreads(cachedThreads, pinnedThreadIds);
-          _selectedThread = cachedThreads.first;
           _usingLocalCache = true;
           _loading = false;
         });
-
-        await _loadCachedMessages(cachedThreads.first);
       }
 
       final threads = await _chatService.getThreads();
@@ -105,14 +102,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _user = user;
         _pinnedThreadIds = pinnedThreadIds;
         _threads = _sortThreads(threads, pinnedThreadIds);
-        _selectedThread = threads.isNotEmpty ? threads.first : null;
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
       });
-
-      if (threads.isNotEmpty) {
-        await _selectThread(threads.first, silent: true);
-      }
     } catch (e) {
       if (!mounted) return;
       if (_threads.isNotEmpty) {
@@ -132,28 +124,6 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
-  }
-
-  Future<void> _loadCachedMessages(ChatThreadModel thread) async {
-    final userId = _user?.id;
-    if (userId == null) return;
-
-    final pinnedMessageIds = await _chatService.getPinnedMessageIds(
-      userId: userId,
-      threadId: thread.id,
-    );
-    final cached = await _chatService.getCachedMessages(
-      userId: userId,
-      threadId: thread.id,
-    );
-
-    if (!mounted || cached.isEmpty) return;
-
-    setState(() {
-      _messages = cached;
-      _mergeServerReactions(cached);
-      _pinnedMessageIds = pinnedMessageIds;
-    });
   }
 
   void _mergeServerReactions(List<ChatMessageModel> messages) {
@@ -756,20 +726,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadChat,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final horizontalPadding = constraints.maxWidth < 560 ? 12.0 : 24.0;
-          final isWide = constraints.maxWidth >= 920;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 920;
 
-          return ListView(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              20,
-              horizontalPadding,
-              28,
-            ),
+        if (!isWide) {
+          return _buildMobileChat();
+        }
+
+        return RefreshIndicator(
+          onRefresh: _loadChat,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
             children: [
               Center(
                 child: ConstrainedBox(
@@ -785,7 +753,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const _LoadingCard()
                       else if (_error != null)
                         _ErrorCard(message: _error!, onRetry: _loadChat)
-                      else if (isWide)
+                      else
                         SizedBox(
                           height: MediaQuery.sizeOf(context).height - 170,
                           child: Row(
@@ -805,81 +773,151 @@ class _ChatScreenState extends State<ChatScreen> {
                               Expanded(child: _conversationPanel()),
                             ],
                           ),
-                        )
-                      else
-                        _selectedThread == null
-                            ? SizedBox(
-                                height: MediaQuery.sizeOf(context).height - 170,
-                                child: _ThreadsPanel(
-                                  threads: _threads,
-                                  selectedThread: _selectedThread,
-                                  pinnedThreadIds: _pinnedThreadIds,
-                                  currentUserId: _user?.id,
-                                  onSelect: _selectThread,
-                                ),
-                              )
-                            : SizedBox(
-                                height: MediaQuery.sizeOf(context).height - 170,
-                                child: _conversationPanel(showBack: true),
-                              ),
+                        ),
                     ],
                   ),
                 ),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _conversationPanel({bool showBack = false}) {
-    return Card(
-      child: Column(
-        children: [
-          _ConversationHeader(
-            thread: _selectedThread,
+  Widget _buildMobileChat() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [_ErrorCard(message: _error!, onRetry: _loadChat)],
+      );
+    }
+    if (_selectedThread != null) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) {
+            setState(() => _selectedThread = null);
+          }
+        },
+        child: _conversationPanel(showBack: true, framed: false),
+      );
+    }
+
+    return Column(
+      children: [
+        _MobileChatToolbar(
+          usingLocalCache: _usingLocalCache,
+          onNewThread: _openNewThreadDialog,
+        ),
+        Expanded(
+          child: _ThreadsPanel(
+            threads: _threads,
+            selectedThread: null,
+            pinnedThreadIds: _pinnedThreadIds,
             currentUserId: _user?.id,
-            showBack: showBack,
-            pinned: _selectedThread == null
-                ? false
-                : _pinnedThreadIds.contains(_selectedThread!.id),
-            syncing: _backgroundSyncing,
-            lastSyncedAt: _lastSyncedAt,
-            onBack: () => setState(() => _selectedThread = null),
-            onInfo: _openConversationInfo,
-            onTogglePin: _toggleSelectedThreadPin,
+            onSelect: _selectThread,
+            framed: false,
+            compact: true,
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: _messagesLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _selectedThread == null
-                ? const _EmptyConversation()
-                : _MessagesList(
-                    thread: _selectedThread!,
-                    messages: _messages
-                        .where(
-                          (message) => !_hiddenMessageIds.contains(message.id),
-                        )
-                        .toList(),
-                    currentUserId: _user?.id,
-                    pinnedMessageIds: _pinnedMessageIds,
-                    messageReactions: _messageReactions,
-                    removedServerReactionIds: _removedServerReactionIds,
-                    onMessageLongPress: _openMessageActions,
-                  ),
+        ),
+      ],
+    );
+  }
+
+  Widget _conversationPanel({bool showBack = false, bool framed = true}) {
+    final content = Column(
+      children: [
+        _ConversationHeader(
+          thread: _selectedThread,
+          currentUserId: _user?.id,
+          showBack: showBack,
+          pinned: _selectedThread == null
+              ? false
+              : _pinnedThreadIds.contains(_selectedThread!.id),
+          syncing: _backgroundSyncing,
+          lastSyncedAt: _lastSyncedAt,
+          onBack: () => setState(() => _selectedThread = null),
+          onInfo: _openConversationInfo,
+          onTogglePin: _toggleSelectedThreadPin,
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: _messagesLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _selectedThread == null
+              ? const _EmptyConversation()
+              : _MessagesList(
+                  thread: _selectedThread!,
+                  messages: _messages
+                      .where(
+                        (message) => !_hiddenMessageIds.contains(message.id),
+                      )
+                      .toList(),
+                  currentUserId: _user?.id,
+                  pinnedMessageIds: _pinnedMessageIds,
+                  messageReactions: _messageReactions,
+                  removedServerReactionIds: _removedServerReactionIds,
+                  onMessageLongPress: _openMessageActions,
+                ),
+        ),
+        if (_selectedThread != null)
+          _MessageComposer(
+            controller: _messageController,
+            sending: _sending,
+            replyingTo: _replyingToMessage,
+            onClearReply: _clearReply,
+            onSend: _sendMessage,
+            onAttach: _openAttachmentDialog,
           ),
-          if (_selectedThread != null)
-            _MessageComposer(
-              controller: _messageController,
-              sending: _sending,
-              replyingTo: _replyingToMessage,
-              onClearReply: _clearReply,
-              onSend: _sendMessage,
-              onAttach: _openAttachmentDialog,
+      ],
+    );
+
+    if (!framed) {
+      return Material(color: Colors.white, child: content);
+    }
+    return Card(child: content);
+  }
+}
+
+class _MobileChatToolbar extends StatelessWidget {
+  final bool usingLocalCache;
+  final VoidCallback onNewThread;
+
+  const _MobileChatToolbar({
+    required this.usingLocalCache,
+    required this.onNewThread,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Discussions',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+              ),
             ),
-        ],
+            if (usingLocalCache)
+              const Tooltip(
+                message: 'Disponible localement',
+                child: Icon(Icons.offline_bolt_rounded, size: 20),
+              ),
+            IconButton(
+              onPressed: onNewThread,
+              tooltip: 'Nouvelle discussion',
+              icon: const Icon(Icons.add_comment_rounded),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1012,6 +1050,8 @@ class _ThreadsPanel extends StatefulWidget {
   final Set<String> pinnedThreadIds;
   final String? currentUserId;
   final ValueChanged<ChatThreadModel> onSelect;
+  final bool framed;
+  final bool compact;
 
   const _ThreadsPanel({
     required this.threads,
@@ -1019,6 +1059,8 @@ class _ThreadsPanel extends StatefulWidget {
     required this.pinnedThreadIds,
     required this.currentUserId,
     required this.onSelect,
+    this.framed = true,
+    this.compact = false,
   });
 
   @override
@@ -1043,11 +1085,11 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
       return _threadSearchText(thread, widget.currentUserId).contains(query);
     }).toList();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
+    final content = Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          if (!widget.compact)
             const ListTile(
               leading: Icon(Icons.forum_rounded),
               title: Text(
@@ -1055,42 +1097,45 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
-            const SizedBox(height: 4),
-            TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Rechercher une discussion',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-              onChanged: (value) => setState(() => _query = value),
+          TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              hintText: 'Rechercher une discussion',
+              prefixIcon: Icon(Icons.search_rounded),
             ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            Expanded(
-              child: widget.threads.isEmpty
-                  ? const _EmptyThreads()
-                  : filteredThreads.isEmpty
-                  ? const _EmptySearchResult()
-                  : ListView.builder(
-                      itemCount: filteredThreads.length,
-                      itemBuilder: (context, index) {
-                        final thread = filteredThreads[index];
-                        final selected = thread.id == widget.selectedThread?.id;
+            onChanged: (value) => setState(() => _query = value),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          Expanded(
+            child: widget.threads.isEmpty
+                ? const _EmptyThreads()
+                : filteredThreads.isEmpty
+                ? const _EmptySearchResult()
+                : ListView.builder(
+                    itemCount: filteredThreads.length,
+                    itemBuilder: (context, index) {
+                      final thread = filteredThreads[index];
+                      final selected = thread.id == widget.selectedThread?.id;
 
-                        return _ThreadTile(
-                          thread: thread,
-                          selected: selected,
-                          pinned: widget.pinnedThreadIds.contains(thread.id),
-                          currentUserId: widget.currentUserId,
-                          onTap: () => widget.onSelect(thread),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+                      return _ThreadTile(
+                        thread: thread,
+                        selected: selected,
+                        pinned: widget.pinnedThreadIds.contains(thread.id),
+                        currentUserId: widget.currentUserId,
+                        onTap: () => widget.onSelect(thread),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
+
+    if (!widget.framed) {
+      return Material(color: Colors.white, child: content);
+    }
+    return Card(child: content);
   }
 }
 
@@ -1112,17 +1157,19 @@ class _ThreadTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = _threadDisplayTitle(thread, currentUserId);
+    final hasUnread = thread.unreadCount > 0;
 
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 2),
       decoration: BoxDecoration(
         color: selected
             ? AppTheme.enactusYellow.withValues(alpha: 0.24)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
         onTap: onTap,
+        minVerticalPadding: 10,
         leading: _ChatAvatar(
           title: title,
           imageUrl: _threadAvatarUrl(thread, currentUserId),
@@ -1132,24 +1179,50 @@ class _ThreadTile extends StatelessWidget {
         title: Text(
           title,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontWeight: hasUnread ? FontWeight.w900 : FontWeight.w700,
+          ),
         ),
         subtitle: Text(
           thread.lastMessage ?? _threadSubtitle(thread, currentUserId),
           overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w400,
+            color: hasUnread ? AppTheme.softBlack : Colors.black54,
+          ),
         ),
         trailing: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (pinned) const Icon(Icons.push_pin_rounded, size: 16),
-            if (thread.unreadCount > 0)
-              Badge(
-                label: Text(
-                  thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}',
-                ),
-                backgroundColor: AppTheme.enactusYellow,
-                textColor: AppTheme.softBlack,
+            Text(
+              _threadTimeLabel(thread.lastMessageAt ?? thread.updatedAt),
+              style: TextStyle(
+                color: hasUnread ? Colors.green.shade700 : Colors.black45,
+                fontSize: 11,
+                fontWeight: hasUnread ? FontWeight.w800 : FontWeight.w500,
               ),
+            ),
+            const SizedBox(height: 5),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (pinned)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 5),
+                    child: Icon(Icons.push_pin_rounded, size: 15),
+                  ),
+                if (hasUnread)
+                  Badge(
+                    label: Text(
+                      thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}',
+                    ),
+                    backgroundColor: Colors.green.shade600,
+                    textColor: Colors.white,
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -3215,6 +3288,19 @@ String _threadSubtitle(ChatThreadModel thread, String? currentUserId) {
   }
 
   return '${thread.participantsCount} participant(s)';
+}
+
+String _threadTimeLabel(DateTime date) {
+  final now = DateTime.now();
+  final local = date.toLocal();
+  final today = DateTime(now.year, now.month, now.day);
+  final messageDay = DateTime(local.year, local.month, local.day);
+  final difference = today.difference(messageDay).inDays;
+
+  if (difference == 0) return DateFormat('HH:mm').format(local);
+  if (difference == 1) return 'Hier';
+  if (difference < 7) return DateFormat('EEE', 'fr').format(local);
+  return DateFormat('dd/MM/yy').format(local);
 }
 
 String _conversationTypeLabel(ChatThreadModel thread) {

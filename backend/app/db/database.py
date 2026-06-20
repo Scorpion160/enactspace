@@ -39,6 +39,12 @@ def get_db():
 
 
 def ensure_compatibility_columns() -> None:
+    # Import every model before create_all so installations upgraded from an
+    # older database receive newly introduced tables without losing data.
+    import app.models.base  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+
     inspector = inspect(engine)
     if "users" not in inspector.get_table_names():
         return

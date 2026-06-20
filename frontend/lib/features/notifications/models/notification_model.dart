@@ -110,6 +110,8 @@ class NotificationModel {
         return 'Document partage';
       case 'mentorship_assigned':
         return 'Mentorat';
+      case 'chat_message':
+        return 'Nouveau message';
       case 'attendance':
         return 'Présence';
       case 'payment':
