@@ -49,6 +49,8 @@ class DocumentRead(BaseModel):
     season_id: Optional[UUID]
     is_template: bool
     is_official: bool
+    can_manage: bool = False
+    can_validate: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -42,6 +42,8 @@ class TasksService {
     required DateTime? dueDate,
     required bool proofRequired,
     required List<String> assigneeIds,
+    String? poleId,
+    String? projectId,
   }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -56,6 +58,8 @@ class TasksService {
         'due_date': dueDate?.toIso8601String(),
         'proof_required': proofRequired,
         'assignee_ids': assigneeIds,
+        'pole_id': poleId,
+        'project_id': projectId,
       },
     );
 

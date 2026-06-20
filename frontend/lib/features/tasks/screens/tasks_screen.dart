@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/task_model.dart';
 import '../services/tasks_service.dart';
 import '../models/task_assignee_model.dart';
@@ -16,13 +22,19 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   final TasksService _tasksService = TasksService();
   final MembersService _membersService = MembersService();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   List<TaskModel> _tasks = [];
   List<MemberModel> _members = [];
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
   Map<String, List<TaskAssigneeModel>> _assigneesByTaskId = {};
+  UserExperience? _userExperience;
   String _selectedView = 'all';
   String _priorityFilter = 'all';
 
@@ -45,6 +57,7 @@ class _TasksScreenState extends State<TasksScreen> {
     });
 
     try {
+      final user = UserExperience.fromJson(await _authService.getCurrentUser());
       final Future<List<TaskModel>> tasksFuture;
 
       if (_selectedView == 'my') {
@@ -58,10 +71,14 @@ class _TasksScreenState extends State<TasksScreen> {
       final results = await Future.wait([
         tasksFuture,
         _membersService.getMembers(),
+        _polesService.getPoles(),
+        _projectsService.getProjects(),
       ]);
 
       final tasks = results[0] as List<TaskModel>;
       final members = results[1] as List<MemberModel>;
+      final poles = results[2] as List<PoleModel>;
+      final projects = results[3] as List<ProjectModel>;
 
       final Map<String, List<TaskAssigneeModel>> assigneesMap = {};
 
@@ -79,7 +96,10 @@ class _TasksScreenState extends State<TasksScreen> {
       setState(() {
         _tasks = tasks;
         _members = members;
+        _poles = poles;
+        _projects = projects;
         _assigneesByTaskId = assigneesMap;
+        _userExperience = user;
       });
     } catch (e) {
       if (!mounted) return;
@@ -100,7 +120,18 @@ class _TasksScreenState extends State<TasksScreen> {
     final created = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return CreateTaskDialog(tasksService: _tasksService, members: _members);
+        final user = _userExperience;
+        return CreateTaskDialog(
+          tasksService: _tasksService,
+          members: _members,
+          poles: _poles,
+          projects: _projects,
+          requiresScope:
+              user?.isProjectOrPoleLead == true &&
+              user?.isAdmin != true &&
+              user?.isTeamLeader != true &&
+              user?.isSecretary != true,
+        );
       },
     );
 
@@ -248,6 +279,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canManageTasks = _userExperience?.canCreateTasks == true;
+
     return RefreshIndicator(
       onRefresh: _loadTasks,
       child: ListView(
@@ -260,7 +293,7 @@ class _TasksScreenState extends State<TasksScreen> {
             done: _tasksByStatus('termine').length,
             validated: _tasksByStatus('valide').length,
             onRefresh: _loadTasks,
-            onCreate: _openCreateTaskDialog,
+            onCreate: canManageTasks ? _openCreateTaskDialog : null,
           ),
           const SizedBox(height: 18),
           _TaskViewFilters(
@@ -317,7 +350,7 @@ class _TasksHeader extends StatelessWidget {
   final int done;
   final int validated;
   final VoidCallback onRefresh;
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
 
   const _TasksHeader({
     required this.total,
@@ -342,11 +375,12 @@ class _TasksHeader extends StatelessWidget {
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
         ),
-        ElevatedButton.icon(
-          onPressed: onCreate,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Créer tâche'),
-        ),
+        if (onCreate != null)
+          ElevatedButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Créer tâche'),
+          ),
       ],
     );
 
@@ -592,6 +626,7 @@ class _KanbanColumn extends StatelessWidget {
                   onChangeStatus: onChangeStatus,
                   onSubmitProof: onSubmitProof,
                   onValidate: onValidate,
+                  canManage: task.canManage,
                 ),
               ),
           ],
@@ -608,6 +643,7 @@ class _TaskCard extends StatelessWidget {
   final Future<void> Function(TaskModel task) onValidate;
   final List<MemberModel> members;
   final List<TaskAssigneeModel> assignees;
+  final bool canManage;
 
   const _TaskCard({
     required this.task,
@@ -616,6 +652,7 @@ class _TaskCard extends StatelessWidget {
     required this.onValidate,
     required this.members,
     required this.assignees,
+    required this.canManage,
   });
 
   @override
@@ -665,26 +702,35 @@ class _TaskCard extends StatelessWidget {
                       labelText: 'Statut',
                       isDense: true,
                     ),
-                    items: const [
-                      DropdownMenuItem(
+                    items: [
+                      const DropdownMenuItem(
                         value: 'a_faire',
                         child: Text('À faire'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'en_cours',
                         child: Text('En cours'),
                       ),
-                      DropdownMenuItem(
+                      const DropdownMenuItem(
                         value: 'termine',
                         child: Text('Terminé'),
                       ),
-                      DropdownMenuItem(value: 'valide', child: Text('Validé')),
-                      DropdownMenuItem(value: 'bloque', child: Text('Bloqué')),
+                      if (canManage || task.status == 'valide')
+                        const DropdownMenuItem(
+                          value: 'valide',
+                          child: Text('Validé'),
+                        ),
+                      const DropdownMenuItem(
+                        value: 'bloque',
+                        child: Text('Bloqué'),
+                      ),
                     ],
-                    onChanged: (value) {
-                      if (value == null || value == task.status) return;
-                      onChangeStatus(task, value);
-                    },
+                    onChanged: !canManage && task.status == 'valide'
+                        ? null
+                        : (value) {
+                            if (value == null || value == task.status) return;
+                            onChangeStatus(task, value);
+                          },
                   ),
                 ),
               ],
@@ -699,13 +745,14 @@ class _TaskCard extends StatelessWidget {
                   icon: const Icon(Icons.link_rounded),
                   label: const Text('Preuve'),
                 ),
-                ElevatedButton.icon(
-                  onPressed: task.status == 'termine'
-                      ? () => onValidate(task)
-                      : null,
-                  icon: const Icon(Icons.verified_rounded),
-                  label: const Text('Valider'),
-                ),
+                if (canManage)
+                  ElevatedButton.icon(
+                    onPressed: task.status == 'termine'
+                        ? () => onValidate(task)
+                        : null,
+                    icon: const Icon(Icons.verified_rounded),
+                    label: const Text('Valider'),
+                  ),
               ],
             ),
           ],
@@ -718,11 +765,17 @@ class _TaskCard extends StatelessWidget {
 class CreateTaskDialog extends StatefulWidget {
   final TasksService tasksService;
   final List<MemberModel> members;
+  final List<PoleModel> poles;
+  final List<ProjectModel> projects;
+  final bool requiresScope;
 
   const CreateTaskDialog({
     super.key,
     required this.tasksService,
     required this.members,
+    required this.poles,
+    required this.projects,
+    required this.requiresScope,
   });
 
   @override
@@ -731,6 +784,8 @@ class CreateTaskDialog extends StatefulWidget {
 
 class _CreateTaskDialogState extends State<CreateTaskDialog> {
   final _formKey = GlobalKey<FormState>();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -739,9 +794,19 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
   DateTime? _dueDate = DateTime.now().add(const Duration(days: 7));
   bool _proofRequired = false;
   final Set<String> _assigneeIds = {};
+  String? _poleId;
+  String? _projectId;
+  late List<MemberModel> _eligibleMembers;
+  bool _loadingScope = false;
 
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _eligibleMembers = List<MemberModel>.from(widget.members);
+  }
 
   @override
   void dispose() {
@@ -767,6 +832,12 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (widget.requiresScope && _poleId == null && _projectId == null) {
+      setState(() {
+        _error = 'Sélectionnez le pôle ou projet que vous dirigez.';
+      });
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -781,6 +852,8 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
         dueDate: _dueDate,
         proofRequired: _proofRequired,
         assigneeIds: _assigneeIds.toList(),
+        poleId: _poleId,
+        projectId: _projectId,
       );
 
       if (!mounted) return;
@@ -803,6 +876,61 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
 
     final d = _dueDate!;
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  Future<void> _selectPole(String? poleId) async {
+    setState(() {
+      _poleId = poleId;
+      _projectId = null;
+      _assigneeIds.clear();
+      _loadingScope = poleId != null;
+      _eligibleMembers = poleId == null
+          ? List<MemberModel>.from(widget.members)
+          : [];
+    });
+    if (poleId == null) return;
+    try {
+      final members = await _polesService.getPoleMembers(poleId);
+      if (!mounted) return;
+      setState(() => _eligibleMembers = members);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _loadingScope = false);
+    }
+  }
+
+  Future<void> _selectProject(String? projectId) async {
+    setState(() {
+      _projectId = projectId;
+      _poleId = null;
+      _assigneeIds.clear();
+      _loadingScope = projectId != null;
+      _eligibleMembers = projectId == null
+          ? List<MemberModel>.from(widget.members)
+          : [];
+    });
+    if (projectId == null) return;
+    try {
+      final memberships = await _projectsService.getProjectMembers(projectId);
+      final memberIds = memberships.map((item) => item.userId).toSet();
+      if (!mounted) return;
+      setState(() {
+        _eligibleMembers = widget.members
+            .where((member) => memberIds.contains(member.id))
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _loadingScope = false);
+    }
   }
 
   @override
@@ -900,6 +1028,56 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
                         },
                 ),
                 const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_poleId),
+                  initialValue: _poleId,
+                  decoration: const InputDecoration(
+                    labelText: 'Pôle lié',
+                    prefixIcon: Icon(Icons.hub_rounded),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Aucun pôle'),
+                    ),
+                    for (final pole in widget.poles)
+                      DropdownMenuItem(
+                        value: pole.id,
+                        child: Text(pole.name, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: _loading ? null : _selectPole,
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_projectId),
+                  initialValue: _projectId,
+                  decoration: const InputDecoration(
+                    labelText: 'Projet lié',
+                    prefixIcon: Icon(Icons.rocket_launch_rounded),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Aucun projet'),
+                    ),
+                    for (final project in widget.projects)
+                      DropdownMenuItem(
+                        value: project.id,
+                        child: Text(
+                          project.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _loading ? null : _selectProject,
+                ),
+                const SizedBox(height: 8),
+                if (_loadingScope)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(),
+                  ),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -913,7 +1091,7 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: widget.members.map((member) {
+                  children: _eligibleMembers.map((member) {
                     final selected = _assigneeIds.contains(member.id);
 
                     return FilterChip(

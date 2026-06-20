@@ -42,6 +42,8 @@ class TaskRead(BaseModel):
     proof_required: bool
     proof_url: Optional[str]
     is_late_alert_sent: bool
+    can_manage: bool = False
+    current_user_assigned: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -752,24 +752,25 @@ class _DocumentCard extends StatelessWidget {
                   icon: const Icon(Icons.content_copy_rounded),
                   label: const Text('Copier le lien'),
                 ),
-                if (!document.isOfficial)
+                if (!document.isOfficial && document.canValidate)
                   ElevatedButton.icon(
                     onPressed: () => onValidate(document),
                     icon: const Icon(Icons.verified_rounded),
                     label: const Text('Valider'),
                   ),
-                if (document.isOfficial)
+                if (document.isOfficial && document.canValidate)
                   OutlinedButton.icon(
                     onPressed: () => onUnvalidate(document),
                     icon: const Icon(Icons.remove_done_rounded),
                     label: const Text('Retirer'),
                   ),
-                IconButton(
-                  onPressed: () => onDelete(document),
-                  icon: const Icon(Icons.delete_rounded),
-                  tooltip: 'Supprimer',
-                  color: Colors.red,
-                ),
+                if (document.canManage)
+                  IconButton(
+                    onPressed: () => onDelete(document),
+                    icon: const Icon(Icons.delete_rounded),
+                    tooltip: 'Supprimer',
+                    color: Colors.red,
+                  ),
               ],
             ),
           ],

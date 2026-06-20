@@ -13,6 +13,8 @@ class DocumentModel {
   final String? seasonId;
   final bool isTemplate;
   final bool isOfficial;
+  final bool canManage;
+  final bool canValidate;
   final String? validatedBy;
   final String? validatedAt;
   final String? createdAt;
@@ -33,6 +35,8 @@ class DocumentModel {
     this.seasonId,
     required this.isTemplate,
     required this.isOfficial,
+    required this.canManage,
+    required this.canValidate,
     this.validatedBy,
     this.validatedAt,
     this.createdAt,
@@ -55,6 +59,8 @@ class DocumentModel {
       seasonId: json['season_id']?.toString(),
       isTemplate: json['is_template'] == true,
       isOfficial: json['is_official'] == true,
+      canManage: json['can_manage'] == true,
+      canValidate: json['can_validate'] == true,
       validatedBy: json['validated_by']?.toString(),
       validatedAt: json['validated_at']?.toString(),
       createdAt: json['created_at']?.toString(),

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -10,6 +11,8 @@ from app.models.task import (
     TaskChecklistItem,
     TaskComment,
 )
+from app.models.pole import PoleMember
+from app.models.project import ProjectMember
 from app.models.user import User
 from app.schemas.task import (
     TaskCreate,
@@ -27,7 +30,6 @@ from app.schemas.task import (
 )
 from app.api.deps import (
     get_current_active_validated_user,
-    require_enacchef_or_admin,
     user_has_any_role,
 )
 from app.services.notification_service import notify_user, notify_users
@@ -51,15 +53,13 @@ VALID_TASK_PRIORITIES = {
     "urgente",
 }
 
-TASK_MANAGER_ROLES = {
+GLOBAL_TASK_MANAGER_ROLES = {
     "administrateur",
     "team_leader",
     "secretaire_generale",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
 }
+POLE_LEAD_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
+PROJECT_LEAD_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
 
 
 def get_task_or_404(db: Session, task_id: str) -> Task:
@@ -84,9 +84,42 @@ def task_is_late(task: Task) -> bool:
     return datetime.utcnow() > task.due_date
 
 
-def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
-    is_manager = user_has_any_role(db, user.id, TASK_MANAGER_ROLES)
-    is_assignee = (
+def user_can_manage_task(db: Session, task: Task, user: User) -> bool:
+    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
+        return True
+    if task.creator_id == user.id:
+        return True
+    if task.pole_id is not None:
+        if (
+            db.query(PoleMember.id)
+            .filter(
+                PoleMember.pole_id == task.pole_id,
+                PoleMember.user_id == user.id,
+                PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
+                PoleMember.position.in_(POLE_LEAD_POSITIONS),
+            )
+            .first()
+        ):
+            return True
+    if task.project_id is not None:
+        if (
+            db.query(ProjectMember.id)
+            .filter(
+                ProjectMember.project_id == task.project_id,
+                ProjectMember.user_id == user.id,
+                ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
+                ProjectMember.position.in_(PROJECT_LEAD_POSITIONS),
+            )
+            .first()
+        ):
+            return True
+    return False
+
+
+def user_is_assigned(db: Session, task: Task, user: User) -> bool:
+    return (
         db.query(TaskAssignee.id)
         .filter(
             TaskAssignee.task_id == task.id,
@@ -95,6 +128,26 @@ def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
         .first()
         is not None
     )
+
+
+def task_payload(db: Session, task: Task, user: User) -> dict:
+    data = TaskRead.model_validate(task).model_dump()
+    data["can_manage"] = user_can_manage_task(db, task, user)
+    data["current_user_assigned"] = user_is_assigned(db, task, user)
+    return data
+
+
+def ensure_task_manager(db: Session, task: Task, user: User) -> None:
+    if not user_can_manage_task(db, task, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Gestion réservée au responsable de ce périmètre",
+        )
+
+
+def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
+    is_manager = user_can_manage_task(db, task, user)
+    is_assignee = user_is_assigned(db, task, user)
 
     if not is_manager and not is_assignee:
         raise HTTPException(
@@ -106,21 +159,135 @@ def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
 
 def visible_tasks_query(db: Session, user: User):
     query = db.query(Task)
-    if user_has_any_role(db, user.id, TASK_MANAGER_ROLES):
+    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
         return query
 
-    task_ids = db.query(TaskAssignee.task_id).filter(
+    assigned_task_ids = db.query(TaskAssignee.task_id).filter(
         TaskAssignee.user_id == user.id
     )
-    return query.filter(Task.id.in_(task_ids))
+    pole_ids = db.query(PoleMember.pole_id).filter(
+        PoleMember.user_id == user.id,
+        PoleMember.is_active.is_(True),
+        PoleMember.left_at.is_(None),
+        PoleMember.position.in_(POLE_LEAD_POSITIONS),
+    )
+    project_ids = db.query(ProjectMember.project_id).filter(
+        ProjectMember.user_id == user.id,
+        ProjectMember.is_active.is_(True),
+        ProjectMember.left_at.is_(None),
+        ProjectMember.position.in_(PROJECT_LEAD_POSITIONS),
+    )
+    return query.filter(
+        or_(
+            Task.id.in_(assigned_task_ids),
+            Task.creator_id == user.id,
+            and_(Task.pole_id.isnot(None), Task.pole_id.in_(pole_ids)),
+            and_(
+                Task.project_id.isnot(None),
+                Task.project_id.in_(project_ids),
+            ),
+        )
+    )
+
+
+def ensure_task_creation_scope(
+    db: Session,
+    user: User,
+    payload: TaskCreate,
+) -> None:
+    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
+        return
+    if payload.pole_id is not None:
+        if (
+            db.query(PoleMember.id)
+            .filter(
+                PoleMember.pole_id == payload.pole_id,
+                PoleMember.user_id == user.id,
+                PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
+                PoleMember.position.in_(POLE_LEAD_POSITIONS),
+            )
+            .first()
+        ):
+            return
+    if payload.project_id is not None:
+        if (
+            db.query(ProjectMember.id)
+            .filter(
+                ProjectMember.project_id == payload.project_id,
+                ProjectMember.user_id == user.id,
+                ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
+                ProjectMember.position.in_(PROJECT_LEAD_POSITIONS),
+            )
+            .first()
+        ):
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Sélectionnez un pôle ou projet que vous dirigez",
+    )
+
+
+def ensure_assignees_in_scope(
+    db: Session,
+    user: User,
+    pole_id,
+    project_id,
+    user_ids,
+) -> None:
+    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
+        return
+    requested_ids = set(user_ids)
+    if not requested_ids:
+        return
+    if pole_id is not None:
+        allowed_ids = {
+            row[0]
+            for row in db.query(PoleMember.user_id)
+            .filter(
+                PoleMember.pole_id == pole_id,
+                PoleMember.user_id.in_(requested_ids),
+                PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
+            )
+            .all()
+        }
+    elif project_id is not None:
+        allowed_ids = {
+            row[0]
+            for row in db.query(ProjectMember.user_id)
+            .filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id.in_(requested_ids),
+                ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
+            )
+            .all()
+        }
+    else:
+        allowed_ids = set()
+    if allowed_ids != requested_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tous les assignés doivent appartenir au périmètre",
+        )
 
 
 @router.post("/", response_model=TaskRead)
 def create_task(
     payload: TaskCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
+    ensure_task_creation_scope(db, current_user, payload)
+    ensure_assignees_in_scope(
+        db,
+        current_user,
+        payload.pole_id,
+        payload.project_id,
+        payload.assignee_ids,
+    )
     if payload.priority not in VALID_TASK_PRIORITIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -163,7 +330,7 @@ def create_task(
     db.commit()
     db.refresh(task)
 
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.get("/", response_model=list[TaskRead])
@@ -171,9 +338,12 @@ def list_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return visible_tasks_query(db, current_user).order_by(
-        Task.created_at.desc()
-    ).all()
+    tasks = (
+        visible_tasks_query(db, current_user)
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    return [task_payload(db, task, current_user) for task in tasks]
 
 
 @router.get("/my", response_model=list[TaskRead])
@@ -185,9 +355,13 @@ def list_my_tasks(
         TaskAssignee.user_id == current_user.id
     )
 
-    return db.query(Task).filter(
-        Task.id.in_(task_ids)
-    ).order_by(Task.created_at.desc()).all()
+    tasks = (
+        db.query(Task)
+        .filter(Task.id.in_(task_ids))
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    return [task_payload(db, task, current_user) for task in tasks]
 
 
 @router.get("/late", response_model=list[TaskRead])
@@ -197,11 +371,17 @@ def list_late_tasks(
 ):
     now = datetime.utcnow()
 
-    return visible_tasks_query(db, current_user).filter(
-        Task.due_date.isnot(None),
-        Task.due_date < now,
-        Task.status.notin_(["termine", "valide", "annule"]),
-    ).order_by(Task.due_date.asc()).all()
+    tasks = (
+        visible_tasks_query(db, current_user)
+        .filter(
+            Task.due_date.isnot(None),
+            Task.due_date < now,
+            Task.status.notin_(["termine", "valide", "annule"]),
+        )
+        .order_by(Task.due_date.asc())
+        .all()
+    )
+    return [task_payload(db, task, current_user) for task in tasks]
 
 
 @router.get("/project/{project_id}", response_model=list[TaskRead])
@@ -210,9 +390,13 @@ def list_project_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return visible_tasks_query(db, current_user).filter(
-        Task.project_id == project_id
-    ).order_by(Task.created_at.desc()).all()
+    tasks = (
+        visible_tasks_query(db, current_user)
+        .filter(Task.project_id == project_id)
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    return [task_payload(db, task, current_user) for task in tasks]
 
 
 @router.get("/pole/{pole_id}", response_model=list[TaskRead])
@@ -221,9 +405,13 @@ def list_pole_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return visible_tasks_query(db, current_user).filter(
-        Task.pole_id == pole_id
-    ).order_by(Task.created_at.desc()).all()
+    tasks = (
+        visible_tasks_query(db, current_user)
+        .filter(Task.pole_id == pole_id)
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    return [task_payload(db, task, current_user) for task in tasks]
 
 
 @router.get("/{task_id}", response_model=TaskRead)
@@ -234,7 +422,7 @@ def get_task(
 ):
     task = get_task_or_404(db, task_id)
     ensure_task_actor(db, task, current_user)
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
@@ -242,9 +430,10 @@ def update_task(
     task_id: str,
     payload: TaskUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
+    ensure_task_manager(db, task, current_user)
 
     if payload.priority is not None:
         if payload.priority not in VALID_TASK_PRIORITIES:
@@ -304,7 +493,7 @@ def update_task(
     db.commit()
     db.refresh(task)
 
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.post("/{task_id}/status", response_model=TaskRead)
@@ -367,7 +556,7 @@ def change_task_status(
     db.commit()
     db.refresh(task)
 
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.post("/{task_id}/proof", response_model=TaskRead)
@@ -386,16 +575,17 @@ def submit_task_proof(
     db.commit()
     db.refresh(task)
 
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.post("/{task_id}/validate", response_model=TaskRead)
 def validate_task(
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
+    ensure_task_manager(db, task, current_user)
 
     if task.status != "termine":
         raise HTTPException(
@@ -430,16 +620,17 @@ def validate_task(
     db.commit()
     db.refresh(task)
 
-    return task
+    return task_payload(db, task, current_user)
 
 
 @router.delete("/{task_id}")
 def delete_task(
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
+    ensure_task_manager(db, task, current_user)
 
     db.delete(task)
     db.commit()
@@ -454,9 +645,17 @@ def delete_task(
 def add_task_assignees(
     payload: TaskAssigneeCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, str(payload.task_id))
+    ensure_task_manager(db, task, current_user)
+    ensure_assignees_in_scope(
+        db,
+        current_user,
+        task.pole_id,
+        task.project_id,
+        payload.user_ids,
+    )
 
     created = []
 
@@ -513,8 +712,10 @@ def remove_task_assignee(
     task_id: str,
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
+    task = get_task_or_404(db, task_id)
+    ensure_task_manager(db, task, current_user)
     assignee = db.query(TaskAssignee).filter(
         TaskAssignee.task_id == task_id,
         TaskAssignee.user_id == user_id,
@@ -539,9 +740,10 @@ def remove_task_assignee(
 def create_checklist_item(
     payload: TaskChecklistItemCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_task_or_404(db, str(payload.task_id))
+    task = get_task_or_404(db, str(payload.task_id))
+    ensure_task_manager(db, task, current_user)
 
     item = TaskChecklistItem(
         task_id=payload.task_id,
@@ -575,7 +777,7 @@ def update_checklist_item(
     item_id: str,
     payload: TaskChecklistItemUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     item = db.query(TaskChecklistItem).filter(
         TaskChecklistItem.id == item_id
@@ -586,6 +788,8 @@ def update_checklist_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Élément de checklist introuvable",
         )
+    task = get_task_or_404(db, str(item.task_id))
+    ensure_task_manager(db, task, current_user)
 
     if payload.title is not None:
         item.title = payload.title
@@ -605,7 +809,7 @@ def update_checklist_item(
 def delete_checklist_item(
     item_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     item = db.query(TaskChecklistItem).filter(
         TaskChecklistItem.id == item_id
@@ -616,6 +820,8 @@ def delete_checklist_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Élément de checklist introuvable",
         )
+    task = get_task_or_404(db, str(item.task_id))
+    ensure_task_manager(db, task, current_user)
 
     db.delete(item)
     db.commit()

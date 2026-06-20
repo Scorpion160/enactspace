@@ -10,6 +10,10 @@ class TaskModel {
   final String? createdAt;
   final String? completedAt;
   final String? validatedAt;
+  final String? poleId;
+  final String? projectId;
+  final bool canManage;
+  final bool currentUserAssigned;
 
   const TaskModel({
     required this.id,
@@ -23,6 +27,10 @@ class TaskModel {
     this.createdAt,
     this.completedAt,
     this.validatedAt,
+    this.poleId,
+    this.projectId,
+    required this.canManage,
+    required this.currentUserAssigned,
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +46,10 @@ class TaskModel {
       createdAt: json['created_at']?.toString(),
       completedAt: json['completed_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
+      poleId: json['pole_id']?.toString(),
+      projectId: json['project_id']?.toString(),
+      canManage: json['can_manage'] == true,
+      currentUserAssigned: json['current_user_assigned'] == true,
     );
   }
 

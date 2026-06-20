@@ -112,6 +112,8 @@ class UserExperience {
       isAdmin || isTeamLeader || isSecretary || isRecruitmentLead || isEnacchef;
   bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
+  bool get canCreateTasks =>
+      isAdmin || isTeamLeader || isSecretary || isProjectOrPoleLead;
   bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
   bool get canManageGamification => isAdmin || isTeamLeader || isSecretary;
   bool get canViewMembersDirectory => !isAlumni || canManageMembers;
