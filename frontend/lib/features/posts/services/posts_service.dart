@@ -17,6 +17,8 @@ class PostsService {
     String? search,
     String? postType,
     String? visibility,
+    String? poleId,
+    String? projectId,
   }) async {
     final token = await _requireToken();
     final params = <String, String>{};
@@ -31,6 +33,12 @@ class PostsService {
 
     if (visibility != null && visibility != 'all') {
       params['visibility'] = visibility;
+    }
+    if (poleId != null && poleId.isNotEmpty) {
+      params['pole_id'] = poleId;
+    }
+    if (projectId != null && projectId.isNotEmpty) {
+      params['project_id'] = projectId;
     }
 
     final response = await _apiClient.get(
@@ -49,6 +57,8 @@ class PostsService {
     required String postType,
     required String visibility,
     required bool isOfficial,
+    String? poleId,
+    String? projectId,
   }) async {
     final token = await _requireToken();
 
@@ -61,6 +71,8 @@ class PostsService {
         'post_type': postType,
         'visibility': visibility,
         'is_official': isOfficial,
+        'pole_id': poleId,
+        'project_id': projectId,
       },
     );
 

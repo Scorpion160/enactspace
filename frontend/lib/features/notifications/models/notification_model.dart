@@ -112,6 +112,10 @@ class NotificationModel {
         return 'Mentorat';
       case 'chat_message':
         return 'Nouveau message';
+      case 'post_comment':
+        return 'Nouveau commentaire';
+      case 'post_reaction':
+        return 'Nouvelle réaction';
       case 'attendance':
         return 'Présence';
       case 'payment':

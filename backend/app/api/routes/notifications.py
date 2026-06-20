@@ -26,6 +26,8 @@ VALID_NOTIFICATION_TYPES = {
     "deadline_near",
     "task_late",
     "new_announcement",
+    "post_comment",
+    "post_reaction",
     "event_scheduled",
     "absence_recorded",
     "fee_due",

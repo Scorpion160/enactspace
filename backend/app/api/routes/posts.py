@@ -2,10 +2,12 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 
 from app.db.database import get_db
 from app.models.post import Post, PostComment, PostReaction
+from app.models.pole import PoleMember
+from app.models.project import ProjectMember
 from app.models.user import User
 from app.schemas.post import (
     PostCreate,
@@ -19,8 +21,10 @@ from app.schemas.post import (
 )
 from app.api.deps import (
     get_current_active_validated_user,
+    get_user_role_names,
     require_enacchef_or_admin,
 )
+from app.services.notification_service import notify_user
 
 router = APIRouter(prefix="/posts", tags=["Publications"])
 
@@ -56,17 +60,159 @@ VALID_REACTION_TYPES = {
     "soutien",
 }
 
+GLOBAL_POST_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+    "financier",
+    "faculty_advisor",
+}
 
-def get_post_or_404(db: Session, post_id: str) -> Post:
-    post = db.query(Post).filter(Post.id == post_id).first()
+ENACCHEF_ROLES = GLOBAL_POST_ROLES | {
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+}
 
+
+def user_scope_ids(db: Session, current_user: User) -> tuple[set, set]:
+    pole_ids = {
+        row[0]
+        for row in db.query(PoleMember.pole_id)
+        .filter(
+            PoleMember.user_id == current_user.id,
+            PoleMember.is_active.is_(True),
+            PoleMember.left_at.is_(None),
+        )
+        .all()
+    }
+    project_ids = {
+        row[0]
+        for row in db.query(ProjectMember.project_id)
+        .filter(
+            ProjectMember.user_id == current_user.id,
+            ProjectMember.is_active.is_(True),
+            ProjectMember.left_at.is_(None),
+        )
+        .all()
+    }
+    return pole_ids, project_ids
+
+
+def visible_posts_query(db: Session, current_user: User):
+    roles = get_user_role_names(db, current_user.id)
+    pole_ids, project_ids = user_scope_ids(db, current_user)
+
+    if roles.intersection(GLOBAL_POST_ROLES):
+        return db.query(Post).filter(
+            or_(
+                Post.visibility != "private",
+                Post.author_id == current_user.id,
+            )
+        )
+
+    conditions = [
+        Post.visibility.in_(("public_club", "internal")),
+        Post.author_id == current_user.id,
+    ]
+    if current_user.status == "alumni" or "alumni" in roles:
+        conditions.append(Post.visibility == "alumni_only")
+    if roles.intersection(ENACCHEF_ROLES):
+        conditions.append(Post.visibility == "enacchef_only")
+    if pole_ids:
+        conditions.append(
+            and_(
+                Post.visibility == "pole_only",
+                Post.pole_id.in_(pole_ids),
+            )
+        )
+    if project_ids:
+        conditions.append(
+            and_(
+                Post.visibility == "project_only",
+                Post.project_id.in_(project_ids),
+            )
+        )
+
+    return db.query(Post).filter(or_(*conditions))
+
+
+def get_visible_post_or_404(
+    db: Session,
+    post_id: str,
+    current_user: User,
+) -> Post:
+    post = visible_posts_query(db, current_user).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Publication introuvable",
+            detail="Publication introuvable ou non accessible",
+        )
+    return post
+
+
+def ensure_post_scope_allowed(
+    db: Session,
+    current_user: User,
+    *,
+    visibility: str,
+    pole_id=None,
+    project_id=None,
+) -> None:
+    roles = get_user_role_names(db, current_user.id)
+    if roles.intersection(GLOBAL_POST_ROLES):
+        return
+
+    pole_ids, project_ids = user_scope_ids(db, current_user)
+    if visibility == "enacchef_only" and not roles.intersection(ENACCHEF_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Publication réservée aux membres d'Enacchef",
+        )
+    if visibility == "alumni_only" and not (
+        current_user.status == "alumni" or "alumni" in roles
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Publication réservée aux alumni",
+        )
+    if visibility == "pole_only" and pole_id not in pole_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sélectionnez un pôle auquel vous appartenez",
+        )
+    if visibility == "project_only" and project_id not in project_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sélectionnez un projet auquel vous appartenez",
         )
 
-    return post
+def ensure_can_moderate_post(
+    db: Session,
+    current_user: User,
+    post: Post,
+) -> None:
+    roles = get_user_role_names(db, current_user.id)
+    if roles.intersection(GLOBAL_POST_ROLES) or post.author_id == current_user.id:
+        return
+
+    pole_ids, project_ids = user_scope_ids(db, current_user)
+    if (
+        post.pole_id in pole_ids
+        and roles.intersection({"chef_pole", "adjoint_chef_pole"})
+    ):
+        return
+    if (
+        post.project_id in project_ids
+        and roles.intersection({"chef_projet", "adjoint_chef_projet"})
+    ):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Vous ne pouvez pas modérer cette publication",
+    )
 
 
 @router.post("/", response_model=PostRead)
@@ -86,6 +232,14 @@ def create_post(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Visibilité invalide",
         )
+
+    ensure_post_scope_allowed(
+        db,
+        current_user,
+        visibility=payload.visibility,
+        pole_id=payload.pole_id,
+        project_id=payload.project_id,
+    )
 
     if payload.is_official or payload.post_type == "announcement":
         from app.api.deps import user_has_any_role
@@ -140,7 +294,7 @@ def list_posts(
     is_official: bool | None = Query(default=None),
     is_pinned: bool | None = Query(default=None),
 ):
-    query = db.query(Post)
+    query = visible_posts_query(db, current_user)
 
     if search:
         pattern = f"%{search}%"
@@ -181,8 +335,8 @@ def list_official_posts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Post).filter(
-        Post.is_official == True
+    return visible_posts_query(db, current_user).filter(
+        Post.is_official.is_(True)
     ).order_by(Post.created_at.desc()).all()
 
 
@@ -191,7 +345,7 @@ def get_main_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Post).filter(
+    return visible_posts_query(db, current_user).filter(
         Post.visibility.in_(["public_club", "internal"])
     ).order_by(
         Post.is_pinned.desc(),
@@ -205,7 +359,7 @@ def get_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return get_post_or_404(db, post_id)
+    return get_visible_post_or_404(db, post_id, current_user)
 
 
 @router.patch("/{post_id}", response_model=PostRead)
@@ -213,9 +367,11 @@ def update_post(
     post_id: str,
     payload: PostUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
-    post = get_post_or_404(db, post_id)
+    post = get_visible_post_or_404(db, post_id, current_user)
+    ensure_can_moderate_post(db, current_user, post)
+    current_roles = get_user_role_names(db, current_user.id)
 
     if payload.post_type is not None:
         if payload.post_type not in VALID_POST_TYPES:
@@ -231,6 +387,13 @@ def update_post(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Visibilité invalide",
             )
+        ensure_post_scope_allowed(
+            db,
+            current_user,
+            visibility=payload.visibility,
+            pole_id=post.pole_id,
+            project_id=post.project_id,
+        )
         post.visibility = payload.visibility
 
     if payload.title is not None:
@@ -240,9 +403,19 @@ def update_post(
         post.content = payload.content
 
     if payload.is_official is not None:
+        if not current_roles.intersection(ENACCHEF_ROLES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Seuls les responsables peuvent publier officiellement",
+            )
         post.is_official = payload.is_official
 
     if payload.is_pinned is not None:
+        if not current_roles.intersection(ENACCHEF_ROLES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Seuls les responsables peuvent épingler une publication",
+            )
         post.is_pinned = payload.is_pinned
 
     post.updated_at = datetime.utcnow()
@@ -259,7 +432,8 @@ def pin_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    post = get_post_or_404(db, post_id)
+    post = get_visible_post_or_404(db, post_id, current_user)
+    ensure_can_moderate_post(db, current_user, post)
 
     post.is_pinned = True
     post.updated_at = datetime.utcnow()
@@ -276,7 +450,8 @@ def unpin_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    post = get_post_or_404(db, post_id)
+    post = get_visible_post_or_404(db, post_id, current_user)
+    ensure_can_moderate_post(db, current_user, post)
 
     post.is_pinned = False
     post.updated_at = datetime.utcnow()
@@ -291,9 +466,10 @@ def unpin_post(
 def delete_post(
     post_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
-    post = get_post_or_404(db, post_id)
+    post = get_visible_post_or_404(db, post_id, current_user)
+    ensure_can_moderate_post(db, current_user, post)
 
     db.delete(post)
     db.commit()
@@ -310,15 +486,34 @@ def create_post_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_post_or_404(db, str(payload.post_id))
+    post = get_visible_post_or_404(db, str(payload.post_id), current_user)
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le commentaire ne peut pas être vide",
+        )
 
     comment = PostComment(
         post_id=payload.post_id,
         user_id=current_user.id,
-        content=payload.content,
+        content=content,
     )
 
     db.add(comment)
+    if post.author_id != current_user.id:
+        commenter_name = (
+            f"{current_user.first_name} {current_user.last_name}".strip()
+        )
+        notify_user(
+            db,
+            user_id=post.author_id,
+            title=f"Nouveau commentaire de {commenter_name}",
+            message=content[:180],
+            notification_type="post_comment",
+            related_type="post",
+            related_id=post.id,
+        )
     db.commit()
     db.refresh(comment)
 
@@ -331,7 +526,7 @@ def list_post_comments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_post_or_404(db, post_id)
+    get_visible_post_or_404(db, post_id, current_user)
 
     return db.query(PostComment).filter(
         PostComment.post_id == post_id
@@ -342,7 +537,7 @@ def list_post_comments(
 def delete_post_comment(
     comment_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     comment = db.query(PostComment).filter(
         PostComment.id == comment_id
@@ -354,6 +549,9 @@ def delete_post_comment(
             detail="Commentaire introuvable",
         )
 
+    post = get_visible_post_or_404(db, str(comment.post_id), current_user)
+    if comment.user_id != current_user.id:
+        ensure_can_moderate_post(db, current_user, post)
     db.delete(comment)
     db.commit()
 
@@ -375,16 +573,21 @@ def create_post_reaction(
             detail="Type de réaction invalide",
         )
 
-    get_post_or_404(db, str(payload.post_id))
+    post = get_visible_post_or_404(db, str(payload.post_id), current_user)
 
-    existing = db.query(PostReaction).filter(
+    existing_reactions = db.query(PostReaction).filter(
         PostReaction.post_id == payload.post_id,
         PostReaction.user_id == current_user.id,
-        PostReaction.reaction_type == payload.reaction_type,
-    ).first()
+    ).order_by(PostReaction.created_at.asc()).all()
 
-    if existing:
-        return existing
+    if existing_reactions:
+        reaction = existing_reactions[0]
+        reaction.reaction_type = payload.reaction_type
+        for duplicate in existing_reactions[1:]:
+            db.delete(duplicate)
+        db.commit()
+        db.refresh(reaction)
+        return reaction
 
     reaction = PostReaction(
         post_id=payload.post_id,
@@ -393,6 +596,17 @@ def create_post_reaction(
     )
 
     db.add(reaction)
+    if post.author_id != current_user.id:
+        reactor_name = f"{current_user.first_name} {current_user.last_name}".strip()
+        notify_user(
+            db,
+            user_id=post.author_id,
+            title=f"{reactor_name} a réagi à votre publication",
+            message=f"Réaction : {payload.reaction_type}",
+            notification_type="post_reaction",
+            related_type="post",
+            related_id=post.id,
+        )
     db.commit()
     db.refresh(reaction)
 
@@ -415,6 +629,12 @@ def delete_post_reaction(
             detail="Réaction introuvable",
         )
 
+    if reaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez retirer que votre propre réaction",
+        )
+    get_visible_post_or_404(db, str(reaction.post_id), current_user)
     db.delete(reaction)
     db.commit()
 
@@ -430,7 +650,7 @@ def list_post_reactions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_post_or_404(db, post_id)
+    get_visible_post_or_404(db, post_id, current_user)
 
     return db.query(PostReaction).filter(
         PostReaction.post_id == post_id
@@ -443,7 +663,7 @@ def get_post_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    get_post_or_404(db, post_id)
+    get_visible_post_or_404(db, post_id, current_user)
 
     comments_count = db.query(func.count(PostComment.id)).filter(
         PostComment.post_id == post_id

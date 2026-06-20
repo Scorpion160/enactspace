@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -7,6 +9,10 @@ import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/post_comment_model.dart';
 import '../models/post_model.dart';
 import '../models/post_stats_model.dart';
@@ -19,10 +25,12 @@ class PostsScreen extends StatefulWidget {
   State<PostsScreen> createState() => _PostsScreenState();
 }
 
-class _PostsScreenState extends State<PostsScreen> {
+class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   final PostsService _postsService = PostsService();
   final MembersService _membersService = MembersService();
   final AuthService _authService = AuthService();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -31,10 +39,14 @@ class _PostsScreenState extends State<PostsScreen> {
 
   bool _loading = true;
   bool _creating = false;
+  bool _refreshing = false;
   String? _error;
+  Timer? _refreshTimer;
   UserExperience? _user;
 
   List<PostModel> _posts = [];
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
   Map<String, MemberModel> _membersById = {};
   Map<String, PostStatsModel> _statsByPostId = {};
   final Map<String, List<PostCommentModel>> _commentsByPostId = {};
@@ -43,18 +55,30 @@ class _PostsScreenState extends State<PostsScreen> {
 
   String _postType = 'all';
   String _visibility = 'all';
+  String? _filterPoleId;
+  String? _filterProjectId;
   String _composerPostType = 'general';
   String _composerVisibility = 'internal';
+  String? _composerPoleId;
+  String? _composerProjectId;
   bool _composerOfficial = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadPosts();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted && !_loading && !_creating) {
+        _loadPosts(showLoading: false);
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
     _searchController.dispose();
     _titleController.dispose();
     _contentController.dispose();
@@ -66,21 +90,39 @@ class _PostsScreenState extends State<PostsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadPosts() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_loading) {
+      _loadPosts(showLoading: false);
+    }
+  }
+
+  Future<void> _loadPosts({bool showLoading = true}) async {
+    if (_refreshing) return;
+    _refreshing = true;
+
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final posts = await _postsService.getPosts(
         search: _searchController.text,
         postType: _postType,
         visibility: _visibility,
+        poleId: _filterPoleId,
+        projectId: _filterProjectId,
       );
 
       final user = await _loadUserSafely();
       final members = await _loadMembersSafely();
+      final poles = _poles.isEmpty ? await _loadPolesSafely() : _poles;
+      final projects = _projects.isEmpty
+          ? await _loadProjectsSafely()
+          : _projects;
       final stats = await Future.wait(posts.map(_loadStatsSafely));
 
       if (!mounted) return;
@@ -89,18 +131,23 @@ class _PostsScreenState extends State<PostsScreen> {
         _posts = _sortPosts(posts);
         _user = user;
         _membersById = {for (final member in members) member.id: member};
+        _poles = poles;
+        _projects = projects;
         _statsByPostId = {for (final stat in stats) stat.postId: stat};
       });
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (showLoading) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
+      _refreshing = false;
       if (mounted) {
         setState(() {
-          _loading = false;
+          if (showLoading) _loading = false;
         });
       }
     }
@@ -119,6 +166,22 @@ class _PostsScreenState extends State<PostsScreen> {
       return UserExperience.fromJson(await _authService.getCurrentUser());
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<List<PoleModel>> _loadPolesSafely() async {
+    try {
+      return await _polesService.getPoles();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<ProjectModel>> _loadProjectsSafely() async {
+    try {
+      return await _projectsService.getProjects();
+    } catch (_) {
+      return [];
     }
   }
 
@@ -141,6 +204,14 @@ class _PostsScreenState extends State<PostsScreen> {
       _showError('Le contenu de la publication est obligatoire.');
       return;
     }
+    if (_composerVisibility == 'pole_only' && _composerPoleId == null) {
+      _showError('Sélectionnez le pôle concerné.');
+      return;
+    }
+    if (_composerVisibility == 'project_only' && _composerProjectId == null) {
+      _showError('Sélectionnez le projet concerné.');
+      return;
+    }
 
     setState(() {
       _creating = true;
@@ -153,6 +224,10 @@ class _PostsScreenState extends State<PostsScreen> {
         postType: _composerPostType,
         visibility: _composerVisibility,
         isOfficial: (_user?.isEnacchef ?? false) && _composerOfficial,
+        poleId: _composerVisibility == 'pole_only' ? _composerPoleId : null,
+        projectId: _composerVisibility == 'project_only'
+            ? _composerProjectId
+            : null,
       );
 
       _titleController.clear();
@@ -163,6 +238,8 @@ class _PostsScreenState extends State<PostsScreen> {
         _composerPostType = 'general';
         _composerVisibility = 'internal';
         _composerOfficial = false;
+        _composerPoleId = null;
+        _composerProjectId = null;
       });
 
       await _loadPosts();
@@ -385,6 +462,10 @@ class _PostsScreenState extends State<PostsScreen> {
             contentController: _contentController,
             postType: _composerPostType,
             visibility: _composerVisibility,
+            poles: _poles,
+            projects: _projects,
+            selectedPoleId: _composerPoleId,
+            selectedProjectId: _composerProjectId,
             isOfficial: _composerOfficial,
             canPublishOfficial: canModerate,
             creating: _creating,
@@ -392,8 +473,15 @@ class _PostsScreenState extends State<PostsScreen> {
               setState(() => _composerPostType = value);
             },
             onVisibilityChanged: (value) {
-              setState(() => _composerVisibility = value);
+              setState(() {
+                _composerVisibility = value;
+                if (value != 'pole_only') _composerPoleId = null;
+                if (value != 'project_only') _composerProjectId = null;
+              });
             },
+            onPoleChanged: (value) => setState(() => _composerPoleId = value),
+            onProjectChanged: (value) =>
+                setState(() => _composerProjectId = value),
             onOfficialChanged: (value) {
               setState(() => _composerOfficial = value);
             },
@@ -404,13 +492,29 @@ class _PostsScreenState extends State<PostsScreen> {
             searchController: _searchController,
             postType: _postType,
             visibility: _visibility,
+            poles: _poles,
+            projects: _projects,
+            selectedPoleId: _filterPoleId,
+            selectedProjectId: _filterProjectId,
             onSearch: _loadPosts,
             onPostTypeChanged: (value) async {
               setState(() => _postType = value);
               await _loadPosts();
             },
             onVisibilityChanged: (value) async {
-              setState(() => _visibility = value);
+              setState(() {
+                _visibility = value;
+                if (value != 'pole_only') _filterPoleId = null;
+                if (value != 'project_only') _filterProjectId = null;
+              });
+              await _loadPosts();
+            },
+            onPoleChanged: (value) async {
+              setState(() => _filterPoleId = value);
+              await _loadPosts();
+            },
+            onProjectChanged: (value) async {
+              setState(() => _filterProjectId = value);
               await _loadPosts();
             },
           );
@@ -498,6 +602,7 @@ class _PostsScreenState extends State<PostsScreen> {
               authorPhotoUrl: _authorPhotoUrl(post),
               stats: _statsByPostId[post.id],
               comments: _commentsByPostId[post.id] ?? const [],
+              membersById: _membersById,
               commentsExpanded: _expandedPosts.contains(post.id),
               commentsLoading: _loadingComments.contains(post.id),
               commentController: _commentControllerFor(post.id),
@@ -507,6 +612,8 @@ class _PostsScreenState extends State<PostsScreen> {
               onReactionSelected: (reactionType) =>
                   _reactWith(post, reactionType),
               canModerate: _user?.isEnacchef ?? false,
+              canDelete:
+                  (_user?.isEnacchef ?? false) || post.authorId == _user?.id,
               onTogglePin: () => _togglePostPin(post),
               onDelete: () => _deletePost(post),
             ),
@@ -696,11 +803,17 @@ class _PostComposer extends StatelessWidget {
   final TextEditingController contentController;
   final String postType;
   final String visibility;
+  final List<PoleModel> poles;
+  final List<ProjectModel> projects;
+  final String? selectedPoleId;
+  final String? selectedProjectId;
   final bool isOfficial;
   final bool canPublishOfficial;
   final bool creating;
   final ValueChanged<String> onPostTypeChanged;
   final ValueChanged<String> onVisibilityChanged;
+  final ValueChanged<String?> onPoleChanged;
+  final ValueChanged<String?> onProjectChanged;
   final ValueChanged<bool> onOfficialChanged;
   final VoidCallback onSubmit;
 
@@ -709,11 +822,17 @@ class _PostComposer extends StatelessWidget {
     required this.contentController,
     required this.postType,
     required this.visibility,
+    required this.poles,
+    required this.projects,
+    required this.selectedPoleId,
+    required this.selectedProjectId,
     required this.isOfficial,
     required this.canPublishOfficial,
     required this.creating,
     required this.onPostTypeChanged,
     required this.onVisibilityChanged,
+    required this.onPoleChanged,
+    required this.onProjectChanged,
     required this.onOfficialChanged,
     required this.onSubmit,
   });
@@ -786,6 +905,48 @@ class _PostComposer extends StatelessWidget {
                     },
                   ),
                 ),
+                if (visibility == 'pole_only')
+                  SizedBox(
+                    width: _responsiveControlWidth(context, 240),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: selectedPoleId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Pôle'),
+                      items: poles
+                          .map(
+                            (pole) => DropdownMenuItem(
+                              value: pole.id,
+                              child: Text(
+                                pole.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: onPoleChanged,
+                    ),
+                  ),
+                if (visibility == 'project_only')
+                  SizedBox(
+                    width: _responsiveControlWidth(context, 240),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: selectedProjectId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Projet'),
+                      items: projects
+                          .map(
+                            (project) => DropdownMenuItem(
+                              value: project.id,
+                              child: Text(
+                                project.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: onProjectChanged,
+                    ),
+                  ),
                 if (canPublishOfficial)
                   FilterChip(
                     selected: isOfficial,
@@ -824,17 +985,29 @@ class _PostFilters extends StatelessWidget {
   final TextEditingController searchController;
   final String postType;
   final String visibility;
+  final List<PoleModel> poles;
+  final List<ProjectModel> projects;
+  final String? selectedPoleId;
+  final String? selectedProjectId;
   final VoidCallback onSearch;
   final ValueChanged<String> onPostTypeChanged;
   final ValueChanged<String> onVisibilityChanged;
+  final ValueChanged<String?> onPoleChanged;
+  final ValueChanged<String?> onProjectChanged;
 
   const _PostFilters({
     required this.searchController,
     required this.postType,
     required this.visibility,
+    required this.poles,
+    required this.projects,
+    required this.selectedPoleId,
+    required this.selectedProjectId,
     required this.onSearch,
     required this.onPostTypeChanged,
     required this.onVisibilityChanged,
+    required this.onPoleChanged,
+    required this.onProjectChanged,
   });
 
   @override
@@ -862,6 +1035,48 @@ class _PostFilters extends StatelessWidget {
                 onSubmitted: (_) => onSearch(),
               ),
             ),
+            if (visibility == 'pole_only')
+              SizedBox(
+                width: _responsiveControlWidth(context, 220),
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedPoleId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Pôle'),
+                  items: poles
+                      .map(
+                        (pole) => DropdownMenuItem(
+                          value: pole.id,
+                          child: Text(
+                            pole.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: onPoleChanged,
+                ),
+              ),
+            if (visibility == 'project_only')
+              SizedBox(
+                width: _responsiveControlWidth(context, 220),
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedProjectId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Projet'),
+                  items: projects
+                      .map(
+                        (project) => DropdownMenuItem(
+                          value: project.id,
+                          child: Text(
+                            project.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: onProjectChanged,
+                ),
+              ),
             SizedBox(
               width: _responsiveControlWidth(context, 220),
               child: DropdownButtonFormField<String>(
@@ -900,6 +1115,7 @@ class _PostCard extends StatelessWidget {
   final String? authorPhotoUrl;
   final PostStatsModel? stats;
   final List<PostCommentModel> comments;
+  final Map<String, MemberModel> membersById;
   final bool commentsExpanded;
   final bool commentsLoading;
   final TextEditingController commentController;
@@ -908,6 +1124,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onReact;
   final ValueChanged<String> onReactionSelected;
   final bool canModerate;
+  final bool canDelete;
   final VoidCallback onTogglePin;
   final VoidCallback onDelete;
 
@@ -918,6 +1135,7 @@ class _PostCard extends StatelessWidget {
     required this.authorPhotoUrl,
     required this.stats,
     required this.comments,
+    required this.membersById,
     required this.commentsExpanded,
     required this.commentsLoading,
     required this.commentController,
@@ -926,6 +1144,7 @@ class _PostCard extends StatelessWidget {
     required this.onReact,
     required this.onReactionSelected,
     required this.canModerate,
+    required this.canDelete,
     required this.onTogglePin,
     required this.onDelete,
   });
@@ -989,7 +1208,7 @@ class _PostCard extends StatelessWidget {
                           ),
                           if (post.isPinned)
                             const Icon(Icons.push_pin_rounded, size: 18),
-                          if (canModerate)
+                          if (canModerate || canDelete)
                             PopupMenuButton<String>(
                               onSelected: (value) {
                                 if (value == 'pin') onTogglePin();
@@ -998,6 +1217,7 @@ class _PostCard extends StatelessWidget {
                               itemBuilder: (context) => [
                                 PopupMenuItem(
                                   value: 'pin',
+                                  enabled: canModerate,
                                   child: ListTile(
                                     leading: Icon(
                                       post.isPinned
@@ -1105,7 +1325,12 @@ class _PostCard extends StatelessWidget {
                   ),
                 )
               else
-                ...comments.map((comment) => _CommentTile(comment: comment)),
+                ...comments.map(
+                  (comment) => _CommentTile(
+                    comment: comment,
+                    member: membersById[comment.userId],
+                  ),
+                ),
               Row(
                 children: [
                   Expanded(
@@ -1217,8 +1442,9 @@ class _MetaChip extends StatelessWidget {
 
 class _CommentTile extends StatelessWidget {
   final PostCommentModel comment;
+  final MemberModel? member;
 
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, required this.member});
 
   @override
   Widget build(BuildContext context) {
@@ -1231,15 +1457,32 @@ class _CommentTile extends StatelessWidget {
         color: const Color(0xFFF5F5F0),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            date,
-            style: const TextStyle(color: Colors.black54, fontSize: 12),
+          _PostAuthorAvatar(
+            authorName: member?.displayName ?? 'Membre Enactus',
+            photoUrl: _absoluteUrl(member?.photoUrl),
           ),
-          const SizedBox(height: 4),
-          Text(comment.content),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member?.displayName ?? 'Membre Enactus',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  date,
+                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                ),
+                const SizedBox(height: 5),
+                Text(comment.content),
+              ],
+            ),
+          ),
         ],
       ),
     );

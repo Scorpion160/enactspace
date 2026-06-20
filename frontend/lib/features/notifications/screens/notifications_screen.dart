@@ -536,6 +536,14 @@ class _NotificationsFilters extends StatelessWidget {
                         child: Text('Nouveau message'),
                       ),
                       DropdownMenuItem(
+                        value: 'post_comment',
+                        child: Text('Commentaire'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'post_reaction',
+                        child: Text('Réaction'),
+                      ),
+                      DropdownMenuItem(
                         value: 'event_scheduled',
                         child: Text('Evenement'),
                       ),
@@ -787,6 +795,10 @@ class _NotificationCard extends StatelessWidget {
         return Icons.warning_amber_rounded;
       case 'new_announcement':
         return Icons.campaign_rounded;
+      case 'post_comment':
+        return Icons.mode_comment_rounded;
+      case 'post_reaction':
+        return Icons.add_reaction_rounded;
       case 'event_scheduled':
         return Icons.event_rounded;
       case 'absence_recorded':
