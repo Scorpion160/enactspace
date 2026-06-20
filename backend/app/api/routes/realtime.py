@@ -76,17 +76,88 @@ def _snapshot(db, user_id) -> dict:
     }
 
 
-def _register_connection(user_id, websocket: WebSocket) -> None:
-    _connections.setdefault(str(user_id), set()).add(websocket)
+def _register_connection(user_id, websocket: WebSocket) -> bool:
+    connections = _connections.setdefault(str(user_id), set())
+    was_offline = not connections
+    connections.add(websocket)
+    return was_offline
 
 
-def _unregister_connection(user_id, websocket: WebSocket) -> None:
+def _unregister_connection(user_id, websocket: WebSocket) -> bool:
     connections = _connections.get(str(user_id))
     if not connections:
-        return
+        return False
     connections.discard(websocket)
     if not connections:
         _connections.pop(str(user_id), None)
+        return True
+    return False
+
+
+async def _broadcast_to_users(user_ids: list[str], event: dict) -> None:
+    for user_id in user_ids:
+        for connection in list(_connections.get(user_id, set())):
+            try:
+                await connection.send_json(event)
+            except RuntimeError:
+                _unregister_connection(user_id, connection)
+
+
+async def _broadcast_presence(user_id, is_online: bool) -> None:
+    await _broadcast_to_users(
+        list(_connections),
+        {
+            "type": "presence",
+            "user_id": str(user_id),
+            "is_online": is_online,
+        },
+    )
+
+
+async def _broadcast_read(db, user: User, payload: dict) -> None:
+    thread_id = payload.get("thread_id")
+    if not thread_id:
+        return
+
+    try:
+        parsed_thread_id = UUID(str(thread_id))
+    except ValueError:
+        return
+
+    db.expire_all()
+    participant = (
+        db.query(ChatParticipant)
+        .filter(
+            ChatParticipant.thread_id == parsed_thread_id,
+            ChatParticipant.user_id == user.id,
+        )
+        .first()
+    )
+    if not participant:
+        return
+
+    recipient_ids = [
+        str(row[0])
+        for row in db.query(ChatParticipant.user_id)
+        .filter(
+            ChatParticipant.thread_id == parsed_thread_id,
+            ChatParticipant.user_id != user.id,
+        )
+        .all()
+    ]
+    await _broadcast_to_users(
+        recipient_ids,
+        {
+            "type": "read",
+            "thread_id": str(parsed_thread_id),
+            "user_id": str(user.id),
+            "read_at": (
+                participant.last_read_at.isoformat()
+                if participant.last_read_at
+                else None
+            ),
+        },
+    )
 
 
 async def _broadcast_typing(db, user: User, payload: dict) -> None:
@@ -127,12 +198,7 @@ async def _broadcast_typing(db, user: User, payload: dict) -> None:
         "is_typing": payload.get("is_typing") is True,
     }
 
-    for recipient_id in recipient_ids:
-        for connection in list(_connections.get(recipient_id, set())):
-            try:
-                await connection.send_json(event)
-            except RuntimeError:
-                _unregister_connection(recipient_id, connection)
+    await _broadcast_to_users(recipient_ids, event)
 
 
 @router.websocket("/ws")
@@ -156,14 +222,17 @@ async def realtime_events(websocket: WebSocket):
             await websocket.close(code=4401, reason="Authentification requise")
             return
 
-        _register_connection(user.id, websocket)
+        became_online = _register_connection(user.id, websocket)
         previous = _snapshot(db, user.id)
         await websocket.send_json(
             {
                 "type": "connected",
                 "unread_count": previous["unread_count"],
+                "online_user_ids": list(_connections),
             }
         )
+        if became_online:
+            await _broadcast_presence(user.id, True)
 
         while True:
             try:
@@ -173,6 +242,8 @@ async def realtime_events(websocket: WebSocket):
                 )
                 if isinstance(payload, dict) and payload.get("type") == "typing":
                     await _broadcast_typing(db, user, payload)
+                if isinstance(payload, dict) and payload.get("type") == "read":
+                    await _broadcast_read(db, user, payload)
             except asyncio.TimeoutError:
                 pass
 
@@ -205,5 +276,7 @@ async def realtime_events(websocket: WebSocket):
         pass
     finally:
         if user is not None:
-            _unregister_connection(user.id, websocket)
+            became_offline = _unregister_connection(user.id, websocket)
+            if became_offline:
+                await _broadcast_presence(user.id, False)
         db.close()

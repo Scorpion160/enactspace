@@ -50,6 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, String> _messageReactions = {};
   final Set<String> _removedServerReactionIds = {};
   final Set<String> _hiddenMessageIds = {};
+  final Set<String> _onlineUserIds = {};
   final Map<String, String> _typingUsers = {};
   final Map<String, Timer> _typingExpiryTimers = {};
   Timer? _typingTimer;
@@ -89,6 +90,36 @@ class _ChatScreenState extends State<ChatScreen> {
   void _handleRealtimeEvent(Map<String, dynamic> event) {
     if (!mounted) return;
 
+    if (event['type'] == 'connected') {
+      final onlineIds = event['online_user_ids'];
+      if (onlineIds is List) {
+        setState(() {
+          _onlineUserIds
+            ..clear()
+            ..addAll(onlineIds.map((id) => id.toString()));
+        });
+      }
+      return;
+    }
+
+    if (event['type'] == 'presence') {
+      final userId = event['user_id']?.toString();
+      if (userId == null || userId.isEmpty) return;
+      setState(() {
+        if (event['is_online'] == true) {
+          _onlineUserIds.add(userId);
+        } else {
+          _onlineUserIds.remove(userId);
+        }
+      });
+      return;
+    }
+
+    if (event['type'] == 'read') {
+      _applyReadReceipt(event);
+      return;
+    }
+
     if (event['type'] == 'chat' &&
         !_loading &&
         !_messagesLoading &&
@@ -121,6 +152,37 @@ class _ChatScreenState extends State<ChatScreen> {
     } else {
       setState(() => _typingUsers.remove(userId));
     }
+  }
+
+  void _applyReadReceipt(Map<String, dynamic> event) {
+    final threadId = event['thread_id']?.toString();
+    final userId = event['user_id']?.toString();
+    final readAt = DateTime.tryParse(event['read_at']?.toString() ?? '');
+    if (threadId == null || userId == null || readAt == null) return;
+
+    ChatThreadModel updateThread(ChatThreadModel thread) {
+      if (thread.id != threadId) return thread;
+      return thread.copyWith(
+        participantsPreview: thread.participantsPreview
+            .map(
+              (participant) => participant.userId == userId
+                  ? participant.copyWith(lastReadAt: readAt)
+                  : participant,
+            )
+            .toList(),
+      );
+    }
+
+    setState(() {
+      _threads = _threads.map(updateThread).toList();
+      if (_selectedThread?.id == threadId) {
+        _selectedThread = updateThread(_selectedThread!);
+      }
+    });
+  }
+
+  void _sendReadReceipt(String threadId) {
+    _realtimeService.send({'type': 'read', 'thread_id': threadId});
   }
 
   void _handleComposerChanged() {
@@ -301,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final messages = await _chatService.getMessages(thread.id);
       await _chatService.markThreadAsRead(thread.id);
+      _sendReadReceipt(thread.id);
       if (!mounted) return;
       setState(() {
         _selectedThread = thread;
@@ -484,6 +547,7 @@ class _ChatScreenState extends State<ChatScreen> {
             messages: messages,
           );
           await _chatService.markThreadAsRead(selectedThread.id);
+          _sendReadReceipt(selectedThread.id);
         }
       }
 
@@ -878,6 +942,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   threads: _threads,
                                   selectedThread: _selectedThread,
                                   pinnedThreadIds: _pinnedThreadIds,
+                                  onlineUserIds: _onlineUserIds,
                                   currentUserId: _user?.id,
                                   onSelect: _selectThread,
                                 ),
@@ -931,6 +996,7 @@ class _ChatScreenState extends State<ChatScreen> {
             threads: _threads,
             selectedThread: null,
             pinnedThreadIds: _pinnedThreadIds,
+            onlineUserIds: _onlineUserIds,
             currentUserId: _user?.id,
             onSelect: _selectThread,
             framed: false,
@@ -947,6 +1013,13 @@ class _ChatScreenState extends State<ChatScreen> {
         _ConversationHeader(
           thread: _selectedThread,
           currentUserId: _user?.id,
+          online:
+              _selectedThread != null &&
+              _isDirectThreadOnline(
+                _selectedThread!,
+                _user?.id,
+                _onlineUserIds,
+              ),
           showBack: showBack,
           pinned: _selectedThread == null
               ? false
@@ -1164,6 +1237,7 @@ class _ThreadsPanel extends StatefulWidget {
   final List<ChatThreadModel> threads;
   final ChatThreadModel? selectedThread;
   final Set<String> pinnedThreadIds;
+  final Set<String> onlineUserIds;
   final String? currentUserId;
   final ValueChanged<ChatThreadModel> onSelect;
   final bool framed;
@@ -1173,6 +1247,7 @@ class _ThreadsPanel extends StatefulWidget {
     required this.threads,
     required this.selectedThread,
     required this.pinnedThreadIds,
+    required this.onlineUserIds,
     required this.currentUserId,
     required this.onSelect,
     this.framed = true,
@@ -1238,6 +1313,11 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
                         thread: thread,
                         selected: selected,
                         pinned: widget.pinnedThreadIds.contains(thread.id),
+                        online: _isDirectThreadOnline(
+                          thread,
+                          widget.currentUserId,
+                          widget.onlineUserIds,
+                        ),
                         currentUserId: widget.currentUserId,
                         onTap: () => widget.onSelect(thread),
                       );
@@ -1259,6 +1339,7 @@ class _ThreadTile extends StatelessWidget {
   final ChatThreadModel thread;
   final bool selected;
   final bool pinned;
+  final bool online;
   final String? currentUserId;
   final VoidCallback onTap;
 
@@ -1266,6 +1347,7 @@ class _ThreadTile extends StatelessWidget {
     required this.thread,
     required this.selected,
     required this.pinned,
+    required this.online,
     required this.currentUserId,
     required this.onTap,
   });
@@ -1286,11 +1368,16 @@ class _ThreadTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         minVerticalPadding: 10,
-        leading: _ChatAvatar(
-          title: title,
-          imageUrl: _threadAvatarUrl(thread, currentUserId),
-          selected: selected,
-          icon: thread.threadType == 'direct' ? Icons.person : Icons.groups,
+        leading: Badge(
+          isLabelVisible: online,
+          backgroundColor: Colors.green.shade600,
+          smallSize: 11,
+          child: _ChatAvatar(
+            title: title,
+            imageUrl: _threadAvatarUrl(thread, currentUserId),
+            selected: selected,
+            icon: thread.threadType == 'direct' ? Icons.person : Icons.groups,
+          ),
         ),
         title: Text(
           title,
@@ -1385,6 +1472,7 @@ class _ConversationHeader extends StatelessWidget {
   final bool showBack;
   final bool pinned;
   final bool syncing;
+  final bool online;
   final DateTime? lastSyncedAt;
   final VoidCallback onBack;
   final VoidCallback onInfo;
@@ -1396,6 +1484,7 @@ class _ConversationHeader extends StatelessWidget {
     required this.showBack,
     required this.pinned,
     required this.syncing,
+    required this.online,
     required this.lastSyncedAt,
     required this.onBack,
     required this.onInfo,
@@ -1433,6 +1522,7 @@ class _ConversationHeader extends StatelessWidget {
               thread: thread!,
               currentUserId: currentUserId,
               syncing: syncing,
+              online: online,
               lastSyncedAt: lastSyncedAt,
             ),
       trailing: thread == null
@@ -1469,17 +1559,31 @@ class _ConversationSubtitle extends StatelessWidget {
   final ChatThreadModel thread;
   final String? currentUserId;
   final bool syncing;
+  final bool online;
   final DateTime? lastSyncedAt;
 
   const _ConversationSubtitle({
     required this.thread,
     required this.currentUserId,
     required this.syncing,
+    required this.online,
     required this.lastSyncedAt,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (thread.threadType == 'direct' && online) {
+      return Text(
+        'En ligne',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.green.shade700,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+
     final syncLabel = syncing
         ? 'synchro...'
         : lastSyncedAt == null
@@ -3418,6 +3522,15 @@ ChatThreadMemberModel? _directParticipant(
   });
 
   return others.firstOrNull ?? thread.participantsPreview.first;
+}
+
+bool _isDirectThreadOnline(
+  ChatThreadModel thread,
+  String? currentUserId,
+  Set<String> onlineUserIds,
+) {
+  final participant = _directParticipant(thread, currentUserId);
+  return participant != null && onlineUserIds.contains(participant.userId);
 }
 
 String _threadSubtitle(ChatThreadModel thread, String? currentUserId) {

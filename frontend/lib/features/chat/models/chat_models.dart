@@ -227,6 +227,19 @@ class ChatThreadMemberModel {
     };
   }
 
+  ChatThreadMemberModel copyWith({DateTime? lastReadAt}) {
+    return ChatThreadMemberModel(
+      userId: userId,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      status: status,
+      photoUrl: photoUrl,
+      participantRole: participantRole,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+    );
+  }
+
   String get displayName {
     final name = [
       firstName,
