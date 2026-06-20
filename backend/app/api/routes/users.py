@@ -12,6 +12,7 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
     UserAdminUpdate,
+    UserDirectoryRead,
     UserRoleAssign,
     UserWithRolesRead,
 )
@@ -169,6 +170,28 @@ def build_user_with_roles(db: Session, user: User) -> UserWithRolesRead:
     return UserWithRolesRead(**data)
 
 
+def build_directory_user(db: Session, user: User) -> UserDirectoryRead:
+    pole_member = (
+        db.query(PoleMember)
+        .filter(PoleMember.user_id == user.id, PoleMember.is_active.is_(True))
+        .order_by(PoleMember.joined_at.desc())
+        .first()
+    )
+    return UserDirectoryRead(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        photo_url=user.photo_url,
+        profile_type=user.profile_type,
+        department=user.department,
+        core_pole_id=pole_member.pole_id if pole_member else None,
+        pole_position=pole_member.position if pole_member else None,
+        status=user.status,
+        roles=sorted(get_user_role_names(db, user.id)),
+    )
+
+
 @router.post("/", response_model=UserRead)
 def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
@@ -254,6 +277,23 @@ def list_users(
 ):
     users = db.query(User).order_by(User.created_at.desc()).all()
     return [build_user_with_roles(db, user) for user in users]
+
+
+@router.get("/directory", response_model=list[UserDirectoryRead])
+def list_user_directory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    users = (
+        db.query(User)
+        .filter(
+            User.is_active.is_(True),
+            User.status.in_(("active", "alumni")),
+        )
+        .order_by(User.first_name.asc(), User.last_name.asc())
+        .all()
+    )
+    return [build_directory_user(db, user) for user in users]
 
 
 @router.get("/pending", response_model=list[UserWithRolesRead])

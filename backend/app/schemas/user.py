@@ -67,3 +67,20 @@ class UserRead(UserBase):
 
 class UserWithRolesRead(UserRead):
     roles: List[str] = []
+
+
+class UserDirectoryRead(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: str
+    email: EmailStr
+    photo_url: Optional[str] = None
+    profile_type: str
+    department: Optional[str] = None
+    core_pole_id: Optional[UUID] = None
+    pole_position: Optional[str] = None
+    status: str
+    roles: List[str] = []
+
+    class Config:
+        from_attributes = True

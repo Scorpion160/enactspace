@@ -10,14 +10,22 @@ class MembersService {
     : _apiClient = apiClient ?? ApiClient(),
       _authService = authService ?? AuthService();
 
-  Future<List<MemberModel>> getMembers() async {
+  Future<List<MemberModel>> getMembers() {
+    return _getMembersFrom('/users/directory');
+  }
+
+  Future<List<MemberModel>> getManagedMembers() {
+    return _getMembersFrom('/users/');
+  }
+
+  Future<List<MemberModel>> _getMembersFrom(String path) async {
     final token = await _authService.getToken();
 
     if (token == null) {
       throw Exception('Utilisateur non connecté.');
     }
 
-    final response = await _apiClient.get('/users/', token: token);
+    final response = await _apiClient.get(path, token: token);
 
     final List<dynamic> rawList;
 

@@ -38,7 +38,9 @@ class _MembersScreenState extends State<MembersScreen> {
 
     try {
       final user = UserExperience.fromJson(await _authService.getCurrentUser());
-      final members = await _membersService.getMembers();
+      final members = user.canManageMembers
+          ? await _membersService.getManagedMembers()
+          : await _membersService.getMembers();
 
       if (!mounted) return;
 
