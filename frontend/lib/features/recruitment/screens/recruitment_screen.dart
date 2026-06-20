@@ -50,6 +50,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
         campaignId: _selectedCampaign,
         status: _selectedStatus,
         search: _searchController.text,
+        anonymized: _anonymousReview,
       );
 
       if (!mounted) return;
@@ -119,8 +120,22 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       await _loadRecruitment();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Candidature créée avec succès.')),
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Candidature enregistrée'),
+          content: SelectableText(
+            'Référence de suivi : ${created.id}\n\n'
+            'Le candidat doit conserver cette référence et utiliser son '
+            'adresse email pour suivre son dossier.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Compris'),
+            ),
+          ],
+        ),
       );
     }
   }
@@ -269,8 +284,12 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
               setState(() => _selectedStatus = value);
               await _loadRecruitment();
             },
-            onAnonymousChanged: (value) {
-              setState(() => _anonymousReview = value);
+            onAnonymousChanged: (value) async {
+              setState(() {
+                _anonymousReview = value;
+                if (value) _searchController.clear();
+              });
+              await _loadRecruitment();
             },
             onSearch: _loadRecruitment,
           ),
@@ -291,7 +310,6 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
           else
             _ApplicationsGrid(
               applications: _applications,
-              anonymousReview: _anonymousReview,
               campaignTitle: _campaignTitle,
               onStatusChanged: _changeStatus,
               onReview: _openReviewDialog,
@@ -591,8 +609,11 @@ class _RecruitmentFilters extends StatelessWidget {
                   width: searchWidth,
                   child: TextField(
                     controller: searchController,
+                    enabled: !anonymousReview,
                     decoration: InputDecoration(
-                      labelText: 'Rechercher',
+                      labelText: anonymousReview
+                          ? 'Recherche désactivée en mode anonymisé'
+                          : 'Rechercher',
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: IconButton(
                         onPressed: onSearch,
@@ -975,7 +996,6 @@ double _dialogWidth(BuildContext context, double maxWidth) {
 
 class _ApplicationsGrid extends StatelessWidget {
   final List<ApplicationModel> applications;
-  final bool anonymousReview;
   final String Function(String campaignId) campaignTitle;
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
@@ -984,7 +1004,6 @@ class _ApplicationsGrid extends StatelessWidget {
 
   const _ApplicationsGrid({
     required this.applications,
-    required this.anonymousReview,
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
@@ -1013,7 +1032,6 @@ class _ApplicationsGrid extends StatelessWidget {
                 width: itemWidth,
                 child: _ApplicationCard(
                   application: application,
-                  anonymousReview: anonymousReview,
                   campaignTitle: campaignTitle(application.campaignId),
                   onStatusChanged: onStatusChanged,
                   onReview: onReview,
@@ -1029,7 +1047,6 @@ class _ApplicationsGrid extends StatelessWidget {
 
 class _ApplicationCard extends StatelessWidget {
   final ApplicationModel application;
-  final bool anonymousReview;
   final String campaignTitle;
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
@@ -1038,7 +1055,6 @@ class _ApplicationCard extends StatelessWidget {
 
   const _ApplicationCard({
     required this.application,
-    required this.anonymousReview,
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
@@ -1047,10 +1063,10 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = anonymousReview
+    final displayName = application.isAnonymized
         ? application.anonymousCode
         : application.fullName;
-    final avatarLabel = anonymousReview
+    final avatarLabel = application.isAnonymized
         ? '#'
         : application.firstName.isEmpty
         ? '?'
@@ -1088,7 +1104,7 @@ class _ApplicationCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              anonymousReview
+              application.isAnonymized
                   ? 'Identité masquée pendant l’évaluation.'
                   : application.email,
               maxLines: 1,
@@ -1160,7 +1176,8 @@ class _ApplicationCard extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed:
                       application.status == 'accepted' &&
-                          !application.isConverted
+                          !application.isConverted &&
+                          application.canConvert
                       ? () => onConvert(application)
                       : null,
                   icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -2095,7 +2112,7 @@ class ConvertApplicationDialog extends StatefulWidget {
 }
 
 class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
-  final _passwordController = TextEditingController(text: 'Enactus12345');
+  final _passwordController = TextEditingController();
 
   bool _loading = false;
   String? _error;

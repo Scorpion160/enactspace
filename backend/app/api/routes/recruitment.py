@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -29,7 +29,11 @@ from app.schemas.recruitment import (
     ApplicationReviewRead,
     ConvertApplicationToUserRequest,
 )
-from app.api.deps import require_recruitment_access
+from app.api.deps import (
+    require_recruitment_access,
+    require_sg_or_admin,
+    user_has_any_role,
+)
 
 
 router = APIRouter(prefix="/recruitment", tags=["Recrutement"])
@@ -56,6 +60,12 @@ RECRUITMENT_NOTIFICATION_ROLES = {
     "chef_pole",
     "adjoint_chef_pole",
 }
+RECRUITMENT_CONVERSION_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+}
+REVIEW_ADMIN_ROLES = {"administrateur", "team_leader"}
 
 
 def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
@@ -70,6 +80,24 @@ def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
         )
 
     return campaign
+
+
+def campaign_is_open(campaign: RecruitmentCampaign) -> bool:
+    today = date.today()
+    return (
+        campaign.is_active
+        and (campaign.start_date is None or campaign.start_date <= today)
+        and (campaign.end_date is None or campaign.end_date >= today)
+    )
+
+
+def validate_campaign_dates(start_date, end_date) -> None:
+    if start_date is not None and end_date is not None:
+        if end_date < start_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La date de fin doit suivre la date de début",
+            )
 
 
 def get_application_or_404(db: Session, application_id: str) -> Application:
@@ -146,6 +174,7 @@ def create_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    validate_campaign_dates(payload.start_date, payload.end_date)
     campaign = RecruitmentCampaign(
         season_id=payload.season_id,
         title=payload.title,
@@ -181,9 +210,10 @@ def list_campaigns(
 def list_public_active_campaigns(
     db: Session = Depends(get_db),
 ):
-    return db.query(RecruitmentCampaign).filter(
-        RecruitmentCampaign.is_active == True
+    campaigns = db.query(RecruitmentCampaign).filter(
+        RecruitmentCampaign.is_active.is_(True)
     ).order_by(RecruitmentCampaign.created_at.desc()).all()
+    return [campaign for campaign in campaigns if campaign_is_open(campaign)]
 
 
 @router.get("/campaigns/{campaign_id}", response_model=RecruitmentCampaignRead)
@@ -203,6 +233,10 @@ def update_campaign(
     current_user: User = Depends(require_recruitment_access),
 ):
     campaign = get_campaign_or_404(db, campaign_id)
+    validate_campaign_dates(
+        payload.start_date or campaign.start_date,
+        payload.end_date or campaign.end_date,
+    )
 
     if payload.title is not None:
         campaign.title = payload.title
@@ -251,10 +285,23 @@ def submit_application(
 ):
     campaign = get_campaign_or_404(db, str(payload.campaign_id))
 
-    if not campaign.is_active:
+    if not campaign_is_open(campaign):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette campagne de recrutement n'est pas active",
+            detail="Cette campagne de recrutement n'est pas ouverte",
+        )
+    duplicate = (
+        db.query(Application.id)
+        .filter(
+            Application.campaign_id == payload.campaign_id,
+            func.lower(Application.email) == payload.email.lower(),
+        )
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une candidature existe déjà pour cet email",
         )
 
     application = Application(
@@ -284,6 +331,50 @@ def submit_application(
     db.refresh(application)
 
     return application
+
+
+def anonymous_code(application: Application) -> str:
+    return f"Candidat #{str(application.id).replace('-', '')[:6].upper()}"
+
+
+def application_payload(
+    db: Session,
+    current_user: User,
+    application: Application,
+    *,
+    anonymized: bool = False,
+) -> dict:
+    data = ApplicationRead.model_validate(application).model_dump()
+    data["is_anonymized"] = anonymized
+    data["anonymous_code"] = anonymous_code(application)
+    data["can_convert"] = not anonymized and user_has_any_role(
+        db,
+        current_user.id,
+        RECRUITMENT_CONVERSION_ROLES,
+    )
+    if anonymized:
+        code = str(application.id).replace("-", "")[:12]
+        data.update(
+            {
+                "first_name": "Candidat",
+                "last_name": anonymous_code(application).split("#")[-1].strip(),
+                "email": f"candidate-{code}@example.com",
+                "phone": None,
+                "cv_url": None,
+                "motivation_letter_url": None,
+                "known_enactus_from": None,
+                "other_clubs": None,
+            }
+        )
+    return data
+
+
+def can_manage_review(db: Session, current_user: User, review) -> bool:
+    return review.reviewer_id == current_user.id or user_has_any_role(
+        db,
+        current_user.id,
+        REVIEW_ADMIN_ROLES,
+    )
 
 
 @router.post("/applications/track", response_model=ApplicationTrackingRead)
@@ -336,6 +427,7 @@ def list_applications(
     campaign_id: str | None = Query(default=None),
     status_filter: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    anonymized: bool = Query(default=False),
 ):
     query = db.query(Application)
 
@@ -345,7 +437,7 @@ def list_applications(
     if status_filter:
         query = query.filter(Application.status == status_filter)
 
-    if search:
+    if search and not anonymized:
         pattern = f"%{search}%"
         query = query.filter(
             (Application.first_name.ilike(pattern)) |
@@ -354,7 +446,16 @@ def list_applications(
             (Application.department.ilike(pattern))
         )
 
-    return query.order_by(Application.created_at.desc()).all()
+    applications = query.order_by(Application.created_at.desc()).all()
+    return [
+        application_payload(
+            db,
+            current_user,
+            application,
+            anonymized=anonymized,
+        )
+        for application in applications
+    ]
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationRead)
@@ -363,7 +464,8 @@ def get_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    return get_application_or_404(db, application_id)
+    application = get_application_or_404(db, application_id)
+    return application_payload(db, current_user, application)
 
 
 @router.patch("/applications/{application_id}", response_model=ApplicationRead)
@@ -408,7 +510,7 @@ def update_application(
     db.commit()
     db.refresh(application)
 
-    return application
+    return application_payload(db, current_user, application)
 
 
 @router.post("/applications/{application_id}/status", response_model=ApplicationRead)
@@ -432,7 +534,7 @@ def change_application_status(
     db.commit()
     db.refresh(application)
 
-    return application
+    return application_payload(db, current_user, application)
 
 
 @router.delete("/applications/{application_id}")
@@ -531,6 +633,11 @@ def update_review(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Évaluation introuvable",
         )
+    if not can_manage_review(db, current_user, review):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez modifier que votre propre évaluation",
+        )
 
     if payload.recommendation is not None:
         if payload.recommendation not in VALID_RECOMMENDATIONS:
@@ -577,6 +684,11 @@ def delete_review(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Évaluation introuvable",
         )
+    if not can_manage_review(db, current_user, review):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez supprimer que votre propre évaluation",
+        )
 
     application_id = review.application_id
 
@@ -599,7 +711,7 @@ def convert_application_to_user(
     application_id: str,
     payload: ConvertApplicationToUserRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_recruitment_access),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     application = get_application_or_404(db, application_id)
 
@@ -607,6 +719,11 @@ def convert_application_to_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La candidature doit être acceptée avant création du compte",
+        )
+    if len(payload.password.strip()) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe initial doit contenir au moins 8 caractères",
         )
 
     if application.converted_user_id:
@@ -617,7 +734,7 @@ def convert_application_to_user(
         }
 
     existing_user = db.query(User).filter(
-        User.email == application.email
+        func.lower(User.email) == application.email.lower()
     ).first()
 
     if existing_user:
@@ -636,7 +753,7 @@ def convert_application_to_user(
         last_name=application.last_name,
         email=application.email,
         phone=application.phone,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(payload.password.strip()),
         department=application.department,
         study_level=application.study_level,
         status="pending",

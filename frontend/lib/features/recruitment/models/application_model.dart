@@ -21,6 +21,9 @@ class ApplicationModel {
   final String? convertedUserId;
   final String? createdAt;
   final String? updatedAt;
+  final bool isAnonymized;
+  final String? serverAnonymousCode;
+  final bool canConvert;
 
   const ApplicationModel({
     required this.id,
@@ -45,6 +48,9 @@ class ApplicationModel {
     this.convertedUserId,
     this.createdAt,
     this.updatedAt,
+    required this.isAnonymized,
+    this.serverAnonymousCode,
+    required this.canConvert,
   });
 
   factory ApplicationModel.fromJson(Map<String, dynamic> json) {
@@ -71,6 +77,9 @@ class ApplicationModel {
       convertedUserId: json['converted_user_id']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      isAnonymized: json['is_anonymized'] == true,
+      serverAnonymousCode: json['anonymous_code']?.toString(),
+      canConvert: json['can_convert'] == true,
     );
   }
 
@@ -102,6 +111,9 @@ class ApplicationModel {
   }
 
   String get anonymousCode {
+    if (serverAnonymousCode != null && serverAnonymousCode!.isNotEmpty) {
+      return serverAnonymousCode!;
+    }
     final source = id.isNotEmpty ? id : email;
     final seed = source.codeUnits.fold<int>(
       0,

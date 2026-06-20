@@ -93,6 +93,9 @@ class ApplicationRead(BaseModel):
     status: str
     final_score: Optional[float]
     converted_user_id: Optional[UUID]
+    is_anonymized: bool = False
+    anonymous_code: Optional[str] = None
+    can_convert: bool = False
     created_at: datetime
     updated_at: datetime
 

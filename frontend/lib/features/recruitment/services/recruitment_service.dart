@@ -75,6 +75,7 @@ class RecruitmentService {
     String? campaignId,
     String? status,
     String? search,
+    bool anonymized = false,
   }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -91,6 +92,9 @@ class RecruitmentService {
 
     if (search != null && search.trim().isNotEmpty) {
       params['search'] = search.trim();
+    }
+    if (anonymized) {
+      params['anonymized'] = 'true';
     }
 
     final query = params.entries
