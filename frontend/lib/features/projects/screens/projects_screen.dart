@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -29,6 +31,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   UserExperience? _userExperience;
   List<ProjectModel> _projects = [];
   List<MemberModel> _members = [];
+  Map<String, List<ProjectMemberModel>> _membersByProjectId = {};
 
   @override
   void initState() {
@@ -51,12 +54,19 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     try {
       final projects = await _service.getProjects();
       final members = await _loadMembersSafely();
+      final projectMemberships = await Future.wait(
+        projects.map((project) => _service.getProjectMembers(project.id)),
+      );
       final userExperience = await _loadUserExperienceSafely();
 
       if (!mounted) return;
       setState(() {
         _projects = projects;
         _members = members;
+        _membersByProjectId = {
+          for (var index = 0; index < projects.length; index++)
+            projects[index].id: projectMemberships[index],
+        };
         _userExperience = userExperience;
       });
     } catch (e) {
@@ -86,6 +96,29 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     } catch (_) {
       return [];
     }
+  }
+
+  bool get _canManageGlobally {
+    final user = _userExperience;
+    return user?.isAdmin == true ||
+        user?.isTeamLeader == true ||
+        user?.isSecretary == true;
+  }
+
+  bool _canManageProject(ProjectModel project) {
+    if (_canManageGlobally) return true;
+    final userId = _userExperience?.id;
+    if (userId == null) return false;
+
+    return (_membersByProjectId[project.id] ?? const <ProjectMemberModel>[])
+        .any(
+          (member) =>
+              member.userId == userId &&
+              const {
+                'chef_projet',
+                'adjoint_chef_projet',
+              }.contains(member.position),
+        );
   }
 
   List<ProjectModel> get _filteredProjects {
@@ -130,8 +163,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canManage = _userExperience?.canCreateOperationalWork ?? false;
-
     return RefreshIndicator(
       onRefresh: _loadProjects,
       child: LayoutBuilder(
@@ -160,7 +191,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   project.status != 'suspendu',
                             )
                             .length,
-                        onCreate: canManage ? _openCreateSheet : null,
+                        onCreate: _canManageGlobally ? _openCreateSheet : null,
                         onRefresh: _loadProjects,
                       ),
                       const SizedBox(height: 18),
@@ -184,7 +215,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           projects: _filteredProjects,
                           service: _service,
                           allMembers: _members,
-                          canManage: canManage,
+                          canManageProject: _canManageProject,
+                          canAssignLeadership: _canManageGlobally,
                           onProjectChanged: _replaceProject,
                         ),
                     ],
@@ -417,14 +449,16 @@ class _ProjectsGrid extends StatelessWidget {
   final List<ProjectModel> projects;
   final ProjectsService service;
   final List<MemberModel> allMembers;
-  final bool canManage;
+  final bool Function(ProjectModel project) canManageProject;
+  final bool canAssignLeadership;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectsGrid({
     required this.projects,
     required this.service,
     required this.allMembers,
-    required this.canManage,
+    required this.canManageProject,
+    required this.canAssignLeadership,
     required this.onProjectChanged,
   });
 
@@ -453,7 +487,8 @@ class _ProjectsGrid extends StatelessWidget {
                   project: project,
                   service: service,
                   allMembers: allMembers,
-                  canManage: canManage,
+                  canManage: canManageProject(project),
+                  canAssignLeadership: canAssignLeadership,
                   onProjectChanged: onProjectChanged,
                 ),
               ),
@@ -469,6 +504,7 @@ class _ProjectCard extends StatelessWidget {
   final ProjectsService service;
   final List<MemberModel> allMembers;
   final bool canManage;
+  final bool canAssignLeadership;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectCard({
@@ -476,6 +512,7 @@ class _ProjectCard extends StatelessWidget {
     required this.service,
     required this.allMembers,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.onProjectChanged,
   });
 
@@ -606,6 +643,7 @@ class _ProjectCard extends StatelessWidget {
                   service,
                   allMembers,
                   canManage,
+                  canAssignLeadership,
                   onProjectChanged,
                 ),
                 icon: const Icon(Icons.open_in_new_rounded),
@@ -713,6 +751,7 @@ void _showProjectDetails(
   ProjectsService service,
   List<MemberModel> allMembers,
   bool canManage,
+  bool canAssignLeadership,
   ValueChanged<ProjectModel> onProjectChanged,
 ) {
   showModalBottomSheet<void>(
@@ -725,6 +764,7 @@ void _showProjectDetails(
       service: service,
       allMembers: allMembers,
       canManage: canManage,
+      canAssignLeadership: canAssignLeadership,
       onProjectChanged: onProjectChanged,
     ),
   );
@@ -735,6 +775,7 @@ class _ProjectDetailsSheet extends StatefulWidget {
   final ProjectsService service;
   final List<MemberModel> allMembers;
   final bool canManage;
+  final bool canAssignLeadership;
   final ValueChanged<ProjectModel> onProjectChanged;
 
   const _ProjectDetailsSheet({
@@ -742,6 +783,7 @@ class _ProjectDetailsSheet extends StatefulWidget {
     required this.service,
     required this.allMembers,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.onProjectChanged,
   });
 
@@ -940,6 +982,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     selectedUserId: _selectedUserId,
                     selectedPosition: _memberPosition,
                     canManage: widget.canManage,
+                    canAssignLeadership: widget.canAssignLeadership,
                     loading: _loadingMembers,
                     saving: _savingMember,
                     onUserChanged: (value) =>
@@ -1104,6 +1147,7 @@ class _ProjectTeamPanel extends StatelessWidget {
   final String? selectedUserId;
   final String selectedPosition;
   final bool canManage;
+  final bool canAssignLeadership;
   final bool loading;
   final bool saving;
   final ValueChanged<String?> onUserChanged;
@@ -1117,6 +1161,7 @@ class _ProjectTeamPanel extends StatelessWidget {
     required this.selectedUserId,
     required this.selectedPosition,
     required this.canManage,
+    required this.canAssignLeadership,
     required this.loading,
     required this.saving,
     required this.onUserChanged,
@@ -1177,7 +1222,20 @@ class _ProjectTeamPanel extends StatelessWidget {
                   children: [
                     for (final member in projectMembers)
                       InputChip(
-                        avatar: const Icon(Icons.person_rounded, size: 16),
+                        avatar: CircleAvatar(
+                          backgroundImage:
+                              _absoluteProjectMemberPhoto(member.photoUrl) ==
+                                  null
+                              ? null
+                              : NetworkImage(
+                                  _absoluteProjectMemberPhoto(member.photoUrl)!,
+                                ),
+                          child:
+                              _absoluteProjectMemberPhoto(member.photoUrl) ==
+                                  null
+                              ? Text(_initials(member.displayName))
+                              : null,
+                        ),
                         label: Text(
                           '${member.displayName} · ${member.positionLabel}',
                         ),
@@ -1229,19 +1287,21 @@ class _ProjectTeamPanel extends StatelessWidget {
                         labelText: 'Position',
                         prefixIcon: Icon(Icons.admin_panel_settings_rounded),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'membre',
                           child: Text('Membre'),
                         ),
-                        DropdownMenuItem(
-                          value: 'adjoint_chef_projet',
-                          child: Text('Adjoint chef de projet'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'chef_projet',
-                          child: Text('Chef de projet'),
-                        ),
+                        if (canAssignLeadership)
+                          DropdownMenuItem(
+                            value: 'adjoint_chef_projet',
+                            child: Text('Adjoint chef de projet'),
+                          ),
+                        if (canAssignLeadership)
+                          DropdownMenuItem(
+                            value: 'chef_projet',
+                            child: Text('Chef de projet'),
+                          ),
                       ],
                       onChanged: !canManage || saving
                           ? null
@@ -1463,12 +1523,36 @@ class _ProjectActionPanel extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: const [
-        _ProjectActionChip(icon: Icons.groups_rounded, label: 'Équipe'),
-        _ProjectActionChip(icon: Icons.task_alt_rounded, label: 'Tâches'),
-        _ProjectActionChip(icon: Icons.description_rounded, label: 'Documents'),
-        _ProjectActionChip(icon: Icons.payments_rounded, label: 'Budget'),
-        _ProjectActionChip(icon: Icons.photo_library_rounded, label: 'Photos'),
-        _ProjectActionChip(icon: Icons.handshake_rounded, label: 'Partenaires'),
+        _ProjectActionChip(
+          icon: Icons.groups_rounded,
+          label: 'Équipe',
+          route: '/members',
+        ),
+        _ProjectActionChip(
+          icon: Icons.task_alt_rounded,
+          label: 'Tâches',
+          route: '/tasks',
+        ),
+        _ProjectActionChip(
+          icon: Icons.description_rounded,
+          label: 'Documents',
+          route: '/documents',
+        ),
+        _ProjectActionChip(
+          icon: Icons.payments_rounded,
+          label: 'Budget',
+          route: '/finance',
+        ),
+        _ProjectActionChip(
+          icon: Icons.photo_library_rounded,
+          label: 'Photos',
+          route: '/documents',
+        ),
+        _ProjectActionChip(
+          icon: Icons.handshake_rounded,
+          label: 'Partenaires',
+          route: '/alumni',
+        ),
       ],
     );
   }
@@ -1477,14 +1561,24 @@ class _ProjectActionPanel extends StatelessWidget {
 class _ProjectActionChip extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String route;
 
-  const _ProjectActionChip({required this.icon, required this.label});
+  const _ProjectActionChip({
+    required this.icon,
+    required this.label,
+    required this.route,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
+    return ActionChip(
       avatar: Icon(icon, size: 16),
       label: Text(label),
+      onPressed: () {
+        final router = GoRouter.of(context);
+        Navigator.of(context).pop();
+        router.go(route);
+      },
       backgroundColor: Colors.white,
       side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -2006,6 +2100,24 @@ Color _statusColor(String status) {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+String? _absoluteProjectMemberPhoto(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return '${ApiClient.serverUrl}$value';
+}
+
+String _initials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+  return '${parts.first.characters.first}${parts.last.characters.first}'
+      .toUpperCase();
 }
 
 int _projectReadinessScore(ProjectModel project) {

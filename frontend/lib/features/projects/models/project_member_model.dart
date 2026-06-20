@@ -8,6 +8,8 @@ class ProjectMemberModel {
   final bool isActive;
   final String displayName;
   final String email;
+  final String? photoUrl;
+  final String status;
 
   const ProjectMemberModel({
     required this.id,
@@ -19,6 +21,8 @@ class ProjectMemberModel {
     required this.isActive,
     required this.displayName,
     required this.email,
+    required this.photoUrl,
+    required this.status,
   });
 
   factory ProjectMemberModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,8 @@ class ProjectMemberModel {
       isActive: json['is_active'] != false,
       displayName: json['display_name']?.toString() ?? 'Membre projet',
       email: json['email']?.toString() ?? '',
+      photoUrl: json['photo_url']?.toString(),
+      status: json['status']?.toString() ?? 'active',
     );
   }
 

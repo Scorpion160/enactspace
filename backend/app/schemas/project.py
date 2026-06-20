@@ -47,6 +47,8 @@ class ProjectMemberRead(BaseModel):
     is_active: bool
     display_name: str
     email: str
+    photo_url: Optional[str] = None
+    status: str
 
 
 class ProjectRead(BaseModel):
