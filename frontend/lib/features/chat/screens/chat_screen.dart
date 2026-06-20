@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
+import '../../../core/realtime/realtime_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
 import '../../poles/services/poles_service.dart';
@@ -29,6 +30,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final AuthService _authService = AuthService();
   final PolesService _polesService = PolesService();
   final ProjectsService _projectsService = ProjectsService();
+  final RealtimeService _realtimeService = RealtimeService();
   final TextEditingController _messageController = TextEditingController();
 
   bool _loading = true;
@@ -38,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _usingLocalCache = false;
   String? _error;
   Timer? _syncTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
   DateTime? _lastSyncedAt;
   UserExperience? _user;
   List<ChatThreadModel> _threads = [];
@@ -47,12 +50,21 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, String> _messageReactions = {};
   final Set<String> _removedServerReactionIds = {};
   final Set<String> _hiddenMessageIds = {};
+  final Map<String, String> _typingUsers = {};
+  final Map<String, Timer> _typingExpiryTimers = {};
+  Timer? _typingTimer;
+  bool _typingSent = false;
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
 
   @override
   void initState() {
     super.initState();
+    _realtimeSubscription = _realtimeService.events.listen(
+      _handleRealtimeEvent,
+    );
+    _messageController.addListener(_handleComposerChanged);
+    unawaited(_realtimeService.start());
     _loadChat();
     _syncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (mounted && !_loading && !_messagesLoading && !_sending) {
@@ -63,9 +75,103 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _stopTyping();
+    for (final timer in _typingExpiryTimers.values) {
+      timer.cancel();
+    }
     _syncTimer?.cancel();
+    unawaited(_realtimeSubscription?.cancel());
+    unawaited(_realtimeService.dispose());
     _messageController.dispose();
     super.dispose();
+  }
+
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    if (!mounted) return;
+
+    if (event['type'] == 'chat' &&
+        !_loading &&
+        !_messagesLoading &&
+        !_sending) {
+      _syncActiveChat();
+      return;
+    }
+
+    if (event['type'] != 'typing' ||
+        event['thread_id']?.toString() != _selectedThread?.id ||
+        event['user_id']?.toString() == _user?.id) {
+      return;
+    }
+
+    final userId = event['user_id']?.toString() ?? '';
+    if (userId.isEmpty) return;
+
+    _typingExpiryTimers.remove(userId)?.cancel();
+    if (event['is_typing'] == true) {
+      setState(() {
+        _typingUsers[userId] =
+            event['display_name']?.toString().trim().isNotEmpty == true
+            ? event['display_name'].toString()
+            : 'Un membre';
+      });
+      _typingExpiryTimers[userId] = Timer(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        setState(() => _typingUsers.remove(userId));
+      });
+    } else {
+      setState(() => _typingUsers.remove(userId));
+    }
+  }
+
+  void _handleComposerChanged() {
+    final threadId = _selectedThread?.id;
+    final hasText = _messageController.text.trim().isNotEmpty;
+    if (threadId == null || !hasText) {
+      _stopTyping();
+      return;
+    }
+
+    if (!_typingSent) {
+      _typingSent = true;
+      _realtimeService.send({
+        'type': 'typing',
+        'thread_id': threadId,
+        'is_typing': true,
+      });
+    }
+
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 2), _stopTyping);
+  }
+
+  void _stopTyping() {
+    _typingTimer?.cancel();
+    _typingTimer = null;
+    if (!_typingSent) return;
+
+    final threadId = _selectedThread?.id;
+    _typingSent = false;
+    if (threadId != null) {
+      _realtimeService.send({
+        'type': 'typing',
+        'thread_id': threadId,
+        'is_typing': false,
+      });
+    }
+  }
+
+  void _clearTypingIndicators() {
+    for (final timer in _typingExpiryTimers.values) {
+      timer.cancel();
+    }
+    _typingExpiryTimers.clear();
+    _typingUsers.clear();
+  }
+
+  void _leaveSelectedThread() {
+    _stopTyping();
+    _clearTypingIndicators();
+    setState(() => _selectedThread = null);
   }
 
   Future<void> _loadChat() async {
@@ -155,6 +261,8 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatThreadModel thread, {
     bool silent = false,
   }) async {
+    _stopTyping();
+    _clearTypingIndicators();
     if (!silent) {
       setState(() {
         _selectedThread = thread;
@@ -236,6 +344,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _sending = true;
     });
+    _stopTyping();
 
     try {
       final message = await _chatService.sendMessage(
@@ -635,6 +744,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final thread = _selectedThread;
     if (thread == null) return;
 
+    _stopTyping();
+    _clearTypingIndicators();
     await _chatService.deleteThread(thread.id);
     if (!mounted) return;
     setState(() {
@@ -674,6 +785,8 @@ class _ChatScreenState extends State<ChatScreen> {
             userId: user.id,
           );
           if (!mounted) return;
+          _stopTyping();
+          _clearTypingIndicators();
           setState(() {
             _selectedThread = null;
             _messages = [];
@@ -800,7 +913,7 @@ class _ChatScreenState extends State<ChatScreen> {
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop) {
-            setState(() => _selectedThread = null);
+            _leaveSelectedThread();
           }
         },
         child: _conversationPanel(showBack: true, framed: false),
@@ -840,7 +953,7 @@ class _ChatScreenState extends State<ChatScreen> {
               : _pinnedThreadIds.contains(_selectedThread!.id),
           syncing: _backgroundSyncing,
           lastSyncedAt: _lastSyncedAt,
-          onBack: () => setState(() => _selectedThread = null),
+          onBack: _leaveSelectedThread,
           onInfo: _openConversationInfo,
           onTogglePin: _toggleSelectedThreadPin,
         ),
@@ -864,6 +977,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   onMessageLongPress: _openMessageActions,
                 ),
         ),
+        if (_selectedThread != null)
+          if (_typingUsers.isNotEmpty)
+            _TypingIndicator(names: _typingUsers.values.toList()),
         if (_selectedThread != null)
           _MessageComposer(
             controller: _messageController,
@@ -1638,6 +1754,46 @@ class _MediaFallback extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypingIndicator extends StatelessWidget {
+  final List<String> names;
+
+  const _TypingIndicator({required this.names});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = names.length == 1
+        ? '${names.first} écrit...'
+        : '${names.take(2).join(', ')} écrivent...';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
+      color: Colors.white,
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

@@ -27,6 +27,7 @@ from app.api.routes import (
     academy,
     audit,
     seed,
+    realtime,
 )
 
 
@@ -101,3 +102,4 @@ app.include_router(impact.router, prefix="/api")
 app.include_router(academy.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
+app.include_router(realtime.router, prefix="/api")

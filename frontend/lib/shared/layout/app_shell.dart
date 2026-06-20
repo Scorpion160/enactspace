@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/user_experience.dart';
+import '../../core/realtime/realtime_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/services/notifications_service.dart';
@@ -24,12 +25,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final NotificationsService _notificationsService = NotificationsService();
   final TasksService _tasksService = TasksService();
+  final RealtimeService _realtimeService = RealtimeService();
 
   int? _unreadNotifications;
   int? _lateTasks;
   UserExperience? _userExperience;
   Timer? _metricsTimer;
   Timer? _notificationTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
   bool _metricsLoading = false;
   bool _notificationLoading = false;
   String? _lastPresentedNotificationId;
@@ -38,6 +41,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _realtimeSubscription = _realtimeService.events.listen((event) {
+      if (event['type'] == 'notification') {
+        _loadNotificationMetric();
+      }
+    });
+    unawaited(_realtimeService.start());
     _loadNavigationMetrics();
     _metricsTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _loadNavigationMetrics();
@@ -52,6 +61,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _metricsTimer?.cancel();
     _notificationTimer?.cancel();
+    unawaited(_realtimeSubscription?.cancel());
+    unawaited(_realtimeService.dispose());
     super.dispose();
   }
 

@@ -532,6 +532,10 @@ class _NotificationsFilters extends StatelessWidget {
                         child: Text('Annonce'),
                       ),
                       DropdownMenuItem(
+                        value: 'chat_message',
+                        child: Text('Nouveau message'),
+                      ),
+                      DropdownMenuItem(
                         value: 'event_scheduled',
                         child: Text('Evenement'),
                       ),
