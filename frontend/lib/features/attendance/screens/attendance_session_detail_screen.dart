@@ -24,6 +24,7 @@ class _AttendanceSessionDetailScreenState
   final TextEditingController _memberSearchController = TextEditingController();
 
   bool _loading = true;
+  late bool _sessionClosed;
   String? _error;
   String _statusFilter = 'all';
 
@@ -34,6 +35,7 @@ class _AttendanceSessionDetailScreenState
   @override
   void initState() {
     super.initState();
+    _sessionClosed = widget.session.status == 'closed';
     _loadDetails();
   }
 
@@ -223,6 +225,7 @@ class _AttendanceSessionDetailScreenState
       await _loadDetails();
 
       if (!mounted) return;
+      setState(() => _sessionClosed = true);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Session clôturée avec succès.')),
@@ -261,9 +264,15 @@ class _AttendanceSessionDetailScreenState
       body: RefreshIndicator(
         onRefresh: _loadDetails,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(
+            MediaQuery.sizeOf(context).width < 560 ? 14 : 24,
+          ),
           children: [
-            _SessionHeader(session: widget.session, onClose: _closeSession),
+            _SessionHeader(
+              session: widget.session,
+              isClosed: _sessionClosed,
+              onClose: _closeSession,
+            ),
             const SizedBox(height: 20),
             _AttendanceStatsCard(
               totalExpected: _expectedMembers.length,
@@ -312,7 +321,7 @@ class _AttendanceSessionDetailScreenState
                 members: filteredExpectedMembers,
                 recordByUserId: recordByUserId,
                 onMarkAttendance: _markAttendance,
-                sessionClosed: widget.session.status == 'closed',
+                sessionClosed: _sessionClosed,
               ),
             ],
           ],
@@ -394,61 +403,93 @@ class _AttendanceSessionDetailScreenState
 
 class _SessionHeader extends StatelessWidget {
   final AttendanceSessionModel session;
+  final bool isClosed;
   final VoidCallback onClose;
 
-  const _SessionHeader({required this.session, required this.onClose});
+  const _SessionHeader({
+    required this.session,
+    required this.isClosed,
+    required this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(26),
+      padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 560 ? 18 : 26),
       decoration: BoxDecoration(
         color: AppTheme.softBlack,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppTheme.enactusYellow,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.fact_check_rounded,
-              color: AppTheme.softBlack,
-              size: 34,
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  session.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 640;
+          final identity = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppTheme.enactusYellow,
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${session.typeLabel} • ${session.statusLabel} • ${session.dateLabel}',
-                  style: const TextStyle(color: Colors.white70),
+                child: const Icon(
+                  Icons.fact_check_rounded,
+                  color: AppTheme.softBlack,
+                  size: 34,
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: session.status == 'closed' ? null : onClose,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${session.typeLabel} • ${isClosed ? 'Clôturée' : session.statusLabel} • ${session.dateLabel}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final closeButton = ElevatedButton.icon(
+            onPressed: isClosed ? null : onClose,
             icon: const Icon(Icons.lock_rounded),
-            label: Text(session.status == 'closed' ? 'Clôturée' : 'Clôturer'),
-          ),
-        ],
+            label: Text(isClosed ? 'Clôturée' : 'Clôturer'),
+          );
+
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: identity),
+                const SizedBox(width: 16),
+                closeButton,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              identity,
+              const SizedBox(height: 16),
+              Align(alignment: Alignment.centerRight, child: closeButton),
+            ],
+          );
+        },
       ),
     );
   }

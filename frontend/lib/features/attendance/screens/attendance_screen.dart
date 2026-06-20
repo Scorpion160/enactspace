@@ -48,8 +48,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     try {
-      final cachedUser = await _authService.getCachedCurrentUser();
       final results = await Future.wait([
+        _authService.getCurrentUser(),
         _attendanceService.getSessions(),
         _attendanceService.getMyRecords(),
       ]);
@@ -57,9 +57,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (!mounted) return;
 
       setState(() {
-        _user = cachedUser == null ? null : UserExperience.fromJson(cachedUser);
-        _sessions = results[0] as List<AttendanceSessionModel>;
-        _myRecords = results[1] as List<AttendanceRecordModel>;
+        _user = UserExperience.fromJson(results[0] as Map<String, dynamic>);
+        _sessions = results[1] as List<AttendanceSessionModel>;
+        _myRecords = results[2] as List<AttendanceRecordModel>;
         if (!_viewInitialized) {
           _view = _user?.canManageAttendance == true
               ? 'management'
@@ -148,7 +148,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return RefreshIndicator(
       onRefresh: _loadSessions,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).width < 560 ? 14 : 24,
+        ),
         children: [
           if (canManage) ...[
             _AttendanceViewSwitch(

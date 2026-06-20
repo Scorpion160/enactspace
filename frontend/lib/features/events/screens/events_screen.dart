@@ -205,6 +205,8 @@ class _EventsScreenState extends State<EventsScreen> {
                           events: _filteredEvents,
                           service: _service,
                           attendanceService: _attendanceService,
+                          canManageAttendance:
+                              _userExperience?.canManageAttendance == true,
                           onToggleRegistration: _toggleRegistration,
                           onEventChanged: _replaceEvent,
                           onEventDeleted: _removeEvent,
@@ -462,6 +464,7 @@ class _EventsGrid extends StatelessWidget {
   final List<EventModel> events;
   final EventsService service;
   final AttendanceService attendanceService;
+  final bool canManageAttendance;
   final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
   final ValueChanged<String> onEventDeleted;
@@ -470,6 +473,7 @@ class _EventsGrid extends StatelessWidget {
     required this.events,
     required this.service,
     required this.attendanceService,
+    required this.canManageAttendance,
     required this.onToggleRegistration,
     required this.onEventChanged,
     required this.onEventDeleted,
@@ -500,6 +504,7 @@ class _EventsGrid extends StatelessWidget {
                   event: event,
                   service: service,
                   attendanceService: attendanceService,
+                  canManageAttendance: canManageAttendance,
                   onToggleRegistration: onToggleRegistration,
                   onEventChanged: onEventChanged,
                   onEventDeleted: onEventDeleted,
@@ -516,6 +521,7 @@ class _EventCard extends StatelessWidget {
   final EventModel event;
   final EventsService service;
   final AttendanceService attendanceService;
+  final bool canManageAttendance;
   final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
   final ValueChanged<String> onEventDeleted;
@@ -524,6 +530,7 @@ class _EventCard extends StatelessWidget {
     required this.event,
     required this.service,
     required this.attendanceService,
+    required this.canManageAttendance,
     required this.onToggleRegistration,
     required this.onEventChanged,
     required this.onEventDeleted,
@@ -660,6 +667,7 @@ class _EventCard extends StatelessWidget {
                     service,
                     attendanceService,
                     event.canManage,
+                    canManageAttendance,
                     onToggleRegistration,
                     onEventChanged,
                     onEventDeleted,
@@ -749,6 +757,7 @@ void _showEventDetails(
   EventsService service,
   AttendanceService attendanceService,
   bool canManage,
+  bool canManageAttendance,
   ValueChanged<EventModel> onToggleRegistration,
   ValueChanged<EventModel> onEventChanged,
   ValueChanged<String> onEventDeleted,
@@ -763,6 +772,7 @@ void _showEventDetails(
       service: service,
       attendanceService: attendanceService,
       canManage: canManage,
+      canManageAttendance: canManageAttendance,
       onToggleRegistration: onToggleRegistration,
       onEventChanged: onEventChanged,
       onEventDeleted: onEventDeleted,
@@ -775,6 +785,7 @@ class _EventDetailsSheet extends StatelessWidget {
   final EventsService service;
   final AttendanceService attendanceService;
   final bool canManage;
+  final bool canManageAttendance;
   final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
   final ValueChanged<String> onEventDeleted;
@@ -784,6 +795,7 @@ class _EventDetailsSheet extends StatelessWidget {
     required this.service,
     required this.attendanceService,
     required this.canManage,
+    required this.canManageAttendance,
     required this.onToggleRegistration,
     required this.onEventChanged,
     required this.onEventDeleted,
@@ -1011,6 +1023,7 @@ class _EventDetailsSheet extends StatelessWidget {
                   _EventActionPanel(
                     event: event,
                     canManage: canManage,
+                    canManageAttendance: canManageAttendance,
                     onToggleRegistration: () => onToggleRegistration(event),
                     onShowParticipants: () => _showParticipants(context),
                     onCreateAttendance: () =>
@@ -1149,6 +1162,7 @@ class _EventMetricCard extends StatelessWidget {
 class _EventActionPanel extends StatelessWidget {
   final EventModel event;
   final bool canManage;
+  final bool canManageAttendance;
   final VoidCallback onToggleRegistration;
   final VoidCallback onShowParticipants;
   final VoidCallback onCreateAttendance;
@@ -1156,6 +1170,7 @@ class _EventActionPanel extends StatelessWidget {
   const _EventActionPanel({
     required this.event,
     required this.canManage,
+    required this.canManageAttendance,
     required this.onToggleRegistration,
     required this.onShowParticipants,
     required this.onCreateAttendance,
@@ -1179,7 +1194,7 @@ class _EventActionPanel extends StatelessWidget {
           _EventActionChip(
             icon: Icons.fact_check_rounded,
             label: 'Présence liée',
-            onTap: canManage ? onCreateAttendance : null,
+            onTap: canManageAttendance ? onCreateAttendance : null,
           ),
         _EventActionChip(
           icon: Icons.groups_rounded,

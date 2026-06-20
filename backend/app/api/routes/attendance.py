@@ -2,9 +2,6 @@ import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import Request
-from app.services.audit_service import create_audit_log, get_client_ip
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
@@ -29,10 +26,37 @@ from app.schemas.attendance import (
 from app.api.deps import (
     get_current_active_validated_user,
     require_sg_or_admin,
-    require_enacchef_or_admin,
+    user_has_any_role,
 )
+from app.services.audit_service import create_audit_log, get_client_ip
 
 router = APIRouter(prefix="/attendance", tags=["Présences"])
+ATTENDANCE_MANAGER_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+}
+
+
+def can_manage_attendance(db: Session, current_user: User) -> bool:
+    return user_has_any_role(
+        db,
+        current_user.id,
+        ATTENDANCE_MANAGER_ROLES,
+    )
+
+
+def attendance_session_payload(
+    db: Session,
+    current_user: User,
+    session: AttendanceSession,
+) -> dict:
+    can_manage = can_manage_attendance(db, current_user)
+    data = AttendanceSessionRead.model_validate(session).model_dump()
+    data["can_manage"] = can_manage
+    if not can_manage:
+        data["qr_token"] = None
+    return data
 
 
 RETARD_PENALTY = 300
@@ -138,7 +162,7 @@ def compute_checkin_status(session: AttendanceSession, now: datetime) -> str:
 def create_attendance_session(
     payload: AttendanceSessionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     session = AttendanceSession(
         title=payload.title,
@@ -160,7 +184,7 @@ def create_attendance_session(
     db.commit()
     db.refresh(session)
 
-    return session
+    return attendance_session_payload(db, current_user, session)
 
 
 @router.get("/sessions", response_model=list[AttendanceSessionRead])
@@ -168,16 +192,20 @@ def list_attendance_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(AttendanceSession).order_by(
+    sessions = db.query(AttendanceSession).order_by(
         AttendanceSession.created_at.desc()
     ).all()
+    return [
+        attendance_session_payload(db, current_user, session)
+        for session in sessions
+    ]
 
 
 @router.post("/expected-members", response_model=AttendanceExpectedMemberRead)
 def add_expected_member(
     payload: AttendanceExpectedMembersCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     session = db.query(AttendanceSession).filter(
         AttendanceSession.id == payload.session_id
@@ -222,7 +250,7 @@ def add_expected_member(
 def list_expected_members(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     return db.query(AttendanceExpectedMember).filter(
         AttendanceExpectedMember.session_id == session_id
@@ -312,7 +340,7 @@ def qr_check_in(
 def create_manual_attendance(
     payload: AttendanceManualCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     session = db.query(AttendanceSession).filter(
         AttendanceSession.id == payload.session_id
@@ -448,7 +476,7 @@ def create_manual_attendance(
 @router.get("/records", response_model=list[AttendanceRecordRead])
 def list_attendance_records(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
     user_id: Optional[str] = Query(default=None),
     session_id: Optional[str] = Query(default=None),
     status_filter: Optional[str] = Query(default=None),
@@ -470,7 +498,7 @@ def list_attendance_records(
 def list_attendance_records_by_session(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     return db.query(AttendanceRecord).filter(
         AttendanceRecord.session_id == session_id
@@ -482,7 +510,7 @@ def close_attendance_session(
     session_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_enacchef_or_admin),
+    current_user: User = Depends(require_sg_or_admin),
 ):
     session = db.query(AttendanceSession).filter(
         AttendanceSession.id == session_id

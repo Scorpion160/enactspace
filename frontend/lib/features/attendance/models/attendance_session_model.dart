@@ -11,6 +11,7 @@ class AttendanceSessionModel {
   final String? poleId;
   final String? projectId;
   final String? qrToken;
+  final bool canManage;
 
   const AttendanceSessionModel({
     required this.id,
@@ -25,6 +26,7 @@ class AttendanceSessionModel {
     this.poleId,
     this.projectId,
     this.qrToken,
+    required this.canManage,
   });
 
   factory AttendanceSessionModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,7 @@ class AttendanceSessionModel {
       poleId: json['pole_id']?.toString(),
       projectId: json['project_id']?.toString(),
       qrToken: json['qr_token']?.toString(),
+      canManage: json['can_manage'] == true,
     );
   }
 

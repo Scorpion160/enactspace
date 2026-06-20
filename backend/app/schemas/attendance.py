@@ -33,6 +33,7 @@ class AttendanceSessionRead(BaseModel):
     qr_token: Optional[str]
     created_by: Optional[UUID]
     is_closed: bool
+    can_manage: bool = False
     created_at: datetime
     updated_at: datetime
 
