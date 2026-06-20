@@ -8,6 +8,8 @@ class PaymentModel {
   final String? proofUrl;
   final String? createdAt;
   final String? validatedAt;
+  final bool canValidate;
+  final bool canCancel;
 
   const PaymentModel({
     required this.id,
@@ -19,6 +21,8 @@ class PaymentModel {
     this.proofUrl,
     this.createdAt,
     this.validatedAt,
+    required this.canValidate,
+    required this.canCancel,
   });
 
   factory PaymentModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class PaymentModel {
       proofUrl: json['proof_url']?.toString(),
       createdAt: json['created_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
+      canValidate: json['can_validate'] == true,
+      canCancel: json['can_cancel'] == true,
     );
   }
 
@@ -50,14 +56,18 @@ class PaymentModel {
 
   String get methodLabel {
     switch (method) {
-      case 'cash':
+      case 'manuel':
+        return 'Saisie manuelle';
+      case 'especes':
         return 'Espèces';
       case 'wave':
         return 'Wave';
       case 'orange_money':
         return 'Orange Money';
-      case 'bank':
-        return 'Banque';
+      case 'free_money':
+        return 'Free Money';
+      case 'bank_transfer':
+        return 'Virement bancaire';
       default:
         return method;
     }

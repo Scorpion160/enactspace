@@ -212,6 +212,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         return CreatePaymentDialog(
           financeService: _financeService,
           members: _members,
+          canManage: _canManageFinance,
         );
       },
     );
@@ -272,6 +273,29 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   Future<void> _cancelPayment(PaymentModel payment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler ce paiement ?'),
+        content: Text(
+          'La déclaration de ${_money(payment.amount)} sera annulée. '
+          'Un paiement validé ne peut pas être annulé ici.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Retour'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.cancel_rounded),
+            label: const Text('Annuler le paiement'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     try {
       await _financeService.cancelPayment(payment.id);
       await _loadFinance();
@@ -357,7 +381,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
             _PaymentsCard(
               payments: _filteredPayments,
               memberName: _memberName,
-              canManage: _canManageFinance,
               onValidate: _validatePayment,
               onCancel: _cancelPayment,
             ),
@@ -942,14 +965,12 @@ class _FeesCard extends StatelessWidget {
 class _PaymentsCard extends StatelessWidget {
   final List<PaymentModel> payments;
   final String Function(String userId) memberName;
-  final bool canManage;
   final ValueChanged<PaymentModel> onValidate;
   final ValueChanged<PaymentModel> onCancel;
 
   const _PaymentsCard({
     required this.payments,
     required this.memberName,
-    required this.canManage,
     required this.onValidate,
     required this.onCancel,
   });
@@ -964,15 +985,20 @@ class _PaymentsCard extends StatelessWidget {
           : Column(
               children: payments.take(20).map((payment) {
                 final isPending = payment.status == 'pending';
+                final isCancelled = payment.status == 'cancelled';
 
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: isPending
                         ? Colors.orange.shade100
+                        : isCancelled
+                        ? Colors.red.shade100
                         : Colors.green.shade100,
                     child: Icon(
                       isPending
                           ? Icons.pending_rounded
+                          : isCancelled
+                          ? Icons.cancel_rounded
                           : Icons.verified_rounded,
                     ),
                   ),
@@ -988,7 +1014,7 @@ class _PaymentsCard extends StatelessWidget {
                         _money(payment.amount),
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      if (canManage && isPending)
+                      if (payment.canValidate || payment.canCancel)
                         PopupMenuButton<String>(
                           tooltip: 'Actions du paiement',
                           onSelected: (action) {
@@ -998,24 +1024,26 @@ class _PaymentsCard extends StatelessWidget {
                               onCancel(payment);
                             }
                           },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(
-                              value: 'validate',
-                              child: ListTile(
-                                leading: Icon(Icons.verified_rounded),
-                                title: Text('Valider'),
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'cancel',
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.cancel_rounded,
-                                  color: Colors.red,
+                          itemBuilder: (context) => [
+                            if (payment.canValidate)
+                              const PopupMenuItem(
+                                value: 'validate',
+                                child: ListTile(
+                                  leading: Icon(Icons.verified_rounded),
+                                  title: Text('Valider'),
                                 ),
-                                title: Text('Annuler'),
                               ),
-                            ),
+                            if (payment.canCancel)
+                              const PopupMenuItem(
+                                value: 'cancel',
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.cancel_rounded,
+                                    color: Colors.red,
+                                  ),
+                                  title: Text('Annuler'),
+                                ),
+                              ),
                           ],
                         ),
                     ],
@@ -1293,11 +1321,13 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
 class CreatePaymentDialog extends StatefulWidget {
   final FinanceService financeService;
   final List<MemberModel> members;
+  final bool canManage;
 
   const CreatePaymentDialog({
     super.key,
     required this.financeService,
     required this.members,
+    required this.canManage,
   });
 
   @override
@@ -1312,10 +1342,21 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
   final _proofUrlController = TextEditingController();
 
   String? _selectedUserId;
-  String _method = 'cash';
+  String _method = 'wave';
 
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.canManage && widget.members.length == 1) {
+      _selectedUserId = widget.members.first.id;
+    }
+    if (widget.canManage) {
+      _method = 'especes';
+    }
+  }
 
   @override
   void dispose() {
@@ -1331,6 +1372,14 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
     if (_selectedUserId == null) {
       setState(() {
         _error = 'Sélectionnez un membre.';
+      });
+      return;
+    }
+    if (!widget.canManage &&
+        _referenceController.text.trim().isEmpty &&
+        _proofUrlController.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Ajoutez une référence ou une preuve de paiement.';
       });
       return;
     }
@@ -1407,7 +1456,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                       child: Text(member.displayName),
                     );
                   }).toList(),
-                  onChanged: _loading
+                  onChanged: _loading || !widget.canManage
                       ? null
                       : (value) {
                           setState(() {
@@ -1445,22 +1494,36 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     labelText: 'Méthode',
                     prefixIcon: Icon(Icons.account_balance_wallet_rounded),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'cash', child: Text('Espèces')),
-                    DropdownMenuItem(value: 'wave', child: Text('Wave')),
-                    DropdownMenuItem(
+                  items: [
+                    if (widget.canManage)
+                      const DropdownMenuItem(
+                        value: 'especes',
+                        child: Text('Espèces'),
+                      ),
+                    if (widget.canManage)
+                      const DropdownMenuItem(
+                        value: 'manuel',
+                        child: Text('Saisie manuelle'),
+                      ),
+                    const DropdownMenuItem(value: 'wave', child: Text('Wave')),
+                    const DropdownMenuItem(
                       value: 'orange_money',
                       child: Text('Orange Money'),
                     ),
-                    DropdownMenuItem(value: 'bank', child: Text('Banque')),
+                    const DropdownMenuItem(
+                      value: 'free_money',
+                      child: Text('Free Money'),
+                    ),
+                    const DropdownMenuItem(
+                      value: 'bank_transfer',
+                      child: Text('Virement bancaire'),
+                    ),
                   ],
                   onChanged: _loading
                       ? null
                       : (value) {
                           if (value == null) return;
-                          setState(() {
-                            _method = value;
-                          });
+                          setState(() => _method = value);
                         },
                 ),
                 const SizedBox(height: 14),
@@ -1468,6 +1531,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                   controller: _referenceController,
                   decoration: const InputDecoration(
                     labelText: 'Référence',
+                    hintText: 'Référence de transaction',
                     prefixIcon: Icon(Icons.tag_rounded),
                   ),
                 ),
@@ -1476,6 +1540,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                   controller: _proofUrlController,
                   decoration: const InputDecoration(
                     labelText: 'Lien de preuve',
+                    hintText: 'Capture ou reçu de paiement',
                     prefixIcon: Icon(Icons.link_rounded),
                   ),
                 ),

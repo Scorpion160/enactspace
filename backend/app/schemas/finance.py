@@ -60,6 +60,8 @@ class PaymentRead(BaseModel):
     validated_by: Optional[UUID]
     validated_at: Optional[datetime]
     receipt_url: Optional[str]
+    can_validate: bool = False
+    can_cancel: bool = False
     created_at: datetime
 
     class Config:

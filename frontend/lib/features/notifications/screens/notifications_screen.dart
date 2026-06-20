@@ -561,7 +561,11 @@ class _NotificationsFilters extends StatelessWidget {
                       ),
                       DropdownMenuItem(
                         value: 'payment_validated',
-                        child: Text('Paiement'),
+                        child: Text('Paiement validé'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'payment_submitted',
+                        child: Text('Paiement à vérifier'),
                       ),
                       DropdownMenuItem(
                         value: 'document_shared',
@@ -807,6 +811,8 @@ class _NotificationCard extends StatelessWidget {
         return Icons.account_balance_wallet_rounded;
       case 'payment_validated':
         return Icons.verified_rounded;
+      case 'payment_submitted':
+        return Icons.manage_search_rounded;
       case 'application_received':
         return Icons.assignment_ind_rounded;
       case 'recruitment_update':

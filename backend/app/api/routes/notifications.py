@@ -32,6 +32,7 @@ VALID_NOTIFICATION_TYPES = {
     "absence_recorded",
     "fee_due",
     "payment_validated",
+    "payment_submitted",
     "application_received",
     "recruitment_update",
     "account_approved",

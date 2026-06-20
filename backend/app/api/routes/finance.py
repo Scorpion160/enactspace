@@ -1,10 +1,8 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from app.services.audit_service import create_audit_log, get_client_ip
-from app.services.notification_service import notify_user
-
-from fastapi import Request
+from app.services.notification_service import notify_user, notify_users
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +14,7 @@ from app.models.finance import (
     PaymentAllocation,
     ClubTransaction,
 )
+from app.models.role import Role, UserRole
 from app.models.user import User
 from app.schemas.finance import (
     FeeCreate,
@@ -53,6 +52,45 @@ VALID_FEE_STATUSES = {
 }
 
 FINANCE_MANAGER_ROLES = {"administrateur", "team_leader", "financier"}
+
+
+def is_finance_manager(db: Session, current_user: User) -> bool:
+    return user_has_any_role(db, current_user.id, FINANCE_MANAGER_ROLES)
+
+
+def get_payment_or_404(db: Session, payment_id: str) -> Payment:
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paiement introuvable",
+        )
+    return payment
+
+
+def payment_payload(
+    db: Session,
+    current_user: User,
+    payment: Payment,
+) -> dict:
+    manager = is_finance_manager(db, current_user)
+    data = PaymentRead.model_validate(payment).model_dump()
+    data["can_validate"] = manager and payment.status == "pending"
+    data["can_cancel"] = payment.status == "pending" and (
+        manager or payment.user_id == current_user.id
+    )
+    return data
+
+
+def finance_manager_ids(db: Session) -> list:
+    rows = (
+        db.query(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(Role.name.in_(FINANCE_MANAGER_ROLES))
+        .distinct()
+        .all()
+    )
+    return [row[0] for row in rows]
 
 
 def ensure_financial_account(db: Session, user_id):
@@ -255,12 +293,23 @@ def create_payment(
         )
     if (
         payload.user_id != current_user.id
-        and not user_has_any_role(db, current_user.id, FINANCE_MANAGER_ROLES)
+        and not is_finance_manager(db, current_user)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous ne pouvez enregistrer qu’un paiement pour votre compte",
         )
+    if not is_finance_manager(db, current_user):
+        if payload.method in {"manuel", "especes"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Les paiements en espèces sont saisis par le financier",
+            )
+        if not (payload.reference or payload.proof_url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ajoutez une référence ou une preuve de paiement",
+            )
 
     payment = Payment(
         user_id=payload.user_id,
@@ -272,10 +321,24 @@ def create_payment(
     )
 
     db.add(payment)
+    db.flush()
+    if not is_finance_manager(db, current_user):
+        notify_users(
+            db,
+            user_ids=finance_manager_ids(db),
+            title="Paiement à vérifier",
+            message=(
+                f"{current_user.first_name} {current_user.last_name}".strip()
+                + f" a déclaré {payload.amount:.0f} FCFA."
+            ),
+            notification_type="payment_submitted",
+            related_type="payment",
+            related_id=payment.id,
+        )
     db.commit()
     db.refresh(payment)
 
-    return payment
+    return payment_payload(db, current_user, payment)
 
 
 @router.get("/payments", response_model=list[PaymentRead])
@@ -283,7 +346,11 @@ def list_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    return db.query(Payment).order_by(Payment.created_at.desc()).all()
+    payments = db.query(Payment).order_by(Payment.created_at.desc()).all()
+    return [
+        payment_payload(db, current_user, payment)
+        for payment in payments
+    ]
 
 
 @router.get("/payments/me", response_model=list[PaymentRead])
@@ -291,9 +358,13 @@ def list_my_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return db.query(Payment).filter(
+    payments = db.query(Payment).filter(
         Payment.user_id == current_user.id
     ).order_by(Payment.created_at.desc()).all()
+    return [
+        payment_payload(db, current_user, payment)
+        for payment in payments
+    ]
 
 
 @router.get("/payments/user/{user_id}", response_model=list[PaymentRead])
@@ -302,9 +373,13 @@ def list_user_payments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    return db.query(Payment).filter(
+    payments = db.query(Payment).filter(
         Payment.user_id == user_id
     ).order_by(Payment.created_at.desc()).all()
+    return [
+        payment_payload(db, current_user, payment)
+        for payment in payments
+    ]
 
 
 @router.post("/payments/{payment_id}/validate", response_model=PaymentRead)
@@ -314,18 +389,10 @@ def validate_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    payment = db.query(Payment).filter(
-        Payment.id == payment_id
-    ).first()
-
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paiement introuvable",
-        )
+    payment = get_payment_or_404(db, payment_id)
 
     if payment.status == "validated":
-        return payment
+        return payment_payload(db, current_user, payment)
 
     if payment.status == "cancelled":
         raise HTTPException(
@@ -386,37 +453,32 @@ def validate_payment(
         ip_address=get_client_ip(request),
     )
 
-    create_audit_log(
-        db=db,
-        action="validation_paiement",
-        user_id=current_user.id,
-        entity_type="payment",
-        entity_id=payment.id,
-        old_value={"status": "pending"},
-        new_value={
-            "status": "validated",
-            "amount": float(payment.amount or 0),
-            "method": payment.method,
-            "allocated_total": allocated_total,
-        },
-        ip_address=get_client_ip(request),
-    )
-
     db.commit()
     db.refresh(payment)
 
-    return payment
+    return payment_payload(db, current_user, payment)
 
 @router.post("/payments/{payment_id}/cancel", response_model=PaymentRead)
 def cancel_payment(
     payment_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_finance_or_admin),
+    current_user: User = Depends(get_current_active_validated_user),
 ):
     payment = get_payment_or_404(db, payment_id)
+    if not (
+        is_finance_manager(db, current_user)
+        or payment.user_id == current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas annuler ce paiement",
+        )
 
     old_status = payment.status
+
+    if payment.status == "cancelled":
+        return payment_payload(db, current_user, payment)
 
     if payment.status == "validated":
         raise HTTPException(
@@ -425,8 +487,6 @@ def cancel_payment(
         )
 
     payment.status = "cancelled"
-    payment.updated_at = datetime.utcnow()
-
     create_audit_log(
         db=db,
         action="annulation_paiement",
@@ -445,7 +505,7 @@ def cancel_payment(
     db.commit()
     db.refresh(payment)
 
-    return payment
+    return payment_payload(db, current_user, payment)
 
 
 @router.get("/payments/{payment_id}/allocations", response_model=list[PaymentAllocationRead])

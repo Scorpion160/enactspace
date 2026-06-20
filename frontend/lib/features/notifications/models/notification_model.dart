@@ -102,6 +102,8 @@ class NotificationModel {
         return 'Cotisation';
       case 'payment_validated':
         return 'Paiement valide';
+      case 'payment_submitted':
+        return 'Paiement à vérifier';
       case 'application_received':
         return 'Candidature recue';
       case 'recruitment_update':
