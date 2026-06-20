@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Numeric, Integer, Boolean
+from sqlalchemy import (
+    String,
+    Text,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    Integer,
+    Boolean,
+    UniqueConstraint,
+)
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -61,3 +70,31 @@ class Event(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EventParticipant(Base):
+    __tablename__ = "event_participants"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "user_id", name="uq_event_participant"),
+    )

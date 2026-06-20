@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -114,9 +116,45 @@ class _EventsScreenState extends State<EventsScreen> {
     });
   }
 
+  void _removeEvent(String eventId) {
+    setState(() {
+      _events = _events.where((event) => event.id != eventId).toList();
+    });
+  }
+
+  Future<void> _toggleRegistration(EventModel event) async {
+    try {
+      final updated = event.currentUserRegistered
+          ? await _service.unregister(event.id)
+          : await _service.register(event.id);
+      _replaceEvent(updated);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated.currentUserRegistered
+                ? 'Inscription confirmée.'
+                : 'Désistement enregistré.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canManage = _userExperience?.canCreateOperationalWork ?? false;
+    final canCreate =
+        _userExperience?.isAdmin == true ||
+        _userExperience?.isTeamLeader == true ||
+        _userExperience?.isSecretary == true;
 
     return RefreshIndicator(
       onRefresh: _loadEvents,
@@ -142,7 +180,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         upcoming: _events
                             .where((event) => event.isUpcoming)
                             .length,
-                        onCreate: canManage ? _openCreateSheet : null,
+                        onCreate: canCreate ? _openCreateSheet : null,
                         onRefresh: _loadEvents,
                       ),
                       const SizedBox(height: 18),
@@ -167,8 +205,9 @@ class _EventsScreenState extends State<EventsScreen> {
                           events: _filteredEvents,
                           service: _service,
                           attendanceService: _attendanceService,
-                          canManage: canManage,
+                          onToggleRegistration: _toggleRegistration,
                           onEventChanged: _replaceEvent,
+                          onEventDeleted: _removeEvent,
                         ),
                     ],
                   ),
@@ -423,15 +462,17 @@ class _EventsGrid extends StatelessWidget {
   final List<EventModel> events;
   final EventsService service;
   final AttendanceService attendanceService;
-  final bool canManage;
+  final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
+  final ValueChanged<String> onEventDeleted;
 
   const _EventsGrid({
     required this.events,
     required this.service,
     required this.attendanceService,
-    required this.canManage,
+    required this.onToggleRegistration,
     required this.onEventChanged,
+    required this.onEventDeleted,
   });
 
   @override
@@ -459,8 +500,9 @@ class _EventsGrid extends StatelessWidget {
                   event: event,
                   service: service,
                   attendanceService: attendanceService,
-                  canManage: canManage,
+                  onToggleRegistration: onToggleRegistration,
                   onEventChanged: onEventChanged,
+                  onEventDeleted: onEventDeleted,
                 ),
               ),
           ],
@@ -474,15 +516,17 @@ class _EventCard extends StatelessWidget {
   final EventModel event;
   final EventsService service;
   final AttendanceService attendanceService;
-  final bool canManage;
+  final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
+  final ValueChanged<String> onEventDeleted;
 
   const _EventCard({
     required this.event,
     required this.service,
     required this.attendanceService,
-    required this.canManage,
+    required this.onToggleRegistration,
     required this.onEventChanged,
+    required this.onEventDeleted,
   });
 
   @override
@@ -584,26 +628,46 @@ class _EventCard extends StatelessWidget {
                 ),
                 if (event.maxParticipants != null)
                   Text(
-                    '${event.maxParticipants} place(s)',
+                    '${event.registeredCount}/${event.maxParticipants} place(s)',
                     style: const TextStyle(color: Colors.black54),
                   ),
               ],
             ),
             const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _showEventDetails(
-                  context,
-                  event,
-                  service,
-                  attendanceService,
-                  canManage,
-                  onEventChanged,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (event.requiresRegistration && event.isUpcoming)
+                  FilledButton.tonalIcon(
+                    onPressed: () => onToggleRegistration(event),
+                    icon: Icon(
+                      event.currentUserRegistered
+                          ? Icons.event_busy_rounded
+                          : Icons.how_to_reg_rounded,
+                    ),
+                    label: Text(
+                      event.currentUserRegistered
+                          ? 'Se désinscrire'
+                          : 'S’inscrire',
+                    ),
+                  ),
+                TextButton.icon(
+                  onPressed: () => _showEventDetails(
+                    context,
+                    event,
+                    service,
+                    attendanceService,
+                    event.canManage,
+                    onToggleRegistration,
+                    onEventChanged,
+                    onEventDeleted,
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Détail événement'),
                 ),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Détail événement'),
-              ),
+              ],
             ),
           ],
         ),
@@ -685,7 +749,9 @@ void _showEventDetails(
   EventsService service,
   AttendanceService attendanceService,
   bool canManage,
+  ValueChanged<EventModel> onToggleRegistration,
   ValueChanged<EventModel> onEventChanged,
+  ValueChanged<String> onEventDeleted,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -697,7 +763,9 @@ void _showEventDetails(
       service: service,
       attendanceService: attendanceService,
       canManage: canManage,
+      onToggleRegistration: onToggleRegistration,
       onEventChanged: onEventChanged,
+      onEventDeleted: onEventDeleted,
     ),
   );
 }
@@ -707,15 +775,62 @@ class _EventDetailsSheet extends StatelessWidget {
   final EventsService service;
   final AttendanceService attendanceService;
   final bool canManage;
+  final ValueChanged<EventModel> onToggleRegistration;
   final ValueChanged<EventModel> onEventChanged;
+  final ValueChanged<String> onEventDeleted;
 
   const _EventDetailsSheet({
     required this.event,
     required this.service,
     required this.attendanceService,
     required this.canManage,
+    required this.onToggleRegistration,
     required this.onEventChanged,
+    required this.onEventDeleted,
   });
+
+  Future<void> _deleteEvent(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer cet événement ?'),
+        content: Text(
+          '« ${event.title} » et ses inscriptions seront supprimés. '
+          'Cette action est définitive.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await service.deleteEvent(event.id);
+      onEventDeleted(event.id);
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Événement supprimé.')));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   Future<void> _createLinkedAttendanceSession(BuildContext context) async {
     try {
@@ -734,6 +849,61 @@ class _EventDetailsSheet extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Séance de présence liée créée.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showParticipants(BuildContext context) async {
+    try {
+      final participants = await service.getParticipants(event.id);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Participants (${participants.length})'),
+          content: SizedBox(
+            width: 480,
+            child: participants.isEmpty
+                ? const Text('Aucune inscription pour le moment.')
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: participants.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final participant = participants[index];
+                      final photoUrl = _absoluteEventPhoto(
+                        participant.photoUrl,
+                      );
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: photoUrl == null
+                              ? null
+                              : NetworkImage(photoUrl),
+                          child: photoUrl == null
+                              ? Text(_initials(participant.displayName))
+                              : null,
+                        ),
+                        title: Text(participant.displayName),
+                        subtitle: Text(participant.email),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -841,6 +1011,8 @@ class _EventDetailsSheet extends StatelessWidget {
                   _EventActionPanel(
                     event: event,
                     canManage: canManage,
+                    onToggleRegistration: () => onToggleRegistration(event),
+                    onShowParticipants: () => _showParticipants(context),
                     onCreateAttendance: () =>
                         _createLinkedAttendanceSession(context),
                   ),
@@ -851,6 +1023,20 @@ class _EventDetailsSheet extends StatelessWidget {
                     canManage: canManage,
                     onEventChanged: onEventChanged,
                   ),
+                  if (canManage) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => _deleteEvent(context),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Supprimer l’événement'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -963,11 +1149,15 @@ class _EventMetricCard extends StatelessWidget {
 class _EventActionPanel extends StatelessWidget {
   final EventModel event;
   final bool canManage;
+  final VoidCallback onToggleRegistration;
+  final VoidCallback onShowParticipants;
   final VoidCallback onCreateAttendance;
 
   const _EventActionPanel({
     required this.event,
     required this.canManage,
+    required this.onToggleRegistration,
+    required this.onShowParticipants,
     required this.onCreateAttendance,
   });
 
@@ -978,9 +1168,12 @@ class _EventActionPanel extends StatelessWidget {
       runSpacing: 8,
       children: [
         if (event.requiresRegistration)
-          const _EventActionChip(
+          _EventActionChip(
             icon: Icons.how_to_reg_rounded,
-            label: 'Inscriptions',
+            label: event.currentUserRegistered
+                ? 'Se désinscrire'
+                : 'S’inscrire',
+            onTap: event.isUpcoming ? onToggleRegistration : null,
           ),
         if (event.attendanceEnabled)
           _EventActionChip(
@@ -988,18 +1181,25 @@ class _EventActionPanel extends StatelessWidget {
             label: 'Présence liée',
             onTap: canManage ? onCreateAttendance : null,
           ),
-        const _EventActionChip(
+        _EventActionChip(
           icon: Icons.groups_rounded,
-          label: 'Participants',
+          label: 'Participants (${event.registeredCount})',
+          onTap: canManage ? onShowParticipants : null,
         ),
-        const _EventActionChip(
+        _EventActionChip(
           icon: Icons.description_rounded,
           label: 'Documents',
+          onTap: () => _goFromSheet(context, '/documents'),
         ),
-        const _EventActionChip(icon: Icons.payments_rounded, label: 'Budget'),
-        const _EventActionChip(
+        _EventActionChip(
+          icon: Icons.payments_rounded,
+          label: 'Budget',
+          onTap: () => _goFromSheet(context, '/finance'),
+        ),
+        _EventActionChip(
           icon: Icons.notifications_active_rounded,
           label: 'Rappels',
+          onTap: () => _goFromSheet(context, '/notifications'),
         ),
       ],
     );
@@ -1585,6 +1785,30 @@ List<DropdownMenuItem<String>> _eventTypeItems({required bool includeAll}) {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+void _goFromSheet(BuildContext context, String route) {
+  final router = GoRouter.of(context);
+  Navigator.of(context).pop();
+  router.go(route);
+}
+
+String? _absoluteEventPhoto(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return '${ApiClient.serverUrl}$value';
+}
+
+String _initials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+  return '${parts.first.characters.first}${parts.last.characters.first}'
+      .toUpperCase();
 }
 
 int _eventReadinessScore(EventModel event) {

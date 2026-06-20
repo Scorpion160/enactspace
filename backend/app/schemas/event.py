@@ -52,7 +52,20 @@ class EventRead(BaseModel):
     requires_registration: bool
     attendance_enabled: bool
     report_url: Optional[str]
+    created_by: Optional[UUID]
+    registered_count: int = 0
+    current_user_registered: bool = False
+    can_manage: bool = False
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class EventParticipantRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    display_name: str
+    email: str
+    photo_url: Optional[str] = None
+    registered_at: datetime

@@ -14,6 +14,10 @@ class EventModel {
   final bool requiresRegistration;
   final bool attendanceEnabled;
   final String? reportUrl;
+  final String? createdBy;
+  final int registeredCount;
+  final bool currentUserRegistered;
+  final bool canManage;
   final DateTime createdAt;
 
   const EventModel({
@@ -32,6 +36,10 @@ class EventModel {
     required this.requiresRegistration,
     required this.attendanceEnabled,
     required this.reportUrl,
+    required this.createdBy,
+    required this.registeredCount,
+    required this.currentUserRegistered,
+    required this.canManage,
     required this.createdAt,
   });
 
@@ -54,6 +62,11 @@ class EventModel {
       requiresRegistration: json['requires_registration'] == true,
       attendanceEnabled: json['attendance_enabled'] != false,
       reportUrl: json['report_url']?.toString(),
+      createdBy: json['created_by']?.toString(),
+      registeredCount:
+          int.tryParse(json['registered_count']?.toString() ?? '') ?? 0,
+      currentUserRegistered: json['current_user_registered'] == true,
+      canManage: json['can_manage'] == true,
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),

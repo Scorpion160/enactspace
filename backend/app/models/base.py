@@ -5,7 +5,7 @@ from app.models.role import Role, UserRole
 from app.models.season import Season
 from app.models.pole import Pole, PoleMember
 from app.models.project import Project, ProjectMember, ProjectPole
-from app.models.event import Event
+from app.models.event import Event, EventParticipant
 from app.models.attendance import (
     AttendanceSession,
     AttendanceExpectedMember,

@@ -1,6 +1,7 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/event_model.dart';
+import '../models/event_participant_model.dart';
 
 class EventsService {
   final ApiClient _apiClient;
@@ -76,6 +77,48 @@ class EventsService {
     }
 
     throw Exception('Réponse invalide lors de la mise à jour de l’événement.');
+  }
+
+  Future<EventModel> register(String eventId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.postJson(
+      '/events/$eventId/register',
+      token: token,
+      data: {},
+    );
+    if (response is Map<String, dynamic>) {
+      return EventModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de l’inscription.');
+  }
+
+  Future<EventModel> unregister(String eventId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.delete(
+      '/events/$eventId/register',
+      token: token,
+    );
+    if (response is Map<String, dynamic>) {
+      return EventModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors du désistement.');
+  }
+
+  Future<List<EventParticipantModel>> getParticipants(String eventId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get(
+      '/events/$eventId/participants',
+      token: token,
+    );
+    return _extractList(response)
+        .whereType<Map<String, dynamic>>()
+        .map(EventParticipantModel.fromJson)
+        .toList();
+  }
+
+  Future<void> deleteEvent(String eventId) async {
+    final token = await _requireToken();
+    await _apiClient.delete('/events/$eventId', token: token);
   }
 
   Future<String> _requireToken() async {
