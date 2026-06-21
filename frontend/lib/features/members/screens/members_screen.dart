@@ -204,6 +204,75 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _openLifecycleDialog(MemberModel member) async {
+    final choice = await showDialog<_LifecycleChoice>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Gérer ${member.displayName}'),
+        children: [
+          if (member.status == 'active')
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.of(context).pop(_LifecycleChoice.makeAlumni),
+              child: const ListTile(
+                leading: Icon(Icons.workspace_premium_outlined),
+                title: Text('Passer Alumni'),
+                subtitle: Text('Clôture les affectations actives'),
+              ),
+            ),
+          if (member.status != 'suspended' &&
+              member.status != 'pending' &&
+              member.status != 'rejected')
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.of(context).pop(_LifecycleChoice.suspend),
+              child: const ListTile(
+                leading: Icon(Icons.person_off_outlined),
+                title: Text('Suspendre le compte'),
+              ),
+            ),
+          if (member.status == 'suspended' || member.status == 'inactive')
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.of(context).pop(_LifecycleChoice.reactivate),
+              child: const ListTile(
+                leading: Icon(Icons.person_add_alt_rounded),
+                title: Text('Réactiver le compte'),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+
+    try {
+      switch (choice) {
+        case _LifecycleChoice.makeAlumni:
+          await _membersService.makeAlumni(member.id);
+          break;
+        case _LifecycleChoice.suspend:
+          await _membersService.suspendMember(member.id);
+          break;
+        case _LifecycleChoice.reactivate:
+          await _membersService.reactivateMember(member.id);
+          break;
+      }
+      await _loadMembers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.displayName} a été mis à jour.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   Future<void> _openAssignDepartmentDialog(MemberModel member) async {
     final updated = await showDialog<bool>(
       context: context,
@@ -256,6 +325,9 @@ class _MembersScreenState extends State<MembersScreen> {
     final canManageMembers = _userExperience?.canManageMembers == true;
     final canReviewJoinRequests =
         _userExperience?.canReviewJoinRequests == true;
+    final canManageLifecycle =
+        _userExperience?.isAdmin == true ||
+        _userExperience?.isTeamLeader == true;
     final horizontalPadding = MediaQuery.sizeOf(context).width < 560
         ? 14.0
         : 24.0;
@@ -302,8 +374,11 @@ class _MembersScreenState extends State<MembersScreen> {
               members: filteredMembers,
               canManageMembers: canManageMembers,
               canReviewJoinRequests: canReviewJoinRequests,
+              canManageLifecycle: canManageLifecycle,
+              currentUserId: _userExperience?.id,
               onApprove: _approveMember,
               onReject: _rejectMember,
+              onManageLifecycle: _openLifecycleDialog,
               onAssignRole: _openAssignRoleDialog,
               onAssignDepartment: _openAssignDepartmentDialog,
             ),
@@ -431,8 +506,11 @@ class _MembersList extends StatelessWidget {
   final List<MemberModel> members;
   final bool canManageMembers;
   final bool canReviewJoinRequests;
+  final bool canManageLifecycle;
+  final String? currentUserId;
   final ValueChanged<MemberModel> onApprove;
   final ValueChanged<MemberModel> onReject;
+  final ValueChanged<MemberModel> onManageLifecycle;
   final ValueChanged<MemberModel> onAssignRole;
   final ValueChanged<MemberModel> onAssignDepartment;
 
@@ -440,8 +518,11 @@ class _MembersList extends StatelessWidget {
     required this.members,
     required this.canManageMembers,
     required this.canReviewJoinRequests,
+    required this.canManageLifecycle,
+    required this.currentUserId,
     required this.onApprove,
     required this.onReject,
+    required this.onManageLifecycle,
     required this.onAssignRole,
     required this.onAssignDepartment,
   });
@@ -585,6 +666,27 @@ class _MembersList extends StatelessWidget {
                                 color: Colors.red,
                               ),
                             ],
+                            if (canManageLifecycle &&
+                                member.id != currentUserId &&
+                                const {
+                                  'active',
+                                  'alumni',
+                                  'suspended',
+                                  'inactive',
+                                }.contains(member.status))
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => onManageLifecycle(member),
+                                icon: const Icon(
+                                  Icons.manage_accounts_outlined,
+                                ),
+                                tooltip: 'Gérer le compte',
+                              ),
                           ],
                         ),
                       ),
@@ -616,6 +718,15 @@ class _MembersList extends StatelessWidget {
                   member: member,
                   canManageMembers: canManageMembers,
                   canReviewJoinRequests: canReviewJoinRequests,
+                  canManageLifecycle:
+                      canManageLifecycle &&
+                      member.id != currentUserId &&
+                      const {
+                        'active',
+                        'alumni',
+                        'suspended',
+                        'inactive',
+                      }.contains(member.status),
                   onDetails: () => _showMemberDetails(context, member),
                   onApprove: member.status == 'pending'
                       ? () => onApprove(member)
@@ -623,6 +734,7 @@ class _MembersList extends StatelessWidget {
                   onReject: member.status == 'pending'
                       ? () => onReject(member)
                       : null,
+                  onManageLifecycle: () => onManageLifecycle(member),
                   onAssignRole: () => onAssignRole(member),
                   onAssignDepartment: () => onAssignDepartment(member),
                 ),
@@ -703,9 +815,11 @@ class _MemberCard extends StatelessWidget {
   final MemberModel member;
   final bool canManageMembers;
   final bool canReviewJoinRequests;
+  final bool canManageLifecycle;
   final VoidCallback onDetails;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback onManageLifecycle;
   final VoidCallback onAssignRole;
   final VoidCallback onAssignDepartment;
 
@@ -713,9 +827,11 @@ class _MemberCard extends StatelessWidget {
     required this.member,
     required this.canManageMembers,
     required this.canReviewJoinRequests,
+    required this.canManageLifecycle,
     required this.onDetails,
     required this.onApprove,
     required this.onReject,
+    required this.onManageLifecycle,
     required this.onAssignRole,
     required this.onAssignDepartment,
   });
@@ -774,6 +890,9 @@ class _MemberCard extends StatelessWidget {
                         case _MemberAction.reject:
                           onReject?.call();
                           break;
+                        case _MemberAction.manageLifecycle:
+                          onManageLifecycle();
+                          break;
                       }
                     },
                     itemBuilder: (context) => [
@@ -822,6 +941,14 @@ class _MemberCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (canManageLifecycle)
+                        const PopupMenuItem(
+                          value: _MemberAction.manageLifecycle,
+                          child: ListTile(
+                            leading: Icon(Icons.manage_accounts_outlined),
+                            title: Text('Gérer le compte'),
+                          ),
+                        ),
                     ],
                   ),
               ],
@@ -874,6 +1001,12 @@ class _MemberCard extends StatelessWidget {
                       tooltip: 'Rejeter',
                     ),
                   ],
+                  if (canManageLifecycle)
+                    IconButton(
+                      onPressed: onManageLifecycle,
+                      icon: const Icon(Icons.manage_accounts_outlined),
+                      tooltip: 'Gérer le compte',
+                    ),
                 ],
               ),
             ],
@@ -906,7 +1039,16 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-enum _MemberAction { details, assignRole, assignDepartment, approve, reject }
+enum _MemberAction {
+  details,
+  assignRole,
+  assignDepartment,
+  approve,
+  reject,
+  manageLifecycle,
+}
+
+enum _LifecycleChoice { makeAlumni, suspend, reactivate }
 
 String? _absoluteMemberPhotoUrl(String? value) {
   final url = value?.trim();

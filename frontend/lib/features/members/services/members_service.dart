@@ -120,6 +120,35 @@ class MembersService {
     throw Exception('Réponse invalide lors du rejet de la demande.');
   }
 
+  Future<MemberModel> suspendMember(String userId) {
+    return _postMemberAction(userId, 'suspend');
+  }
+
+  Future<MemberModel> reactivateMember(String userId) {
+    return _postMemberAction(userId, 'reactivate');
+  }
+
+  Future<MemberModel> makeAlumni(String userId) {
+    return _postMemberAction(userId, 'make-alumni');
+  }
+
+  Future<MemberModel> _postMemberAction(String userId, String action) async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/$action',
+      token: token,
+      data: {},
+    );
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la mise à jour du membre.');
+  }
+
   Future<MemberModel> assignRoles({
     required String userId,
     required List<String> roleNames,

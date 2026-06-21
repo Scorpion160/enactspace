@@ -98,6 +98,12 @@ class MemberModel {
         return 'En attente';
       case 'inactive':
         return 'Inactif';
+      case 'alumni':
+        return 'Alumni';
+      case 'suspended':
+        return 'Suspendu';
+      case 'rejected':
+        return 'Rejeté';
       case 'resigned':
         return 'Démissionné';
       case 'removed':

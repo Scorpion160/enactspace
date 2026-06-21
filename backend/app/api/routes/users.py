@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.pole import PoleMember
+from app.models.project import ProjectMember
 from app.models.user import User
 from app.models.role import Role, UserRole
 from app.schemas.user import (
@@ -520,6 +521,24 @@ def suspend_user(
     current_user: User = Depends(require_admin_or_team_leader),
 ):
     user = get_user_or_404(db, user_id)
+    current_roles = get_user_role_names(db, current_user.id)
+    target_roles = get_user_role_names(db, user.id)
+
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vous ne pouvez pas suspendre votre propre compte",
+        )
+    if "administrateur" in target_roles and "administrateur" not in current_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul un administrateur peut suspendre un administrateur",
+        )
+    if user.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce compte est déjà suspendu",
+        )
 
     old_value = {
         "status": user.status,
@@ -550,6 +569,63 @@ def suspend_user(
     return user
 
 
+@router.post("/{user_id}/reactivate", response_model=UserRead)
+def reactivate_user(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    user = get_user_or_404(db, user_id)
+    if user.status not in {"suspended", "inactive"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Seul un compte suspendu ou inactif peut être réactivé",
+        )
+
+    old_value = {"status": user.status, "is_active": user.is_active}
+    role_name = "alumni" if user.profile_type == "alumni" else BASE_ACTIVE_ROLE
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if role is None:
+        role = Role(name=role_name, description=f"Rôle de base {role_name}")
+        db.add(role)
+        db.flush()
+
+    user.status = "alumni" if user.profile_type == "alumni" else "active"
+    user.is_active = True
+    user.updated_at = datetime.utcnow()
+
+    assignment = db.query(UserRole).filter(
+        UserRole.user_id == user.id,
+        UserRole.role_id == role.id,
+    ).first()
+    if assignment is None:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+
+    notify_user(
+        db,
+        user_id=user.id,
+        title="Compte réactivé",
+        message="Votre accès EnactSpace est de nouveau actif.",
+        notification_type="account_approved",
+        related_type="user",
+        related_id=user.id,
+    )
+    create_audit_log(
+        db=db,
+        action="reactivation_compte",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=user.id,
+        old_value=old_value,
+        new_value={"status": user.status, "is_active": user.is_active},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.post("/{user_id}/make-alumni", response_model=UserRead)
 def make_user_alumni(
     user_id: str,
@@ -558,6 +634,23 @@ def make_user_alumni(
     current_user: User = Depends(require_admin_or_team_leader),
 ):
     user = get_user_or_404(db, user_id)
+    target_roles = get_user_role_names(db, user.id)
+
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vous ne pouvez pas modifier votre propre cycle de membre",
+        )
+    if user.status == "alumni":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce membre est déjà Alumni",
+        )
+    if "administrateur" in target_roles:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Retirez d'abord le rôle administrateur de ce membre",
+        )
 
     old_value = {
         "status": user.status,
@@ -586,6 +679,20 @@ def make_user_alumni(
     )
     if not has_alumni_role:
         db.add(UserRole(user_id=user.id, role_id=alumni_role.id))
+
+    for membership in db.query(PoleMember).filter(
+        PoleMember.user_id == user.id,
+        PoleMember.is_active.is_(True),
+    ).all():
+        membership.is_active = False
+        membership.left_at = date.today()
+
+    for membership in db.query(ProjectMember).filter(
+        ProjectMember.user_id == user.id,
+        ProjectMember.is_active.is_(True),
+    ).all():
+        membership.is_active = False
+        membership.left_at = date.today()
 
     notify_user(
         db,
