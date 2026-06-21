@@ -41,6 +41,13 @@ class _MembersScreenState extends State<MembersScreen> {
       final members = user.canManageMembers
           ? await _membersService.getManagedMembers()
           : await _membersService.getMembers();
+      if (user.canReviewJoinRequests && !user.canManageMembers) {
+        final pendingMembers = await _membersService.getPendingMembers();
+        final knownIds = members.map((member) => member.id).toSet();
+        members.addAll(
+          pendingMembers.where((member) => knownIds.add(member.id)),
+        );
+      }
 
       if (!mounted) return;
 
@@ -132,6 +139,48 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _rejectMember(MemberModel member) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rejeter la demande'),
+        content: Text(
+          'La demande de ${member.displayName} sera rejetée. '
+          'Cette action ne supprime pas son dossier.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.close_rounded),
+            label: const Text('Rejeter'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await _membersService.rejectMember(member.id);
+      await _loadMembers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Demande de ${member.displayName} rejetée.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   Future<void> _openAssignRoleDialog(MemberModel member) async {
     final updated = await showDialog<bool>(
       context: context,
@@ -205,6 +254,8 @@ class _MembersScreenState extends State<MembersScreen> {
   Widget build(BuildContext context) {
     final filteredMembers = _filteredMembers;
     final canManageMembers = _userExperience?.canManageMembers == true;
+    final canReviewJoinRequests =
+        _userExperience?.canReviewJoinRequests == true;
     final horizontalPadding = MediaQuery.sizeOf(context).width < 560
         ? 14.0
         : 24.0;
@@ -250,7 +301,9 @@ class _MembersScreenState extends State<MembersScreen> {
             _MembersList(
               members: filteredMembers,
               canManageMembers: canManageMembers,
+              canReviewJoinRequests: canReviewJoinRequests,
               onApprove: _approveMember,
+              onReject: _rejectMember,
               onAssignRole: _openAssignRoleDialog,
               onAssignDepartment: _openAssignDepartmentDialog,
             ),
@@ -377,14 +430,18 @@ class _SearchAndActions extends StatelessWidget {
 class _MembersList extends StatelessWidget {
   final List<MemberModel> members;
   final bool canManageMembers;
+  final bool canReviewJoinRequests;
   final ValueChanged<MemberModel> onApprove;
+  final ValueChanged<MemberModel> onReject;
   final ValueChanged<MemberModel> onAssignRole;
   final ValueChanged<MemberModel> onAssignDepartment;
 
   const _MembersList({
     required this.members,
     required this.canManageMembers,
+    required this.canReviewJoinRequests,
     required this.onApprove,
+    required this.onReject,
     required this.onAssignRole,
     required this.onAssignDepartment,
   });
@@ -500,19 +557,33 @@ class _MembersList extends StatelessWidget {
                                 icon: const Icon(Icons.account_tree_rounded),
                                 tooltip: 'Assigner pôle cœur',
                               ),
-                              if (member.status == 'pending')
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 36,
-                                    minHeight: 36,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () => onApprove(member),
-                                  icon: const Icon(Icons.verified_user_rounded),
-                                  tooltip: 'Approuver',
-                                  color: Colors.green,
+                            ],
+                            if (canReviewJoinRequests &&
+                                member.status == 'pending') ...[
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
                                 ),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => onApprove(member),
+                                icon: const Icon(Icons.verified_user_rounded),
+                                tooltip: 'Approuver',
+                                color: Colors.green,
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => onReject(member),
+                                icon: const Icon(Icons.cancel_outlined),
+                                tooltip: 'Rejeter',
+                                color: Colors.red,
+                              ),
                             ],
                           ],
                         ),
@@ -544,9 +615,13 @@ class _MembersList extends StatelessWidget {
                 child: _MemberCard(
                   member: member,
                   canManageMembers: canManageMembers,
+                  canReviewJoinRequests: canReviewJoinRequests,
                   onDetails: () => _showMemberDetails(context, member),
                   onApprove: member.status == 'pending'
                       ? () => onApprove(member)
+                      : null,
+                  onReject: member.status == 'pending'
+                      ? () => onReject(member)
                       : null,
                   onAssignRole: () => onAssignRole(member),
                   onAssignDepartment: () => onAssignDepartment(member),
@@ -627,16 +702,20 @@ class _MemberIdentity extends StatelessWidget {
 class _MemberCard extends StatelessWidget {
   final MemberModel member;
   final bool canManageMembers;
+  final bool canReviewJoinRequests;
   final VoidCallback onDetails;
   final VoidCallback? onApprove;
+  final VoidCallback? onReject;
   final VoidCallback onAssignRole;
   final VoidCallback onAssignDepartment;
 
   const _MemberCard({
     required this.member,
     required this.canManageMembers,
+    required this.canReviewJoinRequests,
     required this.onDetails,
     required this.onApprove,
+    required this.onReject,
     required this.onAssignRole,
     required this.onAssignDepartment,
   });
@@ -692,6 +771,9 @@ class _MemberCard extends StatelessWidget {
                         case _MemberAction.approve:
                           onApprove?.call();
                           break;
+                        case _MemberAction.reject:
+                          onReject?.call();
+                          break;
                       }
                     },
                     itemBuilder: (context) => [
@@ -717,17 +799,28 @@ class _MemberCard extends StatelessWidget {
                             title: Text('Assigner le pôle cœur'),
                           ),
                         ),
-                        if (onApprove != null)
-                          const PopupMenuItem(
-                            value: _MemberAction.approve,
-                            child: ListTile(
-                              leading: Icon(
-                                Icons.verified_user_rounded,
-                                color: Colors.green,
-                              ),
-                              title: Text('Approuver'),
+                      ],
+                      if (canReviewJoinRequests && onApprove != null) ...[
+                        const PopupMenuItem(
+                          value: _MemberAction.approve,
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.verified_user_rounded,
+                              color: Colors.green,
                             ),
+                            title: Text('Approuver'),
                           ),
+                        ),
+                        const PopupMenuItem(
+                          value: _MemberAction.reject,
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.cancel_outlined,
+                              color: Colors.red,
+                            ),
+                            title: Text('Rejeter'),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -767,12 +860,19 @@ class _MemberCard extends StatelessWidget {
                       icon: const Icon(Icons.account_tree_rounded),
                       tooltip: 'Assigner pôle cœur',
                     ),
-                    if (onApprove != null)
-                      FilledButton.icon(
-                        onPressed: onApprove,
-                        icon: const Icon(Icons.verified_user_rounded),
-                        label: const Text('Approuver'),
-                      ),
+                  ],
+                  if (canReviewJoinRequests && onApprove != null) ...[
+                    FilledButton.icon(
+                      onPressed: onApprove,
+                      icon: const Icon(Icons.verified_user_rounded),
+                      label: const Text('Approuver'),
+                    ),
+                    IconButton(
+                      onPressed: onReject,
+                      icon: const Icon(Icons.cancel_outlined),
+                      color: Colors.red,
+                      tooltip: 'Rejeter',
+                    ),
                   ],
                 ],
               ),
@@ -806,7 +906,7 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-enum _MemberAction { details, assignRole, assignDepartment, approve }
+enum _MemberAction { details, assignRole, assignDepartment, approve, reject }
 
 String? _absoluteMemberPhotoUrl(String? value) {
   final url = value?.trim();
@@ -993,7 +1093,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController(text: 'Test12345');
+  final _passwordController = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
@@ -1244,13 +1344,8 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
         'team_leader',
         'secretaire_generale',
         'financier',
-        'chef_pole',
-        'adjoint_chef_pole',
-        'chef_projet',
-        'adjoint_chef_projet',
         'faculty_advisor',
         'enacteur',
-        'alumni',
       ];
     }
 
@@ -1258,26 +1353,13 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
       return const [
         'secretaire_generale',
         'financier',
-        'chef_pole',
-        'adjoint_chef_pole',
-        'chef_projet',
-        'adjoint_chef_projet',
         'faculty_advisor',
         'enacteur',
-        'alumni',
       ];
     }
 
     if (user?.isSecretary == true) {
-      return const [
-        'financier',
-        'chef_pole',
-        'adjoint_chef_pole',
-        'chef_projet',
-        'adjoint_chef_projet',
-        'enacteur',
-        'alumni',
-      ];
+      return const ['financier', 'enacteur'];
     }
 
     return const ['enacteur'];
@@ -1371,6 +1453,12 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
                 style: const TextStyle(color: Colors.black54),
               ),
               const SizedBox(height: 18),
+              const Text(
+                'Les chefs et adjoints sont nommés depuis les modules '
+                'Pôles et Projets afin de conserver leur périmètre.',
+                style: TextStyle(color: Colors.black54, height: 1.35),
+              ),
+              const SizedBox(height: 14),
               if (_error != null)
                 Container(
                   padding: const EdgeInsets.all(12),

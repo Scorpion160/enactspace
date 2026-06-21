@@ -21,7 +21,9 @@ from app.api.deps import (
     get_current_user,
     get_current_active_validated_user,
     require_admin_or_team_leader,
+    require_join_request_reviewer,
     require_sg_or_admin,
+    can_review_join_requests,
     get_user_role_names,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
@@ -54,41 +56,32 @@ RESPONSIBILITY_ROLES = {
     "adjoint_chef_projet",
 }
 
+SCOPED_RESPONSIBILITY_ROLES = {
+    "chef_pole",
+    "adjoint_chef_pole",
+    "chef_projet",
+    "adjoint_chef_projet",
+}
+
 ADMIN_MANAGED_ROLES = {
     "administrateur",
     "team_leader",
     "secretaire_generale",
     "financier",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
     "faculty_advisor",
     "enacteur",
-    "alumni",
-    "candidat",
 }
 
 TEAM_LEADER_MANAGED_ROLES = {
     "secretaire_generale",
     "financier",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
     "faculty_advisor",
     "enacteur",
-    "alumni",
 }
 
 SECRETARY_MANAGED_ROLES = {
     "financier",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
     "enacteur",
-    "alumni",
 }
 
 
@@ -167,6 +160,7 @@ def build_user_with_roles(db: Session, user: User) -> UserWithRolesRead:
     )
     data["core_pole_id"] = pole_member.pole_id if pole_member else None
     data["pole_position"] = pole_member.position if pole_member else None
+    data["can_review_join_requests"] = can_review_join_requests(db, user)
     return UserWithRolesRead(**data)
 
 
@@ -193,13 +187,27 @@ def build_directory_user(db: Session, user: User) -> UserDirectoryRead:
 
 
 @router.post("/", response_model=UserRead)
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sg_or_admin),
+):
     existing = db.query(User).filter(User.email == payload.email).first()
 
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Un compte existe déjà avec cet email",
+        )
+    if len(payload.password.strip()) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe doit contenir au moins 8 caractères",
+        )
+    if payload.profile_type not in {"enacteur", "alumni"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de profil invalide",
         )
 
     user = User(
@@ -299,7 +307,7 @@ def list_user_directory(
 @router.get("/pending", response_model=list[UserWithRolesRead])
 def list_pending_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_sg_or_admin),
+    current_user: User = Depends(require_join_request_reviewer),
 ):
     users = db.query(User).filter(
         User.status == "pending"
@@ -391,9 +399,14 @@ def approve_user(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_sg_or_admin),
+    current_user: User = Depends(require_join_request_reviewer),
 ):
     user = get_user_or_404(db, user_id)
+    if user.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Seul un compte en attente peut être approuvé",
+        )
 
     old_value = {
         "status": user.status,
@@ -456,9 +469,14 @@ def reject_user(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_sg_or_admin),
+    current_user: User = Depends(require_join_request_reviewer),
 ):
     user = get_user_or_404(db, user_id)
+    if user.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Seul un compte en attente peut être rejeté",
+        )
 
     old_value = {
         "status": user.status,
@@ -607,6 +625,20 @@ def assign_roles_to_user(
     user = get_user_or_404(db, user_id)
 
     requested_role_names = set(payload.role_names)
+    scoped_roles = requested_role_names.intersection(SCOPED_RESPONSIBILITY_ROLES)
+    if scoped_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Les responsabilités de pôle ou projet se gèrent depuis "
+                "le module concerné"
+            ),
+        )
+    if user.status != "active" or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les responsabilités sont réservées aux membres actifs",
+        )
     managed_roles = ensure_role_authority(db, current_user, requested_role_names)
     current_role_names = get_user_role_names(db, user.id)
     old_roles = sorted(list(current_role_names))
@@ -620,6 +652,37 @@ def assign_roles_to_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Rôles introuvables : {', '.join(sorted(missing_roles))}",
         )
+
+    exclusive_roles = requested_role_names.intersection(
+        {"team_leader", "secretaire_generale"}
+    )
+    for exclusive_role_name in exclusive_roles:
+        exclusive_role = next(
+            role for role in roles if role.name == exclusive_role_name
+        )
+        previous_links = (
+            db.query(UserRole)
+            .filter(
+                UserRole.role_id == exclusive_role.id,
+                UserRole.user_id != user.id,
+            )
+            .all()
+        )
+        for previous_link in previous_links:
+            previous_user_id = previous_link.user_id
+            db.delete(previous_link)
+            notify_user(
+                db,
+                user_id=previous_user_id,
+                title="Fin de responsabilité",
+                message=(
+                    f"Votre mandat {exclusive_role_name} est terminé. "
+                    "Votre accès Enacteur reste actif."
+                ),
+                notification_type="role_assigned",
+                related_type="user",
+                related_id=previous_user_id,
+            )
 
     next_role_names = (current_role_names - managed_roles) | requested_role_names
     next_role_names = normalize_lifecycle_roles(db, user, next_role_names)

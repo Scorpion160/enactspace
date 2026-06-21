@@ -160,6 +160,51 @@ def require_sg_or_admin(
     return current_user
 
 
+def can_review_join_requests(
+    db: Session,
+    user: User,
+) -> bool:
+    roles = get_user_role_names(db, user.id)
+    if roles.intersection(
+        {
+            "administrateur",
+            "team_leader",
+            "secretaire_generale",
+        }
+    ):
+        return True
+
+    return (
+        db.query(PoleMember.id)
+        .join(Pole, Pole.id == PoleMember.pole_id)
+        .filter(
+            PoleMember.user_id == user.id,
+            PoleMember.is_active.is_(True),
+            PoleMember.left_at.is_(None),
+            PoleMember.position.in_({"chef_pole", "adjoint_chef_pole"}),
+            func.lower(Pole.name).like("%veille%"),
+        )
+        .first()
+        is not None
+    )
+
+
+def require_join_request_reviewer(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+) -> User:
+    if not can_review_join_requests(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Action réservée à la SG, au Team Leader, à l'administration "
+                "ou aux responsables du pôle Veille"
+            ),
+        )
+
+    return current_user
+
+
 def require_finance_or_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),

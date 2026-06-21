@@ -67,6 +67,7 @@ class UserRead(UserBase):
 
 class UserWithRolesRead(UserRead):
     roles: List[str] = []
+    can_review_join_requests: bool = False
 
 
 class UserDirectoryRead(BaseModel):

@@ -18,6 +18,10 @@ class MembersService {
     return _getMembersFrom('/users/');
   }
 
+  Future<List<MemberModel>> getPendingMembers() {
+    return _getMembersFrom('/users/pending');
+  }
+
   Future<List<MemberModel>> _getMembersFrom(String path) async {
     final token = await _authService.getToken();
 
@@ -94,6 +98,26 @@ class MembersService {
     }
 
     throw Exception('Réponse invalide lors de l’approbation du membre.');
+  }
+
+  Future<MemberModel> rejectMember(String userId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/reject',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du rejet de la demande.');
   }
 
   Future<MemberModel> assignRoles({

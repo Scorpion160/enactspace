@@ -6,6 +6,7 @@ class UserExperience {
   final String? gender;
   final String profileType;
   final Set<String> roles;
+  final bool canReviewJoinRequests;
 
   const UserExperience({
     required this.id,
@@ -15,6 +16,7 @@ class UserExperience {
     required this.gender,
     required this.profileType,
     required this.roles,
+    required this.canReviewJoinRequests,
   });
 
   factory UserExperience.fromJson(Map<String, dynamic> json) {
@@ -36,6 +38,7 @@ class UserExperience {
           json['profile_type']?.toString() ??
           (json['status']?.toString() == 'alumni' ? 'alumni' : 'enacteur'),
       roles: _parseRoles(json['roles']),
+      canReviewJoinRequests: json['can_review_join_requests'] == true,
     );
   }
 
