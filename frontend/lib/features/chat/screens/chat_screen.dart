@@ -48,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatThreadModel> _threads = [];
   List<ChatMessageModel> _messages = [];
   Set<String> _pinnedThreadIds = {};
+  Set<String> _hiddenThreadIds = {};
   Set<String> _pinnedMessageIds = {};
   final Map<String, String> _messageReactions = {};
   final Set<String> _removedServerReactionIds = {};
@@ -279,6 +280,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final pinnedThreadIds = await _chatService.getPinnedThreadIds(
         userId: user.id,
       );
+      final hiddenThreadIds = await _chatService.getHiddenThreadIds(
+        userId: user.id,
+      );
       final cachedThreads = await _chatService.getCachedThreads(
         userId: user.id,
       );
@@ -287,7 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _user = user;
           _pinnedThreadIds = pinnedThreadIds;
-          _threads = _sortThreads(cachedThreads, pinnedThreadIds);
+          _hiddenThreadIds = hiddenThreadIds;
+          _threads = _visibleSortedThreads(
+            cachedThreads,
+            pinnedThreadIds,
+            hiddenThreadIds,
+          );
           _usingLocalCache = true;
           _loading = false;
         });
@@ -302,7 +311,12 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _user = user;
         _pinnedThreadIds = pinnedThreadIds;
-        _threads = _sortThreads(threads, pinnedThreadIds);
+        _hiddenThreadIds = hiddenThreadIds;
+        _threads = _visibleSortedThreads(
+          threads,
+          pinnedThreadIds,
+          hiddenThreadIds,
+        );
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
       });
@@ -376,6 +390,14 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final userId = _user?.id;
       if (userId != null) {
+        if (_hiddenThreadIds.contains(thread.id)) {
+          await _chatService.setThreadHidden(
+            userId: userId,
+            threadId: thread.id,
+            hidden: false,
+          );
+          _hiddenThreadIds.remove(thread.id);
+        }
         pinnedMessageIds = await _chatService.getPinnedMessageIds(
           userId: userId,
           threadId: thread.id,
@@ -400,6 +422,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _sendReadReceipt(thread.id);
       if (!mounted) return;
       setState(() {
+        if (!_threads.any((item) => item.id == thread.id)) {
+          _threads = _sortThreads([..._threads, thread], _pinnedThreadIds);
+        }
         _selectedThread = thread;
         _messages = messages;
         _mergeServerReactions(messages);
@@ -541,7 +566,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (!mounted) return;
     setState(() {
-      _threads = _sortThreads(threads, _pinnedThreadIds);
+      _threads = _visibleSortedThreads(
+        threads,
+        _pinnedThreadIds,
+        _hiddenThreadIds,
+      );
       if (_selectedThread != null) {
         _selectedThread = threads
             .where((thread) => thread.id == _selectedThread!.id)
@@ -587,7 +616,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (!mounted) return;
       setState(() {
-        _threads = _sortThreads(threads, _pinnedThreadIds);
+        _threads = _visibleSortedThreads(
+          threads,
+          _pinnedThreadIds,
+          _hiddenThreadIds,
+        );
         _selectedThread = selectedId == null ? _selectedThread : selectedThread;
         if (messages != null) {
           _messages = messages;
@@ -628,6 +661,17 @@ class _ChatScreenState extends State<ChatScreen> {
     return sorted;
   }
 
+  List<ChatThreadModel> _visibleSortedThreads(
+    List<ChatThreadModel> threads,
+    Set<String> pinnedIds,
+    Set<String> hiddenIds,
+  ) {
+    final visible = threads.where((thread) {
+      return !hiddenIds.contains(thread.id) || thread.unreadCount > 0;
+    }).toList();
+    return _sortThreads(visible, pinnedIds);
+  }
+
   Future<void> _openNewThreadDialog() async {
     final created = await showDialog<ChatThreadModel>(
       context: context,
@@ -663,7 +707,11 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         _pinnedThreadIds.remove(thread.id);
       }
-      _threads = _sortThreads(_threads, _pinnedThreadIds);
+      _threads = _visibleSortedThreads(
+        _threads,
+        _pinnedThreadIds,
+        _hiddenThreadIds,
+      );
     });
   }
 
@@ -853,6 +901,27 @@ class _ChatScreenState extends State<ChatScreen> {
     await _loadChat();
   }
 
+  Future<void> _hideSelectedThreadForMe() async {
+    final user = _user;
+    final thread = _selectedThread;
+    if (user == null || thread == null) return;
+
+    _stopTyping();
+    _clearTypingIndicators();
+    await _chatService.setThreadHidden(
+      userId: user.id,
+      threadId: thread.id,
+      hidden: true,
+    );
+    if (!mounted) return;
+    setState(() {
+      _hiddenThreadIds.add(thread.id);
+      _threads = _threads.where((item) => item.id != thread.id).toList();
+      _selectedThread = null;
+      _messages = [];
+    });
+  }
+
   Future<void> _openConversationInfo() async {
     final thread = _selectedThread;
     if (thread == null) return;
@@ -892,6 +961,10 @@ class _ChatScreenState extends State<ChatScreen> {
           await _loadChat();
           if (context.mounted) Navigator.of(context).pop();
         },
+        onHideForMe: () async {
+          await _hideSelectedThreadForMe();
+          if (context.mounted) Navigator.of(context).pop();
+        },
         onAddMember: thread.canManageMembers && thread.threadType != 'direct'
             ? () async {
                 final selectedIds = await showDialog<List<String>>(
@@ -911,7 +984,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 await _refreshThreads();
               }
             : null,
-        onDelete: thread.canManageMembers
+        onDelete: thread.canManageMembers && thread.threadType != 'direct'
             ? () async {
                 await _deleteSelectedThread();
                 if (context.mounted) Navigator.of(context).pop();
@@ -2058,6 +2131,7 @@ class _ConversationInfoDialog extends StatelessWidget {
   final Future<void> Function() onChanged;
   final Future<void> Function() onTogglePin;
   final Future<void> Function() onLeave;
+  final Future<void> Function() onHideForMe;
   final Future<void> Function()? onAddMember;
   final Future<void> Function()? onDelete;
 
@@ -2069,6 +2143,7 @@ class _ConversationInfoDialog extends StatelessWidget {
     required this.onChanged,
     required this.onTogglePin,
     required this.onLeave,
+    required this.onHideForMe,
     required this.onAddMember,
     required this.onDelete,
   });
@@ -2187,11 +2262,16 @@ class _ConversationInfoDialog extends StatelessWidget {
                       icon: Icons.logout_rounded,
                       label: 'Quitter',
                     ),
+                  _ConversationActionButton(
+                    onPressed: onHideForMe,
+                    icon: Icons.delete_sweep_rounded,
+                    label: 'Supprimer pour moi',
+                  ),
                   if (onDelete != null) ...[
                     _ConversationActionButton(
                       onPressed: onDelete,
                       icon: Icons.delete_outline_rounded,
-                      label: 'Supprimer',
+                      label: 'Supprimer pour tous',
                     ),
                   ],
                 ],

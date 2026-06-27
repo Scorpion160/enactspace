@@ -83,6 +83,26 @@ class ChatService {
     return prefs.getStringList(_pinnedThreadsKey(userId))?.toSet() ?? {};
   }
 
+  Future<Set<String>> getHiddenThreadIds({required String userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_hiddenThreadsKey(userId))?.toSet() ?? {};
+  }
+
+  Future<void> setThreadHidden({
+    required String userId,
+    required String threadId,
+    required bool hidden,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_hiddenThreadsKey(userId))?.toSet() ?? {};
+    if (hidden) {
+      ids.add(threadId);
+    } else {
+      ids.remove(threadId);
+    }
+    await prefs.setStringList(_hiddenThreadsKey(userId), ids.toList());
+  }
+
   Future<void> setThreadPinned({
     required String userId,
     required String threadId,
@@ -377,6 +397,10 @@ class ChatService {
 
   String _pinnedThreadsKey(String userId) {
     return 'enactspace_chat_pinned_threads_$userId';
+  }
+
+  String _hiddenThreadsKey(String userId) {
+    return 'enactspace_chat_hidden_threads_$userId';
   }
 
   String _messagesCacheKey(String userId, String threadId) {
