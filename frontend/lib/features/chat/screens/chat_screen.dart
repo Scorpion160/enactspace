@@ -19,7 +19,9 @@ import '../models/chat_models.dart';
 import '../services/chat_service.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialThreadId;
+
+  const ChatScreen({super.key, this.initialThreadId});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -57,10 +59,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _typingSent = false;
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
+  String? _pendingThreadId;
 
   @override
   void initState() {
     super.initState();
+    _pendingThreadId = _normalizeThreadId(widget.initialThreadId);
     _realtimeSubscription = _realtimeService.events.listen(
       _handleRealtimeEvent,
     );
@@ -72,6 +76,18 @@ class _ChatScreenState extends State<ChatScreen> {
         _syncActiveChat();
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextThreadId = _normalizeThreadId(widget.initialThreadId);
+    if (nextThreadId == _normalizeThreadId(oldWidget.initialThreadId)) return;
+
+    _pendingThreadId = nextThreadId;
+    if (nextThreadId != null && !_loading) {
+      _openPendingThread(_threads);
+    }
   }
 
   @override
@@ -236,6 +252,22 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _selectedThread = null);
   }
 
+  String? _normalizeThreadId(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _openPendingThread(List<ChatThreadModel> threads) {
+    final threadId = _pendingThreadId;
+    if (threadId == null || _selectedThread?.id == threadId) return;
+
+    final thread = threads.where((item) => item.id == threadId).firstOrNull;
+    if (thread == null) return;
+
+    _pendingThreadId = null;
+    unawaited(_selectThread(thread));
+  }
+
   Future<void> _loadChat() async {
     setState(() {
       _loading = true;
@@ -259,6 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _usingLocalCache = true;
           _loading = false;
         });
+        _openPendingThread(cachedThreads);
       }
 
       final threads = await _chatService.getThreads();
@@ -273,6 +306,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
       });
+      _openPendingThread(threads);
     } catch (e) {
       if (!mounted) return;
       if (_threads.isNotEmpty) {

@@ -58,6 +58,9 @@ class NotificationModel {
         (relatedType == null || relatedType!.isEmpty ? type : relatedType!)
             .toLowerCase();
 
+    if (type == 'chat_message' && relatedId != null && relatedId!.isNotEmpty) {
+      return '/chat?thread=${Uri.encodeComponent(relatedId!)}';
+    }
     if (source.contains('task')) return '/tasks';
     if (source.contains('attendance') || source.contains('presence')) {
       return '/attendance';

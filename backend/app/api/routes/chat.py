@@ -793,7 +793,7 @@ def send_message(
         ).all()
     ]
     if recipient_ids:
-        sender_name = f"{current_user.first_name} {current_user.last_name}".strip()
+        sender_name = user_display_name(current_user)
         notify_users(
             db,
             user_ids=recipient_ids,

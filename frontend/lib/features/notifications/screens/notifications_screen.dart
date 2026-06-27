@@ -821,6 +821,8 @@ class _NotificationCard extends StatelessWidget {
         return Icons.description_rounded;
       case 'mentorship_assigned':
         return Icons.diversity_3_rounded;
+      case 'chat_message':
+        return Icons.chat_bubble_rounded;
       case 'attendance':
         return Icons.fact_check_rounded;
       case 'payment':

@@ -110,7 +110,9 @@ class AppRouter {
           ),
           GoRoute(
             path: '/chat',
-            builder: (context, state) => const ChatScreen(),
+            builder: (context, state) => ChatScreen(
+              initialThreadId: state.uri.queryParameters['thread'],
+            ),
           ),
           GoRoute(
             path: '/poles',

@@ -40,6 +40,7 @@ VALID_NOTIFICATION_TYPES = {
     "role_assigned",
     "document_shared",
     "mentorship_assigned",
+    "chat_message",
     "general",
 }
 
