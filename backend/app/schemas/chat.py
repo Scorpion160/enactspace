@@ -54,6 +54,10 @@ class ChatThreadRead(BaseModel):
     participants_preview: List[ChatThreadMemberRead] = []
 
 
+class ChatUnreadCountRead(BaseModel):
+    unread_count: int
+
+
 class ChatParticipantRead(BaseModel):
     id: UUID
     thread_id: UUID

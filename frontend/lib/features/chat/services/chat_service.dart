@@ -35,6 +35,17 @@ class ChatService {
     ).whereType<Map<String, dynamic>>().map(ChatThreadModel.fromJson).toList();
   }
 
+  Future<int> getUnreadCount() async {
+    final token = await _requireToken();
+    final response = await _apiClient.get('/chat/unread-count', token: token);
+
+    if (response is Map<String, dynamic>) {
+      return int.tryParse(response['unread_count']?.toString() ?? '0') ?? 0;
+    }
+
+    return 0;
+  }
+
   Future<List<ChatThreadModel>> getCachedThreads({
     required String userId,
   }) async {

@@ -7,6 +7,7 @@ import '../../core/auth/auth_service.dart';
 import '../../core/auth/user_experience.dart';
 import '../../core/realtime/realtime_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/chat/services/chat_service.dart';
 import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/services/notifications_service.dart';
 import '../../features/tasks/services/tasks_service.dart';
@@ -23,11 +24,13 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
+  final ChatService _chatService = ChatService();
   final NotificationsService _notificationsService = NotificationsService();
   final TasksService _tasksService = TasksService();
   final RealtimeService _realtimeService = RealtimeService();
 
   int? _unreadNotifications;
+  int? _unreadChatMessages;
   int? _lateTasks;
   UserExperience? _userExperience;
   Timer? _metricsTimer;
@@ -35,6 +38,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
   bool _metricsLoading = false;
   bool _notificationLoading = false;
+  bool _chatMetricLoading = false;
   String? _lastPresentedNotificationId;
 
   @override
@@ -45,6 +49,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (event['type'] == 'notification') {
         _loadNotificationMetric();
       }
+      if (event['type'] == 'chat' || event['type'] == 'read') {
+        _loadChatMetric();
+      }
     });
     unawaited(_realtimeService.start());
     _loadNavigationMetrics();
@@ -53,6 +60,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
     _notificationTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       _loadNotificationMetric();
+      _loadChatMetric();
     });
   }
 
@@ -91,6 +99,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     try {
       await _loadNotificationMetric();
+      await _loadChatMetric();
 
       try {
         final user = await _authService.getCurrentUser();
@@ -151,6 +160,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _loadChatMetric() async {
+    if (_chatMetricLoading) return;
+    _chatMetricLoading = true;
+
+    try {
+      final unreadChatMessages = await _chatService.getUnreadCount();
+      if (!mounted) return;
+      setState(() => _unreadChatMessages = unreadChatMessages);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _unreadChatMessages = null);
+      }
+    } finally {
+      _chatMetricLoading = false;
+    }
+  }
+
   void _presentNotification(NotificationModel notification) {
     if (_lastPresentedNotificationId == notification.id || !mounted) return;
     _lastPresentedNotificationId = notification.id;
@@ -208,6 +234,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               currentPath: widget.currentPath,
               userExperience: _userExperience,
               unreadNotifications: _unreadNotifications,
+              unreadChatMessages: _unreadChatMessages,
               lateTasks: _lateTasks,
               onLogout: () => _logout(context),
             ),
@@ -248,6 +275,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         currentPath: widget.currentPath,
         userExperience: _userExperience,
         unreadNotifications: _unreadNotifications,
+        unreadChatMessages: _unreadChatMessages,
         lateTasks: _lateTasks,
       ),
       drawer: Drawer(
@@ -255,6 +283,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           currentPath: widget.currentPath,
           userExperience: _userExperience,
           unreadNotifications: _unreadNotifications,
+          unreadChatMessages: _unreadChatMessages,
           lateTasks: _lateTasks,
           onLogout: () => _logout(context),
           compact: true,
@@ -320,6 +349,7 @@ class _SideMenu extends StatelessWidget {
   final String currentPath;
   final UserExperience? userExperience;
   final int? unreadNotifications;
+  final int? unreadChatMessages;
   final int? lateTasks;
   final VoidCallback onLogout;
   final bool compact;
@@ -328,6 +358,7 @@ class _SideMenu extends StatelessWidget {
     required this.currentPath,
     required this.userExperience,
     required this.unreadNotifications,
+    required this.unreadChatMessages,
     required this.lateTasks,
     required this.onLogout,
     this.compact = false,
@@ -363,6 +394,7 @@ class _SideMenu extends StatelessWidget {
                     label: 'Chat',
                     icon: Icons.chat_rounded,
                     path: '/chat',
+                    badgeCount: unreadChatMessages,
                   ),
                   _MenuItem(
                     label: 'Gamification',
@@ -727,12 +759,14 @@ class _MobileBottomNavigation extends StatelessWidget {
   final String currentPath;
   final UserExperience? userExperience;
   final int? unreadNotifications;
+  final int? unreadChatMessages;
   final int? lateTasks;
 
   const _MobileBottomNavigation({
     required this.currentPath,
     required this.userExperience,
     required this.unreadNotifications,
+    required this.unreadChatMessages,
     required this.lateTasks,
   });
 
@@ -753,6 +787,7 @@ class _MobileBottomNavigation extends StatelessWidget {
         icon: Icons.chat_outlined,
         selectedIcon: Icons.chat_rounded,
         path: '/chat',
+        badgeCount: unreadChatMessages,
       ),
       _MobileDestination(
         label: 'Tâches',

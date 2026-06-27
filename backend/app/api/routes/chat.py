@@ -26,6 +26,7 @@ from app.schemas.chat import (
     ChatContactRead,
     ChatThreadCreate,
     ChatThreadRead,
+    ChatUnreadCountRead,
     ChatParticipantRead,
     ChatMessageCreate,
     ChatMessageRead,
@@ -568,6 +569,29 @@ def list_threads(
     ).order_by(ChatThread.updated_at.desc()).all()
 
     return [build_thread_read(db, thread, current_user.id) for thread in threads]
+
+
+@router.get("/unread-count", response_model=ChatUnreadCountRead)
+def get_chat_unread_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    participants = db.query(ChatParticipant).filter(
+        ChatParticipant.user_id == current_user.id,
+    ).all()
+
+    total = 0
+    for participant in participants:
+        query = db.query(func.count(ChatMessage.id)).filter(
+            ChatMessage.thread_id == participant.thread_id,
+            ChatMessage.author_id != current_user.id,
+            ChatMessage.deleted_at.is_(None),
+        )
+        if participant.last_read_at:
+            query = query.filter(ChatMessage.created_at > participant.last_read_at)
+        total += int(query.scalar() or 0)
+
+    return ChatUnreadCountRead(unread_count=total)
 
 
 @router.get("/threads/{thread_id}/participants", response_model=list[ChatParticipantRead])
