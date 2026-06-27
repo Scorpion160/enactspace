@@ -587,6 +587,11 @@ class _ArchiveFiltersCard extends StatelessWidget {
                   onSelected: () => onStatusChanged('terminé'),
                 ),
                 _ArchiveChoiceChip(
+                  label: 'Développement',
+                  selected: statusFilter == 'développement',
+                  onSelected: () => onStatusChanged('développement'),
+                ),
+                _ArchiveChoiceChip(
                   label: 'Expansion',
                   selected: statusFilter == 'expansion',
                   onSelected: () => onStatusChanged('expansion'),

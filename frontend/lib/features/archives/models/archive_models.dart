@@ -82,7 +82,12 @@ class ArchiveProjectModel {
   });
 
   String get periodLabel {
-    final end = archiveYear == null ? 'en mémoire' : archiveYear.toString();
+    final activeStatuses = {'développement', 'expansion', 'actif'};
+    final end = archiveYear == null
+        ? activeStatuses.contains(status)
+              ? 'en cours'
+              : 'en mémoire'
+        : archiveYear.toString();
     return '$launchYear - $end';
   }
 }
