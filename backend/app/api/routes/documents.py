@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -33,15 +33,29 @@ VALID_DOCUMENT_CATEGORIES = {
     "general",
     "pv",
     "rapport",
+    "rapport_terrain",
+    "preuve_impact",
     "budget",
+    "finance",
     "fiche_projet",
     "pitch_deck",
+    "competition",
     "support_formation",
     "photo",
     "video",
+    "media",
     "code_source",
+    "technique",
+    "recherche",
     "administratif",
+    "juridique",
+    "discipline",
+    "presence",
+    "voyage",
+    "communication",
+    "rh_recrutement",
     "partenariat",
+    "modele",
     "autre",
 }
 
@@ -60,6 +74,59 @@ ENACCHEF_ROLES = GLOBAL_DOCUMENT_MANAGERS | {
 }
 POLE_LEAD_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
 PROJECT_LEAD_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
+
+
+DOCUMENT_CATEGORY_KEYWORDS = {
+    "pv": ("pv", "proces verbal", "proces-verbal", "reunion", "meet"),
+    "budget": ("budget", "budgetisation", "devis", "prix", "depense"),
+    "finance": ("finance", "paiement", "cotisation", "facture", "tresorerie"),
+    "fiche_projet": ("fiche", "projet", "cahier des charges", "cdc"),
+    "pitch_deck": ("pitch", "presentation", "poster", "deck", "slide"),
+    "competition": ("world cup", "competition", "uhodari", "jury", "annual report"),
+    "rapport_terrain": ("terrain", "voyage", "visite", "mission", "bilan mensuel"),
+    "preuve_impact": ("impact", "preuve", "beneficiaire", "recueil"),
+    "support_formation": ("formation", "cours", "academy", "guide"),
+    "partenariat": ("partenariat", "fundraising", "sponsor", "appel"),
+    "technique": ("technique", "prototype", "irrigation", "esp32", "pompe"),
+    "recherche": ("recherche", "etude", "rapport de recherche", "analyse"),
+    "administratif": ("autorisation", "demande", "lettre", "administratif"),
+    "juridique": ("statut", "reglement", "texte", "legal", "juridique"),
+    "discipline": ("renvoi", "avertissement", "discipline"),
+    "presence": ("presence", "assiduite", "absence"),
+    "voyage": ("voyage", "itineraire", "bus"),
+    "communication": ("communication", "post", "media", "presse", "rfi"),
+    "rh_recrutement": ("recrutement", "candidat", "entretien", "selection"),
+}
+
+
+def _normalized_document_text(*parts: str | None) -> str:
+    return " ".join(part or "" for part in parts).lower()
+
+
+def infer_document_category(
+    title: str,
+    description: str | None = None,
+    file_url: str | None = None,
+) -> str:
+    text = _normalized_document_text(title, description, file_url)
+    for category, keywords in DOCUMENT_CATEGORY_KEYWORDS.items():
+        if any(keyword in text for keyword in keywords):
+            return category
+    if any(text.endswith(extension) for extension in (".jpg", ".jpeg", ".png", ".heic")):
+        return "photo"
+    if any(text.endswith(extension) for extension in (".mp4", ".mov", ".avi")):
+        return "video"
+    return "general"
+
+
+def infer_file_type(file_url: str | None) -> str | None:
+    if not file_url:
+        return None
+    path = file_url.split("?", 1)[0].split("#", 1)[0].rstrip("/").lower()
+    if "." not in path:
+        return None
+    extension = path.rsplit(".", 1)[-1]
+    return extension[:20] if extension else None
 
 
 def active_pole_ids_query(db: Session, user_id):
@@ -270,7 +337,13 @@ def create_document(
             detail="Visibilité invalide",
         )
 
-    if payload.category and payload.category not in VALID_DOCUMENT_CATEGORIES:
+    category = payload.category or infer_document_category(
+        payload.title,
+        payload.description,
+        payload.file_url,
+    )
+
+    if category and category not in VALID_DOCUMENT_CATEGORIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Catégorie invalide",
@@ -287,8 +360,8 @@ def create_document(
         title=payload.title,
         description=payload.description,
         file_url=payload.file_url,
-        file_type=payload.file_type,
-        category=payload.category,
+        file_type=payload.file_type or infer_file_type(payload.file_url),
+        category=category,
         uploaded_by=current_user.id,
         visibility=payload.visibility,
         pole_id=payload.pole_id,
@@ -326,7 +399,9 @@ def list_documents(
         pattern = f"%{search}%"
         query = query.filter(
             (Document.title.ilike(pattern)) |
-            (Document.description.ilike(pattern))
+            (func.coalesce(Document.description, "").ilike(pattern)) |
+            (func.coalesce(Document.category, "").ilike(pattern)) |
+            (func.coalesce(Document.file_type, "").ilike(pattern))
         )
 
     if category:

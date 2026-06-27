@@ -484,45 +484,16 @@ class _DocumentsFilters extends StatelessWidget {
                     isExpanded: true,
                     initialValue: category,
                     decoration: const InputDecoration(labelText: 'Catégorie'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Toutes')),
-                      DropdownMenuItem(
-                        value: 'general',
-                        child: Text('Général'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Toutes'),
                       ),
-                      DropdownMenuItem(value: 'pv', child: Text('PV')),
-                      DropdownMenuItem(
-                        value: 'rapport',
-                        child: Text('Rapport'),
-                      ),
-                      DropdownMenuItem(value: 'budget', child: Text('Budget')),
-                      DropdownMenuItem(
-                        value: 'fiche_projet',
-                        child: Text('Fiche projet'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'pitch_deck',
-                        child: Text('Pitch deck'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'support_formation',
-                        child: Text('Support formation'),
-                      ),
-                      DropdownMenuItem(value: 'photo', child: Text('Photo')),
-                      DropdownMenuItem(value: 'video', child: Text('Vidéo')),
-                      DropdownMenuItem(
-                        value: 'code_source',
-                        child: Text('Code source'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'administratif',
-                        child: Text('Administratif'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'partenariat',
-                        child: Text('Partenariat'),
-                      ),
-                      DropdownMenuItem(value: 'autre', child: Text('Autre')),
+                      for (final option in DocumentModel.categoryOptions)
+                        DropdownMenuItem(
+                          value: option.value,
+                          child: Text(option.label),
+                        ),
                     ],
                     onChanged: (value) {
                       if (value != null) onCategoryChanged(value);
@@ -781,15 +752,15 @@ class _DocumentCard extends StatelessWidget {
 
   String? _scopeLabel() {
     if (document.poleId != null && document.poleId!.isNotEmpty) {
-      return 'Pole : ${poleNames[document.poleId] ?? 'lie'}';
+      return 'Pôle : ${poleNames[document.poleId] ?? 'lié'}';
     }
 
     if (document.projectId != null && document.projectId!.isNotEmpty) {
-      return 'Projet : ${projectNames[document.projectId] ?? 'lie'}';
+      return 'Projet : ${projectNames[document.projectId] ?? 'lié'}';
     }
 
     if (document.eventId != null && document.eventId!.isNotEmpty) {
-      return 'Evenement : ${eventNames[document.eventId] ?? 'lie'}';
+      return 'Événement : ${eventNames[document.eventId] ?? 'lié'}';
     }
 
     return null;
@@ -820,7 +791,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _fileUrlController = TextEditingController();
-  final _fileTypeController = TextEditingController(text: 'pdf');
+  final _fileTypeController = TextEditingController();
 
   String _category = 'general';
   String _visibility = 'internal';
@@ -829,12 +800,24 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
   String? _selectedProjectId;
   String? _selectedEventId;
   bool _isTemplate = false;
+  bool _autoCategory = true;
 
   bool _loading = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _titleController.addListener(_refreshDocumentHints);
+    _descriptionController.addListener(_refreshDocumentHints);
+    _fileUrlController.addListener(_refreshDocumentHints);
+  }
+
+  @override
   void dispose() {
+    _titleController.removeListener(_refreshDocumentHints);
+    _descriptionController.removeListener(_refreshDocumentHints);
+    _fileUrlController.removeListener(_refreshDocumentHints);
     _titleController.dispose();
     _descriptionController.dispose();
     _fileUrlController.dispose();
@@ -842,21 +825,93 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
     super.dispose();
   }
 
+  void _refreshDocumentHints() {
+    final inferredType = _inferFileType(_fileUrlController.text);
+    if (inferredType != null && inferredType != _fileTypeController.text) {
+      _fileTypeController.text = inferredType;
+    }
+
+    if (!_autoCategory) return;
+    final inferredCategory = _inferCategory(
+      title: _titleController.text,
+      description: _descriptionController.text,
+      fileUrl: _fileUrlController.text,
+      fileType: inferredType,
+    );
+    if (inferredCategory != _category && mounted) {
+      setState(() => _category = inferredCategory);
+    }
+  }
+
+  String? _inferFileType(String fileUrl) {
+    final clean = fileUrl.split('?').first.split('#').first.trim();
+    if (!clean.contains('.')) return null;
+    final extension = clean.split('.').last.toLowerCase();
+    if (extension.length > 12 || extension.contains('/')) return null;
+    return extension;
+  }
+
+  String _inferCategory({
+    required String title,
+    required String description,
+    required String fileUrl,
+    String? fileType,
+  }) {
+    final text = '$title $description $fileUrl $fileType'.toLowerCase();
+    final rules = <String, List<String>>{
+      'pv': ['pv', 'proces verbal', 'procès verbal', 'réunion', 'reunion'],
+      'budget': ['budget', 'budgetisation', 'budgétisation', 'devis', 'prix'],
+      'finance': ['finance', 'paiement', 'cotisation', 'facture'],
+      'fiche_projet': ['fiche', 'cahier des charges', 'cdc'],
+      'pitch_deck': ['pitch', 'présentation', 'presentation', 'poster'],
+      'competition': [
+        'world cup',
+        'competition',
+        'compétition',
+        'annual report',
+      ],
+      'rapport_terrain': ['terrain', 'visite', 'mission', 'bilan mensuel'],
+      'preuve_impact': ['impact', 'preuve', 'bénéficiaire', 'beneficiaire'],
+      'support_formation': ['formation', 'academy', 'guide'],
+      'partenariat': ['partenariat', 'fundraising', 'sponsor'],
+      'technique': ['technique', 'prototype', 'irrigation', 'pompe', 'esp32'],
+      'recherche': ['recherche', 'étude', 'etude', 'analyse'],
+      'administratif': ['autorisation', 'demande', 'lettre'],
+      'juridique': ['statut', 'règlement', 'reglement', 'texte'],
+      'discipline': ['renvoi', 'avertissement', 'discipline'],
+      'presence': ['présence', 'presence', 'absence', 'assiduité'],
+      'voyage': ['voyage', 'itinéraire', 'itineraire', 'bus'],
+      'communication': ['communication', 'presse', 'rfi', 'post'],
+      'rh_recrutement': ['recrutement', 'candidat', 'entretien'],
+    };
+
+    for (final entry in rules.entries) {
+      if (entry.value.any((keyword) => text.contains(keyword))) {
+        return entry.key;
+      }
+    }
+    if (['jpg', 'jpeg', 'png', 'heic'].contains(fileType)) return 'photo';
+    if (['mp4', 'mov', 'avi'].contains(fileType)) return 'video';
+    if (['ppt', 'pptx'].contains(fileType)) return 'pitch_deck';
+    if (['xlsx', 'xls', 'csv'].contains(fileType)) return 'budget';
+    return 'general';
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_scopeType == 'pole' && _selectedPoleId == null) {
-      setState(() => _error = 'Selectionnez le pole concerne.');
+      setState(() => _error = 'Sélectionnez le pôle concerné.');
       return;
     }
 
     if (_scopeType == 'project' && _selectedProjectId == null) {
-      setState(() => _error = 'Selectionnez le projet concerne.');
+      setState(() => _error = 'Sélectionnez le projet concerné.');
       return;
     }
 
     if (_scopeType == 'event' && _selectedEventId == null) {
-      setState(() => _error = 'Selectionnez l evenement concerne.');
+      setState(() => _error = 'Sélectionnez l’événement concerné.');
       return;
     }
 
@@ -870,7 +925,9 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
         title: _titleController.text,
         description: _descriptionController.text,
         fileUrl: _fileUrlController.text,
-        fileType: _fileTypeController.text,
+        fileType: _fileTypeController.text.trim().isEmpty
+            ? null
+            : _fileTypeController.text,
         category: _category,
         visibility: _visibility,
         poleId: _scopeType == 'pole' ? _selectedPoleId : null,
@@ -964,15 +1021,9 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                   controller: _fileTypeController,
                   decoration: const InputDecoration(
                     labelText: 'Type de fichier',
-                    hintText: 'pdf, docx, xlsx...',
+                    hintText: 'Déduit automatiquement si possible',
                     prefixIcon: Icon(Icons.file_present_rounded),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le type de fichier est obligatoire.';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
@@ -981,45 +1032,39 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                     labelText: 'Catégorie',
                     prefixIcon: Icon(Icons.category_rounded),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'general', child: Text('Général')),
-                    DropdownMenuItem(value: 'pv', child: Text('PV')),
-                    DropdownMenuItem(value: 'rapport', child: Text('Rapport')),
-                    DropdownMenuItem(value: 'budget', child: Text('Budget')),
-                    DropdownMenuItem(
-                      value: 'fiche_projet',
-                      child: Text('Fiche projet'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'pitch_deck',
-                      child: Text('Pitch deck'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'support_formation',
-                      child: Text('Support formation'),
-                    ),
-                    DropdownMenuItem(value: 'photo', child: Text('Photo')),
-                    DropdownMenuItem(value: 'video', child: Text('Vidéo')),
-                    DropdownMenuItem(
-                      value: 'code_source',
-                      child: Text('Code source'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'administratif',
-                      child: Text('Administratif'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'partenariat',
-                      child: Text('Partenariat'),
-                    ),
-                    DropdownMenuItem(value: 'autre', child: Text('Autre')),
+                  items: [
+                    for (final option in DocumentModel.categoryOptions)
+                      DropdownMenuItem(
+                        value: option.value,
+                        child: Text(option.label),
+                      ),
                   ],
                   onChanged: _loading
                       ? null
                       : (value) {
                           if (value == null) return;
-                          setState(() => _category = value);
+                          setState(() {
+                            _autoCategory = false;
+                            _category = value;
+                          });
                         },
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    DocumentModel.categoryOptions
+                        .firstWhere(
+                          (option) => option.value == _category,
+                          orElse: () => const DocumentCategoryOption(
+                            'general',
+                            'Général',
+                            'Documents transversaux',
+                          ),
+                        )
+                        .hint,
+                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
@@ -1067,9 +1112,9 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                       value: 'none',
                       child: Text('Aucun rattachement'),
                     ),
-                    DropdownMenuItem(value: 'pole', child: Text('Pole')),
+                    DropdownMenuItem(value: 'pole', child: Text('Pôle')),
                     DropdownMenuItem(value: 'project', child: Text('Projet')),
-                    DropdownMenuItem(value: 'event', child: Text('Evenement')),
+                    DropdownMenuItem(value: 'event', child: Text('Événement')),
                   ],
                   onChanged: _loading
                       ? null
@@ -1096,7 +1141,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                     initialValue: _selectedPoleId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Pole concerne',
+                      labelText: 'Pôle concerné',
                       prefixIcon: Icon(Icons.hub_rounded),
                     ),
                     items: [
@@ -1138,7 +1183,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                     initialValue: _selectedEventId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Evenement concerne',
+                      labelText: 'Événement concerné',
                       prefixIcon: Icon(Icons.event_rounded),
                     ),
                     items: [

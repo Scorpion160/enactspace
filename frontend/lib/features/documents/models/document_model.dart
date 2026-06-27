@@ -43,6 +43,72 @@ class DocumentModel {
     this.updatedAt,
   });
 
+  static const List<DocumentCategoryOption> categoryOptions = [
+    DocumentCategoryOption('general', 'Général', 'Documents transversaux'),
+    DocumentCategoryOption('pv', 'PV', 'Comptes rendus de réunion'),
+    DocumentCategoryOption('rapport', 'Rapport', 'Rapports et synthèses'),
+    DocumentCategoryOption(
+      'rapport_terrain',
+      'Rapport terrain',
+      'Visites, missions et bilans mensuels',
+    ),
+    DocumentCategoryOption(
+      'preuve_impact',
+      'Preuve impact',
+      'Bénéficiaires, photos preuve, recueil impact',
+    ),
+    DocumentCategoryOption('budget', 'Budget', 'Budgétisations et devis'),
+    DocumentCategoryOption('finance', 'Finance', 'Paiements et trésorerie'),
+    DocumentCategoryOption('fiche_projet', 'Fiche projet', 'Cadrage projet'),
+    DocumentCategoryOption('pitch_deck', 'Pitch deck', 'Présentations'),
+    DocumentCategoryOption(
+      'competition',
+      'Compétition',
+      'World Cup, jury, annual report',
+    ),
+    DocumentCategoryOption(
+      'support_formation',
+      'Support formation',
+      'Guides et contenus Academy',
+    ),
+    DocumentCategoryOption('photo', 'Photo', 'Albums et preuves visuelles'),
+    DocumentCategoryOption('video', 'Vidéo', 'Vidéos et interviews'),
+    DocumentCategoryOption('media', 'Média', 'Presse et communication'),
+    DocumentCategoryOption(
+      'code_source',
+      'Code source',
+      'Dépôts et livrables IT',
+    ),
+    DocumentCategoryOption('technique', 'Technique', 'Plans et prototypes'),
+    DocumentCategoryOption('recherche', 'Recherche', 'Études et analyses'),
+    DocumentCategoryOption(
+      'administratif',
+      'Administratif',
+      'Lettres, autorisations et demandes',
+    ),
+    DocumentCategoryOption('juridique', 'Juridique', 'Textes et règlements'),
+    DocumentCategoryOption(
+      'discipline',
+      'Discipline',
+      'Notifications confidentielles',
+    ),
+    DocumentCategoryOption('presence', 'Présence', 'Absences et assiduité'),
+    DocumentCategoryOption('voyage', 'Voyage', 'Missions, bus et itinéraires'),
+    DocumentCategoryOption(
+      'communication',
+      'Communication',
+      'Posts et supports',
+    ),
+    DocumentCategoryOption(
+      'rh_recrutement',
+      'RH/Recrutement',
+      'Candidatures et sélections',
+    ),
+    DocumentCategoryOption('partenariat', 'Partenariat', 'Sponsors et appels'),
+    DocumentCategoryOption('modele', 'Modèle', 'Canevas réutilisables'),
+    DocumentCategoryOption('autre', 'Autre', 'Document non classé'),
+  ];
+
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
     return DocumentModel(
       id: json['id']?.toString() ?? '',
@@ -68,38 +134,16 @@ class DocumentModel {
     );
   }
 
-  String get categoryLabel {
-    switch (category) {
-      case 'general':
-        return 'Général';
-      case 'pv':
-        return 'PV';
-      case 'rapport':
-        return 'Rapport';
-      case 'budget':
-        return 'Budget';
-      case 'fiche_projet':
-        return 'Fiche projet';
-      case 'pitch_deck':
-        return 'Pitch deck';
-      case 'support_formation':
-        return 'Support formation';
-      case 'photo':
-        return 'Photo';
-      case 'video':
-        return 'Vidéo';
-      case 'code_source':
-        return 'Code source';
-      case 'administratif':
-        return 'Administratif';
-      case 'partenariat':
-        return 'Partenariat';
-      case 'autre':
-        return 'Autre';
-      default:
-        return category;
-    }
+  static String categoryTitle(String value) {
+    return categoryOptions
+        .firstWhere(
+          (option) => option.value == value,
+          orElse: () => DocumentCategoryOption(value, value, value),
+        )
+        .label;
   }
+
+  String get categoryLabel => categoryTitle(category);
 
   String get visibilityLabel {
     switch (visibility) {
@@ -121,11 +165,8 @@ class DocumentModel {
   }
 
   String get fileTypeLabel {
-    if (fileType == null || fileType!.trim().isEmpty) {
-      return 'Fichier';
-    }
-
-    return fileType!.toUpperCase();
+    final normalized = fileType?.trim().replaceAll('.', '').toUpperCase();
+    return normalized == null || normalized.isEmpty ? 'Fichier' : normalized;
   }
 
   String get createdAtLabel {
@@ -140,4 +181,12 @@ class DocumentModel {
 
     return '$day/$month/$year';
   }
+}
+
+class DocumentCategoryOption {
+  final String value;
+  final String label;
+  final String hint;
+
+  const DocumentCategoryOption(this.value, this.label, this.hint);
 }
