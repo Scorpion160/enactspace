@@ -147,6 +147,58 @@ def notify_mentions(
     )
 
 
+def post_audience_user_ids(
+    db: Session,
+    post: Post,
+    *,
+    exclude_user_ids: set | None = None,
+) -> list:
+    excluded = exclude_user_ids or set()
+    users = db.query(User).filter(
+        User.is_active.is_(True),
+        User.status.in_(["active", "alumni"]),
+    ).all()
+
+    audience_ids = []
+    for user in users:
+        if user.id in excluded:
+            continue
+        can_see_post = visible_posts_query(db, user).filter(Post.id == post.id).first()
+        if can_see_post:
+            audience_ids.append(user.id)
+
+    return audience_ids
+
+
+def notify_post_audience(
+    db: Session,
+    *,
+    post: Post,
+    current_user: User,
+    title: str,
+    message: str,
+    notification_type: str,
+) -> None:
+    audience_ids = post_audience_user_ids(
+        db,
+        post,
+        exclude_user_ids={current_user.id},
+    )
+    if not audience_ids:
+        return
+
+    notify_users(
+        db,
+        user_ids=audience_ids,
+        title=title,
+        message=message[:180],
+        notification_type=notification_type,
+        related_type="post",
+        related_id=post.id,
+        dedupe=True,
+    )
+
+
 def user_scope_ids(db: Session, current_user: User) -> tuple[set, set]:
     pole_ids = {
         row[0]
@@ -381,6 +433,15 @@ def create_post(
         post=post,
         source="post",
     )
+    if post.is_official or post.post_type == "announcement":
+        notify_post_audience(
+            db,
+            post=post,
+            current_user=current_user,
+            title="Nouvelle publication officielle",
+            message=post.title or post.content,
+            notification_type="official_post",
+        )
     db.commit()
     db.refresh(post)
 
@@ -478,6 +539,8 @@ def update_post(
     post = get_visible_post_or_404(db, post_id, current_user)
     ensure_can_moderate_post(db, current_user, post)
     current_roles = get_user_role_names(db, current_user.id)
+    was_official = post.is_official
+    was_pinned = post.is_pinned
 
     if payload.post_type is not None:
         if payload.post_type not in VALID_POST_TYPES:
@@ -521,6 +584,25 @@ def update_post(
         post.is_pinned = payload.is_pinned
 
     post.updated_at = datetime.utcnow()
+    db.flush()
+    if post.is_official and not was_official:
+        notify_post_audience(
+            db,
+            post=post,
+            current_user=current_user,
+            title="Publication marquee officielle",
+            message=post.title or post.content,
+            notification_type="official_post",
+        )
+    if post.is_pinned and not was_pinned:
+        notify_post_audience(
+            db,
+            post=post,
+            current_user=current_user,
+            title="Publication epinglee",
+            message=post.title or post.content,
+            notification_type="post_pinned",
+        )
 
     db.commit()
     db.refresh(post)
@@ -536,9 +618,20 @@ def pin_post(
 ):
     post = get_visible_post_or_404(db, post_id, current_user)
     ensure_can_pin_post(db, current_user, post)
+    was_pinned = post.is_pinned
 
     post.is_pinned = True
     post.updated_at = datetime.utcnow()
+    db.flush()
+    if not was_pinned:
+        notify_post_audience(
+            db,
+            post=post,
+            current_user=current_user,
+            title="Publication epinglee",
+            message=post.title or post.content,
+            notification_type="post_pinned",
+        )
 
     db.commit()
     db.refresh(post)

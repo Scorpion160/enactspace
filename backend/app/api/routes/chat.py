@@ -37,7 +37,7 @@ from app.schemas.chat import (
     ChatMessageReactionCreate,
     ChatMessageReactionRead,
 )
-from app.services.notification_service import notify_users
+from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -207,6 +207,12 @@ def user_display_name(user: User | None) -> str:
         part for part in [user.first_name, user.last_name] if part and part.strip()
     ).strip()
     return name or user.email
+
+
+def thread_notification_name(thread: ChatThread | None) -> str:
+    if not thread:
+        return "Conversation"
+    return thread.title or "Discussion privee"
 
 
 def serialize_participant(participant: ChatParticipant) -> dict:
@@ -550,6 +556,20 @@ def create_thread(
             )
         )
 
+    recipient_ids = [user_id for user_id in participant_ids if user_id != current_user.id]
+    if recipient_ids:
+        creator_name = user_display_name(current_user)
+        notify_users(
+            db,
+            user_ids=recipient_ids,
+            title="Nouvelle conversation",
+            message=f"{creator_name} vous a ajoute a {thread_notification_name(thread)}.",
+            notification_type="chat_thread_created",
+            related_type="chat_thread",
+            related_id=thread.id,
+            dedupe=True,
+        )
+
     db.commit()
     db.refresh(thread)
 
@@ -638,6 +658,7 @@ def add_thread_participants(
         User.status.in_(["active", "alumni"]),
     ).all()
 
+    added_user_ids = []
     for user in active_users:
         if user.id in existing_ids:
             continue
@@ -648,10 +669,23 @@ def add_thread_participants(
                 participant_role="member",
             )
         )
+        added_user_ids.append(user.id)
 
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
     if thread:
         thread.updated_at = datetime.utcnow()
+    if added_user_ids:
+        actor_name = user_display_name(current_user)
+        notify_users(
+            db,
+            user_ids=added_user_ids,
+            title="Ajoute a une conversation",
+            message=f"{actor_name} vous a ajoute a {thread_notification_name(thread)}.",
+            notification_type="chat_participant_added",
+            related_type="chat_thread",
+            related_id=UUID(thread_id),
+            dedupe=True,
+        )
 
     db.commit()
 
@@ -870,6 +904,7 @@ def upsert_message_reaction(
         ChatMessageReaction.user_id == current_user.id,
     ).first()
 
+    created_reaction = reaction is None
     if reaction:
         reaction.reaction_type = reaction_type
         reaction.created_at = datetime.utcnow()
@@ -880,6 +915,18 @@ def upsert_message_reaction(
             reaction_type=reaction_type,
         )
         db.add(reaction)
+
+    if created_reaction and message.author_id != current_user.id:
+        notify_user(
+            db,
+            user_id=message.author_id,
+            title=f"{user_display_name(current_user)} a reagi a votre message",
+            message=reaction_type,
+            notification_type="chat_reaction",
+            related_type="chat_thread",
+            related_id=message.thread_id,
+            dedupe=True,
+        )
 
     db.commit()
     db.refresh(reaction)

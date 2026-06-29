@@ -35,6 +35,7 @@ VALID_NOTIFICATION_TYPES = {
     "post_comment",
     "post_reaction",
     "post_mention",
+    "post_pinned",
     "comment_mention",
     "official_post",
     "event_created",
@@ -63,6 +64,9 @@ VALID_NOTIFICATION_TYPES = {
     "quiz_passed",
     "badge_awarded",
     "chat_message",
+    "chat_thread_created",
+    "chat_participant_added",
+    "chat_reaction",
     "general",
 }
 
