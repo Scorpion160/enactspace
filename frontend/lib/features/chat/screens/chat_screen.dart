@@ -1628,6 +1628,9 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
                 : filteredThreads.isEmpty
                 ? const _EmptySearchResult()
                 : ListView.builder(
+                    padding: const EdgeInsets.only(top: 4, bottom: 12),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     itemCount: filteredThreads.length,
                     itemBuilder: (context, index) {
                       final thread = filteredThreads[index];
@@ -1689,68 +1692,113 @@ class _ThreadTile extends StatelessWidget {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        minVerticalPadding: 10,
-        leading: Badge(
-          isLabelVisible: online,
-          backgroundColor: Colors.green.shade600,
-          smallSize: 11,
-          child: _ChatAvatar(
-            title: title,
-            imageUrl: _threadAvatarUrl(thread, currentUserId),
-            selected: selected,
-            icon: thread.threadType == 'direct' ? Icons.person : Icons.groups,
-          ),
-        ),
-        title: Text(
-          title,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontWeight: hasUnread ? FontWeight.w900 : FontWeight.w700,
-          ),
-        ),
-        subtitle: Text(
-          thread.lastMessage ?? _threadSubtitle(thread, currentUserId),
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w400,
-            color: hasUnread ? AppTheme.softBlack : Colors.black54,
-          ),
-        ),
-        trailing: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _threadTimeLabel(thread.lastMessageAt ?? thread.updatedAt),
-              style: TextStyle(
-                color: hasUnread ? Colors.green.shade700 : Colors.black45,
-                fontSize: 11,
-                fontWeight: hasUnread ? FontWeight.w800 : FontWeight.w500,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 74,
+          child: Row(
+            children: [
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 46,
+                child: Badge(
+                  isLabelVisible: online,
+                  backgroundColor: Colors.green.shade600,
+                  smallSize: 11,
+                  child: _ChatAvatar(
+                    title: title,
+                    imageUrl: _threadAvatarUrl(thread, currentUserId),
+                    selected: selected,
+                    icon: thread.threadType == 'direct'
+                        ? Icons.person
+                        : Icons.groups,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (pinned)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 5),
-                    child: Icon(Icons.push_pin_rounded, size: 15),
-                  ),
-                if (hasUnread)
-                  Badge(
-                    label: Text(
-                      thread.unreadCount > 99 ? '99+' : '${thread.unreadCount}',
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: hasUnread
+                            ? FontWeight.w900
+                            : FontWeight.w700,
+                      ),
                     ),
-                    backgroundColor: Colors.green.shade600,
-                    textColor: Colors.white,
-                  ),
-              ],
-            ),
-          ],
+                    const SizedBox(height: 5),
+                    Text(
+                      thread.lastMessage ??
+                          _threadSubtitle(thread, currentUserId),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: hasUnread
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                        color: hasUnread ? AppTheme.softBlack : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 56,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _threadTimeLabel(
+                        thread.lastMessageAt ?? thread.updatedAt,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: hasUnread
+                            ? Colors.green.shade700
+                            : Colors.black45,
+                        fontSize: 11,
+                        fontWeight: hasUnread
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 20,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (pinned)
+                            const Icon(Icons.push_pin_rounded, size: 15),
+                          if (pinned && hasUnread) const SizedBox(width: 4),
+                          if (hasUnread)
+                            Badge(
+                              label: Text(
+                                thread.unreadCount > 99
+                                    ? '99+'
+                                    : '${thread.unreadCount}',
+                              ),
+                              backgroundColor: Colors.green.shade600,
+                              textColor: Colors.white,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+          ),
         ),
       ),
     );
