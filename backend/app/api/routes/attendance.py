@@ -29,6 +29,7 @@ from app.api.deps import (
     user_has_any_role,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.notification_service import notify_user
 
 router = APIRouter(prefix="/attendance", tags=["Présences"])
 ATTENDANCE_MANAGER_ROLES = {
@@ -61,6 +62,13 @@ def attendance_session_payload(
 
 RETARD_PENALTY = 300
 ABSENCE_PENALTY = 500
+
+ABSENCE_STATUSES = {
+    "absent",
+    "absence",
+    "absent_non_justifie",
+    "absence_non_justifiee",
+}
 
 
 VALID_ATTENDANCE_STATUSES = {
@@ -118,6 +126,8 @@ def apply_attendance_penalty(
     ).first()
 
     if existing_fee:
+        record.penalty_amount = amount
+        record.penalty_fee_id = existing_fee.id
         return
 
     fee = Fee(
@@ -138,6 +148,54 @@ def apply_attendance_penalty(
     account.updated_at = datetime.utcnow()
 
     db.add(fee)
+    db.flush()
+    record.penalty_fee_id = fee.id
+
+
+def notify_attendance_record(
+    db: Session,
+    record: AttendanceRecord,
+    session: AttendanceSession,
+) -> None:
+    session_title = session.title or "la seance"
+
+    if record.status == "retard":
+        notify_user(
+            db,
+            user_id=record.user_id,
+            title="Retard enregistre",
+            message=f"Vous avez ete marque en retard pour {session_title}.",
+            notification_type="attendance_late",
+            related_type="attendance_record",
+            related_id=record.id,
+            dedupe=True,
+        )
+    elif record.status in ABSENCE_STATUSES:
+        notify_user(
+            db,
+            user_id=record.user_id,
+            title="Absence enregistree",
+            message=f"Vous avez ete marque absent pour {session_title}.",
+            notification_type="attendance_absent",
+            related_type="attendance_record",
+            related_id=record.id,
+            dedupe=True,
+        )
+
+    if float(record.penalty_amount or 0) > 0:
+        notify_user(
+            db,
+            user_id=record.user_id,
+            title="Penalite appliquee",
+            message=(
+                f"Une penalite de {float(record.penalty_amount):.0f} FCFA "
+                f"a ete ajoutee pour {session_title}."
+            ),
+            notification_type="finance_penalty",
+            related_type="attendance_record",
+            related_id=record.id,
+            dedupe=True,
+        )
 
 
 def compute_checkin_status(session: AttendanceSession, now: datetime) -> str:
@@ -329,6 +387,7 @@ def qr_check_in(
     db.flush()
 
     apply_attendance_penalty(db, record, current_user)
+    notify_attendance_record(db, record, session)
 
     db.commit()
     db.refresh(record)
@@ -447,6 +506,7 @@ def create_manual_attendance(
         if penalty_fee:
             existing.penalty_fee_id = penalty_fee.id
 
+        notify_attendance_record(db, existing, session)
         db.commit()
         db.refresh(existing)
 
@@ -467,6 +527,8 @@ def create_manual_attendance(
     )
 
     db.add(record)
+    db.flush()
+    notify_attendance_record(db, record, session)
     db.commit()
     db.refresh(record)
 
@@ -555,6 +617,7 @@ def close_attendance_session(
         db.flush()
 
         apply_attendance_penalty(db, record, current_user)
+        notify_attendance_record(db, record, session)
 
         created_absences += 1
 

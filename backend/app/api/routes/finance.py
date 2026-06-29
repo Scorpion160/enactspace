@@ -197,6 +197,7 @@ def create_fee(
     account.updated_at = datetime.utcnow()
 
     db.add(fee)
+    db.flush()
     notify_user(
         db,
         user_id=payload.user_id,
@@ -487,6 +488,31 @@ def cancel_payment(
         )
 
     payment.status = "cancelled"
+    if is_finance_manager(db, current_user) and payment.user_id != current_user.id:
+        notify_user(
+            db,
+            user_id=payment.user_id,
+            title="Paiement annule",
+            message=f"Votre paiement de {float(payment.amount):.0f} FCFA a ete annule.",
+            notification_type="payment_cancelled",
+            related_type="payment",
+            related_id=payment.id,
+            dedupe=True,
+        )
+    elif payment.user_id == current_user.id:
+        manager_ids = [
+            user_id for user_id in finance_manager_ids(db) if user_id != current_user.id
+        ]
+        notify_users(
+            db,
+            user_ids=manager_ids,
+            title="Paiement annule",
+            message=f"Un paiement de {float(payment.amount):.0f} FCFA a ete annule.",
+            notification_type="payment_cancelled",
+            related_type="payment",
+            related_id=payment.id,
+            dedupe=True,
+        )
     create_audit_log(
         db=db,
         action="annulation_paiement",
