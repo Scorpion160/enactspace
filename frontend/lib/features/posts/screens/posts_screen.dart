@@ -1440,10 +1440,9 @@ class _PostCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(
-              post.content,
+            _MentionText(
+              text: post.content,
               maxLines: compact ? 8 : 12,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(height: 1.45),
             ),
             const SizedBox(height: 14),
@@ -1627,6 +1626,50 @@ class _RolePill extends StatelessWidget {
   }
 }
 
+class _MentionText extends StatelessWidget {
+  final String text;
+  final int? maxLines;
+  final TextStyle? style;
+
+  const _MentionText({required this.text, this.maxLines, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = DefaultTextStyle.of(context).style.merge(style);
+    final mentionStyle = baseStyle.copyWith(
+      color: AppTheme.softBlack,
+      fontWeight: FontWeight.w900,
+      backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.28),
+    );
+    final pattern = RegExp(r'(@[A-Za-z0-9_.-]{2,80})');
+    final spans = <TextSpan>[];
+    var cursor = 0;
+
+    for (final match in pattern.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
+          style: mentionStyle,
+        ),
+      );
+      cursor = match.end;
+    }
+
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+
+    return Text.rich(
+      TextSpan(style: baseStyle, children: spans),
+      maxLines: maxLines,
+      overflow: maxLines == null ? TextOverflow.visible : TextOverflow.ellipsis,
+    );
+  }
+}
+
 class _ReactionPicker extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
@@ -1720,11 +1763,7 @@ class _CommentTile extends StatelessWidget {
                   style: const TextStyle(color: Colors.black54, fontSize: 12),
                 ),
                 const SizedBox(height: 5),
-                Text(
-                  comment.content,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                _MentionText(text: comment.content, maxLines: 4),
               ],
             ),
           ),

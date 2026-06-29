@@ -28,6 +28,7 @@ VALID_NOTIFICATION_TYPES = {
     "new_announcement",
     "post_comment",
     "post_reaction",
+    "post_mention",
     "event_scheduled",
     "absence_recorded",
     "fee_due",

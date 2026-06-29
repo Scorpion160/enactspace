@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -24,7 +25,7 @@ from app.api.deps import (
     get_user_role_names,
     require_enacchef_or_admin,
 )
-from app.services.notification_service import notify_user
+from app.services.notification_service import notify_user, notify_users
 
 router = APIRouter(prefix="/posts", tags=["Publications"])
 
@@ -60,6 +61,8 @@ VALID_REACTION_TYPES = {
     "soutien",
 }
 
+MENTION_PATTERN = re.compile(r"@([A-Za-z0-9_.-]{2,80})")
+
 GLOBAL_POST_ROLES = {
     "administrateur",
     "team_leader",
@@ -80,6 +83,68 @@ GLOBAL_PIN_ROLES = {
     "team_leader",
     "secretaire_generale",
 }
+
+
+def mention_key(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def find_mentioned_users(db: Session, text: str | None) -> list[User]:
+    keys = {
+        mention_key(match)
+        for match in MENTION_PATTERN.findall(text or "")
+        if mention_key(match)
+    }
+    if not keys:
+        return []
+
+    users = db.query(User).filter(User.is_active.is_(True)).all()
+    mentioned = []
+    for user in users:
+        first = user.first_name or ""
+        last = user.last_name or ""
+        email_prefix = (user.email or "").split("@", 1)[0]
+        aliases = {
+            mention_key(first),
+            mention_key(last),
+            mention_key(f"{first}{last}"),
+            mention_key(f"{last}{first}"),
+            mention_key(email_prefix),
+        }
+        if keys.intersection(aliases):
+            mentioned.append(user)
+
+    return mentioned
+
+
+def notify_mentions(
+    db: Session,
+    *,
+    current_user: User,
+    text: str,
+    post: Post,
+    source: str,
+    exclude_user_ids: set | None = None,
+) -> None:
+    excluded = {current_user.id, *(exclude_user_ids or set())}
+    mentioned_user_ids = [
+        user.id
+        for user in find_mentioned_users(db, text)
+        if user.id not in excluded
+    ]
+    if not mentioned_user_ids:
+        return
+
+    author_name = f"{current_user.first_name} {current_user.last_name}".strip()
+    notify_users(
+        db,
+        user_ids=mentioned_user_ids,
+        title=f"{author_name or 'Un membre'} vous a mentionne",
+        message=(text or "")[:180],
+        notification_type="post_mention",
+        related_type="post",
+        related_id=post.id,
+    )
 
 
 def user_scope_ids(db: Session, current_user: User) -> tuple[set, set]:
@@ -308,6 +373,14 @@ def create_post(
     )
 
     db.add(post)
+    db.flush()
+    notify_mentions(
+        db,
+        current_user=current_user,
+        text=f"{payload.title or ''} {payload.content}",
+        post=post,
+        source="post",
+    )
     db.commit()
     db.refresh(post)
 
@@ -543,6 +616,14 @@ def create_post_comment(
             related_type="post",
             related_id=post.id,
         )
+    notify_mentions(
+        db,
+        current_user=current_user,
+        text=content,
+        post=post,
+        source="comment",
+        exclude_user_ids={post.author_id},
+    )
     db.commit()
     db.refresh(comment)
 

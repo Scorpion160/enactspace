@@ -121,6 +121,8 @@ class NotificationModel {
         return 'Nouveau commentaire';
       case 'post_reaction':
         return 'Nouvelle réaction';
+      case 'post_mention':
+        return 'Mention';
       case 'attendance':
         return 'Présence';
       case 'payment':
