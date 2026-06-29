@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/realtime/realtime_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/notification_model.dart';
 import '../services/notifications_service.dart';
@@ -16,11 +17,13 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen>
     with WidgetsBindingObserver {
   final NotificationsService _service = NotificationsService();
+  final RealtimeService _realtimeService = RealtimeService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   String? _error;
   Timer? _refreshTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
   DateTime? _lastSyncedAt;
 
   List<NotificationModel> _notifications = [];
@@ -34,6 +37,19 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _realtimeSubscription = _realtimeService.events.listen((event) {
+      if (!mounted) return;
+      if (event['type'] == 'connected' && event['unread_count'] != null) {
+        final unreadCount = int.tryParse(event['unread_count'].toString());
+        if (unreadCount != null) {
+          setState(() => _unreadCount = unreadCount);
+        }
+      }
+      if (event['type'] == 'notification') {
+        _loadNotifications(showLoading: false);
+      }
+    });
+    unawaited(_realtimeService.start());
     _loadNotifications();
     _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!_loading && mounted) {
@@ -46,6 +62,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    unawaited(_realtimeSubscription?.cancel());
+    unawaited(_realtimeService.dispose());
     _searchController.dispose();
     super.dispose();
   }

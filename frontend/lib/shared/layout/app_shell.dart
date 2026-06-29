@@ -46,7 +46,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _realtimeSubscription = _realtimeService.events.listen((event) {
+      if (event['type'] == 'connected' && event['unread_count'] != null) {
+        final unreadCount = int.tryParse(event['unread_count'].toString());
+        if (unreadCount != null && mounted) {
+          setState(() => _unreadNotifications = unreadCount);
+        }
+      }
       if (event['type'] == 'notification') {
+        final unreadCount = int.tryParse(
+          event['unread_count']?.toString() ?? '',
+        );
+        if (unreadCount != null && mounted) {
+          setState(() => _unreadNotifications = unreadCount);
+        }
         _loadNotificationMetric();
       }
       if (event['type'] == 'chat' || event['type'] == 'read') {
