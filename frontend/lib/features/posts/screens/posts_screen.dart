@@ -444,7 +444,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 1180;
-          final horizontalPadding = constraints.maxWidth < 560 ? 14.0 : 24.0;
+          final horizontalPadding = constraints.maxWidth < 560 ? 10.0 : 24.0;
           final sidebarWidth = (constraints.maxWidth * 0.31)
               .clamp(340.0, 410.0)
               .toDouble();
@@ -520,11 +520,12 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
           );
 
           return ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
-              20,
+              constraints.maxWidth < 560 ? 12 : 20,
               horizontalPadding,
-              28,
+              28 + MediaQuery.viewInsetsOf(context).bottom,
             ),
             children: [
               Center(
@@ -639,19 +640,20 @@ class _PostsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 760;
+    final compact = MediaQuery.of(context).size.width < 560;
 
     final content = [
       const _HeaderIcon(),
-      const SizedBox(width: 18),
+      SizedBox(width: compact ? 12 : 18),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Communication',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 28,
+                fontSize: compact ? 24 : 28,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -676,7 +678,7 @@ class _PostsHeader extends StatelessWidget {
     ];
 
     return Container(
-      padding: const EdgeInsets.all(26),
+      padding: EdgeInsets.all(compact ? 18 : 26),
       decoration: BoxDecoration(
         color: AppTheme.softBlack,
         borderRadius: BorderRadius.circular(24),
@@ -751,9 +753,11 @@ class _CommunityPulseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 14 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -839,20 +843,25 @@ class _PostComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 14 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.edit_note_rounded),
-                SizedBox(width: 10),
+                const Icon(Icons.edit_note_rounded),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Nouvelle publication',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      fontSize: compact ? 18 : 20,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
@@ -958,20 +967,23 @@ class _PostComposer extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: creating ? null : onSubmit,
-                icon: creating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send_rounded),
-                label: const Text('Publier'),
+              alignment: compact ? Alignment.center : Alignment.centerRight,
+              child: SizedBox(
+                width: compact ? double.infinity : null,
+                child: ElevatedButton.icon(
+                  onPressed: creating ? null : onSubmit,
+                  icon: creating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded),
+                  label: const Text('Publier'),
+                ),
               ),
             ),
           ],
@@ -1012,9 +1024,11 @@ class _PostFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(compact ? 14 : 18),
         child: Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -1151,13 +1165,14 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 560;
     final date = DateFormat('dd/MM/yyyy HH:mm').format(post.createdAt);
     final commentsCount = stats?.commentsCount ?? 0;
     final reactionsCount = stats?.reactionsCount ?? 0;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compact ? 14 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1265,7 +1280,12 @@ class _PostCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(post.content, style: const TextStyle(height: 1.45)),
+            Text(
+              post.content,
+              maxLines: compact ? 8 : 12,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(height: 1.45),
+            ),
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
@@ -1325,31 +1345,64 @@ class _PostCard extends StatelessWidget {
                   ),
                 )
               else
-                ...comments.map(
-                  (comment) => _CommentTile(
-                    comment: comment,
-                    member: membersById[comment.userId],
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: compact ? 280 : 360),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: comments.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final comment = comments[index];
+                      return _CommentTile(
+                        comment: comment,
+                        member: membersById[comment.userId],
+                      );
+                    },
                   ),
                 ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: commentController,
-                      minLines: 1,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Ajouter un commentaire',
-                        prefixIcon: Icon(Icons.reply_rounded),
-                      ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final commentField = TextField(
+                    controller: commentController,
+                    minLines: 1,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Ajouter un commentaire',
+                      prefixIcon: Icon(Icons.reply_rounded),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton.filled(
+                  );
+
+                  final sendButton = IconButton.filled(
                     onPressed: onCreateComment,
                     icon: const Icon(Icons.send_rounded),
-                  ),
-                ],
+                  );
+
+                  if (constraints.maxWidth < 340) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        commentField,
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: sendButton,
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: commentField),
+                      const SizedBox(width: 10),
+                      sendButton,
+                    ],
+                  );
+                },
               ),
             ],
           ],
@@ -1471,6 +1524,8 @@ class _CommentTile extends StatelessWidget {
               children: [
                 Text(
                   member?.displayName ?? 'Membre Enactus',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
@@ -1479,7 +1534,11 @@ class _CommentTile extends StatelessWidget {
                   style: const TextStyle(color: Colors.black54, fontSize: 12),
                 ),
                 const SizedBox(height: 5),
-                Text(comment.content),
+                Text(
+                  comment.content,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
