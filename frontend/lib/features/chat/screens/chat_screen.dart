@@ -18,6 +18,32 @@ import '../../projects/services/projects_service.dart';
 import '../models/chat_models.dart';
 import '../services/chat_service.dart';
 
+enum _LocalMessageStatus { sending, failed }
+
+class _PendingMessageDraft {
+  final String content;
+  final String messageType;
+  final String? attachmentUrl;
+  final String? attachmentName;
+  final String? attachmentMimeType;
+  final int? attachmentSizeBytes;
+  final int? durationSeconds;
+  final String? thumbnailUrl;
+  final String? stickerPack;
+
+  const _PendingMessageDraft({
+    required this.content,
+    this.messageType = 'text',
+    this.attachmentUrl,
+    this.attachmentName,
+    this.attachmentMimeType,
+    this.attachmentSizeBytes,
+    this.durationSeconds,
+    this.thumbnailUrl,
+    this.stickerPack,
+  });
+}
+
 class ChatScreen extends StatefulWidget {
   final String? initialThreadId;
 
@@ -53,6 +79,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, String> _messageReactions = {};
   final Set<String> _removedServerReactionIds = {};
   final Set<String> _hiddenMessageIds = {};
+  final Map<String, _LocalMessageStatus> _localMessageStatuses = {};
+  final Map<String, _PendingMessageDraft> _pendingMessageDrafts = {};
   final Set<String> _onlineUserIds = {};
   final Map<String, String> _typingUsers = {};
   final Map<String, Timer> _typingExpiryTimers = {};
@@ -61,6 +89,7 @@ class _ChatScreenState extends State<ChatScreen> {
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
   String? _pendingThreadId;
+  int _localMessageCounter = 0;
 
   @override
   void initState() {
@@ -355,6 +384,71 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  String _nextLocalMessageId() {
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    return 'local-$timestamp-${_localMessageCounter++}';
+  }
+
+  ChatMessageModel _buildLocalMessage({
+    required String id,
+    required ChatThreadModel thread,
+    required _PendingMessageDraft draft,
+  }) {
+    return ChatMessageModel(
+      id: id,
+      threadId: thread.id,
+      authorId: _user?.id ?? '',
+      content: draft.content,
+      messageType: draft.messageType,
+      attachmentUrl: draft.attachmentUrl,
+      attachmentName: draft.attachmentName,
+      attachmentMimeType: draft.attachmentMimeType,
+      attachmentSizeBytes: draft.attachmentSizeBytes,
+      durationSeconds: draft.durationSeconds,
+      thumbnailUrl: draft.thumbnailUrl,
+      stickerPack: draft.stickerPack,
+      reactionsCount: 0,
+      reactionsSummary: const {},
+      currentUserReaction: null,
+      createdAt: DateTime.now(),
+      editedAt: null,
+      deletedAt: null,
+    );
+  }
+
+  List<ChatMessageModel> _cacheableMessages(List<ChatMessageModel> messages) {
+    return messages
+        .where((message) => !_localMessageStatuses.containsKey(message.id))
+        .toList();
+  }
+
+  List<ChatMessageModel> _mergeWithLocalMessages(
+    String threadId,
+    List<ChatMessageModel> serverMessages,
+  ) {
+    final serverIds = serverMessages.map((message) => message.id).toSet();
+    final localMessages = _messages.where((message) {
+      return message.threadId == threadId &&
+          _localMessageStatuses.containsKey(message.id) &&
+          !serverIds.contains(message.id);
+    });
+
+    final merged = [...serverMessages, ...localMessages];
+    merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return merged;
+  }
+
+  void _replaceLocalMessage(String localId, ChatMessageModel serverMessage) {
+    _localMessageStatuses.remove(localId);
+    _pendingMessageDrafts.remove(localId);
+    _messages = _messages
+        .where((message) => message.id != serverMessage.id)
+        .toList();
+    _messages = _messages
+        .map((message) => message.id == localId ? serverMessage : message)
+        .toList();
+  }
+
   void _markThreadLocallyRead(String threadId) {
     _threads = _threads
         .map(
@@ -422,11 +516,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _sendReadReceipt(thread.id);
       if (!mounted) return;
       setState(() {
+        final displayedMessages = _mergeWithLocalMessages(thread.id, messages);
         if (!_threads.any((item) => item.id == thread.id)) {
           _threads = _sortThreads([..._threads, thread], _pinnedThreadIds);
         }
         _selectedThread = thread;
-        _messages = messages;
+        _messages = displayedMessages;
         _mergeServerReactions(messages);
         _pinnedMessageIds = pinnedMessageIds;
         _usingLocalCache = false;
@@ -463,34 +558,49 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (thread == null || content.isEmpty || _sending) return;
 
+    final draft = _PendingMessageDraft(
+      content: reply == null
+          ? content
+          : 'Réponse à "${_messagePreview(reply)}"\n$content',
+    );
+    final localId = _nextLocalMessageId();
+    final localMessage = _buildLocalMessage(
+      id: localId,
+      thread: thread,
+      draft: draft,
+    );
+
     setState(() {
       _sending = true;
+      _messages = [..._messages, localMessage];
+      _localMessageStatuses[localId] = _LocalMessageStatus.sending;
+      _pendingMessageDrafts[localId] = draft;
+      _replyingToMessage = null;
     });
+    _messageController.clear();
     _stopTyping();
 
     try {
-      final message = await _chatService.sendMessage(
-        threadId: thread.id,
-        content: reply == null
-            ? content
-            : 'Réponse à "${_messagePreview(reply)}"\n$content',
-      );
-      _messageController.clear();
+      final message = await _sendDraft(thread: thread, draft: draft);
 
       if (!mounted) return;
       setState(() {
-        _messages = [..._messages, message];
-        _replyingToMessage = null;
+        _replaceLocalMessage(localId, message);
       });
       if (_user != null) {
         await _chatService.cacheMessages(
           userId: _user!.id,
           threadId: thread.id,
-          messages: _messages,
+          messages: _cacheableMessages(_messages),
         );
       }
       await _refreshThreads();
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _localMessageStatuses[localId] = _LocalMessageStatus.failed;
+        });
+      }
       _showError(e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) {
@@ -506,37 +616,110 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (thread == null || _sending) return;
 
+    final draft = _PendingMessageDraft(
+      content: attachment.caption,
+      messageType: attachment.messageType,
+      attachmentUrl: attachment.url,
+      attachmentName: attachment.name,
+      attachmentMimeType: attachment.mimeType,
+      attachmentSizeBytes: attachment.sizeBytes,
+      durationSeconds: attachment.durationSeconds,
+      thumbnailUrl: attachment.thumbnailUrl,
+      stickerPack: attachment.stickerPack,
+    );
+    final localId = _nextLocalMessageId();
+    final localMessage = _buildLocalMessage(
+      id: localId,
+      thread: thread,
+      draft: draft,
+    );
+
     setState(() {
       _sending = true;
+      _messages = [..._messages, localMessage];
+      _localMessageStatuses[localId] = _LocalMessageStatus.sending;
+      _pendingMessageDrafts[localId] = draft;
     });
 
     try {
-      final message = await _chatService.sendMessage(
-        threadId: thread.id,
-        content: attachment.caption,
-        messageType: attachment.messageType,
-        attachmentUrl: attachment.url,
-        attachmentName: attachment.name,
-        attachmentMimeType: attachment.mimeType,
-        attachmentSizeBytes: attachment.sizeBytes,
-        durationSeconds: attachment.durationSeconds,
-        thumbnailUrl: attachment.thumbnailUrl,
-        stickerPack: attachment.stickerPack,
-      );
+      final message = await _sendDraft(thread: thread, draft: draft);
 
       if (!mounted) return;
       setState(() {
-        _messages = [..._messages, message];
+        _replaceLocalMessage(localId, message);
       });
       if (_user != null) {
         await _chatService.cacheMessages(
           userId: _user!.id,
           threadId: thread.id,
-          messages: _messages,
+          messages: _cacheableMessages(_messages),
         );
       }
       await _refreshThreads();
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _localMessageStatuses[localId] = _LocalMessageStatus.failed;
+        });
+      }
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+        });
+      }
+    }
+  }
+
+  Future<ChatMessageModel> _sendDraft({
+    required ChatThreadModel thread,
+    required _PendingMessageDraft draft,
+  }) {
+    return _chatService.sendMessage(
+      threadId: thread.id,
+      content: draft.content,
+      messageType: draft.messageType,
+      attachmentUrl: draft.attachmentUrl,
+      attachmentName: draft.attachmentName,
+      attachmentMimeType: draft.attachmentMimeType,
+      attachmentSizeBytes: draft.attachmentSizeBytes,
+      durationSeconds: draft.durationSeconds,
+      thumbnailUrl: draft.thumbnailUrl,
+      stickerPack: draft.stickerPack,
+    );
+  }
+
+  Future<void> _retryMessage(ChatMessageModel localMessage) async {
+    final thread = _selectedThread;
+    final draft = _pendingMessageDrafts[localMessage.id];
+    if (thread == null || draft == null || _sending) return;
+
+    setState(() {
+      _sending = true;
+      _localMessageStatuses[localMessage.id] = _LocalMessageStatus.sending;
+    });
+
+    try {
+      final message = await _sendDraft(thread: thread, draft: draft);
+      if (!mounted) return;
+      setState(() {
+        _replaceLocalMessage(localMessage.id, message);
+      });
+      if (_user != null) {
+        await _chatService.cacheMessages(
+          userId: _user!.id,
+          threadId: thread.id,
+          messages: _cacheableMessages(_messages),
+        );
+      }
+      await _refreshThreads();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _localMessageStatuses[localMessage.id] = _LocalMessageStatus.failed;
+        });
+      }
       _showError(e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) {
@@ -623,9 +806,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         _selectedThread = selectedId == null ? _selectedThread : selectedThread;
         if (messages != null) {
-          _messages = messages;
+          _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
           _mergeServerReactions(messages);
-          _markThreadLocallyRead(selectedThread!.id);
+          _markThreadLocallyRead(selectedThread.id);
         } else if (selectedId != null && selectedThread == null) {
           _messages = [];
         }
@@ -808,6 +991,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _messageReactions.remove(message.id);
       _removedServerReactionIds.remove(message.id);
       _pinnedMessageIds.remove(message.id);
+      _localMessageStatuses.remove(message.id);
+      _pendingMessageDrafts.remove(message.id);
       if (_replyingToMessage?.id == message.id) {
         _replyingToMessage = null;
       }
@@ -817,6 +1002,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _openMessageActions(ChatMessageModel message) async {
     final pinned = _pinnedMessageIds.contains(message.id);
+    final localStatus = _localMessageStatuses[message.id];
 
     await showModalBottomSheet<void>(
       context: context,
@@ -844,16 +1030,26 @@ class _ChatScreenState extends State<ChatScreen> {
                     _copyMessage(message);
                   },
                 ),
-                ListTile(
-                  leading: Icon(
-                    pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                if (localStatus == _LocalMessageStatus.failed)
+                  ListTile(
+                    leading: const Icon(Icons.refresh_rounded),
+                    title: const Text('Réessayer'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _retryMessage(message);
+                    },
                   ),
-                  title: Text(pinned ? 'Désépingler' : 'Épingler'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _toggleMessagePin(message);
-                  },
-                ),
+                if (localStatus == null)
+                  ListTile(
+                    leading: Icon(
+                      pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                    ),
+                    title: Text(pinned ? 'Désépingler' : 'Épingler'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _toggleMessagePin(message);
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded),
                   title: const Text('Supprimer pour moi'),
@@ -865,19 +1061,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     _deleteMessageForMe(message);
                   },
                 ),
-                const Divider(),
-                Wrap(
-                  spacing: 10,
-                  children: ['👍', '👏', '💛', '🔥', '🙏'].map((emoji) {
-                    return ActionChip(
-                      label: Text(emoji),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _reactToMessage(message, emoji);
-                      },
-                    );
-                  }).toList(),
-                ),
+                if (localStatus == null) ...[
+                  const Divider(),
+                  Wrap(
+                    spacing: 10,
+                    children: ['👍', '👏', '💛', '🔥', '🙏'].map((emoji) {
+                      return ActionChip(
+                        label: Text(emoji),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _reactToMessage(message, emoji);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1154,7 +1352,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   pinnedMessageIds: _pinnedMessageIds,
                   messageReactions: _messageReactions,
                   removedServerReactionIds: _removedServerReactionIds,
+                  localMessageStatuses: _localMessageStatuses,
                   onMessageLongPress: _openMessageActions,
+                  onRetryMessage: _retryMessage,
                 ),
         ),
         if (_selectedThread != null)
@@ -1712,7 +1912,9 @@ class _MessagesList extends StatelessWidget {
   final Set<String> pinnedMessageIds;
   final Map<String, String> messageReactions;
   final Set<String> removedServerReactionIds;
+  final Map<String, _LocalMessageStatus> localMessageStatuses;
   final ValueChanged<ChatMessageModel> onMessageLongPress;
+  final ValueChanged<ChatMessageModel> onRetryMessage;
 
   const _MessagesList({
     required this.thread,
@@ -1721,7 +1923,9 @@ class _MessagesList extends StatelessWidget {
     required this.pinnedMessageIds,
     required this.messageReactions,
     required this.removedServerReactionIds,
+    required this.localMessageStatuses,
     required this.onMessageLongPress,
+    required this.onRetryMessage,
   });
 
   @override
@@ -1752,6 +1956,7 @@ class _MessagesList extends StatelessWidget {
           message: message,
           currentUserId: currentUserId,
         );
+        final localStatus = mine ? localMessageStatuses[message.id] : null;
 
         return Align(
           alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -1816,33 +2021,12 @@ class _MessagesList extends StatelessWidget {
                       ),
                       if (mine) ...[
                         const SizedBox(width: 5),
-                        Tooltip(
-                          message: readByOthers ? 'Lu' : 'Envoyé',
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                readByOthers
-                                    ? Icons.done_all_rounded
-                                    : Icons.done_rounded,
-                                size: 15,
-                                color: readByOthers
-                                    ? Colors.blue.shade700
-                                    : Colors.black.withValues(alpha: 0.48),
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                readByOthers ? 'Lu' : 'Envoyé',
-                                style: TextStyle(
-                                  color: readByOthers
-                                      ? Colors.blue.shade700
-                                      : Colors.black.withValues(alpha: 0.48),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _MessageStatusIndicator(
+                          status: localStatus,
+                          readByOthers: readByOthers,
+                          onRetry: localStatus == _LocalMessageStatus.failed
+                              ? () => onRetryMessage(message)
+                              : null,
                         ),
                       ],
                     ],
@@ -1853,6 +2037,108 @@ class _MessagesList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _MessageStatusIndicator extends StatelessWidget {
+  final _LocalMessageStatus? status;
+  final bool readByOthers;
+  final VoidCallback? onRetry;
+
+  const _MessageStatusIndicator({
+    required this.status,
+    required this.readByOthers,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == _LocalMessageStatus.sending) {
+      return Tooltip(
+        message: 'Envoi en cours',
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: Colors.black.withValues(alpha: 0.48),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              'Envoi',
+              style: TextStyle(
+                color: Colors.black.withValues(alpha: 0.48),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == _LocalMessageStatus.failed) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: 'Échec de l’envoi',
+            child: Icon(
+              Icons.error_rounded,
+              size: 15,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(width: 2),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red.shade800,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              textStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            child: const Text('Réessayer'),
+          ),
+        ],
+      );
+    }
+
+    // TODO backend: expose delivered/read per recipient to split "livré" from "lu".
+    final label = readByOthers ? 'Lu' : 'Envoyé';
+    final color = readByOthers
+        ? Colors.blue.shade700
+        : Colors.black.withValues(alpha: 0.48);
+    return Tooltip(
+      message: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            readByOthers ? Icons.done_all_rounded : Icons.done_rounded,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
