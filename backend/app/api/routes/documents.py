@@ -16,6 +16,7 @@ from app.api.deps import (
     get_user_role_names,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.notification_service import notify_user, notify_users
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -253,6 +254,48 @@ def can_validate_document(
     )
 
 
+def active_document_users(db: Session) -> list[User]:
+    return db.query(User).filter(
+        User.is_active.is_(True),
+        User.status.in_(["active", "alumni"]),
+    ).all()
+
+
+def document_audience_user_ids(
+    db: Session,
+    document: Document,
+    *,
+    exclude_user_ids: set | None = None,
+) -> list:
+    excluded = exclude_user_ids or set()
+    user_ids = []
+    for user in active_document_users(db):
+        if user.id in excluded:
+            continue
+        can_see_document = (
+            visible_documents_query(db, user)
+            .filter(Document.id == document.id)
+            .first()
+        )
+        if can_see_document:
+            user_ids.append(user.id)
+    return user_ids
+
+
+def document_validator_user_ids(
+    db: Session,
+    document: Document,
+    *,
+    exclude_user_ids: set | None = None,
+) -> list:
+    excluded = exclude_user_ids or set()
+    return [
+        user.id
+        for user in active_document_users(db)
+        if user.id not in excluded and can_validate_document(db, user, document)
+    ]
+
+
 def document_payload(
     db: Session,
     current_user: User,
@@ -373,6 +416,21 @@ def create_document(
     )
 
     db.add(document)
+    db.flush()
+    notify_users(
+        db,
+        user_ids=document_validator_user_ids(
+            db,
+            document,
+            exclude_user_ids={current_user.id},
+        ),
+        title="Document a valider",
+        message=document.title,
+        notification_type="document_submitted",
+        related_type="document",
+        related_id=document.id,
+        dedupe=True,
+    )
     db.commit()
     db.refresh(document)
 
@@ -563,6 +621,32 @@ def validate_document(
     document.validated_by = current_user.id
     document.validated_at = datetime.utcnow()
     document.updated_at = datetime.utcnow()
+    db.flush()
+    if document.uploaded_by and document.uploaded_by != current_user.id:
+        notify_user(
+            db,
+            user_id=document.uploaded_by,
+            title="Document valide",
+            message=f"Votre document {document.title} est maintenant officiel.",
+            notification_type="document_validated",
+            related_type="document",
+            related_id=document.id,
+            dedupe=True,
+        )
+    notify_users(
+        db,
+        user_ids=document_audience_user_ids(
+            db,
+            document,
+            exclude_user_ids={current_user.id},
+        ),
+        title="Nouveau document officiel",
+        message=document.title,
+        notification_type="document_shared",
+        related_type="document",
+        related_id=document.id,
+        dedupe=True,
+    )
 
     create_audit_log(
         db=db,
@@ -600,6 +684,17 @@ def unvalidate_document(
     document.validated_by = None
     document.validated_at = None
     document.updated_at = datetime.utcnow()
+    if document.uploaded_by and document.uploaded_by != current_user.id:
+        notify_user(
+            db,
+            user_id=document.uploaded_by,
+            title="Document retire des officiels",
+            message=f"Votre document {document.title} n'est plus officiel.",
+            notification_type="document_rejected",
+            related_type="document",
+            related_id=document.id,
+            dedupe=True,
+        )
 
     db.commit()
     db.refresh(document)

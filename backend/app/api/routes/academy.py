@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_validated_user
+from app.db.database import get_db
+from app.services.notification_service import notify_user
 
 
 router = APIRouter(prefix="/academy", tags=["Academy"])
@@ -143,6 +146,7 @@ def get_quiz(quiz_id: str, current_user=Depends(get_current_active_validated_use
 def submit_quiz(
     quiz_id: str,
     payload: dict,
+    db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
     quiz = get_quiz(quiz_id, current_user=current_user)
@@ -156,11 +160,24 @@ def submit_quiz(
             correct += 1
 
     score = (correct / len(questions)) * 100 if questions else 0
+    passed = score >= 60
+    if passed:
+        notify_user(
+            db,
+            user_id=current_user.id,
+            title=f"Quiz reussi : {quiz['title']}",
+            message=f"Score obtenu : {score:.0f}%.",
+            notification_type="quiz_passed",
+            related_type="academy_quiz",
+            dedupe=True,
+        )
+        db.commit()
+
     return {
         "quiz_id": quiz_id,
         "score": score,
-        "passed": score >= 60,
+        "passed": passed,
         "correct_answers": correct,
         "total_questions": len(questions),
-        "points": 60 if score >= 60 else 0,
+        "points": 60 if passed else 0,
     }

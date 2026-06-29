@@ -10,7 +10,6 @@ from app.models.recruitment import (
     Application,
     ApplicationReview,
 )
-from app.models.notification import Notification
 from app.models.role import Role, UserRole
 from app.models.user import User
 from app.core.security import hash_password
@@ -34,6 +33,7 @@ from app.api.deps import (
     require_sg_or_admin,
     user_has_any_role,
 )
+from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/recruitment", tags=["Recrutement"])
@@ -155,17 +155,45 @@ def notify_recruitment_responsibles(
         f"{campaign.title}."
     )
 
-    for user in recipients:
-        db.add(
-            Notification(
-                user_id=user.id,
-                title=title,
-                message=message,
-                type="application_received",
-                related_type="application",
-                related_id=application.id,
-            )
-        )
+    notify_users(
+        db,
+        user_ids=[user.id for user in recipients],
+        title=title,
+        message=message,
+        notification_type="application_received",
+        related_type="application",
+        related_id=application.id,
+        dedupe=True,
+    )
+
+
+def notify_application_status_if_linked(
+    db: Session,
+    application: Application,
+) -> None:
+    if not application.converted_user_id:
+        return
+
+    next_steps = {
+        "received": "Votre candidature a ete recue.",
+        "preselected": "Votre candidature est preselectionnee.",
+        "interview": "Votre candidature passe en phase entretien.",
+        "accepted": "Votre candidature est acceptee.",
+        "rejected": "Votre candidature n'a pas ete retenue pour cette campagne.",
+    }
+    notify_user(
+        db,
+        user_id=application.converted_user_id,
+        title="Statut de candidature mis a jour",
+        message=next_steps.get(
+            application.status,
+            "Votre candidature a ete mise a jour.",
+        ),
+        notification_type="recruitment_status",
+        related_type="application",
+        related_id=application.id,
+        dedupe=True,
+    )
 
 
 @router.post("/campaigns", response_model=RecruitmentCampaignRead)
@@ -476,6 +504,7 @@ def update_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
+    old_status = application.status
 
     if payload.status is not None:
         if payload.status not in VALID_APPLICATION_STATUSES:
@@ -506,6 +535,8 @@ def update_application(
             setattr(application, field, value)
 
     application.updated_at = datetime.utcnow()
+    if payload.status is not None and application.status != old_status:
+        notify_application_status_if_linked(db, application)
 
     db.commit()
     db.refresh(application)
@@ -530,6 +561,7 @@ def change_application_status(
 
     application.status = payload.status
     application.updated_at = datetime.utcnow()
+    notify_application_status_if_linked(db, application)
 
     db.commit()
     db.refresh(application)
@@ -740,6 +772,16 @@ def convert_application_to_user(
     if existing_user:
         application.converted_user_id = existing_user.id
         application.updated_at = datetime.utcnow()
+        notify_user(
+            db,
+            user_id=existing_user.id,
+            title="Candidature liee a votre compte",
+            message="Votre candidature Enactus ESP est maintenant liee a votre compte.",
+            notification_type="recruitment_update",
+            related_type="application",
+            related_id=application.id,
+            dedupe=True,
+        )
         db.commit()
 
         return {
@@ -766,6 +808,16 @@ def convert_application_to_user(
 
     application.converted_user_id = user.id
     application.updated_at = datetime.utcnow()
+    notify_user(
+        db,
+        user_id=user.id,
+        title="Compte EnactSpace cree",
+        message="Votre compte candidat a ete cree et attend validation.",
+        notification_type="recruitment_update",
+        related_type="application",
+        related_id=application.id,
+        dedupe=True,
+    )
 
     db.commit()
     db.refresh(user)
