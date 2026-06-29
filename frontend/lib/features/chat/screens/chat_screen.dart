@@ -84,8 +84,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final Set<String> _onlineUserIds = {};
   final Map<String, String> _typingUsers = {};
   final Map<String, Timer> _typingExpiryTimers = {};
-  Timer? _typingTimer;
+  Timer? _typingStartTimer;
+  Timer? _typingStopTimer;
   bool _typingSent = false;
+  String? _typingThreadId;
   ChatMessageModel? _replyingToMessage;
   ChatThreadModel? _selectedThread;
   String? _pendingThreadId;
@@ -239,26 +241,41 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    if (!_typingSent) {
-      _typingSent = true;
-      _realtimeService.send({
-        'type': 'typing',
-        'thread_id': threadId,
-        'is_typing': true,
+    if (!_typingSent || _typingThreadId != threadId) {
+      _typingStartTimer?.cancel();
+      _typingStartTimer = Timer(const Duration(milliseconds: 500), () {
+        if (!mounted ||
+            _selectedThread?.id != threadId ||
+            _messageController.text.trim().isEmpty) {
+          return;
+        }
+        _typingSent = true;
+        _typingThreadId = threadId;
+        _realtimeService.send({
+          'type': 'typing',
+          'thread_id': threadId,
+          'is_typing': true,
+        });
       });
     }
 
-    _typingTimer?.cancel();
-    _typingTimer = Timer(const Duration(seconds: 2), _stopTyping);
+    _typingStopTimer?.cancel();
+    _typingStopTimer = Timer(const Duration(seconds: 4), _stopTyping);
   }
 
   void _stopTyping() {
-    _typingTimer?.cancel();
-    _typingTimer = null;
-    if (!_typingSent) return;
+    _typingStartTimer?.cancel();
+    _typingStartTimer = null;
+    _typingStopTimer?.cancel();
+    _typingStopTimer = null;
+    if (!_typingSent) {
+      _typingThreadId = null;
+      return;
+    }
 
-    final threadId = _selectedThread?.id;
+    final threadId = _typingThreadId ?? _selectedThread?.id;
     _typingSent = false;
+    _typingThreadId = null;
     if (threadId != null) {
       _realtimeService.send({
         'type': 'typing',
@@ -2267,8 +2284,8 @@ class _TypingIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = names.length == 1
-        ? '${names.first} écrit...'
-        : '${names.take(2).join(', ')} écrivent...';
+        ? '${names.first} est en train d’écrire...'
+        : 'Plusieurs personnes écrivent...';
 
     return Container(
       width: double.infinity,
