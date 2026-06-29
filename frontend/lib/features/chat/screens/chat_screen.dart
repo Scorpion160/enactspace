@@ -2172,21 +2172,67 @@ class _MessageBody extends StatelessWidget {
     }
 
     if (message.messageType == 'image' || message.messageType == 'sticker') {
+      final url = message.absoluteAttachmentUrl;
+      if (url == null || url.isEmpty) {
+        return _MediaFallback(message: message, unavailable: true);
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.network(
-              message.absoluteAttachmentUrl ?? '',
-              width: message.messageType == 'sticker' ? 150 : 260,
-              height: message.messageType == 'sticker' ? 150 : 170,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return _MediaFallback(message: message);
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final targetWidth = message.messageType == 'sticker'
+                  ? 150.0
+                  : 260.0;
+              final width =
+                  constraints.maxWidth.isFinite &&
+                      constraints.maxWidth < targetWidth
+                  ? constraints.maxWidth
+                  : targetWidth;
+              final height = message.messageType == 'sticker' ? 150.0 : 170.0;
+
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      url,
+                      width: width,
+                      height: height,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return _MediaLoadingBox(width: width, height: height);
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return _MediaFallback(
+                          message: message,
+                          unavailable: true,
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: _AttachmentActionButton(message: message),
+                  ),
+                ],
+              );
+            },
           ),
+          if (message.attachmentSizeBytes != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _formatBytes(message.attachmentSizeBytes!),
+              style: TextStyle(
+                color: Colors.black.withValues(alpha: 0.54),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if (message.content.trim().isNotEmpty &&
               message.content != message.attachmentLabel) ...[
             const SizedBox(height: 8),
@@ -2202,8 +2248,9 @@ class _MessageBody extends StatelessWidget {
 
 class _MediaFallback extends StatelessWidget {
   final ChatMessageModel message;
+  final bool unavailable;
 
-  const _MediaFallback({required this.message});
+  const _MediaFallback({required this.message, this.unavailable = false});
 
   @override
   Widget build(BuildContext context) {
@@ -2216,15 +2263,15 @@ class _MediaFallback extends StatelessWidget {
       _ => Icons.attach_file_rounded,
     };
     final details = [
-      if (message.attachmentMimeType?.trim().isNotEmpty == true)
-        message.attachmentMimeType!.trim(),
+      _messageTypeLabel(message.messageType),
       if (message.attachmentSizeBytes != null)
         _formatBytes(message.attachmentSizeBytes!),
-      if (message.durationSeconds != null) '${message.durationSeconds}s',
+      if (message.durationSeconds != null)
+        _formatDuration(message.durationSeconds!),
     ].join(' · ');
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 220),
+      constraints: const BoxConstraints(maxWidth: 320),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.62),
@@ -2245,7 +2292,9 @@ class _MediaFallback extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  message.attachmentLabel,
+                  unavailable
+                      ? 'Pièce jointe indisponible'
+                      : message.attachmentLabel,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w900),
@@ -2270,7 +2319,56 @@ class _MediaFallback extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          _AttachmentActionButton(message: message, compact: true),
         ],
+      ),
+    );
+  }
+}
+
+class _MediaLoadingBox extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const _MediaLoadingBox({required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+}
+
+class _AttachmentActionButton extends StatelessWidget {
+  final ChatMessageModel message;
+  final bool compact;
+
+  const _AttachmentActionButton({required this.message, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUrl = message.absoluteAttachmentUrl?.isNotEmpty == true;
+    final icon = compact ? Icons.file_open_rounded : Icons.download_rounded;
+
+    return Tooltip(
+      message: hasUrl ? 'Copier le lien' : 'Pièce jointe indisponible',
+      child: IconButton.filledTonal(
+        visualDensity: VisualDensity.compact,
+        onPressed: hasUrl ? () => _copyAttachmentLink(context, message) : null,
+        icon: Icon(icon, size: compact ? 18 : 20),
       ),
     );
   }
@@ -4147,6 +4245,28 @@ String _formatBytes(int bytes) {
   if (kb < 1024) return '${kb.toStringAsFixed(kb < 100 ? 1 : 0)} Ko';
   final mb = kb / 1024;
   return '${mb.toStringAsFixed(mb < 100 ? 1 : 0)} Mo';
+}
+
+String _formatDuration(int seconds) {
+  final minutes = seconds ~/ 60;
+  final remainingSeconds = seconds % 60;
+  if (minutes <= 0) return '${remainingSeconds}s';
+  return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+}
+
+void _copyAttachmentLink(BuildContext context, ChatMessageModel message) {
+  final url = message.absoluteAttachmentUrl;
+  if (url == null || url.isEmpty) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Pièce jointe indisponible.')));
+    return;
+  }
+
+  Clipboard.setData(ClipboardData(text: url));
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Lien de la pièce jointe copié.')),
+  );
 }
 
 String _inferMessageTypeFromFileName(String fileName) {
