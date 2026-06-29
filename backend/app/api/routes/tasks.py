@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, or_
@@ -82,6 +82,61 @@ def task_is_late(task: Task) -> bool:
         return False
 
     return datetime.utcnow() > task.due_date
+
+
+def task_assignee_user_ids(db: Session, task: Task) -> list:
+    return [
+        row[0]
+        for row in db.query(TaskAssignee.user_id)
+        .filter(TaskAssignee.task_id == task.id)
+        .all()
+    ]
+
+
+def notify_task_assignees(
+    db: Session,
+    task: Task,
+    *,
+    title: str,
+    message: str,
+    notification_type: str,
+    actor_id=None,
+    dedupe: bool = False,
+) -> None:
+    user_ids = [
+        user_id for user_id in task_assignee_user_ids(db, task) if user_id != actor_id
+    ]
+    if not user_ids:
+        return
+    notify_users(
+        db,
+        user_ids=user_ids,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_type="task",
+        related_id=task.id,
+        dedupe=dedupe,
+    )
+
+
+def notify_task_due_soon(db: Session, task: Task, *, actor_id=None) -> None:
+    if not task.due_date or task.status in {"termine", "valide", "annule"}:
+        return
+
+    now = datetime.utcnow()
+    if not now <= task.due_date <= now + timedelta(hours=48):
+        return
+
+    notify_task_assignees(
+        db,
+        task,
+        title="Echeance proche",
+        message=f"La tache {task.title} arrive bientot a echeance.",
+        notification_type="task_due_soon",
+        actor_id=actor_id,
+        dedupe=True,
+    )
 
 
 def user_can_manage_task(db: Session, task: Task, user: User) -> bool:
@@ -317,15 +372,17 @@ def create_task(
         )
         db.add(assignee)
 
-    notify_users(
+    db.flush()
+    notify_task_assignees(
         db,
-        user_ids=payload.assignee_ids,
-        title="Nouvelle tâche assignée",
-        message=f"Vous êtes assigné à la tâche « {task.title} ».",
+        task,
+        title="Nouvelle tache assignee",
+        message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
         notification_type="task_assigned",
-        related_type="task",
-        related_id=task.id,
+        actor_id=current_user.id,
+        dedupe=True,
     )
+    notify_task_due_soon(db, task, actor_id=current_user.id)
 
     db.commit()
     db.refresh(task)
@@ -477,18 +534,25 @@ def update_task(
 
     task.updated_at = datetime.utcnow()
 
-    assignee_ids = db.query(TaskAssignee.user_id).filter(
-        TaskAssignee.task_id == task.id
-    ).all()
-    notify_users(
-        db,
-        user_ids=[row[0] for row in assignee_ids],
-        title="Tâche mise à jour",
-        message=f"La tâche « {task.title} » a été modifiée.",
-        notification_type="task_updated",
-        related_type="task",
-        related_id=task.id,
-    )
+    if payload.status is not None:
+        notify_task_assignees(
+            db,
+            task,
+            title="Statut de tache modifie",
+            message=f"La tache {task.title} est maintenant {task.status}.",
+            notification_type="task_updated",
+            actor_id=current_user.id,
+        )
+    else:
+        notify_task_assignees(
+            db,
+            task,
+            title="Tache mise a jour",
+            message=f"La tache {task.title} a ete modifiee.",
+            notification_type="task_updated",
+            actor_id=current_user.id,
+        )
+    notify_task_due_soon(db, task, actor_id=current_user.id)
 
     db.commit()
     db.refresh(task)
@@ -540,18 +604,15 @@ def change_task_status(
 
     task.updated_at = datetime.utcnow()
 
-    assignee_ids = db.query(TaskAssignee.user_id).filter(
-        TaskAssignee.task_id == task.id
-    ).all()
-    notify_users(
+    notify_task_assignees(
         db,
-        user_ids=[row[0] for row in assignee_ids],
-        title="Statut de tâche modifié",
-        message=f"La tâche « {task.title} » est maintenant {task.status}.",
+        task,
+        title="Statut de tache modifie",
+        message=f"La tache {task.title} est maintenant {task.status}.",
         notification_type="task_updated",
-        related_type="task",
-        related_id=task.id,
+        actor_id=current_user.id,
     )
+    notify_task_due_soon(db, task, actor_id=current_user.id)
 
     db.commit()
     db.refresh(task)
@@ -604,17 +665,13 @@ def validate_task(
     task.validated_at = datetime.utcnow()
     task.updated_at = datetime.utcnow()
 
-    assignee_ids = db.query(TaskAssignee.user_id).filter(
-        TaskAssignee.task_id == task.id
-    ).all()
-    notify_users(
+    notify_task_assignees(
         db,
-        user_ids=[row[0] for row in assignee_ids],
-        title="Tâche validée",
-        message=f"La tâche « {task.title} » a été validée.",
+        task,
+        title="Tache validee",
+        message=f"La tache {task.title} a ete validee.",
         notification_type="task_validated",
-        related_type="task",
-        related_id=task.id,
+        actor_id=current_user.id,
     )
 
     db.commit()
@@ -675,15 +732,17 @@ def add_task_assignees(
 
         db.add(assignee)
         created.append(assignee)
-        notify_user(
-            db,
-            user_id=user_id,
-            title="Nouvelle tâche assignée",
-            message=f"Vous êtes assigné à la tâche « {task.title} ».",
-            notification_type="task_assigned",
-            related_type="task",
-            related_id=task.id,
-        )
+        if user_id != current_user.id:
+            notify_user(
+                db,
+                user_id=user_id,
+                title="Nouvelle tache assignee",
+                message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
+                notification_type="task_assigned",
+                related_type="task",
+                related_id=task.id,
+                dedupe=True,
+            )
 
     db.commit()
 
