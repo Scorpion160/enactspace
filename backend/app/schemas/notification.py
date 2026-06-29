@@ -1,25 +1,39 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class NotificationCreate(BaseModel):
     user_id: UUID
     title: str
-    message: str
+    message: Optional[str] = None
+    body: Optional[str] = None
     type: Optional[str] = None
+    category: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
     related_type: Optional[str] = None
     related_id: Optional[UUID] = None
+    priority: Optional[str] = None
+    created_by_id: Optional[UUID] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 class BulkNotificationCreate(BaseModel):
     user_ids: List[UUID]
     title: str
-    message: str
+    message: Optional[str] = None
+    body: Optional[str] = None
     type: Optional[str] = None
+    category: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
     related_type: Optional[str] = None
     related_id: Optional[UUID] = None
+    priority: Optional[str] = None
+    created_by_id: Optional[UUID] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 class NotificationRead(BaseModel):

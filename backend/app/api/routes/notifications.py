@@ -1,8 +1,5 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.db.database import get_db
 from app.models.notification import Notification
@@ -14,6 +11,14 @@ from app.schemas.notification import (
     NotificationCountRead,
 )
 from app.api.deps import get_current_user, require_enacchef_or_admin
+from app.services.notification_service import (
+    create_notification as create_notification_entry,
+    create_notifications,
+    mark_all_read,
+    mark_read,
+    mark_unread,
+    unread_count,
+)
 
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -23,24 +28,40 @@ VALID_NOTIFICATION_TYPES = {
     "task_assigned",
     "task_updated",
     "task_validated",
+    "task_due_soon",
     "deadline_near",
     "task_late",
     "new_announcement",
     "post_comment",
     "post_reaction",
     "post_mention",
+    "comment_mention",
+    "official_post",
+    "event_created",
     "event_scheduled",
+    "attendance_absent",
+    "attendance_late",
     "absence_recorded",
+    "finance_fee",
+    "finance_penalty",
     "fee_due",
     "payment_validated",
     "payment_submitted",
+    "payment_cancelled",
     "application_received",
+    "recruitment_status",
     "recruitment_update",
     "account_approved",
     "account_rejected",
     "role_assigned",
     "document_shared",
+    "document_submitted",
+    "document_validated",
+    "document_rejected",
     "mentorship_assigned",
+    "academy_completed",
+    "quiz_passed",
+    "badge_awarded",
     "chat_message",
     "general",
 }
@@ -60,24 +81,6 @@ def get_notification_or_404(db: Session, notification_id: str) -> Notification:
     return notification
 
 
-def create_notification_object(
-    user_id,
-    title: str,
-    message: str,
-    type: str | None = None,
-    related_type: str | None = None,
-    related_id=None,
-) -> Notification:
-    return Notification(
-        user_id=user_id,
-        title=title,
-        message=message,
-        type=type,
-        related_type=related_type,
-        related_id=related_id,
-    )
-
-
 @router.post("/", response_model=NotificationRead)
 def create_notification(
     payload: NotificationCreate,
@@ -90,16 +93,23 @@ def create_notification(
             detail="Type de notification invalide",
         )
 
-    notification = create_notification_object(
+    notification = create_notification_entry(
+        db,
         user_id=payload.user_id,
         title=payload.title,
+        body=payload.body,
         message=payload.message,
-        type=payload.type,
+        notification_type=payload.type,
+        category=payload.category,
+        entity_type=payload.entity_type,
+        entity_id=payload.entity_id,
         related_type=payload.related_type,
         related_id=payload.related_id,
+        priority=payload.priority,
+        created_by_id=payload.created_by_id or current_user.id,
+        metadata=payload.metadata,
     )
 
-    db.add(notification)
     db.commit()
     db.refresh(notification)
 
@@ -118,19 +128,22 @@ def create_bulk_notifications(
             detail="Type de notification invalide",
         )
 
-    notifications = []
-
-    for user_id in payload.user_ids:
-        notification = create_notification_object(
-            user_id=user_id,
-            title=payload.title,
-            message=payload.message,
-            type=payload.type,
-            related_type=payload.related_type,
-            related_id=payload.related_id,
-        )
-        db.add(notification)
-        notifications.append(notification)
+    notifications = create_notifications(
+        db,
+        user_ids=payload.user_ids,
+        title=payload.title,
+        body=payload.body,
+        message=payload.message,
+        notification_type=payload.type,
+        category=payload.category,
+        entity_type=payload.entity_type,
+        entity_id=payload.entity_id,
+        related_type=payload.related_type,
+        related_id=payload.related_id,
+        priority=payload.priority,
+        created_by_id=payload.created_by_id or current_user.id,
+        metadata=payload.metadata,
+    )
 
     db.commit()
 
@@ -165,12 +178,7 @@ def get_unread_count(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    count = db.query(func.count(Notification.id)).filter(
-        Notification.user_id == current_user.id,
-        Notification.is_read == False,
-    ).scalar() or 0
-
-    return NotificationCountRead(unread_count=count)
+    return NotificationCountRead(unread_count=unread_count(db, user_id=current_user.id))
 
 
 @router.post("/{notification_id}/read", response_model=NotificationRead)
@@ -187,8 +195,29 @@ def mark_notification_as_read(
             detail="Vous ne pouvez pas modifier cette notification",
         )
 
-    notification.is_read = True
-    notification.read_at = datetime.utcnow()
+    mark_read(db, notification)
+
+    db.commit()
+    db.refresh(notification)
+
+    return notification
+
+
+@router.post("/{notification_id}/unread", response_model=NotificationRead)
+def mark_notification_as_unread(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notification = get_notification_or_404(db, notification_id)
+
+    if notification.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas modifier cette notification",
+        )
+
+    mark_unread(db, notification)
 
     db.commit()
     db.refresh(notification)
@@ -201,23 +230,14 @@ def mark_all_notifications_as_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    notifications = db.query(Notification).filter(
-        Notification.user_id == current_user.id,
-        Notification.is_read == False,
-    ).all()
-
-    now = datetime.utcnow()
-
-    for notification in notifications:
-        notification.is_read = True
-        notification.read_at = now
+    updated = mark_all_read(db, user_id=current_user.id)
 
     db.commit()
 
     return {
         "ok": True,
         "message": "Toutes les notifications ont été marquées comme lues",
-        "updated": len(notifications),
+        "updated": updated,
     }
 
 
