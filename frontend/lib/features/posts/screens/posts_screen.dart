@@ -53,6 +53,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   final Set<String> _expandedPosts = {};
   final Set<String> _loadingComments = {};
 
+  String _feedFilter = 'all';
   String _postType = 'all';
   String _visibility = 'all';
   String? _filterPoleId;
@@ -128,7 +129,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
       if (!mounted) return;
 
       setState(() {
-        _posts = _sortPosts(posts);
+        _posts = _sortPosts(_applyFeedFilter(posts, user));
         _user = user;
         _membersById = {for (final member in members) member.id: member};
         _poles = poles;
@@ -357,6 +358,30 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     return sorted;
   }
 
+  List<PostModel> _applyFeedFilter(
+    List<PostModel> posts,
+    UserExperience? user,
+  ) {
+    return posts.where((post) {
+      switch (_feedFilter) {
+        case 'official':
+          return post.isOfficial;
+        case 'pole':
+          return post.postType == 'pole' ||
+              post.visibility == 'pole_only' ||
+              post.poleId != null;
+        case 'project':
+          return post.postType == 'project' ||
+              post.visibility == 'project_only' ||
+              post.projectId != null;
+        case 'mine':
+          return user != null && post.authorId == user.id;
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
   Future<void> _togglePostPin(PostModel post) async {
     try {
       if (post.isPinned) {
@@ -423,6 +448,44 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
         : member.departmentLabel;
 
     return [?roles, ?department, member.statusLabel].join(' · ');
+  }
+
+  String _authorRoleLabel(PostModel post) {
+    final member = _membersById[post.authorId];
+    if (member == null) return 'Membre Enactus';
+    if (member.status == 'alumni') return 'Alumni';
+
+    final normalizedRoles = member.roles
+        .map((role) => role.toLowerCase().replaceAll('-', '_').trim())
+        .toSet();
+
+    if (normalizedRoles.any(
+      (role) =>
+          role.contains('team_leader') ||
+          role.contains('president') ||
+          role == 'tl',
+    )) {
+      return 'Team Leader';
+    }
+    if (normalizedRoles.any(
+      (role) => role.contains('secretaire') || role == 'sg',
+    )) {
+      return 'SG';
+    }
+    if (normalizedRoles.any(
+      (role) => role.contains('chef_pole') || role.contains('pole_lead'),
+    )) {
+      return 'Chef pôle';
+    }
+    if (normalizedRoles.any(
+      (role) => role.contains('chef_projet') || role.contains('project_lead'),
+    )) {
+      return 'Chef projet';
+    }
+    if (normalizedRoles.any((role) => role.contains('adjoint'))) {
+      return 'Adjoint';
+    }
+    return 'Enacteur';
   }
 
   String? _authorPhotoUrl(PostModel post) {
@@ -574,31 +637,60 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildFeed() {
+    final quickFilters = _PostQuickFilters(
+      selected: _feedFilter,
+      onChanged: (value) async {
+        setState(() => _feedFilter = value);
+        await _loadPosts();
+      },
+    );
+
     if (_loading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(),
-        ),
+      return Column(
+        children: [
+          quickFilters,
+          const SizedBox(height: 12),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ],
       );
     }
 
     if (_error != null) {
-      return _ErrorCard(message: _error!, onRetry: _loadPosts);
+      return Column(
+        children: [
+          quickFilters,
+          const SizedBox(height: 12),
+          _ErrorCard(message: _error!, onRetry: _loadPosts),
+        ],
+      );
     }
 
     if (_posts.isEmpty) {
-      return const _EmptyFeedCard();
+      return Column(
+        children: [
+          quickFilters,
+          const SizedBox(height: 12),
+          const _EmptyFeedCard(),
+        ],
+      );
     }
 
     return Column(
       children: [
+        quickFilters,
+        const SizedBox(height: 12),
         for (final post in _posts)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: _PostCard(
               post: post,
               authorName: _authorName(post),
+              authorRole: _authorRoleLabel(post),
               authorSubtitle: _authorSubtitle(post),
               authorPhotoUrl: _authorPhotoUrl(post),
               stats: _statsByPostId[post.id],
@@ -796,6 +888,46 @@ class _CommunityPulseCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PostQuickFilters extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _PostQuickFilters({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final filters = const [
+      ('all', 'Tous', Icons.dynamic_feed_rounded),
+      ('official', 'Officiels', Icons.verified_rounded),
+      ('pole', 'Pôle', Icons.hub_rounded),
+      ('project', 'Projet', Icons.workspaces_rounded),
+      ('mine', 'Mes posts', Icons.person_rounded),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final filter in filters) ...[
+                ChoiceChip(
+                  selected: selected == filter.$1,
+                  avatar: Icon(filter.$3, size: 16),
+                  label: Text(filter.$2),
+                  onSelected: (_) => onChanged(filter.$1),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -1125,6 +1257,7 @@ class _PostFilters extends StatelessWidget {
 class _PostCard extends StatelessWidget {
   final PostModel post;
   final String authorName;
+  final String authorRole;
   final String authorSubtitle;
   final String? authorPhotoUrl;
   final PostStatsModel? stats;
@@ -1145,6 +1278,7 @@ class _PostCard extends StatelessWidget {
   const _PostCard({
     required this.post,
     required this.authorName,
+    required this.authorRole,
     required this.authorSubtitle,
     required this.authorPhotoUrl,
     required this.stats,
@@ -1171,6 +1305,18 @@ class _PostCard extends StatelessWidget {
     final reactionsCount = stats?.reactionsCount ?? 0;
 
     return Card(
+      color: post.isOfficial
+          ? AppTheme.enactusYellow.withValues(alpha: 0.08)
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: post.isPinned || post.isOfficial
+              ? AppTheme.enactusYellow.withValues(alpha: 0.72)
+              : Colors.transparent,
+          width: post.isPinned || post.isOfficial ? 1.2 : 0,
+        ),
+      ),
       child: Padding(
         padding: EdgeInsets.all(compact ? 14 : 20),
         child: Column(
@@ -1263,7 +1409,9 @@ class _PostCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Colors.black54),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 6),
+                      _RolePill(label: authorRole),
+                      const SizedBox(height: 5),
                       Text(
                         authorSubtitle,
                         maxLines: 1,
@@ -1436,6 +1584,32 @@ class _PostAuthorAvatar extends StatelessWidget {
       child: Text(
         _initials(authorName),
         style: const TextStyle(fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+}
+
+class _RolePill extends StatelessWidget {
+  final String label;
+
+  const _RolePill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppTheme.softBlack.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+        ),
       ),
     );
   }
