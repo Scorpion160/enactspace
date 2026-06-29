@@ -75,6 +75,12 @@ ENACCHEF_ROLES = GLOBAL_POST_ROLES | {
     "adjoint_chef_projet",
 }
 
+GLOBAL_PIN_ROLES = {
+    "administrateur",
+    "team_leader",
+    "secretaire_generale",
+}
+
 
 def user_scope_ids(db: Session, current_user: User) -> tuple[set, set]:
     pole_ids = {
@@ -212,6 +218,33 @@ def ensure_can_moderate_post(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Vous ne pouvez pas modérer cette publication",
+    )
+
+
+def ensure_can_pin_post(
+    db: Session,
+    current_user: User,
+    post: Post,
+) -> None:
+    roles = get_user_role_names(db, current_user.id)
+    if roles.intersection(GLOBAL_PIN_ROLES):
+        return
+
+    pole_ids, project_ids = user_scope_ids(db, current_user)
+    if (
+        post.pole_id in pole_ids
+        and roles.intersection({"chef_pole", "adjoint_chef_pole"})
+    ):
+        return
+    if (
+        post.project_id in project_ids
+        and roles.intersection({"chef_projet", "adjoint_chef_projet"})
+    ):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Seuls les responsables autorisÃ©s peuvent Ã©pingler une publication",
     )
 
 
@@ -411,11 +444,7 @@ def update_post(
         post.is_official = payload.is_official
 
     if payload.is_pinned is not None:
-        if not current_roles.intersection(ENACCHEF_ROLES):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Seuls les responsables peuvent épingler une publication",
-            )
+        ensure_can_pin_post(db, current_user, post)
         post.is_pinned = payload.is_pinned
 
     post.updated_at = datetime.utcnow()
@@ -433,7 +462,7 @@ def pin_post(
     current_user: User = Depends(require_enacchef_or_admin),
 ):
     post = get_visible_post_or_404(db, post_id, current_user)
-    ensure_can_moderate_post(db, current_user, post)
+    ensure_can_pin_post(db, current_user, post)
 
     post.is_pinned = True
     post.updated_at = datetime.utcnow()
@@ -451,7 +480,7 @@ def unpin_post(
     current_user: User = Depends(require_enacchef_or_admin),
 ):
     post = get_visible_post_or_404(db, post_id, current_user)
-    ensure_can_moderate_post(db, current_user, post)
+    ensure_can_pin_post(db, current_user, post)
 
     post.is_pinned = False
     post.updated_at = datetime.utcnow()

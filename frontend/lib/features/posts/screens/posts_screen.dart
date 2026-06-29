@@ -382,6 +382,14 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     }).toList();
   }
 
+  bool _canPinPosts(UserExperience? user) {
+    if (user == null) return false;
+    return user.isAdmin ||
+        user.isTeamLeader ||
+        user.isSecretary ||
+        user.isProjectOrPoleLead;
+  }
+
   Future<void> _togglePostPin(PostModel post) async {
     try {
       if (post.isPinned) {
@@ -637,6 +645,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildFeed() {
+    final canPinPosts = _canPinPosts(_user);
     final quickFilters = _PostQuickFilters(
       selected: _feedFilter,
       onChanged: (value) async {
@@ -704,7 +713,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
               onReact: () => _react(post),
               onReactionSelected: (reactionType) =>
                   _reactWith(post, reactionType),
-              canModerate: _user?.isEnacchef ?? false,
+              canPin: canPinPosts,
               canDelete:
                   (_user?.isEnacchef ?? false) || post.authorId == _user?.id,
               onTogglePin: () => _togglePostPin(post),
@@ -1270,7 +1279,7 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onCreateComment;
   final VoidCallback onReact;
   final ValueChanged<String> onReactionSelected;
-  final bool canModerate;
+  final bool canPin;
   final bool canDelete;
   final VoidCallback onTogglePin;
   final VoidCallback onDelete;
@@ -1291,7 +1300,7 @@ class _PostCard extends StatelessWidget {
     required this.onCreateComment,
     required this.onReact,
     required this.onReactionSelected,
-    required this.canModerate,
+    required this.canPin,
     required this.canDelete,
     required this.onTogglePin,
     required this.onDelete,
@@ -1369,36 +1378,39 @@ class _PostCard extends StatelessWidget {
                           ),
                           if (post.isPinned)
                             const Icon(Icons.push_pin_rounded, size: 18),
-                          if (canModerate || canDelete)
+                          if (canPin || canDelete)
                             PopupMenuButton<String>(
                               onSelected: (value) {
                                 if (value == 'pin') onTogglePin();
                                 if (value == 'delete') onDelete();
                               },
                               itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'pin',
-                                  enabled: canModerate,
-                                  child: ListTile(
-                                    leading: Icon(
-                                      post.isPinned
-                                          ? Icons.push_pin_rounded
-                                          : Icons.push_pin_outlined,
-                                    ),
-                                    title: Text(
-                                      post.isPinned
-                                          ? 'Désépingler'
-                                          : 'Épingler',
+                                if (canPin)
+                                  PopupMenuItem(
+                                    value: 'pin',
+                                    child: ListTile(
+                                      leading: Icon(
+                                        post.isPinned
+                                            ? Icons.push_pin_rounded
+                                            : Icons.push_pin_outlined,
+                                      ),
+                                      title: Text(
+                                        post.isPinned
+                                            ? 'Désépingler'
+                                            : 'Épingler',
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: ListTile(
-                                    leading: Icon(Icons.delete_outline_rounded),
-                                    title: Text('Supprimer'),
+                                if (canDelete)
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: ListTile(
+                                      leading: Icon(
+                                        Icons.delete_outline_rounded,
+                                      ),
+                                      title: Text('Supprimer'),
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                         ],
