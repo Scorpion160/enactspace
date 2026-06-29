@@ -5,6 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.notification import Notification
+from app.models.user import User
+from app.services.notification_channels import dispatch_notification_channels
 
 
 def create_notification(
@@ -61,6 +63,8 @@ def create_notification(
         related_id=normalized_related_id,
     )
     db.add(notification)
+    recipient_user = db.query(User).filter(User.id == recipient).first()
+    dispatch_notification_channels(notification, recipient_user)
     return notification
 
 

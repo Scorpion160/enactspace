@@ -16,6 +16,17 @@ class Settings(BaseSettings):
 
     ENABLE_SEED: bool = True
 
+    NOTIFICATION_EMAIL_ENABLED: bool = False
+    NOTIFICATION_EMAIL_FROM: str = "noreply@enactspace.local"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True
+
+    NOTIFICATION_PUSH_ENABLED: bool = False
+    FCM_SERVER_KEY: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
