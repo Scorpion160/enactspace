@@ -23,6 +23,7 @@ enum _LocalMessageStatus { sending, failed }
 class _PendingMessageDraft {
   final String content;
   final String messageType;
+  final String? attachmentFileId;
   final String? attachmentUrl;
   final String? attachmentName;
   final String? attachmentMimeType;
@@ -34,6 +35,7 @@ class _PendingMessageDraft {
   const _PendingMessageDraft({
     required this.content,
     this.messageType = 'text',
+    this.attachmentFileId,
     this.attachmentUrl,
     this.attachmentName,
     this.attachmentMimeType,
@@ -417,6 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
       authorId: _user?.id ?? '',
       content: draft.content,
       messageType: draft.messageType,
+      attachmentFileId: draft.attachmentFileId,
       attachmentUrl: draft.attachmentUrl,
       attachmentName: draft.attachmentName,
       attachmentMimeType: draft.attachmentMimeType,
@@ -636,6 +639,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final draft = _PendingMessageDraft(
       content: attachment.caption,
       messageType: attachment.messageType,
+      attachmentFileId: attachment.fileId,
       attachmentUrl: attachment.url,
       attachmentName: attachment.name,
       attachmentMimeType: attachment.mimeType,
@@ -697,6 +701,7 @@ class _ChatScreenState extends State<ChatScreen> {
       threadId: thread.id,
       content: draft.content,
       messageType: draft.messageType,
+      attachmentFileId: draft.attachmentFileId,
       attachmentUrl: draft.attachmentUrl,
       attachmentName: draft.attachmentName,
       attachmentMimeType: draft.attachmentMimeType,
@@ -752,7 +757,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final attachment = await showDialog<_OutgoingAttachment>(
       context: context,
-      builder: (context) => _AttachmentMessageDialog(chatService: _chatService),
+      builder: (context) => _AttachmentMessageDialog(
+        chatService: _chatService,
+        threadId: _selectedThread!.id,
+      ),
     );
 
     if (attachment == null) return;
@@ -3123,6 +3131,7 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
 
 class _OutgoingAttachment {
   final String messageType;
+  final String? fileId;
   final String url;
   final String name;
   final String caption;
@@ -3134,6 +3143,7 @@ class _OutgoingAttachment {
 
   const _OutgoingAttachment({
     required this.messageType,
+    required this.fileId,
     required this.url,
     required this.name,
     required this.caption,
@@ -3198,8 +3208,12 @@ class _PickedFilePreview extends StatelessWidget {
 
 class _AttachmentMessageDialog extends StatefulWidget {
   final ChatService chatService;
+  final String threadId;
 
-  const _AttachmentMessageDialog({required this.chatService});
+  const _AttachmentMessageDialog({
+    required this.chatService,
+    required this.threadId,
+  });
 
   @override
   State<_AttachmentMessageDialog> createState() =>
@@ -3313,6 +3327,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
     }
 
     var finalUrl = url;
+    String? finalFileId;
     var finalSizeBytes = int.tryParse(_sizeController.text.trim());
     var finalMimeType = _optional(_mimeController.text);
 
@@ -3327,8 +3342,10 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
           fileName: name,
           dataBase64: dataBase64,
           messageType: _messageType,
+          threadId: widget.threadId,
           contentType: finalMimeType,
         );
+        finalFileId = upload.fileId;
         finalUrl = upload.url;
         finalSizeBytes = upload.sizeBytes;
         finalMimeType = upload.contentType;
@@ -3346,6 +3363,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
     Navigator.of(context).pop(
       _OutgoingAttachment(
         messageType: _messageType,
+        fileId: finalFileId,
         url: finalUrl,
         name: name,
         caption: _captionController.text.trim(),

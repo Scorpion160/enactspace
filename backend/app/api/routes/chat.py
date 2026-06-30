@@ -1,9 +1,5 @@
 import json
-import base64
-import binascii
-import re
 from datetime import datetime
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -18,6 +14,7 @@ from app.models.chat import (
     ChatMessage,
     ChatMessageReaction,
 )
+from app.models.stored_file import StoredFile
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.role import Role, UserRole
@@ -38,6 +35,7 @@ from app.schemas.chat import (
     ChatMessageReactionRead,
 )
 from app.services.notification_service import notify_user, notify_users
+from app.services.file_storage_service import store_base64
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -46,8 +44,6 @@ VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
 VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker"}
 MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text"}
 VALID_REACTION_TYPES = {"👍", "❤️", "😂", "😮", "😢", "🙏"}
-CHAT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
-CHAT_UPLOAD_DIR = Path(__file__).resolve().parents[3] / "uploads" / "chat"
 ENACCHEF_ROLES = {
     "administrateur",
     "team_leader",
@@ -125,6 +121,7 @@ def serialize_message(
         "created_at": message.created_at,
         "edited_at": message.edited_at,
         "deleted_at": message.deleted_at,
+        "attachment_file_id": payload.get("attachment_file_id"),
         "attachment_url": payload.get("attachment_url"),
         "attachment_name": payload.get("attachment_name"),
         "attachment_mime_type": payload.get("attachment_mime_type"),
@@ -166,6 +163,9 @@ def build_message_content(payload: ChatMessageCreate) -> str:
 
     media_payload = {
         "content": content,
+        "attachment_file_id": str(payload.attachment_file_id)
+        if payload.attachment_file_id
+        else None,
         "attachment_url": payload.attachment_url.strip()
         if payload.attachment_url
         else None,
@@ -187,18 +187,6 @@ def build_message_content(payload: ChatMessageCreate) -> str:
     )
 
 
-def safe_upload_name(file_name: str) -> str:
-    base_name = Path(file_name).name
-    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", base_name).strip("._")
-    return sanitized or "chat-media.bin"
-
-
-def normalize_base64(data: str) -> str:
-    if "," in data and data.strip().lower().startswith("data:"):
-        return data.split(",", 1)[1]
-    return data
-
-
 def user_display_name(user: User | None) -> str:
     if not user:
         return "Membre"
@@ -213,6 +201,35 @@ def thread_notification_name(thread: ChatThread | None) -> str:
     if not thread:
         return "Conversation"
     return thread.title or "Discussion privee"
+
+
+def attach_file_to_thread(
+    db: Session,
+    *,
+    file_id,
+    thread_id,
+    current_user: User,
+) -> StoredFile | None:
+    if not file_id:
+        return None
+
+    stored_file = db.query(StoredFile).filter(StoredFile.id == file_id).first()
+    if not stored_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier de message introuvable",
+        )
+    if stored_file.uploaded_by_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas envoyer ce fichier.",
+        )
+
+    stored_file.entity_type = "chat_thread"
+    stored_file.entity_id = thread_id
+    stored_file.visibility = "participants"
+    stored_file.updated_at = datetime.utcnow()
+    return stored_file
 
 
 def serialize_participant(participant: ChatParticipant) -> dict:
@@ -430,51 +447,42 @@ def list_chat_contacts(
 @router.post("/uploads", response_model=ChatUploadRead)
 def upload_chat_media(
     payload: ChatUploadCreate,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
     if payload.message_type not in MEDIA_MESSAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Type de média invalide",
+            detail="Type de media invalide",
         )
 
-    try:
-        file_bytes = base64.b64decode(
-            normalize_base64(payload.data_base64),
-            validate=True,
-        )
-    except (binascii.Error, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Fichier encodé invalide",
-        )
+    thread_id = payload.thread_id
+    if thread_id:
+        get_participant_or_404(db, str(thread_id), current_user.id)
 
-    if not file_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le fichier est vide",
-        )
-
-    if len(file_bytes) > CHAT_UPLOAD_MAX_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Le fichier dépasse 25 Mo",
-        )
-
-    CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_name = safe_upload_name(payload.file_name)
-    stored_name = f"{current_user.id}_{int(datetime.utcnow().timestamp())}_{file_name}"
-    file_path = CHAT_UPLOAD_DIR / stored_name
-    file_path.write_bytes(file_bytes)
+    stored_file = store_base64(
+        db,
+        data_base64=payload.data_base64,
+        original_filename=payload.file_name,
+        uploaded_by=current_user,
+        mime_type=payload.content_type,
+        storage_scope="chat",
+        visibility="participants" if thread_id else "private",
+        entity_type="chat_thread" if thread_id else None,
+        entity_id=thread_id,
+        is_temporary=True,
+    )
+    db.commit()
+    db.refresh(stored_file)
 
     return ChatUploadRead(
-        url=f"/uploads/chat/{stored_name}",
-        file_name=file_name,
-        content_type=payload.content_type,
-        size_bytes=len(file_bytes),
+        file_id=stored_file.id,
+        url=f"/api/files/{stored_file.id}/download",
+        file_name=stored_file.original_filename,
+        content_type=stored_file.mime_type,
+        size_bytes=stored_file.file_size,
         message_type=payload.message_type,
     )
-
 
 @router.post("/threads", response_model=ChatThreadRead)
 def create_thread(
@@ -574,7 +582,6 @@ def create_thread(
     db.refresh(thread)
 
     return build_thread_read(db, thread, current_user.id)
-
 
 @router.get("/threads", response_model=list[ChatThreadRead])
 def list_threads(
@@ -820,10 +827,25 @@ def send_message(
             detail="Le message ne peut pas être vide",
         )
 
-    if payload.message_type in MEDIA_MESSAGE_TYPES and not payload.attachment_url:
+    if (
+        payload.message_type in MEDIA_MESSAGE_TYPES
+        and not payload.attachment_url
+        and not payload.attachment_file_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Ajoutez un lien de fichier pour ce message",
+        )
+
+    stored_file = attach_file_to_thread(
+        db,
+        file_id=payload.attachment_file_id,
+        thread_id=UUID(thread_id),
+        current_user=current_user,
+    )
+    if stored_file and not payload.attachment_url:
+        payload = payload.model_copy(
+            update={"attachment_url": f"/api/files/{stored_file.id}/download"}
         )
 
     message = ChatMessage(

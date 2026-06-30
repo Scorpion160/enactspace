@@ -78,6 +78,7 @@ class ChatParticipantRead(BaseModel):
 class ChatMessageCreate(BaseModel):
     content: str
     message_type: str = "text"
+    attachment_file_id: Optional[UUID] = None
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
     attachment_mime_type: Optional[str] = None
@@ -96,6 +97,7 @@ class ChatMessageRead(BaseModel):
     created_at: datetime
     edited_at: Optional[datetime]
     deleted_at: Optional[datetime]
+    attachment_file_id: Optional[UUID] = None
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
     attachment_mime_type: Optional[str] = None
@@ -131,9 +133,11 @@ class ChatUploadCreate(BaseModel):
     content_type: Optional[str] = None
     data_base64: str
     message_type: str = "document"
+    thread_id: Optional[UUID] = None
 
 
 class ChatUploadRead(BaseModel):
+    file_id: Optional[UUID] = None
     url: str
     file_name: str
     content_type: Optional[str]

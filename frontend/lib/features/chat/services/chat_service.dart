@@ -234,6 +234,7 @@ class ChatService {
     required String threadId,
     required String content,
     String messageType = 'text',
+    String? attachmentFileId,
     String? attachmentUrl,
     String? attachmentName,
     String? attachmentMimeType,
@@ -249,6 +250,7 @@ class ChatService {
       data: {
         'content': content.trim(),
         'message_type': messageType,
+        'attachment_file_id': _nullable(attachmentFileId),
         'attachment_url': _nullable(attachmentUrl),
         'attachment_name': _nullable(attachmentName),
         'attachment_mime_type': _nullable(attachmentMimeType),
@@ -348,6 +350,7 @@ class ChatService {
     required String fileName,
     required String dataBase64,
     required String messageType,
+    String? threadId,
     String? contentType,
   }) async {
     final token = await _requireToken();
@@ -359,6 +362,7 @@ class ChatService {
         'content_type': _nullable(contentType),
         'data_base64': dataBase64.trim(),
         'message_type': messageType,
+        'thread_id': _nullable(threadId),
       },
     );
 

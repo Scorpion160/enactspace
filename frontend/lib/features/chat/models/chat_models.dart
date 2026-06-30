@@ -255,6 +255,7 @@ class ChatMessageModel {
   final String authorId;
   final String content;
   final String messageType;
+  final String? attachmentFileId;
   final String? attachmentUrl;
   final String? attachmentName;
   final String? attachmentMimeType;
@@ -275,6 +276,7 @@ class ChatMessageModel {
     required this.authorId,
     required this.content,
     required this.messageType,
+    required this.attachmentFileId,
     required this.attachmentUrl,
     required this.attachmentName,
     required this.attachmentMimeType,
@@ -297,6 +299,7 @@ class ChatMessageModel {
       authorId: json['author_id']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
       messageType: json['message_type']?.toString() ?? 'text',
+      attachmentFileId: json['attachment_file_id']?.toString(),
       attachmentUrl: json['attachment_url']?.toString(),
       attachmentName: json['attachment_name']?.toString(),
       attachmentMimeType: json['attachment_mime_type']?.toString(),
@@ -325,6 +328,7 @@ class ChatMessageModel {
       'author_id': authorId,
       'content': content,
       'message_type': messageType,
+      'attachment_file_id': attachmentFileId,
       'attachment_url': attachmentUrl,
       'attachment_name': attachmentName,
       'attachment_mime_type': attachmentMimeType,
@@ -380,6 +384,7 @@ Map<String, int> _parseReactionsSummary(dynamic value) {
 }
 
 class ChatUploadedMediaModel {
+  final String? fileId;
   final String url;
   final String fileName;
   final String? contentType;
@@ -387,6 +392,7 @@ class ChatUploadedMediaModel {
   final String messageType;
 
   const ChatUploadedMediaModel({
+    required this.fileId,
     required this.url,
     required this.fileName,
     required this.contentType,
@@ -396,6 +402,7 @@ class ChatUploadedMediaModel {
 
   factory ChatUploadedMediaModel.fromJson(Map<String, dynamic> json) {
     return ChatUploadedMediaModel(
+      fileId: json['file_id']?.toString(),
       url: json['url']?.toString() ?? '',
       fileName: json['file_name']?.toString() ?? '',
       contentType: json['content_type']?.toString(),
