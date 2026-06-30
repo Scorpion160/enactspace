@@ -371,7 +371,7 @@ class _LoginPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Text(
-                          'Connexion EnactSpace',
+                          'Connexion des comptes validés',
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w900,
@@ -382,6 +382,8 @@ class _LoginPanel extends StatelessWidget {
                           'Accède à ton espace Enactus ESP avec ton compte validé.',
                           style: TextStyle(color: Colors.black54, height: 1.4),
                         ),
+                        const SizedBox(height: 12),
+                        const _ValidatedAccountHint(),
                         const SizedBox(height: 28),
                         TextField(
                           controller: emailController,
@@ -439,15 +441,24 @@ class _LoginPanel extends StatelessWidget {
                           label: const Text('Se connecter'),
                         ),
                         const SizedBox(height: 20),
-                        const _LoginSectionLabel('Nouveau sur Enactus ESP ?'),
+                        const _LoginSectionLabel(
+                          'Créer un compte en attente de validation',
+                        ),
                         const SizedBox(height: 10),
                         _AccountRequestActions(
                           loading: loading,
-                          onCreateAccount: () => _showJoinRequestSheet(context),
+                          onCreateMemberAccount: () =>
+                              _showJoinRequestSheet(context),
+                          onCreateAlumniAccount: () => _showJoinRequestSheet(
+                            context,
+                            profileType: 'alumni',
+                          ),
                         ),
                         const SizedBox(height: 16),
                         const Divider(height: 1),
                         const SizedBox(height: 12),
+                        const _LoginSectionLabel('Candidature Enactus ESP'),
+                        const SizedBox(height: 8),
                         _LoginSupportActions(
                           onRecruitment: () => _showRecruitmentDialog(context),
                           onTracking: () => context.go('/application-tracking'),
@@ -503,24 +514,65 @@ class _LoginSectionLabel extends StatelessWidget {
   }
 }
 
+class _ValidatedAccountHint extends StatelessWidget {
+  const _ValidatedAccountHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.30),
+        ),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.verified_user_rounded, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Cette connexion est réservée aux comptes validés. Les candidats suivent leur dossier dans l’espace candidature.',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AccountRequestActions extends StatelessWidget {
   final bool loading;
-  final VoidCallback onCreateAccount;
+  final VoidCallback onCreateMemberAccount;
+  final VoidCallback onCreateAlumniAccount;
 
   const _AccountRequestActions({
     required this.loading,
-    required this.onCreateAccount,
+    required this.onCreateMemberAccount,
+    required this.onCreateAlumniAccount,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: loading ? null : onCreateAccount,
-        icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text('Créer un compte'),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: loading ? null : onCreateMemberAccount,
+          icon: const Icon(Icons.school_rounded),
+          label: const Text('Compte Enacteur / Enactrice'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: loading ? null : onCreateAlumniAccount,
+          icon: const Icon(Icons.workspace_premium_rounded),
+          label: const Text('Compte Alumni'),
+        ),
+      ],
     );
   }
 }

@@ -44,7 +44,7 @@ def join_request_bio(payload: JoinRequestCreate) -> str | None:
 
 
 def authenticate_user(email: str, password: str, db: Session) -> User:
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == email.strip()).first()
 
     if not user:
         raise HTTPException(
@@ -64,13 +64,34 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
             detail="Compte désactivé",
         )
 
+    if user.status == "pending" and user.profile_type == "alumni":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Compte alumni en attente de validation. "
+                "Vous serez notifié après validation par un responsable."
+            ),
+        )
+
     if user.status == "pending":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Compte en attente de validation par la Secrétaire Générale",
         )
 
-    if user.status in {"rejected", "suspended", "inactive"}:
+    if user.status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte refusé. Contactez les responsables Enactus ESP.",
+        )
+
+    if user.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte suspendu. Contactez l'administration EnactSpace.",
+        )
+
+    if user.status == "inactive":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Compte non autorisé",
