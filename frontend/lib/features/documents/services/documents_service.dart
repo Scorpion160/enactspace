@@ -1,6 +1,37 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/document_model.dart';
+
+class DocumentUploadedFileModel {
+  final String fileId;
+  final String downloadUrl;
+  final String fileName;
+  final String? fileType;
+  final int sizeBytes;
+
+  const DocumentUploadedFileModel({
+    required this.fileId,
+    required this.downloadUrl,
+    required this.fileName,
+    required this.fileType,
+    required this.sizeBytes,
+  });
+
+  factory DocumentUploadedFileModel.fromJson(Map<String, dynamic> json) {
+    return DocumentUploadedFileModel(
+      fileId: json['id']?.toString() ?? '',
+      downloadUrl: json['download_url']?.toString() ?? '',
+      fileName: json['original_filename']?.toString() ?? '',
+      fileType: json['extension']?.toString(),
+      sizeBytes: int.tryParse(json['file_size']?.toString() ?? '') ?? 0,
+    );
+  }
+}
 
 class DocumentsService {
   final ApiClient _apiClient;
@@ -79,7 +110,8 @@ class DocumentsService {
   Future<DocumentModel> createDocument({
     required String title,
     String? description,
-    required String fileUrl,
+    String? fileUrl,
+    String? fileId,
     String? fileType,
     required String category,
     required String visibility,
@@ -98,7 +130,8 @@ class DocumentsService {
       data: {
         'title': title.trim(),
         'description': description?.trim(),
-        'file_url': fileUrl.trim(),
+        'file_url': _nullableId(fileUrl),
+        'file_id': _nullableId(fileId),
         'file_type': fileType?.trim(),
         'category': category,
         'visibility': visibility,
@@ -115,6 +148,50 @@ class DocumentsService {
     }
 
     throw Exception('Réponse invalide lors de la création du document.');
+  }
+
+  Future<DocumentUploadedFileModel> uploadDocumentFile({
+    required String fileName,
+    required Uint8List bytes,
+    required String visibility,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiClient.baseUrl}/files/upload'),
+    );
+    request.headers.addAll({
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    request.fields.addAll({
+      'storage_scope': 'document',
+      'visibility': visibility,
+      'is_temporary': 'true',
+    });
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+    );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final dynamic body = response.body.isNotEmpty
+        ? jsonDecode(response.body)
+        : {};
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (body is Map<String, dynamic>) {
+        return DocumentUploadedFileModel.fromJson(body);
+      }
+      throw Exception('Reponse invalide lors de l upload du fichier.');
+    }
+
+    if (body is Map<String, dynamic> && body['detail'] != null) {
+      throw Exception(body['detail'].toString());
+    }
+    throw Exception('Erreur serveur ${response.statusCode}');
   }
 
   Future<DocumentModel> validateDocument(String documentId) async {
@@ -149,6 +226,26 @@ class DocumentsService {
     }
 
     throw Exception('Réponse invalide lors du retrait de validation.');
+  }
+
+  Future<DocumentModel> rejectDocument({
+    required String documentId,
+    required String reason,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final response = await _apiClient.postJson(
+      '/documents/$documentId/reject',
+      token: token,
+      data: {'reason': reason.trim()},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return DocumentModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide lors du rejet du document.');
   }
 
   Future<void> deleteDocument(String documentId) async {

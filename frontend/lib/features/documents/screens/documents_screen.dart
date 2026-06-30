@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,6 +10,20 @@ import '../../projects/models/project_model.dart';
 import '../../projects/services/projects_service.dart';
 import '../models/document_model.dart';
 import '../services/documents_service.dart';
+
+class _PickedDocumentFile {
+  final String fileId;
+  final String fileName;
+  final String? fileType;
+  final int sizeBytes;
+
+  const _PickedDocumentFile({
+    required this.fileId,
+    required this.fileName,
+    required this.fileType,
+    required this.sizeBytes,
+  });
+}
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -153,6 +168,55 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
   }
 
+  Future<void> _rejectDocument(DocumentModel document) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rejeter le document'),
+        content: TextField(
+          controller: controller,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: 'Motif',
+            prefixIcon: Icon(Icons.report_problem_outlined),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            icon: const Icon(Icons.close_rounded),
+            label: const Text('Rejeter'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (reason == null || reason.trim().isEmpty) return;
+
+    try {
+      await _documentsService.rejectDocument(
+        documentId: document.id,
+        reason: reason,
+      );
+      await _loadDocuments();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Document rejeté.')));
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
   Future<void> _unvalidateDocument(DocumentModel document) async {
     try {
       await _documentsService.unvalidateDocument(document.id);
@@ -281,6 +345,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               },
               eventNames: {for (final event in _events) event.id: event.title},
               onValidate: _validateDocument,
+              onReject: _rejectDocument,
               onUnvalidate: _unvalidateDocument,
               onDelete: _deleteDocument,
             ),
@@ -565,6 +630,7 @@ class _DocumentsGrid extends StatelessWidget {
   final Map<String, String> projectNames;
   final Map<String, String> eventNames;
   final ValueChanged<DocumentModel> onValidate;
+  final ValueChanged<DocumentModel> onReject;
   final ValueChanged<DocumentModel> onUnvalidate;
   final ValueChanged<DocumentModel> onDelete;
 
@@ -574,6 +640,7 @@ class _DocumentsGrid extends StatelessWidget {
     required this.projectNames,
     required this.eventNames,
     required this.onValidate,
+    required this.onReject,
     required this.onUnvalidate,
     required this.onDelete,
   });
@@ -604,6 +671,7 @@ class _DocumentsGrid extends StatelessWidget {
                   projectNames: projectNames,
                   eventNames: eventNames,
                   onValidate: onValidate,
+                  onReject: onReject,
                   onUnvalidate: onUnvalidate,
                   onDelete: onDelete,
                 ),
@@ -621,6 +689,7 @@ class _DocumentCard extends StatelessWidget {
   final Map<String, String> projectNames;
   final Map<String, String> eventNames;
   final ValueChanged<DocumentModel> onValidate;
+  final ValueChanged<DocumentModel> onReject;
   final ValueChanged<DocumentModel> onUnvalidate;
   final ValueChanged<DocumentModel> onDelete;
 
@@ -630,6 +699,7 @@ class _DocumentCard extends StatelessWidget {
     required this.projectNames,
     required this.eventNames,
     required this.onValidate,
+    required this.onReject,
     required this.onUnvalidate,
     required this.onDelete,
   });
@@ -693,8 +763,32 @@ class _DocumentCard extends StatelessWidget {
                   ),
                 if (document.isTemplate) const Chip(label: Text('Modèle')),
                 if (document.isOfficial) const Chip(label: Text('Officiel')),
+                Chip(
+                  avatar: Icon(
+                    document.isValidated
+                        ? Icons.verified_rounded
+                        : document.isRejected
+                        ? Icons.close_rounded
+                        : Icons.hourglass_top_rounded,
+                    size: 18,
+                  ),
+                  label: Text(document.statusLabel),
+                ),
               ],
             ),
+            if (document.isRejected &&
+                (document.rejectionReason ?? '').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Motif : ${document.rejectionReason}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(
               'Ajouté le ${document.createdAtLabel}',
@@ -723,13 +817,19 @@ class _DocumentCard extends StatelessWidget {
                   icon: const Icon(Icons.content_copy_rounded),
                   label: const Text('Copier le lien'),
                 ),
-                if (!document.isOfficial && document.canValidate)
+                if (!document.isValidated && document.canValidate)
                   ElevatedButton.icon(
                     onPressed: () => onValidate(document),
                     icon: const Icon(Icons.verified_rounded),
                     label: const Text('Valider'),
                   ),
-                if (document.isOfficial && document.canValidate)
+                if (!document.isValidated && document.canValidate)
+                  OutlinedButton.icon(
+                    onPressed: () => onReject(document),
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Rejeter'),
+                  ),
+                if (document.isValidated && document.canValidate)
                   OutlinedButton.icon(
                     onPressed: () => onUnvalidate(document),
                     icon: const Icon(Icons.remove_done_rounded),
@@ -767,6 +867,64 @@ class _DocumentCard extends StatelessWidget {
   }
 }
 
+class _DocumentFilePickerTile extends StatelessWidget {
+  final _PickedDocumentFile? pickedFile;
+  final bool uploading;
+  final VoidCallback onPick;
+  final VoidCallback? onRemove;
+
+  const _DocumentFilePickerTile({
+    required this.pickedFile,
+    required this.uploading,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final file = pickedFile;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            onPressed: uploading ? null : onPick,
+            icon: uploading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_rounded),
+            label: Text(uploading ? 'Upload...' : 'Choisir un fichier'),
+          ),
+          if (file != null) ...[
+            const SizedBox(height: 10),
+            InputChip(
+              avatar: const Icon(Icons.description_rounded, size: 18),
+              label: Text(
+                '${file.fileName} · ${_formatDocumentBytes(file.sizeBytes)}',
+                overflow: TextOverflow.ellipsis,
+              ),
+              onDeleted: onRemove,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class CreateDocumentDialog extends StatefulWidget {
   final DocumentsService documentsService;
   final List<PoleModel> poles;
@@ -801,8 +959,10 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
   String? _selectedEventId;
   bool _isTemplate = false;
   bool _autoCategory = true;
+  _PickedDocumentFile? _pickedFile;
 
   bool _loading = false;
+  bool _uploadingFile = false;
   String? _error;
 
   @override
@@ -897,6 +1057,53 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
     return 'general';
   }
 
+  Future<void> _pickFile() async {
+    if (_loading || _uploadingFile) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: true,
+      type: FileType.any,
+    );
+    final file = result?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || bytes.isEmpty) return;
+
+    setState(() {
+      _uploadingFile = true;
+      _error = null;
+    });
+
+    try {
+      final uploaded = await widget.documentsService.uploadDocumentFile(
+        fileName: file.name,
+        bytes: Uint8List.fromList(bytes),
+        visibility: _visibility,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _pickedFile = _PickedDocumentFile(
+          fileId: uploaded.fileId,
+          fileName: uploaded.fileName,
+          fileType: uploaded.fileType,
+          sizeBytes: uploaded.sizeBytes,
+        );
+        _fileUrlController.text = uploaded.downloadUrl;
+        if ((uploaded.fileType ?? '').isNotEmpty) {
+          _fileTypeController.text = uploaded.fileType!;
+        }
+      });
+      _refreshDocumentHints();
+    } catch (e) {
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingFile = false);
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -925,6 +1132,7 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
         title: _titleController.text,
         description: _descriptionController.text,
         fileUrl: _fileUrlController.text,
+        fileId: _pickedFile?.fileId,
         fileType: _fileTypeController.text.trim().isEmpty
             ? null
             : _fileTypeController.text,
@@ -1002,16 +1210,32 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                _DocumentFilePickerTile(
+                  pickedFile: _pickedFile,
+                  uploading: _uploadingFile,
+                  onPick: _pickFile,
+                  onRemove: _loading || _uploadingFile
+                      ? null
+                      : () {
+                          setState(() {
+                            _pickedFile = null;
+                            _fileUrlController.clear();
+                            _fileTypeController.clear();
+                          });
+                        },
+                ),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _fileUrlController,
                   decoration: const InputDecoration(
-                    labelText: 'Lien du fichier',
+                    labelText: 'Lien du fichier ou fichier uploadé',
                     hintText: 'https://drive.google.com/...',
                     prefixIcon: Icon(Icons.link_rounded),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le lien du fichier est obligatoire.';
+                    if (_pickedFile == null &&
+                        (value == null || value.trim().isEmpty)) {
+                      return 'Ajoutez un fichier ou un lien.';
                     }
                     return null;
                   },
@@ -1241,6 +1465,15 @@ class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
 
 double _dialogWidth(BuildContext context, double maxWidth) {
   return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
+}
+
+String _formatDocumentBytes(int bytes) {
+  if (bytes <= 0) return '0 o';
+  if (bytes < 1024) return '$bytes o';
+  final kb = bytes / 1024;
+  if (kb < 1024) return '${kb.toStringAsFixed(kb < 10 ? 1 : 0)} Ko';
+  final mb = kb / 1024;
+  return '${mb.toStringAsFixed(mb < 10 ? 1 : 0)} Mo';
 }
 
 class _EmptyDocumentsCard extends StatelessWidget {

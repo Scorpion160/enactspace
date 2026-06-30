@@ -3,7 +3,9 @@ class DocumentModel {
   final String title;
   final String? description;
   final String? fileUrl;
+  final String? fileId;
   final String? fileType;
+  final String status;
   final String category;
   final String visibility;
   final String? uploadedBy;
@@ -17,6 +19,10 @@ class DocumentModel {
   final bool canValidate;
   final String? validatedBy;
   final String? validatedAt;
+  final String? rejectedBy;
+  final String? rejectedAt;
+  final String? rejectionReason;
+  final bool isPermanent;
   final String? createdAt;
   final String? updatedAt;
 
@@ -25,7 +31,9 @@ class DocumentModel {
     required this.title,
     this.description,
     this.fileUrl,
+    this.fileId,
     this.fileType,
+    required this.status,
     required this.category,
     required this.visibility,
     this.uploadedBy,
@@ -39,6 +47,10 @@ class DocumentModel {
     required this.canValidate,
     this.validatedBy,
     this.validatedAt,
+    this.rejectedBy,
+    this.rejectedAt,
+    this.rejectionReason,
+    required this.isPermanent,
     this.createdAt,
     this.updatedAt,
   });
@@ -115,7 +127,9 @@ class DocumentModel {
       title: json['title']?.toString() ?? 'Document sans titre',
       description: json['description']?.toString(),
       fileUrl: json['file_url']?.toString(),
+      fileId: json['file_id']?.toString(),
       fileType: json['file_type']?.toString(),
+      status: json['status']?.toString() ?? 'validated',
       category: json['category']?.toString() ?? 'general',
       visibility: json['visibility']?.toString() ?? 'internal',
       uploadedBy: json['uploaded_by']?.toString(),
@@ -129,6 +143,10 @@ class DocumentModel {
       canValidate: json['can_validate'] == true,
       validatedBy: json['validated_by']?.toString(),
       validatedAt: json['validated_at']?.toString(),
+      rejectedBy: json['rejected_by']?.toString(),
+      rejectedAt: json['rejected_at']?.toString(),
+      rejectionReason: json['rejection_reason']?.toString(),
+      isPermanent: json['is_permanent'] == true,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
     );
@@ -167,6 +185,27 @@ class DocumentModel {
   String get fileTypeLabel {
     final normalized = fileType?.trim().replaceAll('.', '').toUpperCase();
     return normalized == null || normalized.isEmpty ? 'Fichier' : normalized;
+  }
+
+  bool get isPendingValidation => status == 'pending_validation';
+
+  bool get isRejected => status == 'rejected';
+
+  bool get isValidated => status == 'validated';
+
+  String get statusLabel {
+    switch (status) {
+      case 'pending_validation':
+        return 'En attente';
+      case 'rejected':
+        return 'Rejete';
+      case 'archived':
+        return 'Archive';
+      case 'validated':
+        return 'Valide';
+      default:
+        return status;
+    }
   }
 
   String get createdAtLabel {
