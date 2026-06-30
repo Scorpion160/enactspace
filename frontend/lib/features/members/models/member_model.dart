@@ -101,7 +101,7 @@ class MemberModel {
       case 'active':
         return 'Actif';
       case 'pending':
-        return 'En attente';
+        return profileType == 'alumni' ? 'Alumni en validation' : 'En attente';
       case 'inactive':
         return 'Inactif';
       case 'alumni':
@@ -120,6 +120,8 @@ class MemberModel {
   }
 
   bool get isAlumni => status == 'alumni' || profileType == 'alumni';
+  bool get isPendingAlumniValidation =>
+      status == 'pending' && profileType == 'alumni';
 
   String get memberLabel {
     if (isAlumni) return 'Alumni';

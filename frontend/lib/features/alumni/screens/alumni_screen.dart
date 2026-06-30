@@ -217,6 +217,12 @@ class _AlumniScreenState extends State<AlumniScreen> {
                           canCreateMentorship: _canCreateMentorship,
                           onRefresh: _loadAlumni,
                         ),
+                        if (_canCreateOwnProfile) ...[
+                          const SizedBox(height: 14),
+                          _AlumniProfilePrompt(
+                            onCreateProfile: _openCreateProfileSheet,
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         _AlumniToolbar(
                           searchController: _searchController,
@@ -478,6 +484,53 @@ class _HeaderChip extends StatelessWidget {
       backgroundColor: Colors.white.withValues(alpha: 0.10),
       side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
       labelStyle: const TextStyle(color: Colors.white),
+    );
+  }
+}
+
+class _AlumniProfilePrompt extends StatelessWidget {
+  final VoidCallback onCreateProfile;
+
+  const _AlumniProfilePrompt({required this.onCreateProfile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: AppTheme.enactusYellow,
+              foregroundColor: AppTheme.softBlack,
+              child: Icon(Icons.badge_rounded),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Complétez votre profil Alumni',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Ajoutez promotion, parcours, expertises et disponibilité mentorat.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: onCreateProfile,
+              icon: const Icon(Icons.edit_rounded),
+              label: const Text('Compléter'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

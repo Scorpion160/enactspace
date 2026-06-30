@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.database import get_db
 from app.models.alumni import AlumniProfile, Mentorship
 from app.models.user import User
+from app.core.roles import ENACCHEF_ROLES, SECRETARIAT_ROLES
 from app.schemas.alumni import (
     AlumniProfileCreate,
     AlumniProfileUpdate,
@@ -39,20 +40,8 @@ VALID_MENTORSHIP_STATUSES = {
     "cancelled",
 }
 
-ALUMNI_MANAGER_ROLES = {
-    "administrateur",
-    "team_leader",
-    "secretaire_generale",
-}
-
-ALUMNI_ENACCHEF_ROLES = ALUMNI_MANAGER_ROLES | {
-    "financier",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
-    "faculty_advisor",
-}
+ALUMNI_MANAGER_ROLES = SECRETARIAT_ROLES
+ALUMNI_ENACCHEF_ROLES = ENACCHEF_ROLES
 
 
 def can_manage_alumni(db: Session, user: User) -> bool:

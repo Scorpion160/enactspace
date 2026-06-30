@@ -409,11 +409,22 @@ def approve_user(
     if not existing_role:
         db.add(UserRole(user_id=user.id, role_id=role.id))
 
+    notification_title = (
+        "Compte Alumni EnactSpace validé"
+        if is_alumni
+        else "Compte EnactSpace validé"
+    )
+    notification_message = (
+        "Votre compte Alumni est validé. Vous pouvez accéder à l'espace Alumni."
+        if is_alumni
+        else "Votre compte est validé. Vous pouvez maintenant vous connecter."
+    )
+
     notify_user(
         db,
         user_id=user.id,
-        title="Compte EnactSpace validé",
-        message="Votre compte est validé. Vous pouvez maintenant vous connecter.",
+        title=notification_title,
+        message=notification_message,
         notification_type="account_approved",
         related_type="user",
         related_id=user.id,
@@ -461,11 +472,20 @@ def reject_user(
     user.status = "rejected"
     user.updated_at = datetime.utcnow()
 
+    is_alumni = user.profile_type == ALUMNI_ROLE
     notify_user(
         db,
         user_id=user.id,
-        title="Demande de compte non validée",
-        message="Votre demande EnactSpace n’a pas été validée.",
+        title=(
+            "Demande Alumni non validée"
+            if is_alumni
+            else "Demande de compte non validée"
+        ),
+        message=(
+            "Votre demande de compte Alumni EnactSpace n’a pas été validée."
+            if is_alumni
+            else "Votre demande EnactSpace n’a pas été validée."
+        ),
         notification_type="account_rejected",
         related_type="user",
         related_id=user.id,
