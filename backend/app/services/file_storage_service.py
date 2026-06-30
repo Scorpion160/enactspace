@@ -10,6 +10,8 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.document import Document
+from app.models.post import Post
 from app.models.stored_file import StoredFile
 from app.models.user import User
 
@@ -59,6 +61,8 @@ BLOCKED_EXTENSIONS = {
     ".vbs",
 }
 BLOCKED_MIME_PREFIXES = ("application/x-msdownload",)
+PROTECTED_STORAGE_SCOPES = {"official", "archive"}
+PROTECTED_DOCUMENT_STATUSES = {"validated", "submitted"}
 
 
 def safe_filename(file_name: str) -> str:
@@ -225,3 +229,135 @@ def delete_physical_file(stored_file: StoredFile) -> None:
             path.unlink()
     except OSError:
         pass
+
+
+def is_storage_path_safe(stored_file: StoredFile) -> bool:
+    try:
+        path = file_path(stored_file)
+        root = UPLOAD_ROOT.resolve()
+        return path != root and root in path.parents
+    except OSError:
+        return False
+
+
+def cleanup_skip_reason(
+    db: Session,
+    stored_file: StoredFile,
+    *,
+    cleanup_time: datetime,
+) -> str | None:
+    if not is_storage_path_safe(stored_file):
+        return "unsafe_path"
+
+    if stored_file.storage_scope in PROTECTED_STORAGE_SCOPES:
+        return "protected_scope"
+
+    if not stored_file.is_temporary and not stored_file.is_ephemeral:
+        return "permanent_file"
+
+    if stored_file.expires_at and stored_file.expires_at > cleanup_time:
+        return "not_expired"
+
+    if stored_file.entity_type == "chat_thread" and not stored_file.is_ephemeral:
+        return "linked_chat_message"
+
+    linked_post = db.query(Post).filter(Post.media_file_id == stored_file.id).first()
+    if linked_post or stored_file.entity_type == "post":
+        return "linked_post"
+
+    linked_document = db.query(Document).filter(
+        Document.file_id == stored_file.id
+    ).first()
+    if not linked_document and stored_file.entity_type == "document":
+        linked_document = db.query(Document).filter(
+            Document.id == stored_file.entity_id
+        ).first()
+    if linked_document:
+        if (
+            linked_document.status in PROTECTED_DOCUMENT_STATUSES
+            or linked_document.is_official
+            or linked_document.is_permanent
+            or linked_document.validated_at is not None
+        ):
+            return "protected_document"
+        return "linked_document"
+
+    return None
+
+
+def cleanup_expired_files(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    limit: int = 500,
+    dry_run: bool = True,
+) -> dict:
+    cleanup_time = now or datetime.utcnow()
+    temporary_cutoff = cleanup_time - timedelta(days=TEMPORARY_RETENTION_DAYS)
+    candidates = (
+        db.query(StoredFile)
+        .filter(
+            (
+                StoredFile.is_ephemeral.is_(True)
+                & (StoredFile.expires_at.isnot(None))
+                & (StoredFile.expires_at <= cleanup_time)
+            )
+            | (
+                StoredFile.is_temporary.is_(True)
+                & (
+                    (
+                        (StoredFile.expires_at.isnot(None))
+                        & (StoredFile.expires_at <= cleanup_time)
+                    )
+                    | (
+                        (StoredFile.expires_at.is_(None))
+                        & (StoredFile.created_at <= temporary_cutoff)
+                    )
+                )
+            )
+        )
+        .order_by(StoredFile.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+
+    scanned_count = len(candidates)
+    deleted_bytes = 0
+    deleted_count = 0
+    skipped_count = 0
+    error_count = 0
+    for stored_file in candidates:
+        skip_reason = cleanup_skip_reason(
+            db,
+            stored_file,
+            cleanup_time=cleanup_time,
+        )
+        if skip_reason:
+            skipped_count += 1
+            continue
+
+        if dry_run:
+            deleted_count += 1
+            deleted_bytes += stored_file.file_size or 0
+            continue
+
+        try:
+            delete_physical_file(stored_file)
+            deleted_bytes += stored_file.file_size or 0
+            db.delete(stored_file)
+            deleted_count += 1
+        except OSError:
+            error_count += 1
+
+    if not dry_run:
+        db.flush()
+    return {
+        "scanned": scanned_count,
+        "deleted": deleted_count,
+        "skipped": skipped_count,
+        "errors": error_count,
+        "dry_run": dry_run,
+        "deleted_bytes": deleted_bytes,
+        "limit": limit,
+        "cleanup_time": cleanup_time.isoformat(),
+    }

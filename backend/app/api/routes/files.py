@@ -8,6 +8,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
     status,
 )
@@ -22,6 +23,7 @@ from app.models.user import User
 from app.schemas.stored_file import StoredFileRead
 from app.services.file_storage_service import (
     MAX_FILE_SIZE_BYTES,
+    cleanup_expired_files,
     delete_physical_file,
     file_path,
     store_bytes,
@@ -148,6 +150,26 @@ async def upload_file(
     db.commit()
     db.refresh(stored_file)
     return file_payload(stored_file)
+
+
+@router.post("/cleanup")
+def cleanup_files(
+    dry_run: bool = Query(default=True),
+    limit: int = Query(default=500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not user_has_any_role(db, current_user.id, GLOBAL_FILE_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Nettoyage reserve aux responsables.",
+        )
+    result = cleanup_expired_files(db, limit=limit, dry_run=dry_run)
+    if dry_run:
+        db.rollback()
+    else:
+        db.commit()
+    return {"ok": True, **result}
 
 
 @router.get("/{file_id}", response_model=StoredFileRead)
