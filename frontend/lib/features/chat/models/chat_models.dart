@@ -263,6 +263,7 @@ class ChatMessageModel {
   final int? durationSeconds;
   final String? thumbnailUrl;
   final String? stickerPack;
+  final String? ephemeralDuration;
   final int reactionsCount;
   final Map<String, int> reactionsSummary;
   final String? currentUserReaction;
@@ -284,6 +285,7 @@ class ChatMessageModel {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.stickerPack,
+    required this.ephemeralDuration,
     required this.reactionsCount,
     required this.reactionsSummary,
     required this.currentUserReaction,
@@ -309,6 +311,7 @@ class ChatMessageModel {
       durationSeconds: int.tryParse(json['duration_seconds']?.toString() ?? ''),
       thumbnailUrl: json['thumbnail_url']?.toString(),
       stickerPack: json['sticker_pack']?.toString(),
+      ephemeralDuration: json['ephemeral_duration']?.toString(),
       reactionsCount:
           int.tryParse(json['reactions_count']?.toString() ?? '') ?? 0,
       reactionsSummary: _parseReactionsSummary(json['reactions_summary']),
@@ -336,6 +339,7 @@ class ChatMessageModel {
       'duration_seconds': durationSeconds,
       'thumbnail_url': thumbnailUrl,
       'sticker_pack': stickerPack,
+      'ephemeral_duration': ephemeralDuration,
       'reactions_count': reactionsCount,
       'reactions_summary': reactionsSummary,
       'current_user_reaction': currentUserReaction,
@@ -346,6 +350,11 @@ class ChatMessageModel {
   }
 
   bool get isMedia => messageType != 'text';
+
+  bool get isEphemeralMedia =>
+      isMedia &&
+      ephemeralDuration != null &&
+      ephemeralDuration!.trim().isNotEmpty;
 
   String? get absoluteAttachmentUrl {
     final url = attachmentUrl;

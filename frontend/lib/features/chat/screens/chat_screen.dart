@@ -68,6 +68,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sending = false;
   bool _backgroundSyncing = false;
   bool _usingLocalCache = false;
+  ChatMediaCacheSettings _mediaCacheSettings = const ChatMediaCacheSettings();
+  int _mediaCacheBytes = 0;
   String? _error;
   Timer? _syncTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
@@ -331,6 +333,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final hiddenThreadIds = await _chatService.getHiddenThreadIds(
         userId: user.id,
       );
+      final mediaCacheSettings = await _chatService.getMediaCacheSettings(
+        userId: user.id,
+      );
+      final mediaCacheBytes = await _chatService.estimateLocalMediaCacheBytes(
+        userId: user.id,
+      );
       final cachedThreads = await _chatService.getCachedThreads(
         userId: user.id,
       );
@@ -340,6 +348,8 @@ class _ChatScreenState extends State<ChatScreen> {
           _user = user;
           _pinnedThreadIds = pinnedThreadIds;
           _hiddenThreadIds = hiddenThreadIds;
+          _mediaCacheSettings = mediaCacheSettings;
+          _mediaCacheBytes = mediaCacheBytes;
           _threads = _visibleSortedThreads(
             cachedThreads,
             pinnedThreadIds,
@@ -360,6 +370,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _user = user;
         _pinnedThreadIds = pinnedThreadIds;
         _hiddenThreadIds = hiddenThreadIds;
+        _mediaCacheSettings = mediaCacheSettings;
+        _mediaCacheBytes = mediaCacheBytes;
         _threads = _visibleSortedThreads(
           threads,
           pinnedThreadIds,
@@ -427,6 +439,7 @@ class _ChatScreenState extends State<ChatScreen> {
       durationSeconds: draft.durationSeconds,
       thumbnailUrl: draft.thumbnailUrl,
       stickerPack: draft.stickerPack,
+      ephemeralDuration: null,
       reactionsCount: 0,
       reactionsSummary: const {},
       currentUserReaction: null,
@@ -437,8 +450,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   List<ChatMessageModel> _cacheableMessages(List<ChatMessageModel> messages) {
+    final mediaAllowed = _mediaCacheSettings.autoDownloadMedia;
     return messages
         .where((message) => !_localMessageStatuses.containsKey(message.id))
+        .where((message) => mediaAllowed || !message.isMedia)
         .toList();
   }
 
@@ -896,6 +911,31 @@ class _ChatScreenState extends State<ChatScreen> {
     await _selectThread(created);
   }
 
+  Future<void> _openMediaCacheControls() async {
+    final user = _user;
+    if (user == null) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _MediaCacheControlsDialog(
+        chatService: _chatService,
+        userId: user.id,
+        initialSettings: _mediaCacheSettings,
+        initialCacheBytes: _mediaCacheBytes,
+      ),
+    );
+
+    final settings = await _chatService.getMediaCacheSettings(userId: user.id);
+    final cacheBytes = await _chatService.estimateLocalMediaCacheBytes(
+      userId: user.id,
+    );
+    if (!mounted) return;
+    setState(() {
+      _mediaCacheSettings = settings;
+      _mediaCacheBytes = cacheBytes;
+    });
+  }
+
   Future<void> _toggleSelectedThreadPin() async {
     final user = _user;
     final thread = _selectedThread;
@@ -1253,6 +1293,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       _ChatHeader(
                         onNewThread: _openNewThreadDialog,
+                        onMediaCache: _openMediaCacheControls,
                         usingLocalCache: _usingLocalCache,
                       ),
                       const SizedBox(height: 16),
@@ -1320,6 +1361,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _MobileChatToolbar(
           usingLocalCache: _usingLocalCache,
           onNewThread: _openNewThreadDialog,
+          onMediaCache: _openMediaCacheControls,
         ),
         Expanded(
           child: _ThreadsPanel(
@@ -1407,10 +1449,12 @@ class _ChatScreenState extends State<ChatScreen> {
 class _MobileChatToolbar extends StatelessWidget {
   final bool usingLocalCache;
   final VoidCallback onNewThread;
+  final VoidCallback onMediaCache;
 
   const _MobileChatToolbar({
     required this.usingLocalCache,
     required this.onNewThread,
+    required this.onMediaCache,
   });
 
   @override
@@ -1433,6 +1477,11 @@ class _MobileChatToolbar extends StatelessWidget {
                 child: Icon(Icons.offline_bolt_rounded, size: 20),
               ),
             IconButton(
+              onPressed: onMediaCache,
+              tooltip: 'Cache médias',
+              icon: const Icon(Icons.storage_rounded),
+            ),
+            IconButton(
               onPressed: onNewThread,
               tooltip: 'Nouvelle discussion',
               icon: const Icon(Icons.add_comment_rounded),
@@ -1446,9 +1495,14 @@ class _MobileChatToolbar extends StatelessWidget {
 
 class _ChatHeader extends StatelessWidget {
   final VoidCallback onNewThread;
+  final VoidCallback onMediaCache;
   final bool usingLocalCache;
 
-  const _ChatHeader({required this.onNewThread, required this.usingLocalCache});
+  const _ChatHeader({
+    required this.onNewThread,
+    required this.onMediaCache,
+    required this.usingLocalCache,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1483,10 +1537,22 @@ class _ChatHeader extends StatelessWidget {
                 ],
               ),
             );
-            final action = ElevatedButton.icon(
-              onPressed: onNewThread,
-              icon: const Icon(Icons.add_comment_rounded),
-              label: const Text('Nouvelle'),
+            final actions = Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.end,
+              children: [
+                IconButton.filledTonal(
+                  onPressed: onMediaCache,
+                  tooltip: 'Cache médias',
+                  icon: const Icon(Icons.storage_rounded),
+                ),
+                ElevatedButton.icon(
+                  onPressed: onNewThread,
+                  icon: const Icon(Icons.add_comment_rounded),
+                  label: const Text('Nouvelle'),
+                ),
+              ],
             );
 
             if (compact) {
@@ -1506,7 +1572,7 @@ class _ChatHeader extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  SizedBox(width: double.infinity, child: action),
+                  SizedBox(width: double.infinity, child: actions),
                 ],
               );
             }
@@ -1522,7 +1588,7 @@ class _ChatHeader extends StatelessWidget {
                 const SizedBox(width: 14),
                 title,
                 const SizedBox(width: 12),
-                action,
+                actions,
               ],
             );
           },
@@ -2289,6 +2355,10 @@ class _MessageBody extends StatelessWidget {
               ),
             ),
           ],
+          if (message.isEphemeralMedia) ...[
+            const SizedBox(height: 6),
+            _EphemeralMediaBadge(duration: message.ephemeralDuration!),
+          ],
           if (message.content.trim().isNotEmpty &&
               message.content != message.attachmentLabel) ...[
             const SizedBox(height: 8),
@@ -2324,6 +2394,8 @@ class _MediaFallback extends StatelessWidget {
         _formatBytes(message.attachmentSizeBytes!),
       if (message.durationSeconds != null)
         _formatDuration(message.durationSeconds!),
+      if (message.isEphemeralMedia)
+        'Éphémère ${_ephemeralDurationLabel(message.ephemeralDuration!)}',
     ].join(' · ');
 
     return Container(
@@ -2379,6 +2451,22 @@ class _MediaFallback extends StatelessWidget {
           _AttachmentActionButton(message: message, compact: true),
         ],
       ),
+    );
+  }
+}
+
+class _EphemeralMediaBadge extends StatelessWidget {
+  final String duration;
+
+  const _EphemeralMediaBadge({required this.duration});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      avatar: const Icon(Icons.timer_outlined, size: 16),
+      label: Text('Éphémère ${_ephemeralDurationLabel(duration)}'),
     );
   }
 }
@@ -2576,6 +2664,149 @@ class _MessageComposer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MediaCacheControlsDialog extends StatefulWidget {
+  final ChatService chatService;
+  final String userId;
+  final ChatMediaCacheSettings initialSettings;
+  final int initialCacheBytes;
+
+  const _MediaCacheControlsDialog({
+    required this.chatService,
+    required this.userId,
+    required this.initialSettings,
+    required this.initialCacheBytes,
+  });
+
+  @override
+  State<_MediaCacheControlsDialog> createState() =>
+      _MediaCacheControlsDialogState();
+}
+
+class _MediaCacheControlsDialogState extends State<_MediaCacheControlsDialog> {
+  late ChatMediaCacheSettings _settings;
+  late int _cacheBytes;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = widget.initialSettings;
+    _cacheBytes = widget.initialCacheBytes;
+  }
+
+  Future<void> _save(ChatMediaCacheSettings settings) async {
+    setState(() {
+      _settings = settings;
+      _busy = true;
+    });
+    await widget.chatService.setMediaCacheSettings(
+      userId: widget.userId,
+      settings: settings,
+    );
+    final bytes = await widget.chatService.estimateLocalMediaCacheBytes(
+      userId: widget.userId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _cacheBytes = bytes;
+      _busy = false;
+    });
+  }
+
+  Future<void> _clearCache() async {
+    setState(() => _busy = true);
+    await widget.chatService.clearLocalMediaCache(userId: widget.userId);
+    final bytes = await widget.chatService.estimateLocalMediaCacheBytes(
+      userId: widget.userId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _cacheBytes = bytes;
+      _busy = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Cache médias'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32)
+            .clamp(280.0, 520.0)
+            .toDouble(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _settings.autoDownloadMedia,
+              onChanged: _busy
+                  ? null
+                  : (value) =>
+                        _save(_settings.copyWith(autoDownloadMedia: value)),
+              secondary: const Icon(Icons.download_for_offline_rounded),
+              title: const Text('Téléchargement auto'),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Mode éphémère',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: '24h', label: Text('24 h')),
+                ButtonSegment(value: '7d', label: Text('7 j')),
+                ButtonSegment(value: '30d', label: Text('30 j')),
+              ],
+              selected: {_settings.ephemeralDuration},
+              onSelectionChanged: _busy
+                  ? null
+                  : (values) => _save(
+                      _settings.copyWith(ephemeralDuration: values.first),
+                    ),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.storage_rounded),
+              title: const Text('Cache local'),
+              subtitle: Text(_formatBytes(_cacheBytes)),
+              trailing: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _clearCache,
+                icon: const Icon(Icons.cleaning_services_rounded),
+                label: const Text('Vider le cache local'),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+      ],
     );
   }
 }
@@ -4318,6 +4549,19 @@ String _formatDuration(int seconds) {
   final remainingSeconds = seconds % 60;
   if (minutes <= 0) return '${remainingSeconds}s';
   return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+}
+
+String _ephemeralDurationLabel(String duration) {
+  switch (duration) {
+    case '24h':
+      return '24 h';
+    case '7d':
+      return '7 j';
+    case '30d':
+      return '30 j';
+    default:
+      return duration;
+  }
 }
 
 void _copyAttachmentLink(BuildContext context, ChatMessageModel message) {

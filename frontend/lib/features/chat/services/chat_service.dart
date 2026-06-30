@@ -6,6 +6,26 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/chat_models.dart';
 
+class ChatMediaCacheSettings {
+  final bool autoDownloadMedia;
+  final String ephemeralDuration;
+
+  const ChatMediaCacheSettings({
+    this.autoDownloadMedia = true,
+    this.ephemeralDuration = '7d',
+  });
+
+  ChatMediaCacheSettings copyWith({
+    bool? autoDownloadMedia,
+    String? ephemeralDuration,
+  }) {
+    return ChatMediaCacheSettings(
+      autoDownloadMedia: autoDownloadMedia ?? this.autoDownloadMedia,
+      ephemeralDuration: ephemeralDuration ?? this.ephemeralDuration,
+    );
+  }
+}
+
 class ChatService {
   final ApiClient _apiClient;
   final AuthService _authService;
@@ -230,6 +250,67 @@ class ChatService {
     );
   }
 
+  Future<ChatMediaCacheSettings> getMediaCacheSettings({
+    required String userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    return ChatMediaCacheSettings(
+      autoDownloadMedia: prefs.getBool(_mediaAutoDownloadKey(userId)) ?? true,
+      ephemeralDuration:
+          prefs.getString(_mediaEphemeralDurationKey(userId)) ?? '7d',
+    );
+  }
+
+  Future<void> setMediaCacheSettings({
+    required String userId,
+    required ChatMediaCacheSettings settings,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _mediaAutoDownloadKey(userId),
+      settings.autoDownloadMedia,
+    );
+    await prefs.setString(
+      _mediaEphemeralDurationKey(userId),
+      settings.ephemeralDuration,
+    );
+  }
+
+  Future<int> estimateLocalMediaCacheBytes({required String userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    var total = 0;
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith(_messagesCachePrefix(userId))) continue;
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) continue;
+        for (final item in decoded.whereType<Map<String, dynamic>>()) {
+          final message = ChatMessageModel.fromJson(item);
+          if (message.isMedia) {
+            total += message.attachmentSizeBytes ?? 0;
+          }
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return total;
+  }
+
+  Future<int> clearLocalMediaCache({required String userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs
+        .getKeys()
+        .where((key) => key.startsWith(_messagesCachePrefix(userId)))
+        .toList();
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+    return keys.length;
+  }
+
   Future<ChatMessageModel> sendMessage({
     required String threadId,
     required String content,
@@ -408,10 +489,22 @@ class ChatService {
   }
 
   String _messagesCacheKey(String userId, String threadId) {
-    return 'enactspace_chat_messages_${userId}_$threadId';
+    return '${_messagesCachePrefix(userId)}$threadId';
+  }
+
+  String _messagesCachePrefix(String userId) {
+    return 'enactspace_chat_messages_${userId}_';
   }
 
   String _pinnedMessagesKey(String userId, String threadId) {
     return 'enactspace_chat_pinned_messages_${userId}_$threadId';
+  }
+
+  String _mediaAutoDownloadKey(String userId) {
+    return 'enactspace_chat_media_auto_download_$userId';
+  }
+
+  String _mediaEphemeralDurationKey(String userId) {
+    return 'enactspace_chat_media_ephemeral_duration_$userId';
   }
 }
