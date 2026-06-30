@@ -59,6 +59,7 @@ class PostsService {
     required bool isOfficial,
     String? poleId,
     String? projectId,
+    String? mediaFileId,
   }) async {
     final token = await _requireToken();
 
@@ -73,6 +74,7 @@ class PostsService {
         'is_official': isOfficial,
         'pole_id': poleId,
         'project_id': projectId,
+        'media_file_id': mediaFileId,
       },
     );
 
@@ -81,6 +83,29 @@ class PostsService {
     }
 
     throw Exception('Réponse invalide lors de la création de publication.');
+  }
+
+  Future<PostUploadedMediaModel> uploadMediaBase64({
+    required String fileName,
+    required String dataBase64,
+    String? contentType,
+  }) async {
+    final token = await _requireToken();
+    final response = await _apiClient.postJson(
+      '/posts/uploads',
+      token: token,
+      data: {
+        'file_name': fileName.trim(),
+        'content_type': _nullable(contentType),
+        'data_base64': dataBase64.trim(),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PostUploadedMediaModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide lors de l upload du media.');
   }
 
   Future<List<PostCommentModel>> getComments(String postId) async {
@@ -220,5 +245,10 @@ class PostsService {
       return response['items'] as List;
     }
     return [];
+  }
+
+  String? _nullable(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }

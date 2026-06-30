@@ -83,6 +83,19 @@ def ensure_compatibility_columns() -> None:
         if "expires_at" not in document_columns:
             statements.append("ALTER TABLE documents ADD COLUMN expires_at DATETIME")
 
+    if "posts" in inspector.get_table_names():
+        post_columns = {column["name"] for column in inspector.get_columns("posts")}
+        if "media_file_id" not in post_columns:
+            statements.append("ALTER TABLE posts ADD COLUMN media_file_id CHAR(36)")
+        if "media_url" not in post_columns:
+            statements.append("ALTER TABLE posts ADD COLUMN media_url VARCHAR(500)")
+        if "media_name" not in post_columns:
+            statements.append("ALTER TABLE posts ADD COLUMN media_name VARCHAR(255)")
+        if "media_mime_type" not in post_columns:
+            statements.append("ALTER TABLE posts ADD COLUMN media_mime_type VARCHAR(120)")
+        if "media_size_bytes" not in post_columns:
+            statements.append("ALTER TABLE posts ADD COLUMN media_size_bytes INTEGER")
+
     if statements:
         with engine.begin() as connection:
             for statement in statements:

@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
@@ -17,6 +21,20 @@ import '../models/post_comment_model.dart';
 import '../models/post_model.dart';
 import '../models/post_stats_model.dart';
 import '../services/posts_service.dart';
+
+class _SelectedPostMedia {
+  final String fileId;
+  final String fileName;
+  final String? contentType;
+  final int sizeBytes;
+
+  const _SelectedPostMedia({
+    required this.fileId,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+  });
+}
 
 class PostsScreen extends StatefulWidget {
   const PostsScreen({super.key});
@@ -39,6 +57,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
 
   bool _loading = true;
   bool _creating = false;
+  bool _uploadingMedia = false;
   bool _refreshing = false;
   String? _error;
   Timer? _refreshTimer;
@@ -63,6 +82,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   String? _composerPoleId;
   String? _composerProjectId;
   bool _composerOfficial = false;
+  _SelectedPostMedia? _selectedMedia;
 
   @override
   void initState() {
@@ -198,10 +218,72 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _pickPostMedia() async {
+    if (_uploadingMedia || _creating) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: false,
+      type: FileType.any,
+    );
+    final file = result?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || bytes.isEmpty) return;
+
+    setState(() => _uploadingMedia = true);
+
+    try {
+      final upload = await _postsService.uploadMediaBase64(
+        fileName: file.name,
+        dataBase64: base64Encode(bytes),
+        contentType: _guessContentType(file.name),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _selectedMedia = _SelectedPostMedia(
+          fileId: upload.fileId,
+          fileName: upload.fileName,
+          contentType: upload.contentType,
+          sizeBytes: upload.sizeBytes,
+        );
+      });
+    } catch (e) {
+      _showError(e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingMedia = false);
+      }
+    }
+  }
+
+  String? _guessContentType(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return null;
+    }
+  }
+
   Future<void> _createPost() async {
     final content = _contentController.text.trim();
 
-    if (content.isEmpty) {
+    if (content.isEmpty && _selectedMedia == null) {
       _showError('Le contenu de la publication est obligatoire.');
       return;
     }
@@ -229,6 +311,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
         projectId: _composerVisibility == 'project_only'
             ? _composerProjectId
             : null,
+        mediaFileId: _selectedMedia?.fileId,
       );
 
       _titleController.clear();
@@ -241,6 +324,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
         _composerOfficial = false;
         _composerPoleId = null;
         _composerProjectId = null;
+        _selectedMedia = null;
       });
 
       await _loadPosts();
@@ -540,6 +624,8 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
             isOfficial: _composerOfficial,
             canPublishOfficial: canModerate,
             creating: _creating,
+            uploadingMedia: _uploadingMedia,
+            selectedMedia: _selectedMedia,
             onPostTypeChanged: (value) {
               setState(() => _composerPostType = value);
             },
@@ -556,6 +642,8 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
             onOfficialChanged: (value) {
               setState(() => _composerOfficial = value);
             },
+            onPickMedia: _pickPostMedia,
+            onRemoveMedia: () => setState(() => _selectedMedia = null),
             onSubmit: _createPost,
           );
 
@@ -955,11 +1043,15 @@ class _PostComposer extends StatelessWidget {
   final bool isOfficial;
   final bool canPublishOfficial;
   final bool creating;
+  final bool uploadingMedia;
+  final _SelectedPostMedia? selectedMedia;
   final ValueChanged<String> onPostTypeChanged;
   final ValueChanged<String> onVisibilityChanged;
   final ValueChanged<String?> onPoleChanged;
   final ValueChanged<String?> onProjectChanged;
   final ValueChanged<bool> onOfficialChanged;
+  final VoidCallback onPickMedia;
+  final VoidCallback onRemoveMedia;
   final VoidCallback onSubmit;
 
   const _PostComposer({
@@ -974,11 +1066,15 @@ class _PostComposer extends StatelessWidget {
     required this.isOfficial,
     required this.canPublishOfficial,
     required this.creating,
+    required this.uploadingMedia,
+    required this.selectedMedia,
     required this.onPostTypeChanged,
     required this.onVisibilityChanged,
     required this.onPoleChanged,
     required this.onProjectChanged,
     required this.onOfficialChanged,
+    required this.onPickMedia,
+    required this.onRemoveMedia,
     required this.onSubmit,
   });
 
@@ -1024,6 +1120,13 @@ class _PostComposer extends StatelessWidget {
                 labelText: 'Contenu',
                 prefixIcon: Icon(Icons.notes_rounded),
               ),
+            ),
+            const SizedBox(height: 12),
+            _ComposerMediaPicker(
+              selectedMedia: selectedMedia,
+              uploading: uploadingMedia,
+              onPick: onPickMedia,
+              onRemove: onRemoveMedia,
             ),
             const SizedBox(height: 14),
             Wrap(
@@ -1129,6 +1232,70 @@ class _PostComposer extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ComposerMediaPicker extends StatelessWidget {
+  final _SelectedPostMedia? selectedMedia;
+  final bool uploading;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  const _ComposerMediaPicker({
+    required this.selectedMedia,
+    required this.uploading,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final media = selectedMedia;
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: compact ? double.infinity : null,
+            child: OutlinedButton.icon(
+              onPressed: uploading ? null : onPick,
+              icon: uploading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.attach_file_rounded),
+              label: Text(uploading ? 'Upload...' : 'Joindre un media'),
+            ),
+          ),
+          if (media != null)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: compact ? 360 : 520),
+              child: InputChip(
+                avatar: Icon(_mediaIcon(media.contentType), size: 18),
+                label: Text(
+                  '${media.fileName} · ${_formatBytes(media.sizeBytes)}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onDeleted: uploading ? null : onRemove,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1445,6 +1612,10 @@ class _PostCard extends StatelessWidget {
               maxLines: compact ? 8 : 12,
               style: const TextStyle(height: 1.45),
             ),
+            if (post.hasMedia) ...[
+              const SizedBox(height: 12),
+              _PostMediaPreview(post: post),
+            ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
@@ -1567,6 +1738,134 @@ class _PostCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PostMediaPreview extends StatelessWidget {
+  final PostModel post;
+
+  const _PostMediaPreview({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = post.absoluteMediaUrl;
+    final name = post.mediaName?.trim().isNotEmpty == true
+        ? post.mediaName!.trim()
+        : 'Piece jointe';
+
+    if (url == null) return const SizedBox.shrink();
+
+    if (post.mediaIsImage) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: AspectRatio(
+          aspectRatio: 16 / 10,
+          child: _AuthenticatedPostImage(url: url),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.22),
+            foregroundColor: AppTheme.softBlack,
+            child: Icon(_mediaIcon(post.mediaMimeType)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatBytes(post.mediaSizeBytes),
+                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthenticatedPostImage extends StatefulWidget {
+  final String url;
+
+  const _AuthenticatedPostImage({required this.url});
+
+  @override
+  State<_AuthenticatedPostImage> createState() =>
+      _AuthenticatedPostImageState();
+}
+
+class _AuthenticatedPostImageState extends State<_AuthenticatedPostImage> {
+  final AuthService _authService = AuthService();
+  Future<Uint8List>? _imageFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageFuture = _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AuthenticatedPostImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _imageFuture = _loadImage();
+    }
+  }
+
+  Future<Uint8List> _loadImage() async {
+    final token = await _authService.getToken();
+    final response = await http.get(
+      Uri.parse(widget.url),
+      headers: {if (token != null) 'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Image indisponible');
+    }
+    return response.bodyBytes;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List>(
+      future: _imageFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return Image.memory(snapshot.data!, fit: BoxFit.cover);
+        }
+        if (snapshot.hasError) {
+          return Container(
+            color: Colors.black.withValues(alpha: 0.05),
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined, size: 38),
+          );
+        }
+        return Container(
+          color: Colors.black.withValues(alpha: 0.04),
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
+        );
+      },
     );
   }
 }
@@ -1873,6 +2172,25 @@ String? _absoluteUrl(String? url) {
   if (url == null || url.trim().isEmpty) return null;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   return '${ApiClient.serverUrl}$url';
+}
+
+IconData _mediaIcon(String? contentType) {
+  final type = (contentType ?? '').toLowerCase();
+  if (type.startsWith('image/')) return Icons.image_rounded;
+  if (type.startsWith('video/')) return Icons.play_circle_outline_rounded;
+  if (type.startsWith('audio/')) return Icons.graphic_eq_rounded;
+  if (type.contains('pdf')) return Icons.picture_as_pdf_rounded;
+  return Icons.insert_drive_file_rounded;
+}
+
+String _formatBytes(int? value) {
+  final bytes = value ?? 0;
+  if (bytes <= 0) return '0 o';
+  if (bytes < 1024) return '$bytes o';
+  final kb = bytes / 1024;
+  if (kb < 1024) return '${kb.toStringAsFixed(kb < 10 ? 1 : 0)} Ko';
+  final mb = kb / 1024;
+  return '${mb.toStringAsFixed(mb < 10 ? 1 : 0)} Mo';
 }
 
 String _initials(String name) {

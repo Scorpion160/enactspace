@@ -101,6 +101,16 @@ def ensure_file_access(
         if participant:
             return
 
+    if stored_file.entity_type == "post" and stored_file.entity_id:
+        from app.api.routes.posts import visible_posts_query
+        from app.models.post import Post
+
+        visible_post = visible_posts_query(db, current_user).filter(
+            Post.id == stored_file.entity_id
+        ).first()
+        if visible_post:
+            return
+
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Vous n'avez pas acces a ce fichier.",

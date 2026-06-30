@@ -52,6 +52,16 @@ class Post(Base):
         nullable=True,
     )
 
+    media_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
+    media_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    media_mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    media_size_bytes: Mapped[int | None] = mapped_column(nullable=True)
+
     is_official: Mapped[bool] = mapped_column(Boolean, default=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
 

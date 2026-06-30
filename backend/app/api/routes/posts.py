@@ -9,11 +9,14 @@ from app.db.database import get_db
 from app.models.post import Post, PostComment, PostReaction
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
+from app.models.stored_file import StoredFile
 from app.models.user import User
 from app.schemas.post import (
     PostCreate,
     PostUpdate,
     PostRead,
+    PostUploadCreate,
+    PostUploadRead,
     PostCommentCreate,
     PostCommentRead,
     PostReactionCreate,
@@ -26,6 +29,7 @@ from app.api.deps import (
     require_enacchef_or_admin,
 )
 from app.services.notification_service import notify_user, notify_users
+from app.services.file_storage_service import store_base64
 
 router = APIRouter(prefix="/posts", tags=["Publications"])
 
@@ -364,6 +368,72 @@ def ensure_can_pin_post(
         detail="Seuls les responsables autorisÃ©s peuvent Ã©pingler une publication",
     )
 
+def attach_media_to_post(
+    db: Session,
+    *,
+    file_id,
+    post: Post,
+    current_user: User,
+) -> StoredFile | None:
+    if not file_id:
+        return None
+
+    stored_file = db.query(StoredFile).filter(StoredFile.id == file_id).first()
+    if not stored_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media de publication introuvable",
+        )
+    if stored_file.uploaded_by_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas utiliser ce media.",
+        )
+
+    stored_file.storage_scope = "post"
+    stored_file.visibility = post.visibility
+    stored_file.entity_type = "post"
+    stored_file.entity_id = post.id
+    stored_file.is_temporary = False
+    stored_file.is_ephemeral = False
+    stored_file.expires_at = None
+    stored_file.updated_at = datetime.utcnow()
+
+    post.media_file_id = stored_file.id
+    post.media_url = f"/api/files/{stored_file.id}/preview"
+    post.media_name = stored_file.original_filename
+    post.media_mime_type = stored_file.mime_type
+    post.media_size_bytes = stored_file.file_size
+    return stored_file
+
+
+@router.post("/uploads", response_model=PostUploadRead)
+def upload_post_media(
+    payload: PostUploadCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    stored_file = store_base64(
+        db,
+        data_base64=payload.data_base64,
+        original_filename=payload.file_name,
+        uploaded_by=current_user,
+        mime_type=payload.content_type,
+        storage_scope="post",
+        visibility="private",
+        is_temporary=True,
+    )
+    db.commit()
+    db.refresh(stored_file)
+
+    return PostUploadRead(
+        file_id=stored_file.id,
+        url=f"/api/files/{stored_file.id}/preview",
+        file_name=stored_file.original_filename,
+        content_type=stored_file.mime_type,
+        size_bytes=stored_file.file_size,
+    )
+
 
 @router.post("/", response_model=PostRead)
 def create_post(
@@ -426,6 +496,12 @@ def create_post(
 
     db.add(post)
     db.flush()
+    attach_media_to_post(
+        db,
+        file_id=payload.media_file_id,
+        post=post,
+        current_user=current_user,
+    )
     notify_mentions(
         db,
         current_user=current_user,
@@ -564,12 +640,27 @@ def update_post(
             project_id=post.project_id,
         )
         post.visibility = payload.visibility
+        if post.media_file_id:
+            stored_file = db.query(StoredFile).filter(
+                StoredFile.id == post.media_file_id
+            ).first()
+            if stored_file:
+                stored_file.visibility = post.visibility
+                stored_file.updated_at = datetime.utcnow()
 
     if payload.title is not None:
         post.title = payload.title
 
     if payload.content is not None:
         post.content = payload.content
+
+    if payload.media_file_id is not None:
+        attach_media_to_post(
+            db,
+            file_id=payload.media_file_id,
+            post=post,
+            current_user=current_user,
+        )
 
     if payload.is_official is not None:
         if not current_roles.intersection(ENACCHEF_ROLES):

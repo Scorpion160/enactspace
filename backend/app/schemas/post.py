@@ -12,6 +12,7 @@ class PostCreate(BaseModel):
     project_id: Optional[UUID] = None
     event_id: Optional[UUID] = None
     document_id: Optional[UUID] = None
+    media_file_id: Optional[UUID] = None
     is_official: bool = False
     visibility: str = "internal"
 
@@ -21,6 +22,7 @@ class PostUpdate(BaseModel):
     content: Optional[str] = None
     post_type: Optional[str] = None
     visibility: Optional[str] = None
+    media_file_id: Optional[UUID] = None
     is_official: Optional[bool] = None
     is_pinned: Optional[bool] = None
 
@@ -35,6 +37,11 @@ class PostRead(BaseModel):
     project_id: Optional[UUID]
     event_id: Optional[UUID]
     document_id: Optional[UUID]
+    media_file_id: Optional[UUID]
+    media_url: Optional[str]
+    media_name: Optional[str]
+    media_mime_type: Optional[str]
+    media_size_bytes: Optional[int]
     is_official: bool
     is_pinned: bool
     visibility: str
@@ -48,6 +55,20 @@ class PostRead(BaseModel):
 class PostCommentCreate(BaseModel):
     post_id: UUID
     content: str
+
+
+class PostUploadCreate(BaseModel):
+    file_name: str
+    content_type: Optional[str] = None
+    data_base64: str
+
+
+class PostUploadRead(BaseModel):
+    file_id: UUID
+    url: str
+    file_name: str
+    content_type: Optional[str]
+    size_bytes: int
 
 
 class PostCommentRead(BaseModel):
