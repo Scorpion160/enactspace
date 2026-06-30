@@ -112,8 +112,17 @@ class UserExperience {
   bool get isFinance => hasAnyRole(_financeRoles);
 
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
-  bool get isEnactrice => gender == 'femme';
-  String get memberLabel => isEnactrice ? 'Enactrice' : 'Enacteur';
+  String get normalizedGender => gender?.trim().toLowerCase() ?? '';
+  bool get isEnactrice =>
+      {'femme', 'feminin', 'féminin', 'female'}.contains(normalizedGender);
+  bool get isEnacteur =>
+      {'homme', 'masculin', 'male'}.contains(normalizedGender);
+
+  String get memberLabel {
+    if (isEnactrice) return 'Enactrice';
+    if (isEnacteur) return 'Enacteur';
+    return 'Enacteur/Enactrice';
+  }
 
   bool get isProjectOrPoleLead {
     return hasAnyRole(_poleLeadRoles) || hasAnyRole(_projectLeadRoles);

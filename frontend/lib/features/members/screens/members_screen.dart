@@ -1562,7 +1562,7 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
       case 'faculty_advisor':
         return 'Faculty Advisor';
       case 'enacteur':
-        return 'Enacteur';
+        return widget.member.memberLabel;
       case 'alumni':
         return 'Alumni';
       default:

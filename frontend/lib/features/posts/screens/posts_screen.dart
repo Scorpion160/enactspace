@@ -534,12 +534,12 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     final member = _membersById[post.authorId];
     if (member == null) return 'Membre Enactus';
 
-    final roles = member.rolesLabel == 'Aucun rôle' ? null : member.rolesLabel;
+    final roles = member.roles.isEmpty ? member.memberLabel : member.rolesLabel;
     final department = member.departmentLabel == 'Non défini'
         ? null
         : member.departmentLabel;
 
-    return [?roles, ?department, member.statusLabel].join(' · ');
+    return [roles, ?department, member.statusLabel].join(' · ');
   }
 
   String _authorRoleLabel(PostModel post) {
@@ -577,7 +577,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     if (normalizedRoles.any((role) => role.contains('adjoint'))) {
       return 'Adjoint';
     }
-    return 'Enacteur';
+    return member.memberLabel;
   }
 
   String? _authorPhotoUrl(PostModel post) {

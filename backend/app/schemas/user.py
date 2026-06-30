@@ -76,6 +76,7 @@ class UserDirectoryRead(BaseModel):
     last_name: str
     email: EmailStr
     photo_url: Optional[str] = None
+    gender: Optional[str] = None
     profile_type: str
     department: Optional[str] = None
     core_pole_id: Optional[UUID] = None

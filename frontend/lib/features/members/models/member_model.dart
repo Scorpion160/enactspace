@@ -9,6 +9,8 @@ class MemberModel {
   final bool? emailVerified;
   final String? corePoleId;
   final String? polePosition;
+  final String? gender;
+  final String? profileType;
   final List<String> roles;
   final String? department;
   final String? photoUrl;
@@ -24,6 +26,8 @@ class MemberModel {
     this.emailVerified,
     this.corePoleId,
     this.polePosition,
+    this.gender,
+    this.profileType,
     this.roles = const [],
     this.department,
     this.photoUrl,
@@ -46,6 +50,8 @@ class MemberModel {
           : null,
       corePoleId: json['core_pole_id']?.toString(),
       polePosition: json['pole_position']?.toString(),
+      gender: json['gender']?.toString(),
+      profileType: json['profile_type']?.toString(),
       roles: _parseRoles(json['roles']),
       department: json['department']?.toString(),
       photoUrl:
@@ -113,12 +119,34 @@ class MemberModel {
     }
   }
 
+  bool get isAlumni => status == 'alumni' || profileType == 'alumni';
+
+  String get memberLabel {
+    if (isAlumni) return 'Alumni';
+
+    switch (gender?.trim().toLowerCase()) {
+      case 'homme':
+      case 'masculin':
+      case 'male':
+        return 'Enacteur';
+      case 'femme':
+      case 'feminin':
+      case 'féminin':
+      case 'female':
+        return 'Enactrice';
+      default:
+        return 'Enacteur/Enactrice';
+    }
+  }
+
   String get rolesLabel {
     final safeRoles = roles.where((role) => role.trim().isNotEmpty).toList();
 
-    if (safeRoles.isEmpty) return 'Aucun rôle';
+    if (safeRoles.isEmpty) return memberLabel;
 
-    return safeRoles.join(', ');
+    return safeRoles
+        .map((role) => role == 'enacteur' ? memberLabel : role)
+        .join(', ');
   }
 
   String get departmentLabel {

@@ -152,6 +152,7 @@ def build_directory_user(db: Session, user: User) -> UserDirectoryRead:
         last_name=user.last_name,
         email=user.email,
         photo_url=user.photo_url,
+        gender=user.gender,
         profile_type=user.profile_type,
         department=user.department,
         core_pole_id=pole_member.pole_id if pole_member else None,
