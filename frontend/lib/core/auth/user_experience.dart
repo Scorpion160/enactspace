@@ -152,7 +152,7 @@ class UserExperience {
       isAdmin || isTeamLeader || isSecretary || isProjectOrPoleLead;
   bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
   bool get canManageGamification => isAdmin || isTeamLeader || isSecretary;
-  bool get canViewMembersDirectory => !isAlumni || canManageMembers;
+  bool get canViewMembersDirectory => canManageMembers || isProjectOrPoleLead;
   bool get canViewOperations => !isAlumni;
 
   bool get isMemberExperience {
@@ -219,22 +219,28 @@ class UserExperience {
       '/posts',
       '/chat',
       '/tasks',
-      '/attendance',
       '/documents',
-      '/events',
       '/gamification',
       '/academy',
       '/archives',
     };
 
-    routes.addAll({'/poles', '/projects'});
-
     if (user.canViewMembersDirectory) {
       routes.add('/members');
     }
 
-    if (!user.isAlumni) {
+    if (user.canViewFinance) {
       routes.add('/finance');
+    }
+
+    if (user.canManageAttendance || user.isProjectOrPoleLead) {
+      routes.add('/attendance');
+    }
+
+    if (user.isEnacchef) {
+      routes.addAll({'/poles', '/projects', '/events'});
+    } else {
+      routes.add('/events');
     }
 
     if (user.canViewRecruitment) {
