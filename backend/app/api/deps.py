@@ -7,6 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.security import decode_access_token
+from app.core.roles import (
+    ENACCHEF_ROLES,
+    FINANCE_MANAGEMENT_ROLES,
+    GLOBAL_MANAGEMENT_ROLES,
+    JOIN_REQUEST_REVIEWER_ROLES,
+    RECRUITMENT_ACCESS_ROLES,
+    SECRETARIAT_ROLES,
+    normalize_role_name,
+)
 from app.models.user import User
 from app.models.role import Role, UserRole
 from app.models.pole import Pole, PoleMember
@@ -70,16 +79,17 @@ def get_user_role_names(db: Session, user_id) -> set[str]:
         .all()
     )
 
-    return {row[0] for row in rows}
+    return {normalize_role_name(row[0]) for row in rows}
 
 
 def user_has_role(db: Session, user_id, role_name: str) -> bool:
-    return role_name in get_user_role_names(db, user_id)
+    return normalize_role_name(role_name) in get_user_role_names(db, user_id)
 
 
 def user_has_any_role(db: Session, user_id, role_names: Iterable[str]) -> bool:
     current_roles = get_user_role_names(db, user_id)
-    return bool(current_roles.intersection(set(role_names)))
+    allowed_roles = {normalize_role_name(role) for role in role_names}
+    return bool(current_roles.intersection(allowed_roles))
 
 
 def require_roles(*allowed_roles: str):
@@ -102,19 +112,7 @@ def require_enacchef_or_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ) -> User:
-    allowed_roles = {
-        "team_leader",
-        "secretaire_generale",
-        "financier",
-        "chef_pole",
-        "adjoint_chef_pole",
-        "chef_projet",
-        "adjoint_chef_projet",
-        "administrateur",
-        "faculty_advisor",
-    }
-
-    if not user_has_any_role(db, current_user.id, allowed_roles):
+    if not user_has_any_role(db, current_user.id, ENACCHEF_ROLES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée à Enacchef ou à l'administration",
@@ -127,12 +125,7 @@ def require_admin_or_team_leader(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ) -> User:
-    allowed_roles = {
-        "administrateur",
-        "team_leader",
-    }
-
-    if not user_has_any_role(db, current_user.id, allowed_roles):
+    if not user_has_any_role(db, current_user.id, GLOBAL_MANAGEMENT_ROLES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée au Team Leader ou à l'administrateur",
@@ -145,13 +138,7 @@ def require_sg_or_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ) -> User:
-    allowed_roles = {
-        "secretaire_generale",
-        "team_leader",
-        "administrateur",
-    }
-
-    if not user_has_any_role(db, current_user.id, allowed_roles):
+    if not user_has_any_role(db, current_user.id, SECRETARIAT_ROLES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée à la Secrétaire Générale, au Team Leader ou à l'administrateur",
@@ -165,13 +152,7 @@ def can_review_join_requests(
     user: User,
 ) -> bool:
     roles = get_user_role_names(db, user.id)
-    if roles.intersection(
-        {
-            "administrateur",
-            "team_leader",
-            "secretaire_generale",
-        }
-    ):
+    if roles.intersection(JOIN_REQUEST_REVIEWER_ROLES):
         return True
 
     return (
@@ -209,13 +190,7 @@ def require_finance_or_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ) -> User:
-    allowed_roles = {
-        "financier",
-        "team_leader",
-        "administrateur",
-    }
-
-    if not user_has_any_role(db, current_user.id, allowed_roles):
+    if not user_has_any_role(db, current_user.id, FINANCE_MANAGEMENT_ROLES):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée au financier, au Team Leader ou à l'administrateur",
@@ -228,23 +203,7 @@ def require_recruitment_access(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ) -> User:
-    allowed_roles = {
-        "administrateur",
-        "team_leader",
-        "secretaire_generale",
-        "chef_pole",
-        "adjoint_chef_pole",
-        "chef_projet",
-        "adjoint_chef_projet",
-        "pole_veille",
-        "veille",
-        "chef_pole_veille",
-        "adjoint_pole_veille",
-        "recrutement",
-        "recruiter",
-    }
-
-    if user_has_any_role(db, current_user.id, allowed_roles):
+    if user_has_any_role(db, current_user.id, RECRUITMENT_ACCESS_ROLES):
         return current_user
 
     veille_membership = (

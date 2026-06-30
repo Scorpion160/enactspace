@@ -1,3 +1,58 @@
+const Set<String> _adminRoles = {
+  'administrateur',
+  'admin',
+  'administrator',
+  'super_admin',
+};
+
+const Set<String> _teamLeaderRoles = {
+  'team_leader',
+  'tl',
+  'president',
+  'presidente',
+};
+
+const Set<String> _secretaryRoles = {
+  'secretaire_generale',
+  'secretaire_general',
+  'secretary',
+  'sg',
+};
+
+const Set<String> _financeRoles = {
+  'financier',
+  'financiere',
+  'finance',
+  'tresorier',
+  'tresoriere',
+  'treasurer',
+};
+
+const Set<String> _poleLeadRoles = {
+  'chef_pole',
+  'chef_de_pole',
+  'adjoint_chef_pole',
+  'adjoint_chef_de_pole',
+  'pole_lead',
+};
+
+const Set<String> _projectLeadRoles = {
+  'chef_projet',
+  'chef_de_projet',
+  'adjoint_chef_projet',
+  'adjoint_chef_de_projet',
+  'project_lead',
+};
+
+const Set<String> _recruitmentRoles = {
+  'pole_veille',
+  'veille',
+  'chef_pole_veille',
+  'adjoint_pole_veille',
+  'recrutement',
+  'recruiter',
+};
+
 class UserExperience {
   final String id;
   final String email;
@@ -48,55 +103,24 @@ class UserExperience {
     return roles.intersection(values.map(_normalizeRole).toSet()).isNotEmpty;
   }
 
-  bool get isAdmin =>
-      hasAnyRole({'administrateur', 'admin', 'administrator', 'super_admin'});
+  bool get isAdmin => hasAnyRole(_adminRoles);
 
-  bool get isTeamLeader => hasAnyRole({
-    'team_leader',
-    'team leader',
-    'tl',
-    'president',
-    'presidente',
-  });
+  bool get isTeamLeader => hasAnyRole(_teamLeaderRoles);
 
-  bool get isSecretary => hasAnyRole({
-    'secretaire_generale',
-    'secretaire_general',
-    'secretary',
-    'sg',
-  });
+  bool get isSecretary => hasAnyRole(_secretaryRoles);
 
-  bool get isFinance =>
-      hasAnyRole({'financier', 'finance', 'tresorier', 'treasurer'});
+  bool get isFinance => hasAnyRole(_financeRoles);
 
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
   bool get isEnactrice => gender == 'femme';
   String get memberLabel => isEnactrice ? 'Enactrice' : 'Enacteur';
 
   bool get isProjectOrPoleLead {
-    return hasAnyRole({
-      'chef_pole',
-      'chef de pole',
-      'adjoint_chef_pole',
-      'adjoint chef pole',
-      'chef_projet',
-      'chef de projet',
-      'adjoint_chef_projet',
-      'adjoint chef projet',
-      'project_lead',
-      'pole_lead',
-    });
+    return hasAnyRole(_poleLeadRoles) || hasAnyRole(_projectLeadRoles);
   }
 
   bool get isRecruitmentLead {
-    return hasAnyRole({
-      'pole_veille',
-      'veille',
-      'chef_pole_veille',
-      'adjoint_pole_veille',
-      'recrutement',
-      'recruiter',
-    });
+    return hasAnyRole(_recruitmentRoles);
   }
 
   bool get isEnacchef {
@@ -234,6 +258,12 @@ String _normalizeRole(String value) {
   return value
       .trim()
       .toLowerCase()
+      .replaceAll(RegExp('[éèêë]'), 'e')
+      .replaceAll(RegExp('[àâä]'), 'a')
+      .replaceAll(RegExp('[îï]'), 'i')
+      .replaceAll(RegExp('[ôö]'), 'o')
+      .replaceAll(RegExp('[ùûü]'), 'u')
+      .replaceAll('ç', 'c')
       .replaceAll('é', 'e')
       .replaceAll('è', 'e')
       .replaceAll('ê', 'e')
@@ -245,6 +275,5 @@ String _normalizeRole(String value) {
       .replaceAll('ô', 'o')
       .replaceAll('ù', 'u')
       .replaceAll('û', 'u')
-      .replaceAll('-', '_')
-      .replaceAll(' ', '_');
+      .replaceAll(RegExp('[- ]+'), '_');
 }

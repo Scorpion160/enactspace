@@ -18,6 +18,20 @@ from app.schemas.user import (
     UserWithRolesRead,
 )
 from app.core.security import hash_password
+from app.core.roles import (
+    ADMIN_MANAGED_ROLES,
+    ADMIN_ROLE,
+    ALUMNI_ROLE,
+    BASE_ACTIVE_ROLE,
+    RESPONSIBILITY_ROLES,
+    SCOPED_RESPONSIBILITY_ROLES,
+    SECRETARY_MANAGED_ROLES,
+    SECRETARY_ROLE,
+    TEAM_LEADER_MANAGED_ROLES,
+    TEAM_LEADER_ROLE,
+    normalize_role_name,
+    normalize_role_names,
+)
 from app.api.deps import (
     get_current_user,
     get_current_active_validated_user,
@@ -44,58 +58,16 @@ VALID_USER_STATUSES = {
     "suspended",
 }
 
-
-BASE_ACTIVE_ROLE = "enacteur"
-
-RESPONSIBILITY_ROLES = {
-    "team_leader",
-    "secretaire_generale",
-    "financier",
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
-}
-
-SCOPED_RESPONSIBILITY_ROLES = {
-    "chef_pole",
-    "adjoint_chef_pole",
-    "chef_projet",
-    "adjoint_chef_projet",
-}
-
-ADMIN_MANAGED_ROLES = {
-    "administrateur",
-    "team_leader",
-    "secretaire_generale",
-    "financier",
-    "faculty_advisor",
-    "enacteur",
-}
-
-TEAM_LEADER_MANAGED_ROLES = {
-    "secretaire_generale",
-    "financier",
-    "faculty_advisor",
-    "enacteur",
-}
-
-SECRETARY_MANAGED_ROLES = {
-    "financier",
-    "enacteur",
-}
-
-
 def get_managed_role_names(db: Session, current_user: User) -> set[str]:
     roles = get_user_role_names(db, current_user.id)
 
-    if "administrateur" in roles:
+    if ADMIN_ROLE in roles:
         return ADMIN_MANAGED_ROLES
 
-    if "team_leader" in roles:
+    if TEAM_LEADER_ROLE in roles:
         return TEAM_LEADER_MANAGED_ROLES
 
-    if "secretaire_generale" in roles:
+    if SECRETARY_ROLE in roles:
         return SECRETARY_MANAGED_ROLES
 
     return set()
@@ -126,7 +98,9 @@ def ensure_role_authority(
 
 
 def normalize_lifecycle_roles(db: Session, user: User, role_names: set[str]) -> set[str]:
-    if user.status == "alumni":
+    role_names = normalize_role_names(role_names)
+
+    if user.status == ALUMNI_ROLE:
         return role_names
 
     if user.status in {"active", "pending", "inactive"}:
@@ -205,7 +179,7 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le mot de passe doit contenir au moins 8 caractères",
         )
-    if payload.profile_type not in {"enacteur", "alumni"}:
+    if payload.profile_type not in {BASE_ACTIVE_ROLE, ALUMNI_ROLE}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de profil invalide",
@@ -297,7 +271,7 @@ def list_user_directory(
         db.query(User)
         .filter(
             User.is_active.is_(True),
-            User.status.in_(("active", "alumni")),
+            User.status.in_(("active", ALUMNI_ROLE)),
         )
         .order_by(User.first_name.asc(), User.last_name.asc())
         .all()
@@ -414,13 +388,13 @@ def approve_user(
         "email_verified": user.email_verified,
     }
 
-    is_alumni = user.profile_type == "alumni"
-    user.status = "alumni" if is_alumni else "active"
+    is_alumni = user.profile_type == ALUMNI_ROLE
+    user.status = ALUMNI_ROLE if is_alumni else "active"
     user.email_verified = True
     user.is_active = True
     user.updated_at = datetime.utcnow()
 
-    role_name = "alumni" if is_alumni else BASE_ACTIVE_ROLE
+    role_name = ALUMNI_ROLE if is_alumni else BASE_ACTIVE_ROLE
     role = db.query(Role).filter(Role.name == role_name).first()
     if not role:
         role = Role(name=role_name, description=f"Rôle de base {role_name}")
@@ -529,7 +503,7 @@ def suspend_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Vous ne pouvez pas suspendre votre propre compte",
         )
-    if "administrateur" in target_roles and "administrateur" not in current_roles:
+    if ADMIN_ROLE in target_roles and ADMIN_ROLE not in current_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seul un administrateur peut suspendre un administrateur",
@@ -584,14 +558,14 @@ def reactivate_user(
         )
 
     old_value = {"status": user.status, "is_active": user.is_active}
-    role_name = "alumni" if user.profile_type == "alumni" else BASE_ACTIVE_ROLE
+    role_name = ALUMNI_ROLE if user.profile_type == ALUMNI_ROLE else BASE_ACTIVE_ROLE
     role = db.query(Role).filter(Role.name == role_name).first()
     if role is None:
         role = Role(name=role_name, description=f"Rôle de base {role_name}")
         db.add(role)
         db.flush()
 
-    user.status = "alumni" if user.profile_type == "alumni" else "active"
+    user.status = ALUMNI_ROLE if user.profile_type == ALUMNI_ROLE else "active"
     user.is_active = True
     user.updated_at = datetime.utcnow()
 
@@ -641,12 +615,12 @@ def make_user_alumni(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Vous ne pouvez pas modifier votre propre cycle de membre",
         )
-    if user.status == "alumni":
+    if user.status == ALUMNI_ROLE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ce membre est déjà Alumni",
         )
-    if "administrateur" in target_roles:
+    if ADMIN_ROLE in target_roles:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Retirez d'abord le rôle administrateur de ce membre",
@@ -656,13 +630,13 @@ def make_user_alumni(
         "status": user.status,
     }
 
-    user.status = "alumni"
-    user.profile_type = "alumni"
+    user.status = ALUMNI_ROLE
+    user.profile_type = ALUMNI_ROLE
     user.updated_at = datetime.utcnow()
 
-    alumni_role = db.query(Role).filter(Role.name == "alumni").first()
+    alumni_role = db.query(Role).filter(Role.name == ALUMNI_ROLE).first()
     if not alumni_role:
-        alumni_role = Role(name="alumni", description="Ancien membre Enactus")
+        alumni_role = Role(name=ALUMNI_ROLE, description="Ancien membre Enactus")
         db.add(alumni_role)
         db.flush()
 
@@ -670,7 +644,7 @@ def make_user_alumni(
     for link in current_links:
         if link.role and (
             link.role.name == BASE_ACTIVE_ROLE
-            or link.role.name in RESPONSIBILITY_ROLES
+            or normalize_role_name(link.role.name) in RESPONSIBILITY_ROLES
         ):
             db.delete(link)
 
@@ -731,7 +705,7 @@ def assign_roles_to_user(
 ):
     user = get_user_or_404(db, user_id)
 
-    requested_role_names = set(payload.role_names)
+    requested_role_names = normalize_role_names(payload.role_names)
     scoped_roles = requested_role_names.intersection(SCOPED_RESPONSIBILITY_ROLES)
     if scoped_roles:
         raise HTTPException(
@@ -761,7 +735,7 @@ def assign_roles_to_user(
         )
 
     exclusive_roles = requested_role_names.intersection(
-        {"team_leader", "secretaire_generale"}
+        {TEAM_LEADER_ROLE, SECRETARY_ROLE}
     )
     for exclusive_role_name in exclusive_roles:
         exclusive_role = next(
@@ -812,7 +786,11 @@ def assign_roles_to_user(
     )
 
     for link in existing_links:
-        if link.role.name in managed_roles and link.role.name not in next_role_names:
+        current_link_role_name = normalize_role_name(link.role.name)
+        if (
+            current_link_role_name in managed_roles
+            and current_link_role_name not in next_role_names
+        ):
             db.delete(link)
 
     for role_name in next_role_names:
@@ -868,6 +846,7 @@ def remove_role_from_user(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     user = get_user_or_404(db, user_id)
+    role_name = normalize_role_name(role_name)
     ensure_role_authority(db, current_user, {role_name})
 
     old_roles = sorted(list(get_user_role_names(db, user.id)))
