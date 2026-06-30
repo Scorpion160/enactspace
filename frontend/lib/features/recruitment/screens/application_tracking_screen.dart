@@ -284,7 +284,7 @@ class _TrackingResult extends StatelessWidget {
 
   static const _steps = [
     ('Dossier reçu', Icons.inbox_rounded),
-    ('Présélection', Icons.fact_check_rounded),
+    ('Étude du dossier', Icons.fact_check_rounded),
     ('Entretien', Icons.record_voice_over_rounded),
     ('Décision', Icons.verified_rounded),
   ];
@@ -330,13 +330,52 @@ class _TrackingResult extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 22),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tracking.candidateName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  if (tracking.candidateSummary.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      tracking.candidateSummary,
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    'Référence : ${tracking.applicationId}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
             for (var index = 0; index < _steps.length; index++)
               _TrackingStep(
                 title: _steps[index].$1,
                 icon: _steps[index].$2,
                 active: index <= tracking.currentStep,
                 isLast: index == _steps.length - 1,
-                rejected: tracking.status == 'rejected' && index == 3,
+                rejected: tracking.isRejected && index == 3,
+                waiting: tracking.isWaitingList && index == 3,
+                cancelled: tracking.isCancelled && index == 3,
               ),
             const SizedBox(height: 18),
             Container(
@@ -369,6 +408,12 @@ class _TrackingResult extends StatelessWidget {
                 avatar: Icon(Icons.person_rounded, size: 18),
                 label: Text('Compte EnactSpace créé'),
               ),
+            ] else if (tracking.isAccepted) ...[
+              const SizedBox(height: 12),
+              const Chip(
+                avatar: Icon(Icons.verified_rounded, size: 18),
+                label: Text('Compte EnactSpace en préparation'),
+              ),
             ],
           ],
         ),
@@ -383,6 +428,8 @@ class _TrackingStep extends StatelessWidget {
   final bool active;
   final bool isLast;
   final bool rejected;
+  final bool waiting;
+  final bool cancelled;
 
   const _TrackingStep({
     required this.title,
@@ -390,15 +437,29 @@ class _TrackingStep extends StatelessWidget {
     required this.active,
     required this.isLast,
     required this.rejected,
+    required this.waiting,
+    required this.cancelled,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = rejected
+    final color = rejected || cancelled
         ? Colors.red.shade700
+        : waiting
+        ? Colors.orange.shade800
         : active
         ? AppTheme.softBlack
         : Colors.grey.shade400;
+    final terminalSoftColor = waiting
+        ? Colors.orange.shade50
+        : Colors.red.shade50;
+    final label = rejected
+        ? 'Candidature non retenue'
+        : waiting
+        ? 'Liste d’attente'
+        : cancelled
+        ? 'Candidature clôturée'
+        : title;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,8 +469,8 @@ class _TrackingStep extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: active
-                  ? rejected
-                        ? Colors.red.shade50
+                  ? rejected || waiting || cancelled
+                        ? terminalSoftColor
                         : AppTheme.enactusYellow
                   : Colors.grey.shade100,
               foregroundColor: color,
@@ -428,7 +489,7 @@ class _TrackingStep extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(top: 7),
             child: Text(
-              rejected ? 'Candidature non retenue' : title,
+              label,
               style: TextStyle(
                 color: color,
                 fontWeight: active ? FontWeight.w900 : FontWeight.w600,

@@ -223,7 +223,9 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
   }
 
   int get _receivedCount {
-    return _applications.where((a) => a.status == 'received').length;
+    return _applications
+        .where((a) => a.status == 'submitted' || a.status == 'received')
+        .length;
   }
 
   int get _acceptedCount {
@@ -231,7 +233,11 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
   }
 
   int get _interviewCount {
-    return _applications.where((a) => a.status == 'interview').length;
+    return _applications
+        .where(
+          (a) => a.status == 'interview_scheduled' || a.status == 'interview',
+        )
+        .length;
   }
 
   double get _averageScore {
@@ -655,24 +661,32 @@ class _RecruitmentFilters extends StatelessWidget {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('Tous')),
                       DropdownMenuItem(
-                        value: 'received',
+                        value: 'submitted',
                         child: Text('Reçues'),
                       ),
                       DropdownMenuItem(
-                        value: 'preselected',
-                        child: Text('Présélectionnées'),
+                        value: 'under_review',
+                        child: Text('En étude'),
                       ),
                       DropdownMenuItem(
-                        value: 'interview',
-                        child: Text('Entretien'),
+                        value: 'interview_scheduled',
+                        child: Text('Entretiens'),
                       ),
                       DropdownMenuItem(
                         value: 'accepted',
                         child: Text('Acceptées'),
                       ),
                       DropdownMenuItem(
+                        value: 'waiting_list',
+                        child: Text('Liste d’attente'),
+                      ),
+                      DropdownMenuItem(
                         value: 'rejected',
                         child: Text('Rejetées'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'cancelled',
+                        child: Text('Clôturées'),
                       ),
                     ],
                     onChanged: (value) {
@@ -1149,14 +1163,22 @@ class _ApplicationCard extends StatelessWidget {
               initialValue: application.status,
               decoration: const InputDecoration(labelText: 'Statut'),
               items: const [
-                DropdownMenuItem(value: 'received', child: Text('Reçue')),
+                DropdownMenuItem(value: 'submitted', child: Text('Reçue')),
                 DropdownMenuItem(
-                  value: 'preselected',
-                  child: Text('Présélectionnée'),
+                  value: 'under_review',
+                  child: Text('En étude'),
                 ),
-                DropdownMenuItem(value: 'interview', child: Text('Entretien')),
+                DropdownMenuItem(
+                  value: 'interview_scheduled',
+                  child: Text('Entretien programmé'),
+                ),
                 DropdownMenuItem(value: 'accepted', child: Text('Acceptée')),
+                DropdownMenuItem(
+                  value: 'waiting_list',
+                  child: Text('Liste d’attente'),
+                ),
                 DropdownMenuItem(value: 'rejected', child: Text('Rejetée')),
+                DropdownMenuItem(value: 'cancelled', child: Text('Clôturée')),
               ],
               onChanged: (value) {
                 if (value == null || value == application.status) return;
@@ -1200,15 +1222,22 @@ class _ApplicationProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const steps = [
-      _RecruitmentStep('received', 'Reçue'),
-      _RecruitmentStep('preselected', 'Tri'),
-      _RecruitmentStep('interview', 'Entretien'),
+      _RecruitmentStep('submitted', 'Reçue'),
+      _RecruitmentStep('under_review', 'Étude'),
+      _RecruitmentStep('interview_scheduled', 'Entretien'),
       _RecruitmentStep('accepted', 'Acceptée'),
     ];
 
-    final activeIndex = status == 'rejected'
+    final normalizedStatus = switch (status) {
+      'received' => 'submitted',
+      'preselected' => 'under_review',
+      'interview' => 'interview_scheduled',
+      _ => status,
+    };
+    final activeIndex =
+        {'rejected', 'waiting_list', 'cancelled'}.contains(normalizedStatus)
         ? 3
-        : steps.indexWhere((step) => step.value == status);
+        : steps.indexWhere((step) => step.value == normalizedStatus);
 
     return Wrap(
       spacing: 6,
@@ -1218,9 +1247,15 @@ class _ApplicationProgress extends StatelessWidget {
           _ProgressChip(
             label: status == 'rejected' && index == steps.length - 1
                 ? 'Rejetée'
+                : status == 'waiting_list' && index == steps.length - 1
+                ? 'Attente'
+                : status == 'cancelled' && index == steps.length - 1
+                ? 'Clôturée'
                 : steps[index].label,
             active: index <= activeIndex,
-            rejected: status == 'rejected' && index == steps.length - 1,
+            rejected:
+                {'rejected', 'cancelled'}.contains(status) &&
+                index == steps.length - 1,
           ),
       ],
     );

@@ -43,8 +43,29 @@ VALID_APPLICATION_STATUSES = {
     "received",
     "preselected",
     "interview",
+    "submitted",
+    "under_review",
+    "interview_scheduled",
     "accepted",
     "rejected",
+    "waiting_list",
+    "cancelled",
+}
+
+APPLICATION_STATUS_ALIASES = {
+    "received": "submitted",
+    "preselected": "under_review",
+    "interview": "interview_scheduled",
+}
+
+APPLICATION_TRACKING_NEXT_STEPS = {
+    "submitted": "Votre dossier a bien été reçu. Le pôle Veille prépare la présélection.",
+    "under_review": "Votre dossier est en cours d'étude par l'équipe recrutement.",
+    "interview_scheduled": "Un entretien est prévu ou en préparation. Les détails seront communiqués par email.",
+    "accepted": "Votre candidature est acceptée. La création de votre compte EnactSpace va suivre.",
+    "rejected": "Le processus est terminé pour cette campagne. Merci pour votre candidature.",
+    "waiting_list": "Votre profil est en liste d'attente. Vous serez contacté si une place se libère.",
+    "cancelled": "Cette candidature est clôturée pour cette campagne.",
 }
 
 VALID_RECOMMENDATIONS = {
@@ -66,6 +87,11 @@ RECRUITMENT_CONVERSION_ROLES = {
     "secretaire_generale",
 }
 REVIEW_ADMIN_ROLES = {"administrateur", "team_leader"}
+
+
+def normalize_application_status(value: str) -> str:
+    status_value = value.strip().lower()
+    return APPLICATION_STATUS_ALIASES.get(status_value, status_value)
 
 
 def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
@@ -174,19 +200,13 @@ def notify_application_status_if_linked(
     if not application.converted_user_id:
         return
 
-    next_steps = {
-        "received": "Votre candidature a ete recue.",
-        "preselected": "Votre candidature est preselectionnee.",
-        "interview": "Votre candidature passe en phase entretien.",
-        "accepted": "Votre candidature est acceptee.",
-        "rejected": "Votre candidature n'a pas ete retenue pour cette campagne.",
-    }
+    normalized_status = normalize_application_status(application.status)
     notify_user(
         db,
         user_id=application.converted_user_id,
         title="Statut de candidature mis a jour",
-        message=next_steps.get(
-            application.status,
+        message=APPLICATION_TRACKING_NEXT_STEPS.get(
+            normalized_status,
             "Votre candidature a ete mise a jour.",
         ),
         notification_type="recruitment_status",
@@ -349,7 +369,7 @@ def submit_application(
         leadership_profile=payload.leadership_profile,
         cv_url=payload.cv_url,
         motivation_letter_url=payload.motivation_letter_url,
-        status="received",
+        status="submitted",
     )
 
     db.add(application)
@@ -373,6 +393,7 @@ def application_payload(
     anonymized: bool = False,
 ) -> dict:
     data = ApplicationRead.model_validate(application).model_dump()
+    data["status"] = normalize_application_status(application.status)
     data["is_anonymized"] = anonymized
     data["anonymous_code"] = anonymous_code(application)
     data["can_convert"] = not anonymized and user_has_any_role(
@@ -426,22 +447,20 @@ def track_application(
         )
 
     campaign = get_campaign_or_404(db, str(application.campaign_id))
-    next_steps = {
-        "received": "Votre dossier a bien été reçu. Le pôle Veille prépare la présélection.",
-        "preselected": "Votre dossier est présélectionné. Surveillez votre email pour la suite.",
-        "interview": "Un entretien est prévu ou en préparation. Les détails seront communiqués par email.",
-        "accepted": "Votre candidature est acceptée. La création de votre compte EnactSpace va suivre.",
-        "rejected": "Le processus est terminé pour cette campagne. Merci pour votre candidature.",
-    }
-
+    normalized_status = normalize_application_status(application.status)
     return {
         "application_id": application.id,
         "campaign_title": campaign.title,
-        "status": application.status,
+        "first_name": application.first_name,
+        "last_name": application.last_name,
+        "email": application.email,
+        "department": application.department,
+        "study_level": application.study_level,
+        "status": normalized_status,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
-        "next_step": next_steps.get(
-            application.status,
+        "next_step": APPLICATION_TRACKING_NEXT_STEPS.get(
+            normalized_status,
             "Votre dossier est en cours de traitement.",
         ),
         "account_created": application.converted_user_id is not None,
@@ -463,7 +482,15 @@ def list_applications(
         query = query.filter(Application.campaign_id == campaign_id)
 
     if status_filter:
-        query = query.filter(Application.status == status_filter)
+        normalized_filter = normalize_application_status(status_filter)
+        legacy_matches = [
+            legacy
+            for legacy, normalized in APPLICATION_STATUS_ALIASES.items()
+            if normalized == normalized_filter
+        ]
+        query = query.filter(
+            Application.status.in_([normalized_filter, *legacy_matches])
+        )
 
     if search and not anonymized:
         pattern = f"%{search}%"
@@ -507,12 +534,13 @@ def update_application(
     old_status = application.status
 
     if payload.status is not None:
-        if payload.status not in VALID_APPLICATION_STATUSES:
+        next_status = normalize_application_status(payload.status)
+        if next_status not in VALID_APPLICATION_STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Statut de candidature invalide",
             )
-        application.status = payload.status
+        application.status = next_status
 
     fields = [
         "phone",
@@ -553,13 +581,14 @@ def change_application_status(
 ):
     application = get_application_or_404(db, application_id)
 
-    if payload.status not in VALID_APPLICATION_STATUSES:
+    next_status = normalize_application_status(payload.status)
+    if next_status not in VALID_APPLICATION_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut de candidature invalide",
         )
 
-    application.status = payload.status
+    application.status = next_status
     application.updated_at = datetime.utcnow()
     notify_application_status_if_linked(db, application)
 

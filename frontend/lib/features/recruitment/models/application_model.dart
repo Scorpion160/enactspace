@@ -72,7 +72,7 @@ class ApplicationModel {
       leadershipProfile: json['leadership_profile']?.toString(),
       cvUrl: json['cv_url']?.toString(),
       motivationLetterUrl: json['motivation_letter_url']?.toString(),
-      status: json['status']?.toString() ?? 'received',
+      status: json['status']?.toString() ?? 'submitted',
       finalScore: double.tryParse(json['final_score']?.toString() ?? ''),
       convertedUserId: json['converted_user_id']?.toString(),
       createdAt: json['created_at']?.toString(),
@@ -90,8 +90,13 @@ class ApplicationModel {
 
   String get statusLabel {
     switch (status) {
+      case 'submitted':
       case 'received':
         return 'Reçue';
+      case 'under_review':
+        return 'En étude';
+      case 'interview_scheduled':
+        return 'Entretien programmé';
       case 'preselected':
         return 'Présélectionnée';
       case 'interview':
@@ -100,6 +105,10 @@ class ApplicationModel {
         return 'Acceptée';
       case 'rejected':
         return 'Rejetée';
+      case 'waiting_list':
+        return 'Liste d’attente';
+      case 'cancelled':
+        return 'Clôturée';
       default:
         return status;
     }

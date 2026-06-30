@@ -115,6 +115,11 @@ class ApplicationTrackingRequest(BaseModel):
 class ApplicationTrackingRead(BaseModel):
     application_id: UUID
     campaign_title: str
+    first_name: str
+    last_name: str
+    email: EmailStr
+    department: Optional[str] = None
+    study_level: Optional[str] = None
     status: str
     submitted_at: datetime
     updated_at: datetime
