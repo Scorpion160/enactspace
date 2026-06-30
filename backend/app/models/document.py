@@ -21,9 +21,15 @@ class Document(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     file_url: Mapped[str] = mapped_column(Text, nullable=False)
+    file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
     file_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="pending_validation")
 
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -38,6 +44,14 @@ class Document(Base):
     )
 
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    rejected_by: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     visibility: Mapped[str] = mapped_column(String(50), default="internal")
 
@@ -67,6 +81,8 @@ class Document(Base):
 
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
     is_official: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_permanent: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

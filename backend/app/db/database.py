@@ -59,6 +59,30 @@ def ensure_compatibility_columns() -> None:
             "DEFAULT 'enacteur'"
         )
 
+    if "documents" in inspector.get_table_names():
+        document_columns = {
+            column["name"] for column in inspector.get_columns("documents")
+        }
+        if "file_id" not in document_columns:
+            statements.append("ALTER TABLE documents ADD COLUMN file_id CHAR(36)")
+        if "status" not in document_columns:
+            statements.append(
+                "ALTER TABLE documents ADD COLUMN status VARCHAR(40) "
+                "DEFAULT 'validated'"
+            )
+        if "rejected_by" not in document_columns:
+            statements.append("ALTER TABLE documents ADD COLUMN rejected_by CHAR(36)")
+        if "rejected_at" not in document_columns:
+            statements.append("ALTER TABLE documents ADD COLUMN rejected_at DATETIME")
+        if "rejection_reason" not in document_columns:
+            statements.append("ALTER TABLE documents ADD COLUMN rejection_reason TEXT")
+        if "is_permanent" not in document_columns:
+            statements.append(
+                "ALTER TABLE documents ADD COLUMN is_permanent BOOLEAN DEFAULT 0"
+            )
+        if "expires_at" not in document_columns:
+            statements.append("ALTER TABLE documents ADD COLUMN expires_at DATETIME")
+
     if statements:
         with engine.begin() as connection:
             for statement in statements:

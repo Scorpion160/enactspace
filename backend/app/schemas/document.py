@@ -7,7 +7,8 @@ from typing import Optional
 class DocumentCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    file_url: str
+    file_url: Optional[str] = None
+    file_id: Optional[UUID] = None
     file_type: Optional[str] = None
     category: Optional[str] = None
     visibility: str = "internal"
@@ -22,6 +23,7 @@ class DocumentUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     file_url: Optional[str] = None
+    file_id: Optional[UUID] = None
     file_type: Optional[str] = None
     category: Optional[str] = None
     visibility: Optional[str] = None
@@ -32,16 +34,25 @@ class DocumentUpdate(BaseModel):
     is_template: Optional[bool] = None
 
 
+class DocumentReject(BaseModel):
+    reason: str
+
+
 class DocumentRead(BaseModel):
     id: UUID
     title: str
     description: Optional[str]
     file_url: str
+    file_id: Optional[UUID]
     file_type: Optional[str]
     category: Optional[str]
+    status: str
     uploaded_by: Optional[UUID]
     validated_by: Optional[UUID]
     validated_at: Optional[datetime]
+    rejected_by: Optional[UUID]
+    rejected_at: Optional[datetime]
+    rejection_reason: Optional[str]
     visibility: str
     pole_id: Optional[UUID]
     project_id: Optional[UUID]
@@ -49,6 +60,8 @@ class DocumentRead(BaseModel):
     season_id: Optional[UUID]
     is_template: bool
     is_official: bool
+    is_permanent: bool
+    expires_at: Optional[datetime]
     can_manage: bool = False
     can_validate: bool = False
     created_at: datetime

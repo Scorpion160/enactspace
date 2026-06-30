@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy import and_, func, or_
@@ -9,8 +9,14 @@ from app.models.document import Document
 from app.models.event import Event
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
+from app.models.stored_file import StoredFile
 from app.models.user import User
-from app.schemas.document import DocumentCreate, DocumentUpdate, DocumentRead
+from app.schemas.document import (
+    DocumentCreate,
+    DocumentReject,
+    DocumentUpdate,
+    DocumentRead,
+)
 from app.api.deps import (
     get_current_active_validated_user,
     get_user_role_names,
@@ -75,6 +81,17 @@ ENACCHEF_ROLES = GLOBAL_DOCUMENT_MANAGERS | {
 }
 POLE_LEAD_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
 PROJECT_LEAD_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
+DOCUMENT_TEMPORARY_DAYS = 90
+
+DOCUMENT_STATUSES = {
+    "draft",
+    "submitted",
+    "pending_validation",
+    "validated",
+    "rejected",
+    "archived",
+    "expired",
+}
 
 
 DOCUMENT_CATEGORY_KEYWORDS = {
@@ -153,7 +170,10 @@ def visible_documents_query(db: Session, current_user: User):
         return query
 
     clauses = [
-        Document.visibility == "public_club",
+        and_(
+            Document.visibility == "public_club",
+            Document.status == "validated",
+        ),
         Document.uploaded_by == current_user.id,
     ]
     is_alumni = (
@@ -162,10 +182,16 @@ def visible_documents_query(db: Session, current_user: User):
         or "alumni" in roles
     )
     if not is_alumni:
-        clauses.append(Document.visibility == "internal")
+        clauses.append(
+            and_(
+                Document.visibility == "internal",
+                Document.status == "validated",
+            )
+        )
         clauses.append(
             and_(
                 Document.visibility == "pole_only",
+                Document.status == "validated",
                 Document.pole_id.in_(
                     active_pole_ids_query(db, current_user.id)
                 ),
@@ -174,13 +200,19 @@ def visible_documents_query(db: Session, current_user: User):
         clauses.append(
             and_(
                 Document.visibility == "project_only",
+                Document.status == "validated",
                 Document.project_id.in_(
                     active_project_ids_query(db, current_user.id)
                 ),
             )
         )
         if roles.intersection(ENACCHEF_ROLES):
-            clauses.append(Document.visibility == "enacchef_only")
+            clauses.append(
+                and_(
+                    Document.visibility == "enacchef_only",
+                    Document.status == "validated",
+                )
+            )
 
     return query.filter(or_(*clauses))
 
@@ -247,11 +279,55 @@ def can_validate_document(
     document: Document,
 ) -> bool:
     roles = get_user_role_names(db, current_user.id)
-    return bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS)) or is_scope_lead(
-        db,
-        current_user,
-        document,
-    )
+    return bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS))
+
+
+def get_linked_file_for_document(
+    db: Session,
+    file_id,
+    current_user: User,
+) -> StoredFile | None:
+    if not file_id:
+        return None
+
+    stored_file = db.query(StoredFile).filter(StoredFile.id == file_id).first()
+    if not stored_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier lie introuvable.",
+        )
+
+    roles = get_user_role_names(db, current_user.id)
+    if (
+        stored_file.uploaded_by_id != current_user.id
+        and not roles.intersection(GLOBAL_DOCUMENT_MANAGERS)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas lier ce fichier au document.",
+        )
+
+    return stored_file
+
+
+def sync_document_file(document: Document, stored_file: StoredFile | None) -> None:
+    if not stored_file:
+        return
+    document.file_id = stored_file.id
+    document.file_url = f"/api/files/{stored_file.id}/download"
+    document.file_type = stored_file.extension or document.file_type
+
+
+def promote_document_file(stored_file: StoredFile | None) -> None:
+    if not stored_file:
+        return
+    stored_file.is_temporary = False
+    stored_file.is_ephemeral = False
+    stored_file.ephemeral_duration = None
+    stored_file.expires_at = None
+    stored_file.storage_scope = "official"
+    stored_file.visibility = "internal"
+    stored_file.updated_at = datetime.utcnow()
 
 
 def active_document_users(db: Session) -> list[User]:
@@ -374,16 +450,27 @@ def create_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    if not payload.file_url and not payload.file_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ajoutez un fichier ou un lien de document.",
+        )
+
     if payload.visibility not in VALID_DOCUMENT_VISIBILITIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Visibilité invalide",
         )
 
+    linked_file = get_linked_file_for_document(db, payload.file_id, current_user)
+    file_url = payload.file_url or (
+        f"/api/files/{linked_file.id}/download" if linked_file else None
+    )
+
     category = payload.category or infer_document_category(
         payload.title,
         payload.description,
-        payload.file_url,
+        file_url,
     )
 
     if category and category not in VALID_DOCUMENT_CATEGORIES:
@@ -402,9 +489,11 @@ def create_document(
     document = Document(
         title=payload.title,
         description=payload.description,
-        file_url=payload.file_url,
-        file_type=payload.file_type or infer_file_type(payload.file_url),
+        file_url=file_url,
+        file_id=payload.file_id,
+        file_type=payload.file_type or infer_file_type(file_url),
         category=category,
+        status="pending_validation",
         uploaded_by=current_user.id,
         visibility=payload.visibility,
         pole_id=payload.pole_id,
@@ -413,10 +502,18 @@ def create_document(
         season_id=payload.season_id,
         is_template=payload.is_template,
         is_official=False,
+        is_permanent=False,
+        expires_at=datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS),
     )
+    sync_document_file(document, linked_file)
 
     db.add(document)
     db.flush()
+    if linked_file:
+        linked_file.entity_type = "document"
+        linked_file.entity_id = document.id
+        linked_file.visibility = payload.visibility
+        linked_file.updated_at = datetime.utcnow()
     notify_users(
         db,
         user_ids=document_validator_user_ids(
@@ -450,6 +547,7 @@ def list_documents(
     season_id: str | None = Query(default=None),
     is_template: bool | None = Query(default=None),
     is_official: bool | None = Query(default=None),
+    status_filter: str | None = Query(default=None),
 ):
     query = visible_documents_query(db, current_user)
 
@@ -485,6 +583,9 @@ def list_documents(
 
     if is_official is not None:
         query = query.filter(Document.is_official == is_official)
+
+    if status_filter:
+        query = query.filter(Document.status == status_filter)
 
     documents = query.order_by(Document.created_at.desc()).all()
     return [
@@ -577,6 +678,14 @@ def update_document(
     if payload.file_url is not None:
         document.file_url = payload.file_url
 
+    if payload.file_id is not None:
+        linked_file = get_linked_file_for_document(db, payload.file_id, current_user)
+        sync_document_file(document, linked_file)
+        linked_file.entity_type = "document"
+        linked_file.entity_id = document.id
+        linked_file.visibility = document.visibility
+        linked_file.updated_at = datetime.utcnow()
+
     if payload.file_type is not None:
         document.file_type = payload.file_type
 
@@ -618,9 +727,21 @@ def validate_document(
         )
 
     document.is_official = True
+    document.is_permanent = True
+    document.status = "validated"
     document.validated_by = current_user.id
     document.validated_at = datetime.utcnow()
+    document.rejected_by = None
+    document.rejected_at = None
+    document.rejection_reason = None
+    document.expires_at = None
     document.updated_at = datetime.utcnow()
+    linked_file = (
+        db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
+        if document.file_id
+        else None
+    )
+    promote_document_file(linked_file)
     db.flush()
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
@@ -657,6 +778,7 @@ def validate_document(
         old_value={"is_official": False},
         new_value={
             "is_official": True,
+            "status": document.status,
             "validated_by": str(current_user.id),
         },
         ip_address=get_client_ip(request),
@@ -664,6 +786,47 @@ def validate_document(
     db.commit()
     db.refresh(document)
 
+    return document_payload(db, current_user, document)
+
+
+@router.post("/{document_id}/submit", response_model=DocumentRead)
+def submit_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    document = get_visible_document_or_404(db, current_user, document_id)
+    if not can_manage_document(db, current_user, document):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Soumission reservee au responsable du document",
+        )
+
+    document.status = "pending_validation"
+    document.is_official = False
+    document.is_permanent = False
+    document.rejected_by = None
+    document.rejected_at = None
+    document.rejection_reason = None
+    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
+    document.updated_at = datetime.utcnow()
+    db.flush()
+    notify_users(
+        db,
+        user_ids=document_validator_user_ids(
+            db,
+            document,
+            exclude_user_ids={current_user.id},
+        ),
+        title="Document a valider",
+        message=document.title,
+        notification_type="document_submitted",
+        related_type="document",
+        related_id=document.id,
+        dedupe=True,
+    )
+    db.commit()
+    db.refresh(document)
     return document_payload(db, current_user, document)
 
 
@@ -681,8 +844,11 @@ def unvalidate_document(
         )
 
     document.is_official = False
+    document.is_permanent = False
+    document.status = "pending_validation"
     document.validated_by = None
     document.validated_at = None
+    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
     document.updated_at = datetime.utcnow()
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
@@ -699,6 +865,76 @@ def unvalidate_document(
     db.commit()
     db.refresh(document)
 
+    return document_payload(db, current_user, document)
+
+
+@router.post("/{document_id}/reject", response_model=DocumentRead)
+def reject_document(
+    document_id: str,
+    payload: DocumentReject,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    document = get_visible_document_or_404(db, current_user, document_id)
+    if not can_validate_document(db, current_user, document):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rejet reserve a la SG, au Team Leader ou a l'admin",
+        )
+
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de refus est obligatoire.",
+        )
+
+    document.status = "rejected"
+    document.is_official = False
+    document.is_permanent = False
+    document.validated_by = None
+    document.validated_at = None
+    document.rejected_by = current_user.id
+    document.rejected_at = datetime.utcnow()
+    document.rejection_reason = reason
+    document.updated_at = datetime.utcnow()
+
+    if document.uploaded_by and document.uploaded_by != current_user.id:
+        notify_user(
+            db,
+            user_id=document.uploaded_by,
+            title="Document refuse",
+            message=reason,
+            notification_type="document_rejected",
+            related_type="document",
+            related_id=document.id,
+            dedupe=True,
+        )
+
+    db.commit()
+    db.refresh(document)
+    return document_payload(db, current_user, document)
+
+
+@router.post("/{document_id}/archive", response_model=DocumentRead)
+def archive_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    document = get_visible_document_or_404(db, current_user, document_id)
+    if not can_validate_document(db, current_user, document):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Archivage reserve a la SG, au Team Leader ou a l'admin",
+        )
+
+    document.status = "archived"
+    document.is_official = False
+    document.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(document)
     return document_payload(db, current_user, document)
 
 
