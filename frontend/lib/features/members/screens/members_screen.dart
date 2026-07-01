@@ -4,6 +4,10 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/member_model.dart';
 import '../services/members_service.dart';
 
@@ -17,6 +21,8 @@ class MembersScreen extends StatefulWidget {
 class _MembersScreenState extends State<MembersScreen> {
   final AuthService _authService = AuthService();
   final MembersService _membersService = MembersService();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
 
   bool _loading = true;
   String? _error;
@@ -299,6 +305,36 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _openMemberAssignmentSheet(MemberModel member) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) {
+        return _MemberAssignmentSheet(
+          member: member,
+          membersService: _membersService,
+          polesService: _polesService,
+          projectsService: _projectsService,
+          canAssignLeadership: _userExperience?.canManageMembers == true,
+        );
+      },
+    );
+
+    if (updated == true) {
+      await _loadMembers();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Affectation mise à jour pour ${member.displayName}.'),
+        ),
+      );
+    }
+  }
+
   List<MemberModel> get _filteredMembers {
     final query = _search.trim().toLowerCase();
 
@@ -399,6 +435,7 @@ class _MembersScreenState extends State<MembersScreen> {
               onManageLifecycle: _openLifecycleDialog,
               onAssignRole: _openAssignRoleDialog,
               onAssignDepartment: _openAssignDepartmentDialog,
+              onAssignPlacement: _openMemberAssignmentSheet,
             ),
         ],
       ),
@@ -602,6 +639,7 @@ class _MembersList extends StatelessWidget {
   final ValueChanged<MemberModel> onManageLifecycle;
   final ValueChanged<MemberModel> onAssignRole;
   final ValueChanged<MemberModel> onAssignDepartment;
+  final ValueChanged<MemberModel> onAssignPlacement;
 
   const _MembersList({
     required this.members,
@@ -614,6 +652,7 @@ class _MembersList extends StatelessWidget {
     required this.onManageLifecycle,
     required this.onAssignRole,
     required this.onAssignDepartment,
+    required this.onAssignPlacement,
   });
 
   @override
@@ -727,6 +766,17 @@ class _MembersList extends StatelessWidget {
                                 icon: const Icon(Icons.account_tree_rounded),
                                 tooltip: 'Assigner pôle cœur',
                               ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => onAssignPlacement(member),
+                                icon: const Icon(Icons.hub_rounded),
+                                tooltip: 'Affecter',
+                              ),
                             ],
                             if (canReviewJoinRequests &&
                                 member.status == 'pending') ...[
@@ -826,6 +876,7 @@ class _MembersList extends StatelessWidget {
                   onManageLifecycle: () => onManageLifecycle(member),
                   onAssignRole: () => onAssignRole(member),
                   onAssignDepartment: () => onAssignDepartment(member),
+                  onAssignPlacement: () => onAssignPlacement(member),
                 ),
               ),
           ],
@@ -952,6 +1003,7 @@ class _MemberCard extends StatelessWidget {
   final VoidCallback onManageLifecycle;
   final VoidCallback onAssignRole;
   final VoidCallback onAssignDepartment;
+  final VoidCallback onAssignPlacement;
 
   const _MemberCard({
     required this.member,
@@ -964,6 +1016,7 @@ class _MemberCard extends StatelessWidget {
     required this.onManageLifecycle,
     required this.onAssignRole,
     required this.onAssignDepartment,
+    required this.onAssignPlacement,
   });
 
   @override
@@ -1014,6 +1067,9 @@ class _MemberCard extends StatelessWidget {
                         case _MemberAction.assignDepartment:
                           onAssignDepartment();
                           break;
+                        case _MemberAction.assignPlacement:
+                          onAssignPlacement();
+                          break;
                         case _MemberAction.approve:
                           onApprove?.call();
                           break;
@@ -1046,6 +1102,13 @@ class _MemberCard extends StatelessWidget {
                           child: ListTile(
                             leading: Icon(Icons.account_tree_rounded),
                             title: Text('Assigner le pôle cœur'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _MemberAction.assignPlacement,
+                          child: ListTile(
+                            leading: Icon(Icons.hub_rounded),
+                            title: Text('Affecter pôle/projet'),
                           ),
                         ),
                       ],
@@ -1120,6 +1183,11 @@ class _MemberCard extends StatelessWidget {
                       icon: const Icon(Icons.account_tree_rounded),
                       tooltip: 'Assigner pôle cœur',
                     ),
+                    IconButton(
+                      onPressed: onAssignPlacement,
+                      icon: const Icon(Icons.hub_rounded),
+                      tooltip: 'Affecter pôle/projet',
+                    ),
                   ],
                   if (canReviewJoinRequests && onApprove != null) ...[
                     FilledButton.icon(
@@ -1176,12 +1244,15 @@ enum _MemberAction {
   details,
   assignRole,
   assignDepartment,
+  assignPlacement,
   approve,
   reject,
   manageLifecycle,
 }
 
 enum _LifecycleChoice { makeAlumni, suspend, reactivate }
+
+enum _AssignmentMode { corePole, pole, project }
 
 String? _absoluteMemberPhotoUrl(String? value) {
   final url = value?.trim();
@@ -1827,6 +1898,424 @@ class _DepartmentChip extends StatelessWidget {
       side: BorderSide(
         color: defined ? Colors.purple.shade100 : Colors.grey.shade200,
       ),
+    );
+  }
+}
+
+class _MemberAssignmentSheet extends StatefulWidget {
+  final MemberModel member;
+  final MembersService membersService;
+  final PolesService polesService;
+  final ProjectsService projectsService;
+  final bool canAssignLeadership;
+
+  const _MemberAssignmentSheet({
+    required this.member,
+    required this.membersService,
+    required this.polesService,
+    required this.projectsService,
+    required this.canAssignLeadership,
+  });
+
+  @override
+  State<_MemberAssignmentSheet> createState() => _MemberAssignmentSheetState();
+}
+
+class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
+  _AssignmentMode _mode = _AssignmentMode.corePole;
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
+  String? _selectedCorePoleId;
+  String? _selectedPoleId;
+  String? _selectedProjectId;
+  String _polePosition = 'membre';
+  String _projectPosition = 'membre';
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTargets();
+  }
+
+  Future<void> _loadTargets() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        widget.polesService.getPoles(),
+        widget.projectsService.getProjects(),
+      ]);
+      final poles = results[0] as List<PoleModel>;
+      final projects = results[1] as List<ProjectModel>;
+
+      if (!mounted) return;
+
+      setState(() {
+        _poles = poles;
+        _projects = projects;
+        _selectedCorePoleId = _corePoles.isNotEmpty
+            ? _corePoles.first.id
+            : null;
+        _selectedPoleId = poles.isNotEmpty ? poles.first.id : null;
+        _selectedProjectId = projects.isNotEmpty ? projects.first.id : null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  List<PoleModel> get _corePoles {
+    final core = _poles.where((pole) => pole.isCorePole).toList();
+    return core.isEmpty ? _poles : core;
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      switch (_mode) {
+        case _AssignmentMode.corePole:
+          final pole = _findPole(_selectedCorePoleId, _corePoles);
+          if (pole == null) {
+            throw Exception('Sélectionnez un pôle cœur.');
+          }
+          await widget.membersService.updateMemberAdmin(
+            userId: widget.member.id,
+            department: pole.name,
+          );
+          break;
+        case _AssignmentMode.pole:
+          final pole = _findPole(_selectedPoleId, _poles);
+          if (pole == null) {
+            throw Exception('Sélectionnez un pôle.');
+          }
+          await widget.polesService.assignMember(
+            poleId: pole.id,
+            userId: widget.member.id,
+            position: _polePosition,
+          );
+          break;
+        case _AssignmentMode.project:
+          final project = _findProject(_selectedProjectId, _projects);
+          if (project == null) {
+            throw Exception('Sélectionnez un projet.');
+          }
+          await widget.projectsService.assignMember(
+            projectId: project.id,
+            userId: widget.member.id,
+            position: _projectPosition,
+          );
+          break;
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final corePoles = _corePoles;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 22,
+          right: 22,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 22,
+        ),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Affecter ${widget.member.displayName}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Choisissez le type d’affectation puis la cible.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 18),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  if (_error != null) ...[
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  DropdownButtonFormField<_AssignmentMode>(
+                    initialValue: _mode,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Type',
+                      prefixIcon: Icon(Icons.route_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: _AssignmentMode.corePole,
+                        child: Text('Pôle cœur principal'),
+                      ),
+                      DropdownMenuItem(
+                        value: _AssignmentMode.pole,
+                        child: Text('Rattachement pôle'),
+                      ),
+                      DropdownMenuItem(
+                        value: _AssignmentMode.project,
+                        child: Text('Rattachement projet'),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value != null) setState(() => _mode = value);
+                          },
+                  ),
+                  const SizedBox(height: 14),
+                  if (_mode == _AssignmentMode.corePole)
+                    _PoleTargetField(
+                      value: _selectedCorePoleId,
+                      poles: corePoles,
+                      label: 'Pôle cœur',
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _selectedCorePoleId = value;
+                            }),
+                    )
+                  else if (_mode == _AssignmentMode.pole) ...[
+                    _PoleTargetField(
+                      value: _selectedPoleId,
+                      poles: _poles,
+                      label: 'Pôle',
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _selectedPoleId = value;
+                            }),
+                    ),
+                    const SizedBox(height: 14),
+                    _PositionField(
+                      value: _polePosition,
+                      canAssignLeadership: widget.canAssignLeadership,
+                      leaderValue: 'chef_pole',
+                      deputyValue: 'adjoint_chef_pole',
+                      leaderLabel: 'Chef de pôle',
+                      deputyLabel: 'Adjoint chef de pôle',
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _polePosition = value;
+                            }),
+                    ),
+                  ] else ...[
+                    _ProjectTargetField(
+                      value: _selectedProjectId,
+                      projects: _projects,
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _selectedProjectId = value;
+                            }),
+                    ),
+                    const SizedBox(height: 14),
+                    _PositionField(
+                      value: _projectPosition,
+                      canAssignLeadership: widget.canAssignLeadership,
+                      leaderValue: 'chef_projet',
+                      deputyValue: 'adjoint_chef_projet',
+                      leaderLabel: 'Chef de projet',
+                      deputyLabel: 'Adjoint chef de projet',
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _projectPosition = value;
+                            }),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  ElevatedButton.icon(
+                    onPressed: _saving ? null : _submit,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded),
+                    label: const Text('Enregistrer l’affectation'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  PoleModel? _findPole(String? id, List<PoleModel> poles) {
+    if (id == null) return null;
+    for (final pole in poles) {
+      if (pole.id == id) return pole;
+    }
+    return null;
+  }
+
+  ProjectModel? _findProject(String? id, List<ProjectModel> projects) {
+    if (id == null) return null;
+    for (final project in projects) {
+      if (project.id == id) return project;
+    }
+    return null;
+  }
+}
+
+class _PoleTargetField extends StatelessWidget {
+  final String? value;
+  final List<PoleModel> poles;
+  final String label;
+  final ValueChanged<String?>? onChanged;
+
+  const _PoleTargetField({
+    required this.value,
+    required this.poles,
+    required this.label,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.account_tree_rounded),
+      ),
+      items: [
+        for (final pole in poles)
+          DropdownMenuItem(
+            value: pole.id,
+            child: Text(
+              '${pole.name} · ${pole.typeLabel}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _ProjectTargetField extends StatelessWidget {
+  final String? value;
+  final List<ProjectModel> projects;
+  final ValueChanged<String?>? onChanged;
+
+  const _ProjectTargetField({
+    required this.value,
+    required this.projects,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Projet',
+        prefixIcon: Icon(Icons.rocket_launch_rounded),
+      ),
+      items: [
+        for (final project in projects)
+          DropdownMenuItem(
+            value: project.id,
+            child: Text(
+              '${project.name} · ${project.statusLabel}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _PositionField extends StatelessWidget {
+  final String value;
+  final bool canAssignLeadership;
+  final String leaderValue;
+  final String deputyValue;
+  final String leaderLabel;
+  final String deputyLabel;
+  final ValueChanged<String>? onChanged;
+
+  const _PositionField({
+    required this.value,
+    required this.canAssignLeadership,
+    required this.leaderValue,
+    required this.deputyValue,
+    required this.leaderLabel,
+    required this.deputyLabel,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Position',
+        prefixIcon: Icon(Icons.admin_panel_settings_rounded),
+      ),
+      items: [
+        const DropdownMenuItem(value: 'membre', child: Text('Membre')),
+        if (canAssignLeadership)
+          DropdownMenuItem(value: deputyValue, child: Text(deputyLabel)),
+        if (canAssignLeadership)
+          DropdownMenuItem(value: leaderValue, child: Text(leaderLabel)),
+      ],
+      onChanged: (value) {
+        if (value != null) onChanged?.call(value);
+      },
     );
   }
 }
