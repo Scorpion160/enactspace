@@ -59,6 +59,34 @@ class PolesService {
     throw Exception('Réponse invalide lors de la création du pôle.');
   }
 
+  Future<PoleModel> updatePole({
+    required String poleId,
+    required String name,
+    required String shortName,
+    required String type,
+    required String description,
+    required String objectives,
+  }) async {
+    final token = await _requireToken();
+    final response = await _apiClient.patchJson(
+      '/poles/$poleId',
+      token: token,
+      data: {
+        'name': name.trim(),
+        'short_name': shortName.trim().isEmpty ? null : shortName.trim(),
+        'type': type,
+        'description': description.trim().isEmpty ? null : description.trim(),
+        'objectives': objectives.trim().isEmpty ? null : objectives.trim(),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PoleModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la modification du pôle.');
+  }
+
   Future<void> assignMember({
     required String poleId,
     required String userId,

@@ -11,6 +11,7 @@ from app.schemas.pole import (
     PoleMemberDirectoryRead,
     PoleMemberRead,
     PoleRead,
+    PoleUpdate,
 )
 from app.api.deps import (
     get_current_active_validated_user,
@@ -136,6 +137,26 @@ def create_pole(
     )
 
     db.add(pole)
+    db.commit()
+    db.refresh(pole)
+
+    return pole
+
+
+@router.patch("/{pole_id}", response_model=PoleRead)
+def update_pole(
+    pole_id: str,
+    payload: PoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    pole = get_pole_or_404(db, pole_id)
+    require_pole_manager(db, current_user, pole_id)
+
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(pole, field, value)
+
     db.commit()
     db.refresh(pole)
 

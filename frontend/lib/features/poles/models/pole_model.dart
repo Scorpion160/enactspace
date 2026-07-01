@@ -1,4 +1,7 @@
 class PoleModel {
+  static const corePoleNames = {'tech', 'chimie', 'gestion', 'it'};
+  static const supportPoleNames = {'communication', 'organisation', 'veille'};
+
   final String id;
   final String? seasonId;
   final String name;
@@ -59,15 +62,66 @@ class PoleModel {
   }
 
   String get typeLabel {
-    switch (type) {
+    if (isCorePole) return 'Pôle cœur';
+    if (isSupportPole) return 'Pôle support';
+
+    switch (type.trim().toLowerCase()) {
+      case 'coeur':
+      case 'core':
+      case 'metier':
+      case 'métier':
+        return 'Pôle cœur';
       case 'support':
-        return 'Support';
+        return 'Pôle support';
       case 'projet':
         return 'Projet';
       case 'bureau':
         return 'Bureau';
       default:
-        return 'Métier';
+        return 'Pôle';
     }
   }
+
+  bool get isCorePole {
+    final normalizedName = _normalizeName(name);
+    final normalizedType = _normalizeName(type);
+    return normalizedType == 'coeur' ||
+        normalizedType == 'core' ||
+        normalizedType == 'metier' ||
+        corePoleNames.contains(normalizedName);
+  }
+
+  bool get isSupportPole {
+    final normalizedName = _normalizeName(name);
+    final normalizedType = _normalizeName(type);
+    return normalizedType == 'support' ||
+        supportPoleNames.contains(normalizedName);
+  }
+
+  String get descriptionLabel {
+    final value = description?.trim();
+    if (value == null || value.isEmpty) {
+      return 'Aucune description renseignée pour ce pôle.';
+    }
+    return value;
+  }
+
+  String get objectivesLabel {
+    final value = objectives?.trim();
+    if (value == null || value.isEmpty) return 'Objectifs à préciser.';
+    return value;
+  }
+}
+
+String _normalizeName(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp('[éèêë]'), 'e')
+      .replaceAll(RegExp('[àâä]'), 'a')
+      .replaceAll(RegExp('[îï]'), 'i')
+      .replaceAll(RegExp('[ôö]'), 'o')
+      .replaceAll(RegExp('[ùûü]'), 'u')
+      .replaceAll('ç', 'c')
+      .replaceAll(RegExp(r'\s+'), '_');
 }

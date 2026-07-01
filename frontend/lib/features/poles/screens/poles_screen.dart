@@ -479,6 +479,10 @@ class _PoleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final createdAt = DateFormat('dd/MM/yyyy').format(pole.createdAt);
+    final activeCount = _activePoleMembers(members).length;
+    final inactiveCount = _inactivePoleMembers(members).length;
+    final leader = _firstOrNull(members.where(_looksLikePoleLead));
+    final deputy = _firstOrNull(members.where(_looksLikeDeputy));
 
     return Card(
       child: Padding(
@@ -534,17 +538,23 @@ class _PoleCard extends StatelessWidget {
               children: [
                 _PoleChip(
                   icon: Icons.people_alt_rounded,
-                  label: '$memberCount membre(s)',
+                  label: '$activeCount actif(s)',
+                ),
+                if (inactiveCount > 0)
+                  _PoleChip(
+                    icon: Icons.person_off_rounded,
+                    label: '$inactiveCount inactif(s)',
+                  ),
+                _PoleChip(
+                  icon: Icons.admin_panel_settings_rounded,
+                  label: leader?.displayName ?? 'Chef à désigner',
                 ),
                 _PoleChip(icon: Icons.category_rounded, label: pole.typeLabel),
               ],
             ),
             const SizedBox(height: 16),
             Text(
-              _safeText(
-                pole.description,
-                fallback: 'Aucune description renseignée pour ce pôle.',
-              ),
+              pole.descriptionLabel,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(height: 1.4),
@@ -560,10 +570,7 @@ class _PoleCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _safeText(
-                      pole.objectives,
-                      fallback: 'Objectifs à préciser',
-                    ),
+                    pole.objectivesLabel,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -575,22 +582,33 @@ class _PoleCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _showPoleDetails(
-                  context,
-                  pole,
-                  members,
-                  allMembers,
-                  polesService,
-                  canManage,
-                  canAssignLeadership,
-                  onMembershipChanged,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    deputy == null
+                        ? 'Adjoint à désigner'
+                        : 'Adjoint : ${deputy.displayName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
                 ),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Détail pôle'),
-              ),
+                TextButton.icon(
+                  onPressed: () => _showPoleDetails(
+                    context,
+                    pole,
+                    members,
+                    allMembers,
+                    polesService,
+                    canManage,
+                    canAssignLeadership,
+                    onMembershipChanged,
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Détail'),
+                ),
+              ],
             ),
           ],
         ),
@@ -767,6 +785,26 @@ class _PoleDetailsSheet extends StatelessWidget {
     required this.onMembershipChanged,
   });
 
+  Future<void> _openEditSheet(BuildContext context) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) => _EditPoleSheet(pole: pole, service: polesService),
+    );
+
+    if (updated == true) {
+      await onMembershipChanged();
+      if (!context.mounted) return;
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pôle mis à jour.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final leaders = members.where(_looksLikePoleLead).toList();
@@ -827,23 +865,28 @@ class _PoleDetailsSheet extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (canManage) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openEditSheet(context),
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Modifier'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   _DetailSection(
                     title: 'Objectifs',
                     icon: Icons.flag_rounded,
-                    body: _safeText(
-                      pole.objectives,
-                      fallback: 'Objectifs à préciser par le responsable.',
-                    ),
+                    body: pole.objectivesLabel,
                   ),
                   const SizedBox(height: 12),
                   _DetailSection(
                     title: 'Description',
                     icon: Icons.description_rounded,
-                    body: _safeText(
-                      pole.description,
-                      fallback: 'Description à compléter.',
-                    ),
+                    body: pole.descriptionLabel,
                   ),
                   const SizedBox(height: 16),
                   _GovernancePanel(leaders: leaders, deputies: deputies),
@@ -1345,6 +1388,186 @@ class _PoleChip extends StatelessWidget {
   }
 }
 
+class _EditPoleSheet extends StatefulWidget {
+  final PoleModel pole;
+  final PolesService service;
+
+  const _EditPoleSheet({required this.pole, required this.service});
+
+  @override
+  State<_EditPoleSheet> createState() => _EditPoleSheetState();
+}
+
+class _EditPoleSheetState extends State<_EditPoleSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _shortNameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _objectivesController;
+
+  late String _type;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.pole.name);
+    _shortNameController = TextEditingController(
+      text: widget.pole.shortName ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.pole.description ?? '',
+    );
+    _objectivesController = TextEditingController(
+      text: widget.pole.objectives ?? '',
+    );
+    _type = _knownPoleType(widget.pole.type);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _shortNameController.dispose();
+    _descriptionController.dispose();
+    _objectivesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await widget.service.updatePole(
+        poleId: widget.pole.id,
+        name: _nameController.text,
+        shortName: _shortNameController.text,
+        type: _type,
+        description: _descriptionController.text,
+        objectives: _objectivesController.text,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 22,
+          right: 22,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 22,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Modifier le pôle',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du pôle',
+                    prefixIcon: Icon(Icons.hub_rounded),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Le nom est obligatoire.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _shortNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom court',
+                    prefixIcon: Icon(Icons.badge_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _type,
+                  decoration: const InputDecoration(
+                    labelText: 'Type',
+                    prefixIcon: Icon(Icons.category_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'metier', child: Text('Métier')),
+                    DropdownMenuItem(value: 'support', child: Text('Support')),
+                    DropdownMenuItem(value: 'bureau', child: Text('Bureau')),
+                    DropdownMenuItem(value: 'projet', child: Text('Projet')),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => _type = value);
+                        },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _descriptionController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    prefixIcon: Icon(Icons.description_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _objectivesController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Objectifs',
+                    prefixIcon: Icon(Icons.flag_rounded),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _submit,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: const Text('Enregistrer'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CreatePoleSheet extends StatefulWidget {
   final PolesService service;
 
@@ -1576,9 +1799,33 @@ class _EmptyPolesCard extends StatelessWidget {
   }
 }
 
-String _safeText(String? value, {required String fallback}) {
-  if (value == null || value.trim().isEmpty) return fallback;
-  return value.trim();
+T? _firstOrNull<T>(Iterable<T> values) {
+  final iterator = values.iterator;
+  if (!iterator.moveNext()) return null;
+  return iterator.current;
+}
+
+List<MemberModel> _activePoleMembers(List<MemberModel> members) {
+  return members.where((member) {
+    if (member.isActive != null) return member.isActive!;
+    final status = member.status?.trim().toLowerCase();
+    return status == null || status == 'active' || status == 'actif';
+  }).toList();
+}
+
+List<MemberModel> _inactivePoleMembers(List<MemberModel> members) {
+  final activeIds = _activePoleMembers(
+    members,
+  ).map((member) => member.id).toSet();
+  return members.where((member) => !activeIds.contains(member.id)).toList();
+}
+
+String _knownPoleType(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (normalized == 'support') return 'support';
+  if (normalized == 'bureau') return 'bureau';
+  if (normalized == 'projet') return 'projet';
+  return 'metier';
 }
 
 String? _absoluteMemberPhoto(String? value) {

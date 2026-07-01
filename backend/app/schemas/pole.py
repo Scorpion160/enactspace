@@ -13,6 +13,14 @@ class PoleCreate(BaseModel):
     objectives: Optional[str] = None
 
 
+class PoleUpdate(BaseModel):
+    name: Optional[str] = None
+    short_name: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    objectives: Optional[str] = None
+
+
 class PoleRead(BaseModel):
     id: UUID
     season_id: Optional[UUID]
