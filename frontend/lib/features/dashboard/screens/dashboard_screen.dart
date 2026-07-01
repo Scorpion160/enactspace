@@ -1611,6 +1611,12 @@ IconData _activityIcon(String type) {
   switch (type) {
     case 'post':
       return Icons.campaign_rounded;
+    case 'task':
+      return Icons.task_alt_rounded;
+    case 'document':
+      return Icons.description_rounded;
+    case 'recruitment':
+      return Icons.how_to_reg_rounded;
     case 'assignment':
       return Icons.hub_rounded;
     case 'notification':

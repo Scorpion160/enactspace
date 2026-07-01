@@ -322,6 +322,62 @@ def _recent_activity(db: Session, current_user: User, flags: dict, scope: dict) 
             )
         )
 
+    task_rows = (
+        db.query(Task)
+        .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+        .filter(TaskAssignee.user_id == current_user.id)
+        .order_by(Task.updated_at.desc())
+        .limit(3)
+        .all()
+    )
+    for task in task_rows:
+        items.append(
+            _activity_item(
+                "task",
+                task.title,
+                task.updated_at or task.created_at,
+                "/tasks",
+            )
+        )
+
+    recent_document_ids = [
+        row[0]
+        for row in _documents_query(db, current_user, flags, scope).limit(5).all()
+    ]
+    document_rows = (
+        db.query(Document)
+        .filter(Document.id.in_(recent_document_ids))
+        .order_by(Document.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    for document in document_rows:
+        items.append(
+            _activity_item(
+                "document",
+                document.title,
+                document.created_at,
+                "/documents",
+            )
+        )
+
+    if flags["can_view_recruitment"]:
+        applications = (
+            db.query(Application)
+            .order_by(Application.created_at.desc())
+            .limit(3)
+            .all()
+        )
+        for application in applications:
+            items.append(
+                _activity_item(
+                    "recruitment",
+                    f"Candidature {application.first_name} {application.last_name}".strip(),
+                    application.created_at,
+                    "/recruitment",
+                )
+            )
+
     if flags["can_view_global_members"]:
         logs = (
             db.query(AuditLog)
