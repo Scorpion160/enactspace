@@ -75,14 +75,19 @@ class UserDirectoryRead(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+    phone: Optional[str] = None
     photo_url: Optional[str] = None
     gender: Optional[str] = None
     profile_type: str
     department: Optional[str] = None
+    study_level: Optional[str] = None
+    promotion: Optional[str] = None
+    bio: Optional[str] = None
     core_pole_id: Optional[UUID] = None
     pole_position: Optional[str] = None
     status: str
     roles: List[str] = []
+    created_at: datetime
 
     class Config:
         from_attributes = True

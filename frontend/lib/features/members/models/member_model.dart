@@ -4,6 +4,7 @@ class MemberModel {
   final String? firstName;
   final String? lastName;
   final String? fullName;
+  final String? phone;
   final String? status;
   final bool? isActive;
   final bool? emailVerified;
@@ -13,6 +14,10 @@ class MemberModel {
   final String? profileType;
   final List<String> roles;
   final String? department;
+  final String? studyLevel;
+  final String? promotion;
+  final String? bio;
+  final String? createdAt;
   final String? photoUrl;
 
   const MemberModel({
@@ -21,6 +26,7 @@ class MemberModel {
     this.firstName,
     this.lastName,
     this.fullName,
+    this.phone,
     this.status,
     this.isActive,
     this.emailVerified,
@@ -30,6 +36,10 @@ class MemberModel {
     this.profileType,
     this.roles = const [],
     this.department,
+    this.studyLevel,
+    this.promotion,
+    this.bio,
+    this.createdAt,
     this.photoUrl,
   });
 
@@ -43,6 +53,7 @@ class MemberModel {
           json['full_name']?.toString() ??
           json['name']?.toString() ??
           _buildFullName(json),
+      phone: json['phone']?.toString(),
       status: json['status']?.toString(),
       isActive: json['is_active'] is bool ? json['is_active'] as bool : null,
       emailVerified: json['email_verified'] is bool
@@ -54,6 +65,10 @@ class MemberModel {
       profileType: json['profile_type']?.toString(),
       roles: _parseRoles(json['roles']),
       department: json['department']?.toString(),
+      studyLevel: json['study_level']?.toString(),
+      promotion: json['promotion']?.toString(),
+      bio: json['bio']?.toString(),
+      createdAt: json['created_at']?.toString(),
       photoUrl:
           json['photo_url']?.toString() ??
           json['avatar_url']?.toString() ??
@@ -115,7 +130,7 @@ class MemberModel {
       case 'removed':
         return 'Renvoyé';
       default:
-        return status ?? 'Non défini';
+        return status ?? 'Non renseigné';
     }
   }
 
@@ -151,11 +166,41 @@ class MemberModel {
         .join(', ');
   }
 
-  String get departmentLabel {
-    if (department == null || department!.trim().isEmpty) {
-      return 'Non défini';
+  String get primaryRoleLabel {
+    if (roles.any((role) => role == 'administrateur')) return 'Admin';
+    if (roles.any((role) => role == 'team_leader')) return 'Team Leader';
+    if (roles.any((role) => role == 'secretaire_generale')) return 'SG';
+    if (roles.any((role) => role == 'financier')) return 'Financier';
+    if (roles.any((role) => role == 'chef_pole')) return 'Chef de pôle';
+    if (roles.any((role) => role == 'adjoint_chef_pole')) {
+      return 'Adjoint de pôle';
     }
+    if (roles.any((role) => role == 'chef_projet')) return 'Chef de projet';
+    if (roles.any((role) => role == 'adjoint_chef_projet')) {
+      return 'Adjoint de projet';
+    }
+    return memberLabel;
+  }
 
-    return department!;
+  String get phoneLabel => _labelOrFallback(phone);
+  String get studyLevelLabel => _labelOrFallback(studyLevel);
+  String get promotionLabel => _labelOrFallback(promotion);
+  String get bioLabel => _labelOrFallback(bio);
+  String get joinedAtLabel {
+    final parsed = DateTime.tryParse(createdAt ?? '');
+    if (parsed == null) return 'Non renseigné';
+    final local = parsed.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month/${local.year}';
+  }
+
+  String get departmentLabel {
+    return _labelOrFallback(department);
+  }
+
+  static String _labelOrFallback(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Non renseigné';
+    return value.trim();
   }
 }

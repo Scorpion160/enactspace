@@ -23,6 +23,8 @@ class _MembersScreenState extends State<MembersScreen> {
   List<MemberModel> _members = [];
   UserExperience? _userExperience;
   String _search = '';
+  String _statusFilter = 'all';
+  String _roleFilter = 'all';
 
   @override
   void initState() {
@@ -300,12 +302,20 @@ class _MembersScreenState extends State<MembersScreen> {
   List<MemberModel> get _filteredMembers {
     final query = _search.trim().toLowerCase();
 
-    if (query.isEmpty) return _members;
-
     return _members.where((member) {
-      return member.displayName.toLowerCase().contains(query) ||
+      final matchesSearch =
+          query.isEmpty ||
+          member.displayName.toLowerCase().contains(query) ||
           member.email.toLowerCase().contains(query) ||
-          member.statusLabel.toLowerCase().contains(query);
+          member.phoneLabel.toLowerCase().contains(query) ||
+          member.departmentLabel.toLowerCase().contains(query) ||
+          member.statusLabel.toLowerCase().contains(query) ||
+          member.rolesLabel.toLowerCase().contains(query);
+      final matchesStatus =
+          _statusFilter == 'all' || member.status == _statusFilter;
+      final matchesRole =
+          _roleFilter == 'all' || member.roles.contains(_roleFilter);
+      return matchesSearch && matchesStatus && matchesRole;
     }).toList();
   }
 
@@ -354,6 +364,14 @@ class _MembersScreenState extends State<MembersScreen> {
               setState(() {
                 _search = value;
               });
+            },
+            statusFilter: _statusFilter,
+            roleFilter: _roleFilter,
+            onStatusChanged: (value) {
+              setState(() => _statusFilter = value);
+            },
+            onRoleChanged: (value) {
+              setState(() => _roleFilter = value);
             },
             onAdd: canManageMembers ? _openAddMemberDialog : null,
           ),
@@ -458,9 +476,20 @@ class _MembersHeader extends StatelessWidget {
 
 class _SearchAndActions extends StatelessWidget {
   final ValueChanged<String> onChanged;
+  final String statusFilter;
+  final String roleFilter;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onRoleChanged;
   final VoidCallback? onAdd;
 
-  const _SearchAndActions({required this.onChanged, required this.onAdd});
+  const _SearchAndActions({
+    required this.onChanged,
+    required this.statusFilter,
+    required this.roleFilter,
+    required this.onStatusChanged,
+    required this.onRoleChanged,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -470,9 +499,52 @@ class _SearchAndActions extends StatelessWidget {
       onChanged: onChanged,
       decoration: const InputDecoration(
         labelText: 'Rechercher un membre',
-        hintText: 'Nom, email, statut...',
+        hintText: 'Nom, email, téléphone, pôle...',
         prefixIcon: Icon(Icons.search_rounded),
       ),
+    );
+    final statusFilterField = DropdownButtonFormField<String>(
+      initialValue: statusFilter,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Statut'),
+      items: const [
+        DropdownMenuItem(value: 'all', child: Text('Tous')),
+        DropdownMenuItem(value: 'active', child: Text('Actifs')),
+        DropdownMenuItem(value: 'pending', child: Text('En attente')),
+        DropdownMenuItem(value: 'inactive', child: Text('Inactifs')),
+        DropdownMenuItem(value: 'suspended', child: Text('Suspendus')),
+        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
+        DropdownMenuItem(value: 'rejected', child: Text('Refusés')),
+      ],
+      onChanged: (value) {
+        if (value != null) onStatusChanged(value);
+      },
+    );
+    final roleFilterField = DropdownButtonFormField<String>(
+      initialValue: roleFilter,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Rôle'),
+      items: const [
+        DropdownMenuItem(value: 'all', child: Text('Tous')),
+        DropdownMenuItem(value: 'enacteur', child: Text('Enacteur/Enactrice')),
+        DropdownMenuItem(value: 'team_leader', child: Text('Team Leader')),
+        DropdownMenuItem(value: 'secretaire_generale', child: Text('SG')),
+        DropdownMenuItem(value: 'financier', child: Text('Financier')),
+        DropdownMenuItem(value: 'chef_pole', child: Text('Chef pôle')),
+        DropdownMenuItem(
+          value: 'adjoint_chef_pole',
+          child: Text('Adjoint pôle'),
+        ),
+        DropdownMenuItem(value: 'chef_projet', child: Text('Chef projet')),
+        DropdownMenuItem(
+          value: 'adjoint_chef_projet',
+          child: Text('Adjoint projet'),
+        ),
+        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
+      ],
+      onChanged: (value) {
+        if (value != null) onRoleChanged(value);
+      },
     );
 
     final addButton = onAdd == null
@@ -488,16 +560,33 @@ class _SearchAndActions extends StatelessWidget {
         children: [
           Expanded(child: searchField),
           const SizedBox(width: 14),
+          SizedBox(width: 170, child: statusFilterField),
+          const SizedBox(width: 12),
+          SizedBox(width: 210, child: roleFilterField),
+          const SizedBox(width: 14),
           addButton,
         ],
       );
     }
 
-    if (addButton == null) return searchField;
+    final filters = [
+      searchField,
+      const SizedBox(height: 12),
+      statusFilterField,
+      const SizedBox(height: 12),
+      roleFilterField,
+    ];
+
+    if (addButton == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: filters,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [searchField, const SizedBox(height: 12), addButton],
+      children: [...filters, const SizedBox(height: 12), addButton],
     );
   }
 }
@@ -749,41 +838,82 @@ class _MembersList extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _Avatar(name: member.displayName),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      member.displayName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            8,
+            24,
+            MediaQuery.viewInsetsOf(context).bottom + 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _Avatar(
+                      name: member.displayName,
+                      photoUrl: member.photoUrl,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            member.displayName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              _StatusChip(member: member),
+                              Chip(label: Text(member.primaryRoleLabel)),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _DetailLine(label: 'Email', value: member.email),
-              _DetailLine(label: 'Statut', value: member.statusLabel),
-              _DetailLine(
-                label: 'Actif',
-                value: member.isActive == true ? 'Oui' : 'Non',
-              ),
-              _DetailLine(
-                label: 'Email vérifié',
-                value: member.emailVerified == true ? 'Oui' : 'Non',
-              ),
-              _DetailLine(label: 'ID', value: member.id),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _DetailLine(label: 'Email', value: member.email),
+                _DetailLine(label: 'Téléphone', value: member.phoneLabel),
+                _DetailLine(label: 'Statut', value: member.statusLabel),
+                _DetailLine(label: 'Profil', value: member.memberLabel),
+                _DetailLine(
+                  label: 'Rôle principal',
+                  value: member.primaryRoleLabel,
+                ),
+                _DetailLine(label: 'Rôles', value: member.rolesLabel),
+                _DetailLine(label: 'Pôle cœur', value: member.departmentLabel),
+                _DetailLine(label: 'Niveau', value: member.studyLevelLabel),
+                _DetailLine(label: 'Promotion', value: member.promotionLabel),
+                _DetailLine(label: 'Adhésion', value: member.joinedAtLabel),
+                _DetailLine(label: 'Bio', value: member.bioLabel),
+                _DetailLine(
+                  label: 'Actif',
+                  value: member.isActive == true ? 'Oui' : 'Non',
+                ),
+                _DetailLine(
+                  label: 'Email vérifié',
+                  value: member.emailVerified == true ? 'Oui' : 'Non',
+                ),
+                _DetailLine(label: 'ID', value: member.id),
+              ],
+            ),
           ),
         );
       },
@@ -959,7 +1089,10 @@ class _MemberCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _StatusChip(member: member),
-                _RolesChip(roles: member.roles),
+                _SoftInfoChip(
+                  icon: Icons.badge_rounded,
+                  label: member.primaryRoleLabel,
+                ),
                 _DepartmentChip(department: member.departmentLabel),
               ],
             ),
@@ -1418,18 +1551,18 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   }
 }
 
-class _RolesChip extends StatelessWidget {
-  final List<String> roles;
+class _SoftInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _RolesChip({required this.roles});
+  const _SoftInfoChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final label = roles.isEmpty ? 'Aucun rôle' : roles.join(', ');
-
     return Chip(
-      label: SizedBox(
-        width: 140,
+      avatar: Icon(icon, size: 16),
+      label: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 150),
         child: Text(
           label,
           overflow: TextOverflow.ellipsis,
@@ -1673,7 +1806,9 @@ class _DepartmentChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defined = department != 'Non défini';
+    final defined =
+        department.trim().isNotEmpty &&
+        !department.toLowerCase().contains('non ');
 
     return Chip(
       label: SizedBox(

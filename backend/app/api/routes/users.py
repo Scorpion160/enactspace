@@ -151,14 +151,19 @@ def build_directory_user(db: Session, user: User) -> UserDirectoryRead:
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
+        phone=user.phone,
         photo_url=user.photo_url,
         gender=user.gender,
         profile_type=user.profile_type,
         department=user.department,
+        study_level=user.study_level,
+        promotion=user.promotion,
+        bio=user.bio,
         core_pole_id=pole_member.pole_id if pole_member else None,
         pole_position=pole_member.position if pole_member else None,
         status=user.status,
         roles=sorted(get_user_role_names(db, user.id)),
+        created_at=user.created_at,
     )
 
 

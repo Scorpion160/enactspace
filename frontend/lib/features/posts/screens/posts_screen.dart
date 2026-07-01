@@ -535,7 +535,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     if (member == null) return 'Membre Enactus';
 
     final roles = member.roles.isEmpty ? member.memberLabel : member.rolesLabel;
-    final department = member.departmentLabel == 'Non défini'
+    final department = member.departmentLabel.toLowerCase().contains('non ')
         ? null
         : member.departmentLabel;
 
