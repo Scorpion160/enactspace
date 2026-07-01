@@ -321,8 +321,16 @@ class _HeroChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = (MediaQuery.sizeOf(context).width - 96).clamp(
+      160.0,
+      360.0,
+    );
+
     return Chip(
-      label: Text(label, overflow: TextOverflow.ellipsis),
+      label: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
       backgroundColor: Colors.white.withValues(alpha: 0.10),
       side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
       labelStyle: const TextStyle(color: Colors.white),
@@ -927,11 +935,17 @@ class _SoftMetric extends StatelessWidget {
           Expanded(
             child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w900),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
           ),
         ],
       ),
