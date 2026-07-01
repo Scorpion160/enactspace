@@ -25,6 +25,7 @@ from app.api.routes import (
     notifications,
     gamification,
     impact,
+    dashboard,
     academy,
     audit,
     seed,
@@ -101,6 +102,7 @@ app.include_router(alumni.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(gamification.router, prefix="/api")
 app.include_router(impact.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 app.include_router(academy.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
