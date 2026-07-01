@@ -126,6 +126,8 @@ class _DashboardBody extends StatelessWidget {
           children: [
             _SummaryGrid(cards: _metricCards(summary)),
             const SizedBox(height: 18),
+            _RoleCardsGrid(cards: _roleCards(summary, userExperience)),
+            const SizedBox(height: 18),
             _QuickActionsPanel(
               userExperience: userExperience,
               summary: summary,
@@ -464,6 +466,128 @@ class _MetricCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCardsGrid extends StatelessWidget {
+  final List<_RoleCardData> cards;
+
+  const _RoleCardsGrid({required this.cards});
+
+  @override
+  Widget build(BuildContext context) {
+    if (cards.isEmpty) return const SizedBox.shrink();
+
+    return _DashboardSection(
+      icon: Icons.dashboard_customize_rounded,
+      title: 'Cartes adaptées à ton rôle',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final count = constraints.maxWidth >= 820
+              ? 3
+              : constraints.maxWidth >= 560
+              ? 2
+              : 1;
+          const spacing = 12.0;
+          final width = (constraints.maxWidth - spacing * (count - 1)) / count;
+
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              for (final card in cards)
+                SizedBox(
+                  width: width,
+                  child: _RoleCard(data: card),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RoleCardData {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final String route;
+  final Color? color;
+
+  const _RoleCardData({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.route,
+    this.color,
+  });
+}
+
+class _RoleCard extends StatelessWidget {
+  final _RoleCardData data;
+
+  const _RoleCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data.color ?? AppTheme.softBlack;
+
+    return InkWell(
+      onTap: () => context.go(data.route),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  foregroundColor: color,
+                  child: Icon(data.icon),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              data.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              data.subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.black54, height: 1.25),
+            ),
+          ],
         ),
       ),
     );
@@ -1051,6 +1175,172 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
   }
 
   return cards;
+}
+
+List<_RoleCardData> _roleCards(
+  DashboardSummaryModel summary,
+  UserExperience? user,
+) {
+  final profile = summary.profile;
+  final counts = summary.counts;
+
+  if (profile.canViewGlobal) {
+    return [
+      _RoleCardData(
+        title: 'Vue club',
+        value: counts.integer('members_active').toString(),
+        subtitle: 'membres actifs actuellement',
+        icon: Icons.groups_rounded,
+        route: '/members',
+      ),
+      _RoleCardData(
+        title: 'Projets en mouvement',
+        value: counts.integer('projects_active').toString(),
+        subtitle: '${counts.integer('poles')} pôle(s) structurés',
+        icon: Icons.rocket_launch_rounded,
+        route: '/projects',
+      ),
+      _RoleCardData(
+        title: 'Organisation',
+        value: counts.integer('documents_pending_validation').toString(),
+        subtitle: 'document(s) à valider',
+        icon: Icons.fact_check_rounded,
+        route: '/documents',
+      ),
+    ];
+  }
+
+  if (profile.canViewFinance) {
+    return [
+      _RoleCardData(
+        title: 'Paiements récents',
+        value: counts.integer('payments_pending').toString(),
+        subtitle: 'paiement(s) à valider',
+        icon: Icons.pending_actions_rounded,
+        route: '/finance',
+        color: Colors.green.shade800,
+      ),
+      _RoleCardData(
+        title: 'Cotisations',
+        value: _money(counts.decimal('finance_due')),
+        subtitle: 'reste à encaisser',
+        icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
+        color: Colors.green.shade800,
+      ),
+      _RoleCardData(
+        title: 'Encaissements',
+        value: _money(counts.decimal('finance_paid')),
+        subtitle: 'total payé enregistré',
+        icon: Icons.verified_rounded,
+        route: '/finance',
+        color: Colors.green.shade800,
+      ),
+    ];
+  }
+
+  if (profile.canViewGlobalMembers || profile.canManageDocuments) {
+    return [
+      _RoleCardData(
+        title: 'Présences',
+        value: counts.integer('absences_recent').toString(),
+        subtitle:
+            '${counts.integer('late_attendance_recent')} retard(s) suivis',
+        icon: Icons.event_busy_rounded,
+        route: '/attendance',
+      ),
+      _RoleCardData(
+        title: 'Documents',
+        value: counts.integer('documents_pending_validation').toString(),
+        subtitle: 'validation et classement',
+        icon: Icons.description_rounded,
+        route: '/documents',
+      ),
+      _RoleCardData(
+        title: 'Candidatures',
+        value: counts.integer('applications_pending').toString(),
+        subtitle: 'profils à suivre',
+        icon: Icons.how_to_reg_rounded,
+        route: '/recruitment',
+      ),
+    ];
+  }
+
+  if (profile.isEnacchef) {
+    return [
+      _RoleCardData(
+        title: 'Mon périmètre',
+        value: counts.integer('tasks_assigned').toString(),
+        subtitle: 'tâche(s) où je suis impliqué',
+        icon: Icons.task_alt_rounded,
+        route: '/tasks',
+      ),
+      _RoleCardData(
+        title: 'Projets',
+        value: counts.integer('projects_active').toString(),
+        subtitle: 'projets actifs à coordonner',
+        icon: Icons.rocket_launch_rounded,
+        route: '/projects',
+      ),
+      _RoleCardData(
+        title: 'Communication',
+        value: counts.integer('posts_recent').toString(),
+        subtitle: 'posts récents visibles',
+        icon: Icons.campaign_rounded,
+        route: '/posts',
+      ),
+    ];
+  }
+
+  if (profile.isAlumni || user?.isAlumni == true) {
+    return [
+      _RoleCardData(
+        title: 'Annonces',
+        value: counts.integer('posts_recent').toString(),
+        subtitle: 'publications accessibles',
+        icon: Icons.campaign_rounded,
+        route: '/posts',
+      ),
+      _RoleCardData(
+        title: 'Événements',
+        value: counts.integer('events_upcoming').toString(),
+        subtitle: 'moments ouverts au réseau',
+        icon: Icons.event_available_rounded,
+        route: '/events',
+      ),
+      _RoleCardData(
+        title: 'Réseau',
+        value: counts.integer('messages_unread').toString(),
+        subtitle: 'message(s) non lus',
+        icon: Icons.chat_rounded,
+        route: '/chat',
+      ),
+    ];
+  }
+
+  return [
+    _RoleCardData(
+      title: 'Mes tâches',
+      value: counts.integer('tasks_assigned').toString(),
+      subtitle: '${counts.integer('tasks_done')} terminée(s)',
+      icon: Icons.task_alt_rounded,
+      route: '/tasks',
+    ),
+    _RoleCardData(
+      title: 'Mes échanges',
+      value: counts.integer('messages_unread').toString(),
+      subtitle: 'message(s) à lire',
+      icon: Icons.chat_rounded,
+      route: '/chat',
+    ),
+    _RoleCardData(
+      title: 'Mon engagement',
+      value: counts.integer('badges_points').toString(),
+      subtitle: '${counts.integer('badges_count')} badge(s)',
+      icon: Icons.workspace_premium_rounded,
+      route: '/gamification',
+    ),
+  ];
 }
 
 List<_AttentionItem> _attentionItems(DashboardSummaryModel summary) {
