@@ -664,7 +664,7 @@ class _MembersList extends StatelessWidget {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
-            width: 1450,
+            width: 1510,
             child: DataTable(
               columnSpacing: 28,
               horizontalMargin: 24,
@@ -724,9 +724,11 @@ class _MembersList extends StatelessWidget {
 
                     DataCell(
                       SizedBox(
-                        width: 180,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        width: 236,
+                        child: Wrap(
+                          spacing: 2,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             IconButton(
                               visualDensity: VisualDensity.compact,

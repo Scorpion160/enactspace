@@ -1323,8 +1323,12 @@ class _ProjectTeamPanel extends StatelessWidget {
                               ? Text(_initials(member.displayName))
                               : null,
                         ),
-                        label: Text(
-                          '${member.displayName} · ${member.positionLabel}',
+                        label: SizedBox(
+                          width: 220,
+                          child: Text(
+                            '${member.displayName} · ${member.positionLabel}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         onDeleted: !canManage || saving
                             ? null

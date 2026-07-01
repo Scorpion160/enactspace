@@ -1353,18 +1353,28 @@ class _PoleMemberTile extends StatelessWidget {
       leading: _MemberMiniAvatar(member: member),
       title: Text(member.displayName),
       subtitle: Text(member.email),
-      trailing: Wrap(
-        spacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Chip(label: Text(_memberRoleLabel(member))),
-          if (onRemove != null)
-            IconButton(
-              tooltip: 'Retirer du pôle',
-              onPressed: onRemove,
-              icon: const Icon(Icons.person_remove_rounded),
+      trailing: SizedBox(
+        width: 178,
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Chip(
+              label: Text(
+                _memberRoleLabel(member),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-        ],
+            if (onRemove != null)
+              IconButton(
+                tooltip: 'Retirer du pôle',
+                onPressed: onRemove,
+                icon: const Icon(Icons.person_remove_rounded),
+              ),
+          ],
+        ),
       ),
     );
   }
