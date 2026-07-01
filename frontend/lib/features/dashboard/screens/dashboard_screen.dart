@@ -4,17 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../academy/models/academy_models.dart';
-import '../../academy/services/academy_service.dart';
-import '../../attendance/services/attendance_service.dart';
-import '../../documents/services/documents_service.dart';
-import '../../finance/services/finance_service.dart';
-import '../../impact/models/impact_models.dart';
-import '../../impact/services/impact_service.dart';
-import '../../members/services/members_service.dart';
-import '../../notifications/services/notifications_service.dart';
-import '../../recruitment/services/recruitment_service.dart';
-import '../../tasks/services/tasks_service.dart';
+import '../models/dashboard_summary_model.dart';
+import '../services/dashboard_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,57 +14,14 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardStats {
-  final int members;
-  final int sessions;
-  final int lateTasks;
-  final int documents;
-  final int applications;
-  final int unreadNotifications;
-  final double totalDue;
-  final double totalPaid;
-  final int pendingPayments;
-
-  const _DashboardStats({
-    required this.members,
-    required this.sessions,
-    required this.lateTasks,
-    required this.documents,
-    required this.applications,
-    required this.unreadNotifications,
-    required this.totalDue,
-    required this.totalPaid,
-    required this.pendingPayments,
-  });
-
-  int get alertCount {
-    return [
-      lateTasks,
-      pendingPayments,
-      unreadNotifications,
-      totalDue > 0 ? 1 : 0,
-    ].where((value) => value > 0).length;
-  }
-}
-
 class _DashboardScreenState extends State<DashboardScreen> {
+  final DashboardService _dashboardService = DashboardService();
   final AuthService _authService = AuthService();
-  final MembersService _membersService = MembersService();
-  final AttendanceService _attendanceService = AttendanceService();
-  final TasksService _tasksService = TasksService();
-  final FinanceService _financeService = FinanceService();
-  final DocumentsService _documentsService = DocumentsService();
-  final RecruitmentService _recruitmentService = RecruitmentService();
-  final NotificationsService _notificationsService = NotificationsService();
-  final AcademyService _academyService = AcademyService();
-  final ImpactService _impactService = ImpactService();
 
   bool _loading = true;
   String? _error;
-  _DashboardStats? _stats;
+  DashboardSummaryModel? _summary;
   UserExperience? _userExperience;
-  AcademyHomeData? _academyData;
-  ImpactDashboardData? _impactData;
 
   @override
   void initState() {
@@ -88,106 +36,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final user = UserExperience.fromJson(await _authService.getCurrentUser());
-
-      final members = user.canManageMembers
-          ? await _safeList(() => _membersService.getMembers())
-          : const [];
-      final sessions = user.isAlumni
-          ? const []
-          : await _safeList(() => _attendanceService.getSessions());
-      final lateTasks = await _safeList(() => _tasksService.getLateTasks());
-      final accounts = user.canViewFinance
-          ? await _safeList(() => _financeService.getAccounts())
-          : const [];
-      final payments = user.canViewFinance
-          ? await _safeList(() => _financeService.getPayments())
-          : const [];
-      final documents = await _safeList(() => _documentsService.getDocuments());
-      final applications = user.canViewRecruitment
-          ? await _safeList(() => _recruitmentService.getApplications())
-          : const [];
-      final unreadCount = await _safeValue(
-        () => _notificationsService.getUnreadCount(),
-        0,
-      );
-      AcademyHomeData? academyData;
-      ImpactDashboardData? impactData;
+      final summary = await _dashboardService.getSummary();
+      UserExperience? user;
 
       try {
-        academyData = await _academyService.getHome();
+        user = UserExperience.fromJson(await _authService.getCurrentUser());
       } catch (_) {
-        academyData = null;
+        user = null;
       }
-
-      if (user.canViewImpact) {
-        try {
-          impactData = await _impactService.getDashboard();
-        } catch (_) {
-          impactData = null;
-        }
-      }
-
-      final totalDue = accounts.fold<double>(
-        0,
-        (sum, account) => sum + account.balanceDue,
-      );
-
-      final totalPaid = accounts.fold<double>(
-        0,
-        (sum, account) => sum + account.totalPaid,
-      );
-
-      final pendingPayments = payments
-          .where((payment) => payment.status == 'pending')
-          .length;
 
       if (!mounted) return;
-
       setState(() {
+        _summary = summary;
         _userExperience = user;
-        _academyData = academyData;
-        _impactData = impactData;
-        _stats = _DashboardStats(
-          members: members.length,
-          sessions: sessions.length,
-          lateTasks: lateTasks.length,
-          documents: documents.length,
-          applications: applications.length,
-          unreadNotifications: unreadCount,
-          totalDue: totalDue,
-          totalPaid: totalPaid,
-          pendingPayments: pendingPayments,
-        );
       });
     } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<List<T>> _safeList<T>(Future<List<T>> Function() loader) async {
-    try {
-      return await loader();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<T> _safeValue<T>(Future<T> Function() loader, T fallback) async {
-    try {
-      return await loader();
-    } catch (_) {
-      return fallback;
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -211,24 +78,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1280),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DashboardHeader(
-                        stats: _stats,
+                      _DashboardHero(
+                        summary: _summary,
                         userExperience: _userExperience,
                         loading: _loading,
                         onRefresh: _loadDashboard,
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 20),
                       if (_loading)
                         const _DashboardLoading()
                       else if (_error != null)
-                        _ErrorCard(message: _error!, onRetry: _loadDashboard)
-                      else if (_stats != null)
-                        _DashboardContent(
-                          stats: _stats!,
+                        _DashboardError(
+                          message: _error!,
+                          onRetry: _loadDashboard,
+                        )
+                      else if (_summary != null)
+                        _DashboardBody(
+                          summary: _summary!,
                           userExperience: _userExperience,
-                          academyData: _academyData,
-                          impactData: _impactData,
                         ),
                     ],
                   ),
@@ -242,97 +111,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _DashboardContent extends StatelessWidget {
-  final _DashboardStats stats;
+class _DashboardBody extends StatelessWidget {
+  final DashboardSummaryModel summary;
   final UserExperience? userExperience;
-  final AcademyHomeData? academyData;
-  final ImpactDashboardData? impactData;
 
-  const _DashboardContent({
-    required this.stats,
-    required this.userExperience,
-    required this.academyData,
-    required this.impactData,
-  });
+  const _DashboardBody({required this.summary, required this.userExperience});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 1120;
+        final isWide = constraints.maxWidth >= 1060;
+        final main = Column(
+          children: [
+            _SummaryGrid(cards: _metricCards(summary)),
+            const SizedBox(height: 18),
+            _QuickActionsPanel(
+              userExperience: userExperience,
+              summary: summary,
+            ),
+          ],
+        );
+        final side = Column(
+          children: [
+            _AttentionPanel(items: _attentionItems(summary)),
+            const SizedBox(height: 18),
+            _ActivityPanel(items: summary.recentActivity),
+            const SizedBox(height: 18),
+            _RoleFocusPanel(summary: summary, userExperience: userExperience),
+          ],
+        );
 
         if (isWide) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 7,
-                child: Column(
-                  children: [
-                    _PriorityGrid(stats: stats, userExperience: userExperience),
-                    const SizedBox(height: 22),
-                    if (impactData != null) ...[
-                      _DashboardImpactPanel(data: impactData!),
-                      const SizedBox(height: 22),
-                    ],
-                    _QuickAccessGrid(userExperience: userExperience),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 22),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    _QuickInsights(
-                      stats: stats,
-                      userExperience: userExperience,
-                    ),
-                    const SizedBox(height: 22),
-                    if (academyData != null) ...[
-                      _DashboardAcademyCard(data: academyData!),
-                      const SizedBox(height: 22),
-                    ],
-                    _MomentumCard(stats: stats, userExperience: userExperience),
-                  ],
-                ),
-              ),
+              Expanded(flex: 7, child: main),
+              const SizedBox(width: 18),
+              Expanded(flex: 4, child: side),
             ],
           );
         }
 
-        return Column(
-          children: [
-            _PriorityGrid(stats: stats, userExperience: userExperience),
-            const SizedBox(height: 22),
-            if (impactData != null) ...[
-              _DashboardImpactPanel(data: impactData!),
-              const SizedBox(height: 22),
-            ],
-            if (academyData != null) ...[
-              _DashboardAcademyCard(data: academyData!),
-              const SizedBox(height: 22),
-            ],
-            _QuickAccessGrid(userExperience: userExperience),
-            const SizedBox(height: 22),
-            _QuickInsights(stats: stats, userExperience: userExperience),
-            const SizedBox(height: 22),
-            _MomentumCard(stats: stats, userExperience: userExperience),
-          ],
-        );
+        return Column(children: [main, const SizedBox(height: 18), side]);
       },
     );
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  final _DashboardStats? stats;
+class _DashboardHero extends StatelessWidget {
+  final DashboardSummaryModel? summary;
   final UserExperience? userExperience;
   final bool loading;
   final VoidCallback onRefresh;
 
-  const _DashboardHeader({
-    required this.stats,
+  const _DashboardHero({
+    required this.summary,
     required this.userExperience,
     required this.loading,
     required this.onRefresh,
@@ -340,54 +174,65 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 820;
-    final alertCount = stats?.alertCount ?? 0;
+    final profile = summary?.profile;
+    final displayName =
+        profile?.displayName ?? userExperience?.displayName ?? 'Enacteur';
+    final title = userExperience?.dashboardTitle ?? _titleForProfile(profile);
+    final subtitle =
+        userExperience?.dashboardSubtitle ?? _subtitleForProfile(profile);
+    final unread = summary?.counts.integer('notifications_unread') ?? 0;
+    final lateTasks = summary?.counts.integer('tasks_late') ?? 0;
     final statusText = loading
         ? 'Synchronisation des données...'
-        : alertCount == 0
-        ? 'Tout est calme pour le moment.'
-        : '$alertCount point(s) à suivre aujourd’hui.';
+        : unread + lateTasks == 0
+        ? 'Aucune alerte urgente pour le moment.'
+        : '${unread + lateTasks} point(s) à suivre aujourd’hui.';
+    final isWide = MediaQuery.sizeOf(context).width >= 820;
 
     return Container(
-      padding: const EdgeInsets.all(26),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: isWide
           ? Row(
               children: [
-                const _HeaderIcon(),
+                const _HeroMark(),
                 const SizedBox(width: 18),
                 Expanded(
-                  child: _HeaderText(
-                    userExperience: userExperience,
+                  child: _HeroText(
+                    title: title,
+                    displayName: displayName,
+                    subtitle: subtitle,
                     statusText: statusText,
                   ),
                 ),
                 const SizedBox(width: 18),
-                _HeaderActions(onRefresh: onRefresh),
+                _HeroActions(onRefresh: onRefresh),
               ],
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _HeaderIcon(),
-                const SizedBox(height: 18),
-                _HeaderText(
-                  userExperience: userExperience,
+                const _HeroMark(),
+                const SizedBox(height: 16),
+                _HeroText(
+                  title: title,
+                  displayName: displayName,
+                  subtitle: subtitle,
                   statusText: statusText,
                 ),
-                const SizedBox(height: 18),
-                _HeaderActions(onRefresh: onRefresh),
+                const SizedBox(height: 16),
+                _HeroActions(onRefresh: onRefresh),
               ],
             ),
     );
   }
 }
 
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon();
+class _HeroMark extends StatelessWidget {
+  const _HeroMark();
 
   @override
   Widget build(BuildContext context) {
@@ -396,22 +241,29 @@ class _HeaderIcon extends StatelessWidget {
       height: 62,
       decoration: BoxDecoration(
         color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: const Icon(
         Icons.dashboard_rounded,
         color: AppTheme.softBlack,
-        size: 36,
+        size: 34,
       ),
     );
   }
 }
 
-class _HeaderText extends StatelessWidget {
-  final UserExperience? userExperience;
+class _HeroText extends StatelessWidget {
+  final String title;
+  final String displayName;
+  final String subtitle;
   final String statusText;
 
-  const _HeaderText({required this.userExperience, required this.statusText});
+  const _HeroText({
+    required this.title,
+    required this.displayName,
+    required this.subtitle,
+    required this.statusText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -419,43 +271,67 @@ class _HeaderText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          userExperience?.dashboardTitle ?? 'Tableau de bord',
-          style: TextStyle(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
             color: Colors.white,
-            fontSize: 30,
+            fontSize: 28,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
-          userExperience?.dashboardSubtitle ??
-              'Le cockpit quotidien de Enactus ESP.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
+          displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppTheme.enactusYellow,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            statusText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white70, height: 1.35),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _HeroChip(label: statusText),
+            const _HeroChip(label: 'Enactus ESP'),
+          ],
         ),
       ],
     );
   }
 }
 
-class _HeaderActions extends StatelessWidget {
+class _HeroChip extends StatelessWidget {
+  final String label;
+
+  const _HeroChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(label, overflow: TextOverflow.ellipsis),
+      backgroundColor: Colors.white.withValues(alpha: 0.10),
+      side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+      labelStyle: const TextStyle(color: Colors.white),
+    );
+  }
+}
+
+class _HeroActions extends StatelessWidget {
   final VoidCallback onRefresh;
 
-  const _HeaderActions({required this.onRefresh});
+  const _HeroActions({required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -469,143 +345,42 @@ class _HeaderActions extends StatelessWidget {
           label: const Text('Actualiser'),
         ),
         ElevatedButton.icon(
-          onPressed: () => context.go('/posts'),
-          icon: const Icon(Icons.forum_rounded),
-          label: const Text('Communication'),
+          onPressed: () => context.go('/chat'),
+          icon: const Icon(Icons.chat_rounded),
+          label: const Text('Chat'),
         ),
       ],
     );
   }
 }
 
-class _PriorityGrid extends StatelessWidget {
-  final _DashboardStats stats;
-  final UserExperience? userExperience;
+class _SummaryGrid extends StatelessWidget {
+  final List<_MetricCardData> cards;
 
-  const _PriorityGrid({required this.stats, required this.userExperience});
+  const _SummaryGrid({required this.cards});
 
   @override
   Widget build(BuildContext context) {
-    final user = userExperience;
-    final items = [
-      if (user?.canManageMembers == true)
-        _StatItem(
-          title: 'Membres',
-          value: stats.members.toString(),
-          subtitle: 'Enacteurs enregistrés',
-          icon: Icons.people_alt_rounded,
-          route: '/members',
-        ),
-      _StatItem(
-        title: 'Notifications',
-        value: stats.unreadNotifications.toString(),
-        subtitle: 'notifications non lues',
-        icon: Icons.notifications_active_rounded,
-        route: '/notifications',
-        danger: stats.unreadNotifications > 0,
-      ),
-      _StatItem(
-        title: user?.isMemberExperience == true ? 'Mes tâches' : 'Tâches',
-        value: stats.lateTasks.toString(),
-        subtitle: 'tâches en retard',
-        icon: Icons.warning_rounded,
-        route: '/tasks',
-        danger: stats.lateTasks > 0,
-      ),
-      if (user?.canViewFinance == true)
-        _StatItem(
-          title: 'Finance',
-          value: _money(stats.totalDue),
-          subtitle: 'reste à encaisser',
-          icon: Icons.account_balance_wallet_rounded,
-          route: '/finance',
-          danger: stats.totalDue > 0,
-        ),
-      if (user?.isAlumni != true)
-        _StatItem(
-          title: 'Présences',
-          value: stats.sessions.toString(),
-          subtitle: user?.isMemberExperience == true
-              ? 'sessions du club'
-              : 'sessions suivies',
-          icon: Icons.event_available_rounded,
-          route: '/attendance',
-        ),
-      _StatItem(
-        title: 'Documents',
-        value: stats.documents.toString(),
-        subtitle: 'ressources partagées',
-        icon: Icons.folder_copy_rounded,
-        route: '/documents',
-      ),
-      _StatItem(
-        title: 'Engagement',
-        value: user?.isAlumni == true ? 'Alumni' : 'Points',
-        subtitle: 'badges et contributions',
-        icon: Icons.workspace_premium_rounded,
-        route: '/gamification',
-      ),
-      const _StatItem(
-        title: 'Academy',
-        value: 'Cours',
-        subtitle: 'leçons, quiz et badges',
-        icon: Icons.school_rounded,
-        route: '/academy',
-      ),
-      if (user?.canViewImpact == true)
-        const _StatItem(
-          title: 'Impact',
-          value: 'Score',
-          subtitle: 'performance projets',
-          icon: Icons.insights_rounded,
-          route: '/impact',
-        ),
-      const _StatItem(
-        title: 'Communication',
-        value: 'Fil',
-        subtitle: 'posts et annonces',
-        icon: Icons.forum_rounded,
-        route: '/posts',
-      ),
-      if (user?.canViewFinance == true)
-        _StatItem(
-          title: 'Paiements',
-          value: stats.pendingPayments.toString(),
-          subtitle: 'paiements à valider',
-          icon: Icons.pending_actions_rounded,
-          route: '/finance',
-          danger: stats.pendingPayments > 0,
-        ),
-      if (user?.canViewRecruitment == true)
-        _StatItem(
-          title: 'Recrutement',
-          value: stats.applications.toString(),
-          subtitle: 'candidatures',
-          icon: Icons.how_to_reg_rounded,
-          route: '/recruitment',
-        ),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth >= 900
+        final count = constraints.maxWidth >= 1040
             ? 4
-            : constraints.maxWidth >= 620
+            : constraints.maxWidth >= 700
+            ? 3
+            : constraints.maxWidth >= 480
             ? 2
             : 1;
-
-        final spacing = 14.0;
-        final cardWidth =
-            (constraints.maxWidth - (spacing * (count - 1))) / count;
+        const spacing = 12.0;
+        final width = (constraints.maxWidth - spacing * (count - 1)) / count;
 
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final item in items)
+            for (final card in cards)
               SizedBox(
-                width: cardWidth,
-                child: _StatCard(item: item),
+                width: width,
+                child: _MetricCard(data: card),
               ),
           ],
         );
@@ -614,7 +389,7 @@ class _PriorityGrid extends StatelessWidget {
   }
 }
 
-class _StatItem {
+class _MetricCardData {
   final String title;
   final String value;
   final String subtitle;
@@ -622,7 +397,7 @@ class _StatItem {
   final String route;
   final bool danger;
 
-  const _StatItem({
+  const _MetricCardData({
     required this.title,
     required this.value,
     required this.subtitle,
@@ -632,176 +407,60 @@ class _StatItem {
   });
 }
 
-class _StatCard extends StatelessWidget {
-  final _StatItem item;
+class _MetricCard extends StatelessWidget {
+  final _MetricCardData data;
 
-  const _StatCard({required this.item});
+  const _MetricCard({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    final color = item.danger ? Colors.red.shade700 : AppTheme.softBlack;
-    final background = item.danger
-        ? Colors.red.shade50
-        : AppTheme.enactusYellow.withValues(alpha: 0.18);
-
+    final color = data.danger ? Colors.red.shade700 : AppTheme.softBlack;
     return Card(
       child: InkWell(
-        onTap: () => context.go(item.route),
         borderRadius: BorderRadius.circular(18),
+        onTap: () => context.go(data.route),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 23,
-                    backgroundColor: background,
+                    backgroundColor: data.danger
+                        ? Colors.red.shade50
+                        : AppTheme.enactusYellow,
                     foregroundColor: color,
-                    child: Icon(item.icon),
+                    child: Icon(data.icon),
                   ),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.black.withValues(alpha: 0.36),
-                    size: 20,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.value,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.title,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  Text(
-                    item.subtitle,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardImpactPanel extends StatelessWidget {
-  final ImpactDashboardData data;
-
-  const _DashboardImpactPanel({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final organization = data.organization;
-    final topProject = [...data.projects]
-      ..sort((a, b) => b.projectImpactScore.compareTo(a.projectImpactScore));
-    final alerts = data.projects
-        .where((project) => project.needsEvidence || project.needsSdg)
-        .length;
-
-    return Card(
-      child: InkWell(
-        onTap: () => context.go('/impact'),
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.enactusYellow.withValues(
-                      alpha: 0.24,
-                    ),
-                    foregroundColor: AppTheme.softBlack,
-                    child: const Icon(Icons.insights_rounded),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
+                  const SizedBox(width: 10),
+                  Expanded(
                     child: Text(
-                      'Impact & Performance',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_rounded),
-                ],
-              ),
-              const SizedBox(height: 14),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 640;
-                  final items = [
-                    _MiniMetric(
-                      label: 'Health score',
-                      value:
-                          '${organization.organizationHealthScore.toStringAsFixed(0)}/100',
-                    ),
-                    _MiniMetric(
-                      label: 'Impact direct',
-                      value: organization.directImpactTotal.toString(),
-                    ),
-                    _MiniMetric(
-                      label: 'Reach',
-                      value: organization.reachTotal.toString(),
-                    ),
-                    _MiniMetric(
-                      label: 'Surplus',
-                      value: _money(organization.surplusTotal),
-                    ),
-                  ];
-
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final item in items)
-                        SizedBox(
-                          width: compact
-                              ? constraints.maxWidth
-                              : (constraints.maxWidth - 10) / 2,
-                          child: _MiniMetricTile(item: item),
-                        ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (topProject.isNotEmpty)
-                    Chip(label: Text('Top: ${topProject.first.projectName}')),
-                  Chip(label: Text('$alerts alerte(s) preuve/ODD')),
-                  Chip(
-                    label: Text(
-                      '${organization.competitionReadiness.toStringAsFixed(0)}% compétition',
+                      data.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                data.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                data.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.black54, height: 1.25),
               ),
             ],
           ),
@@ -811,307 +470,61 @@ class _DashboardImpactPanel extends StatelessWidget {
   }
 }
 
-class _DashboardAcademyCard extends StatelessWidget {
-  final AcademyHomeData data;
-
-  const _DashboardAcademyCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = data.progress;
-
-    return Card(
-      child: InkWell(
-        onTap: () => context.go('/academy'),
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.enactusYellow.withValues(
-                      alpha: 0.24,
-                    ),
-                    foregroundColor: AppTheme.softBlack,
-                    child: const Icon(Icons.school_rounded),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Academy Progress',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_rounded),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _DashboardProgressLine(
-                label: 'Leçons',
-                value: progress.lessonsProgress,
-                detail: '${progress.completedLessons}/${progress.totalLessons}',
-              ),
-              const SizedBox(height: 12),
-              _DashboardProgressLine(
-                label: 'Quiz',
-                value: progress.quizProgress,
-                detail: '${progress.passedQuizzes}/${progress.totalQuizzes}',
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Chip(label: Text('${progress.points} points')),
-                  Chip(
-                    label: Text(
-                      '${data.badges.where((b) => b.unlocked).length} badge(s)',
-                    ),
-                  ),
-                  Chip(label: Text('Rang #${progress.rank}')),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardProgressLine extends StatelessWidget {
-  final String label;
-  final double value;
-  final String detail;
-
-  const _DashboardProgressLine({
-    required this.label,
-    required this.value,
-    required this.detail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-            Text(detail, style: const TextStyle(color: Colors.black54)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: value.clamp(0.0, 1.0),
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(99),
-          color: AppTheme.enactusYellow,
-          backgroundColor: Colors.black.withValues(alpha: 0.08),
-        ),
-      ],
-    );
-  }
-}
-
-class _MiniMetric {
-  final String label;
-  final String value;
-
-  const _MiniMetric({required this.label, required this.value});
-}
-
-class _MiniMetricTile extends StatelessWidget {
-  final _MiniMetric item;
-
-  const _MiniMetricTile({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            item.value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            item.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.black54),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickAccessGrid extends StatelessWidget {
+class _QuickActionsPanel extends StatelessWidget {
   final UserExperience? userExperience;
+  final DashboardSummaryModel summary;
 
-  const _QuickAccessGrid({required this.userExperience});
+  const _QuickActionsPanel({
+    required this.userExperience,
+    required this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
     final allowedRoutes = UserExperience.visibleRoutesFor(
       userExperience,
     ).toSet();
-    final items = [
-      const _QuickAccessItem(
-        title: 'Membres',
-        subtitle: 'Profils, rôles, statuts',
-        icon: Icons.people_alt_rounded,
-        route: '/members',
-      ),
-      const _QuickAccessItem(
-        title: 'Pôles',
-        subtitle: 'Équipes et objectifs',
-        icon: Icons.hub_rounded,
-        route: '/poles',
-      ),
-      const _QuickAccessItem(
-        title: 'Projets',
-        subtitle: 'Impact et avancement',
-        icon: Icons.rocket_launch_rounded,
-        route: '/projects',
-      ),
-      const _QuickAccessItem(
-        title: 'Événements',
-        subtitle: 'Calendrier et pointage',
-        icon: Icons.event_available_rounded,
-        route: '/events',
-      ),
-      const _QuickAccessItem(
-        title: 'Communication',
-        subtitle: 'Posts et annonces',
-        icon: Icons.forum_rounded,
-        route: '/posts',
-      ),
-      const _QuickAccessItem(
-        title: 'Chat',
-        subtitle: 'Messages et groupes',
-        icon: Icons.chat_rounded,
-        route: '/chat',
-      ),
-      const _QuickAccessItem(
-        title: 'Gamification',
-        subtitle: 'Points et badges',
-        icon: Icons.workspace_premium_rounded,
-        route: '/gamification',
-      ),
-      const _QuickAccessItem(
-        title: 'Présences',
-        subtitle: 'Absences et retards',
-        icon: Icons.fact_check_rounded,
-        route: '/attendance',
-      ),
-      const _QuickAccessItem(
-        title: 'Tâches',
-        subtitle: 'Kanban et suivi',
-        icon: Icons.task_alt_rounded,
-        route: '/tasks',
-      ),
-      const _QuickAccessItem(
-        title: 'Finance',
-        subtitle: 'Paiements, dettes',
-        icon: Icons.account_balance_wallet_rounded,
-        route: '/finance',
-      ),
-      const _QuickAccessItem(
-        title: 'Documents',
-        subtitle: 'PV, rapports, fichiers',
-        icon: Icons.folder_copy_rounded,
-        route: '/documents',
-      ),
-      const _QuickAccessItem(
-        title: 'Alumni',
-        subtitle: 'Mentorat et réseau',
-        icon: Icons.school_rounded,
-        route: '/alumni',
-      ),
-      const _QuickAccessItem(
-        title: 'Recrutement',
-        subtitle: 'Candidatures',
-        icon: Icons.how_to_reg_rounded,
-        route: '/recruitment',
-      ),
-      const _QuickAccessItem(
-        title: 'Notifications',
-        subtitle: 'Alertes et rappels',
-        icon: Icons.notifications_rounded,
-        route: '/notifications',
-      ),
-    ].where((item) => allowedRoutes.contains(item.route)).toList();
+    final actions = _quickActions(
+      summary,
+    ).where((action) => allowedRoutes.contains(action.route)).toList();
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const _SectionTitle(
-              icon: Icons.grid_view_rounded,
-              title: 'Accès rapides',
+    return _DashboardSection(
+      icon: Icons.flash_on_rounded,
+      title: 'Actions rapides',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final count = constraints.maxWidth >= 820
+              ? 4
+              : constraints.maxWidth >= 560
+              ? 2
+              : 1;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: count,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              mainAxisExtent: 84,
             ),
-            const Divider(height: 26),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final count = constraints.maxWidth >= 860
-                    ? 4
-                    : constraints.maxWidth >= 560
-                    ? 2
-                    : 1;
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: count,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    mainAxisExtent: 92,
-                  ),
-                  itemBuilder: (context, index) {
-                    return _QuickAccessCard(item: items[index]);
-                  },
-                );
-              },
-            ),
-          ],
-        ),
+            itemBuilder: (context, index) {
+              return _QuickActionTile(action: actions[index]);
+            },
+          );
+        },
       ),
     );
   }
 }
 
-class _QuickAccessItem {
+class _QuickActionData {
   final String title;
   final String subtitle;
   final IconData icon;
   final String route;
 
-  const _QuickAccessItem({
+  const _QuickActionData({
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -1119,45 +532,43 @@ class _QuickAccessItem {
   });
 }
 
-class _QuickAccessCard extends StatelessWidget {
-  final _QuickAccessItem item;
+class _QuickActionTile extends StatelessWidget {
+  final _QuickActionData action;
 
-  const _QuickAccessCard({required this.item});
+  const _QuickActionTile({required this.action});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => context.go(item.route),
-      borderRadius: BorderRadius.circular(16),
+      onTap: () => context.go(action.route),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppTheme.enactusYellow.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: AppTheme.enactusYellow.withValues(alpha: 0.35),
+            color: AppTheme.enactusYellow.withValues(alpha: 0.30),
           ),
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              backgroundColor: AppTheme.enactusYellow,
-              foregroundColor: AppTheme.softBlack,
-              child: Icon(item.icon),
-            ),
-            const SizedBox(width: 12),
+            Icon(action.icon),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.title,
+                    action.title,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   Text(
-                    item.subtitle,
+                    action.subtitle,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
                   ),
@@ -1172,253 +583,56 @@ class _QuickAccessCard extends StatelessWidget {
   }
 }
 
-class _QuickInsights extends StatelessWidget {
-  final _DashboardStats stats;
-  final UserExperience? userExperience;
+class _AttentionPanel extends StatelessWidget {
+  final List<_AttentionItem> items;
 
-  const _QuickInsights({required this.stats, required this.userExperience});
-
-  @override
-  Widget build(BuildContext context) {
-    final alerts = <_InsightItem>[];
-
-    if (stats.lateTasks > 0) {
-      alerts.add(
-        _InsightItem(
-          icon: Icons.warning_rounded,
-          title: 'Tâches en retard',
-          message: '${stats.lateTasks} tâche(s) doivent être suivies.',
-          route: '/tasks',
-          danger: true,
-        ),
-      );
-    }
-
-    if (userExperience?.canViewFinance == true && stats.pendingPayments > 0) {
-      alerts.add(
-        _InsightItem(
-          icon: Icons.pending_actions_rounded,
-          title: 'Paiements à valider',
-          message: '${stats.pendingPayments} paiement(s) attendent validation.',
-          route: '/finance',
-          danger: true,
-        ),
-      );
-    }
-
-    if (userExperience?.canViewFinance == true && stats.totalDue > 0) {
-      alerts.add(
-        _InsightItem(
-          icon: Icons.account_balance_wallet_rounded,
-          title: 'Dette totale',
-          message: '${_money(stats.totalDue)} restent à encaisser.',
-          route: '/finance',
-          danger: true,
-        ),
-      );
-    }
-
-    if (stats.unreadNotifications > 0) {
-      alerts.add(
-        _InsightItem(
-          icon: Icons.notifications_active_rounded,
-          title: 'Notifications',
-          message: '${stats.unreadNotifications} notification(s) non lue(s).',
-          route: '/notifications',
-        ),
-      );
-    }
-
-    if (alerts.isEmpty) {
-      alerts.add(
-        const _InsightItem(
-          icon: Icons.check_circle_rounded,
-          title: 'Tout est sous contrôle',
-          message: 'Aucune alerte critique pour le moment.',
-          route: '/dashboard',
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const _SectionTitle(
-              icon: Icons.insights_rounded,
-              title: 'Points d’attention',
-            ),
-            const Divider(height: 26),
-            ...alerts.map((alert) => _InsightTile(item: alert)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MomentumCard extends StatelessWidget {
-  final _DashboardStats stats;
-  final UserExperience? userExperience;
-
-  const _MomentumCard({required this.stats, required this.userExperience});
+  const _AttentionPanel({required this.items});
 
   @override
   Widget build(BuildContext context) {
-    final showFinance = userExperience?.canViewFinance == true;
-    final totalFinancial = stats.totalPaid + stats.totalDue;
-    final paidRatio = totalFinancial <= 0
-        ? 0.0
-        : stats.totalPaid / totalFinancial;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionTitle(
-              icon: Icons.auto_graph_rounded,
-              title: 'Dynamique utile',
-            ),
-            const Divider(height: 26),
-            if (showFinance) ...[
-              _ProgressLine(
-                label: 'Encaissement',
-                value: paidRatio,
-                trailing: '${(paidRatio * 100).round()}%',
-              ),
-              const SizedBox(height: 16),
-              _SoftMetric(
-                icon: Icons.verified_rounded,
-                label: 'Total payé',
-                value: _money(stats.totalPaid),
-              ),
-              const SizedBox(height: 10),
-            ],
-            _SoftMetric(
-              icon: Icons.description_rounded,
-              label: 'Documents',
-              value: '${stats.documents} ressource(s)',
-            ),
-            const SizedBox(height: 10),
-            _SoftMetric(
-              icon: userExperience?.isAlumni == true
-                  ? Icons.school_rounded
-                  : Icons.workspace_premium_rounded,
-              label: userExperience?.canViewRecruitment == true
-                  ? 'Recrutement'
-                  : 'Espace',
-              value: userExperience?.canViewRecruitment == true
-                  ? '${stats.applications} candidature(s)'
-                  : userExperience?.audienceLabel ?? 'EnactSpace',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressLine extends StatelessWidget {
-  final String label;
-  final double value;
-  final String trailing;
-
-  const _ProgressLine({
-    required this.label,
-    required this.value,
-    required this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-            Text(trailing, style: const TextStyle(fontWeight: FontWeight.w900)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            minHeight: 10,
-            value: value.clamp(0.0, 1.0),
-            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.18),
-            valueColor: const AlwaysStoppedAnimation(AppTheme.enactusYellow),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SoftMetric extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _SoftMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F0),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
+    return _DashboardSection(
+      icon: Icons.notifications_active_rounded,
+      title: 'À suivre',
+      child: Column(
         children: [
-          Icon(icon, color: AppTheme.softBlack),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+          if (items.isEmpty)
+            const _EmptyState(
+              icon: Icons.check_circle_rounded,
+              title: 'Rien de critique',
+              message: 'Les alertes importantes apparaîtront ici.',
+            )
+          else
+            for (final item in items) _AttentionTile(item: item),
         ],
       ),
     );
   }
 }
 
-class _InsightItem {
-  final IconData icon;
+class _AttentionItem {
   final String title;
   final String message;
+  final IconData icon;
   final String route;
   final bool danger;
 
-  const _InsightItem({
-    required this.icon,
+  const _AttentionItem({
     required this.title,
     required this.message,
+    required this.icon,
     required this.route,
     this.danger = false,
   });
 }
 
-class _InsightTile extends StatelessWidget {
-  final _InsightItem item;
+class _AttentionTile extends StatelessWidget {
+  final _AttentionItem item;
 
-  const _InsightTile({required this.item});
+  const _AttentionTile({required this.item});
 
   @override
   Widget build(BuildContext context) {
     final color = item.danger ? Colors.red.shade700 : AppTheme.softBlack;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -1429,19 +643,21 @@ class _InsightTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: item.danger
                 ? Colors.red.shade50
-                : AppTheme.enactusYellow.withValues(alpha: 0.12),
+                : Colors.black.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             children: [
               Icon(item.icon, color: color),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: color,
                         fontWeight: FontWeight.w900,
@@ -1449,6 +665,8 @@ class _InsightTile extends StatelessWidget {
                     ),
                     Text(
                       item.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.black54),
                     ),
                   ],
@@ -1463,25 +681,197 @@ class _InsightTile extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String title;
+class _ActivityPanel extends StatelessWidget {
+  final List<DashboardActivityModel> items;
 
-  const _SectionTitle({required this.icon, required this.title});
+  const _ActivityPanel({required this.items});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+    return _DashboardSection(
+      icon: Icons.history_rounded,
+      title: 'Activité récente',
+      child: Column(
+        children: [
+          if (items.isEmpty)
+            const _EmptyState(
+              icon: Icons.history_toggle_off_rounded,
+              title: 'Aucune activité récente',
+              message:
+                  'Les notifications, posts et affectations apparaîtront ici.',
+            )
+          else
+            for (final item in items) _ActivityTile(item: item),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityTile extends StatelessWidget {
+  final DashboardActivityModel item;
+
+  const _ActivityTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: AppTheme.enactusYellow,
+        foregroundColor: AppTheme.softBlack,
+        child: Icon(_activityIcon(item.type), size: 20),
+      ),
+      title: Text(
+        item.title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text(_relativeTime(item.createdAt)),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.go(item.route),
+    );
+  }
+}
+
+class _RoleFocusPanel extends StatelessWidget {
+  final DashboardSummaryModel summary;
+  final UserExperience? userExperience;
+
+  const _RoleFocusPanel({required this.summary, required this.userExperience});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = summary.profile;
+    final counts = summary.counts;
+    final items = _focusItems(profile, counts, userExperience);
+
+    return _DashboardSection(
+      icon: Icons.center_focus_strong_rounded,
+      title: 'Priorité du moment',
+      child: Column(
+        children: [
+          for (final item in items)
+            _SoftMetric(label: item.$1, value: item.$2, icon: item.$3),
+        ],
+      ),
+    );
+  }
+}
+
+class _SoftMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _SoftMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget child;
+
+  const _DashboardSection({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            child,
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: Colors.black38),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1493,35 +883,35 @@ class _DashboardLoading extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Card(
       child: Padding(
-        padding: EdgeInsets.all(40),
+        padding: EdgeInsets.all(42),
         child: Center(child: CircularProgressIndicator()),
       ),
     );
   }
 }
 
-class _ErrorCard extends StatelessWidget {
+class _DashboardError extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorCard({required this.message, required this.onRetry});
+  const _DashboardError({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Icon(
               Icons.error_outline_rounded,
-              color: Colors.red.shade600,
+              color: Colors.red.shade700,
               size: 44,
             ),
             const SizedBox(height: 12),
             const Text(
               'Erreur de chargement du dashboard',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
@@ -1538,18 +928,411 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
+List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
+  final counts = summary.counts;
+  final profile = summary.profile;
+  final cards = <_MetricCardData>[
+    _MetricCardData(
+      title: 'Notifications',
+      value: counts.integer('notifications_unread').toString(),
+      subtitle: 'non lues',
+      icon: Icons.notifications_active_rounded,
+      route: '/notifications',
+      danger: counts.integer('notifications_unread') > 0,
+    ),
+    _MetricCardData(
+      title: 'Mes tâches',
+      value: counts.integer('tasks_assigned').toString(),
+      subtitle: '${counts.integer('tasks_late')} en retard',
+      icon: Icons.task_alt_rounded,
+      route: '/tasks',
+      danger: counts.integer('tasks_late') > 0,
+    ),
+    _MetricCardData(
+      title: 'Messages',
+      value: counts.integer('messages_unread').toString(),
+      subtitle: 'messages non lus',
+      icon: Icons.chat_rounded,
+      route: '/chat',
+      danger: counts.integer('messages_unread') > 0,
+    ),
+    _MetricCardData(
+      title: 'Événements',
+      value: counts.integer('events_upcoming').toString(),
+      subtitle: 'à venir',
+      icon: Icons.event_available_rounded,
+      route: '/events',
+    ),
+    _MetricCardData(
+      title: 'Documents',
+      value: counts.integer('documents_accessible').toString(),
+      subtitle: 'accessibles',
+      icon: Icons.folder_copy_rounded,
+      route: '/documents',
+    ),
+    _MetricCardData(
+      title: 'Engagement',
+      value: counts.integer('badges_points').toString(),
+      subtitle: '${counts.integer('badges_count')} badge(s)',
+      icon: Icons.workspace_premium_rounded,
+      route: '/gamification',
+    ),
+  ];
+
+  if (counts.hasValue('members_active')) {
+    cards.add(
+      _MetricCardData(
+        title: 'Membres actifs',
+        value: counts.integer('members_active').toString(),
+        subtitle: '${counts.integer('members_inactive')} inactif(s)',
+        icon: Icons.people_alt_rounded,
+        route: '/members',
+      ),
+    );
+  }
+
+  if (counts.hasValue('projects_active')) {
+    cards.add(
+      _MetricCardData(
+        title: 'Projets actifs',
+        value: counts.integer('projects_active').toString(),
+        subtitle: '${counts.integer('poles')} pôle(s)',
+        icon: Icons.rocket_launch_rounded,
+        route: '/projects',
+      ),
+    );
+  }
+
+  if (profile.canManageDocuments) {
+    cards.add(
+      _MetricCardData(
+        title: 'Documents à valider',
+        value: counts.integer('documents_pending_validation').toString(),
+        subtitle: 'en attente',
+        icon: Icons.verified_rounded,
+        route: '/documents',
+        danger: counts.integer('documents_pending_validation') > 0,
+      ),
+    );
+  }
+
+  if (profile.canViewFinance) {
+    cards.addAll([
+      _MetricCardData(
+        title: 'Paiements',
+        value: counts.integer('payments_pending').toString(),
+        subtitle: 'à valider',
+        icon: Icons.pending_actions_rounded,
+        route: '/finance',
+        danger: counts.integer('payments_pending') > 0,
+      ),
+      _MetricCardData(
+        title: 'À encaisser',
+        value: _money(counts.decimal('finance_due')),
+        subtitle: 'solde global',
+        icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
+        danger: counts.decimal('finance_due') > 0,
+      ),
+    ]);
+  }
+
+  if (profile.canViewRecruitment) {
+    cards.add(
+      _MetricCardData(
+        title: 'Candidatures',
+        value: counts.integer('applications_pending').toString(),
+        subtitle: 'à suivre',
+        icon: Icons.how_to_reg_rounded,
+        route: '/recruitment',
+        danger: counts.integer('applications_pending') > 0,
+      ),
+    );
+  }
+
+  return cards;
+}
+
+List<_AttentionItem> _attentionItems(DashboardSummaryModel summary) {
+  final counts = summary.counts;
+  final items = <_AttentionItem>[];
+
+  if (counts.integer('tasks_late') > 0) {
+    items.add(
+      _AttentionItem(
+        title: 'Tâches en retard',
+        message:
+            '${counts.integer('tasks_late')} tâche(s) doivent être suivies.',
+        icon: Icons.warning_rounded,
+        route: '/tasks',
+        danger: true,
+      ),
+    );
+  }
+  if (counts.integer('notifications_unread') > 0) {
+    items.add(
+      _AttentionItem(
+        title: 'Notifications',
+        message:
+            '${counts.integer('notifications_unread')} notification(s) non lue(s).',
+        icon: Icons.notifications_rounded,
+        route: '/notifications',
+      ),
+    );
+  }
+  if (summary.profile.canViewFinance &&
+      counts.integer('payments_pending') > 0) {
+    items.add(
+      _AttentionItem(
+        title: 'Paiements à valider',
+        message:
+            '${counts.integer('payments_pending')} paiement(s) en attente.',
+        icon: Icons.payments_rounded,
+        route: '/finance',
+        danger: true,
+      ),
+    );
+  }
+  if (summary.profile.canManageDocuments &&
+      counts.integer('documents_pending_validation') > 0) {
+    items.add(
+      _AttentionItem(
+        title: 'Documents à valider',
+        message:
+            '${counts.integer('documents_pending_validation')} document(s) attendent.',
+        icon: Icons.description_rounded,
+        route: '/documents',
+      ),
+    );
+  }
+
+  return items;
+}
+
+List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
+  final profile = summary.profile;
+  return [
+    const _QuickActionData(
+      title: 'Chat',
+      subtitle: 'Discussions',
+      icon: Icons.chat_rounded,
+      route: '/chat',
+    ),
+    const _QuickActionData(
+      title: 'Créer / lire posts',
+      subtitle: 'Communication',
+      icon: Icons.campaign_rounded,
+      route: '/posts',
+    ),
+    const _QuickActionData(
+      title: 'Mes tâches',
+      subtitle: 'Suivi opérationnel',
+      icon: Icons.task_alt_rounded,
+      route: '/tasks',
+    ),
+    const _QuickActionData(
+      title: 'Documents',
+      subtitle: 'PV, rapports, fichiers',
+      icon: Icons.folder_copy_rounded,
+      route: '/documents',
+    ),
+    if (profile.canViewGlobalMembers)
+      const _QuickActionData(
+        title: 'Membres',
+        subtitle: 'Profils et rôles',
+        icon: Icons.people_alt_rounded,
+        route: '/members',
+      ),
+    if (profile.isEnacchef)
+      const _QuickActionData(
+        title: 'Pôles',
+        subtitle: 'Équipes',
+        icon: Icons.hub_rounded,
+        route: '/poles',
+      ),
+    if (profile.isEnacchef)
+      const _QuickActionData(
+        title: 'Projets',
+        subtitle: 'Impact',
+        icon: Icons.rocket_launch_rounded,
+        route: '/projects',
+      ),
+    if (profile.canViewFinance)
+      const _QuickActionData(
+        title: 'Finance',
+        subtitle: 'Paiements',
+        icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
+      ),
+    if (profile.canViewRecruitment)
+      const _QuickActionData(
+        title: 'Recrutement',
+        subtitle: 'Candidatures',
+        icon: Icons.how_to_reg_rounded,
+        route: '/recruitment',
+      ),
+    const _QuickActionData(
+      title: 'Événements',
+      subtitle: 'Planning',
+      icon: Icons.event_available_rounded,
+      route: '/events',
+    ),
+  ];
+}
+
+List<(String, String, IconData)> _focusItems(
+  DashboardProfileModel profile,
+  DashboardCountsModel counts,
+  UserExperience? user,
+) {
+  if (profile.canViewFinance) {
+    return [
+      (
+        'Paiements à valider',
+        counts.integer('payments_pending').toString(),
+        Icons.pending_actions_rounded,
+      ),
+      (
+        'Montant à encaisser',
+        _money(counts.decimal('finance_due')),
+        Icons.payments_rounded,
+      ),
+      (
+        'Montant encaissé',
+        _money(counts.decimal('finance_paid')),
+        Icons.verified_rounded,
+      ),
+    ];
+  }
+  if (profile.canViewRecruitment) {
+    return [
+      (
+        'Candidatures à suivre',
+        counts.integer('applications_pending').toString(),
+        Icons.how_to_reg_rounded,
+      ),
+      (
+        'Documents à valider',
+        counts.integer('documents_pending_validation').toString(),
+        Icons.description_rounded,
+      ),
+      (
+        'Événements à venir',
+        counts.integer('events_upcoming').toString(),
+        Icons.event_rounded,
+      ),
+    ];
+  }
+  if (profile.isEnacchef) {
+    return [
+      (
+        'Projets actifs',
+        counts.integer('projects_active').toString(),
+        Icons.rocket_launch_rounded,
+      ),
+      ('Pôles suivis', counts.integer('poles').toString(), Icons.hub_rounded),
+      (
+        'Tâches en retard',
+        counts.integer('tasks_late').toString(),
+        Icons.warning_rounded,
+      ),
+    ];
+  }
+  if (profile.isAlumni || user?.isAlumni == true) {
+    return [
+      (
+        'Annonces récentes',
+        counts.integer('posts_recent').toString(),
+        Icons.campaign_rounded,
+      ),
+      (
+        'Événements ouverts',
+        counts.integer('events_upcoming').toString(),
+        Icons.event_available_rounded,
+      ),
+      (
+        'Messages non lus',
+        counts.integer('messages_unread').toString(),
+        Icons.chat_rounded,
+      ),
+    ];
+  }
+  return [
+    (
+      'Mes tâches',
+      counts.integer('tasks_assigned').toString(),
+      Icons.task_alt_rounded,
+    ),
+    (
+      'Mes points',
+      counts.integer('badges_points').toString(),
+      Icons.workspace_premium_rounded,
+    ),
+    (
+      'Mes messages',
+      counts.integer('messages_unread').toString(),
+      Icons.chat_rounded,
+    ),
+  ];
+}
+
+IconData _activityIcon(String type) {
+  switch (type) {
+    case 'post':
+      return Icons.campaign_rounded;
+    case 'assignment':
+      return Icons.hub_rounded;
+    case 'notification':
+      return Icons.notifications_rounded;
+    default:
+      return Icons.history_rounded;
+  }
+}
+
+String _relativeTime(DateTime value) {
+  final diff = DateTime.now().difference(value);
+  if (diff.inMinutes < 1) return 'À l’instant';
+  if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
+  if (diff.inHours < 24) return 'Il y a ${diff.inHours} h';
+  if (diff.inDays < 7) return 'Il y a ${diff.inDays} j';
+  return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+}
+
 String _money(double value) {
   final rounded = value.round().toString();
   final buffer = StringBuffer();
 
-  for (int i = 0; i < rounded.length; i++) {
-    final reverseIndex = rounded.length - i;
-    buffer.write(rounded[i]);
-
+  for (var index = 0; index < rounded.length; index++) {
+    final reverseIndex = rounded.length - index;
+    buffer.write(rounded[index]);
     if (reverseIndex > 1 && reverseIndex % 3 == 1) {
       buffer.write(' ');
     }
   }
 
   return '${buffer.toString()} FCFA';
+}
+
+String _titleForProfile(DashboardProfileModel? profile) {
+  if (profile?.isAlumni == true) return 'Espace alumni';
+  if (profile?.canViewGlobal == true) return 'Tableau de bord global';
+  if (profile?.canViewFinance == true) return 'Tableau finance';
+  if (profile?.isEnacchef == true) return 'Pilotage Enacchef';
+  return 'Mon espace Enactus';
+}
+
+String _subtitleForProfile(DashboardProfileModel? profile) {
+  if (profile?.isAlumni == true) {
+    return 'Annonces, échanges, événements et réseau alumni.';
+  }
+  if (profile?.canViewGlobal == true) {
+    return 'Vue club, membres, projets, documents, finance et alertes.';
+  }
+  if (profile?.canViewFinance == true) {
+    return 'Cotisations, paiements et signaux financiers utiles.';
+  }
+  if (profile?.isEnacchef == true) {
+    return 'Tes équipes, tâches, documents, projets et points à suivre.';
+  }
+  return 'Tes tâches, messages, documents et prochains rendez-vous.';
 }
