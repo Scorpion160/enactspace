@@ -161,6 +161,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     });
   }
 
+  void _replaceProjectMembers(
+    String projectId,
+    List<ProjectMemberModel> members,
+  ) {
+    setState(() {
+      _membersByProjectId = {..._membersByProjectId, projectId: members};
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -217,7 +226,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           allMembers: _members,
                           canManageProject: _canManageProject,
                           canAssignLeadership: _canManageGlobally,
+                          projectMembersForProject: (project) =>
+                              _membersByProjectId[project.id] ??
+                              const <ProjectMemberModel>[],
                           onProjectChanged: _replaceProject,
+                          onProjectMembersChanged: _replaceProjectMembers,
                         ),
                     ],
                   ),
@@ -451,7 +464,11 @@ class _ProjectsGrid extends StatelessWidget {
   final List<MemberModel> allMembers;
   final bool Function(ProjectModel project) canManageProject;
   final bool canAssignLeadership;
+  final List<ProjectMemberModel> Function(ProjectModel project)
+  projectMembersForProject;
   final ValueChanged<ProjectModel> onProjectChanged;
+  final void Function(String projectId, List<ProjectMemberModel> members)
+  onProjectMembersChanged;
 
   const _ProjectsGrid({
     required this.projects,
@@ -459,7 +476,9 @@ class _ProjectsGrid extends StatelessWidget {
     required this.allMembers,
     required this.canManageProject,
     required this.canAssignLeadership,
+    required this.projectMembersForProject,
     required this.onProjectChanged,
+    required this.onProjectMembersChanged,
   });
 
   @override
@@ -487,9 +506,11 @@ class _ProjectsGrid extends StatelessWidget {
                   project: project,
                   service: service,
                   allMembers: allMembers,
+                  projectMembers: projectMembersForProject(project),
                   canManage: canManageProject(project),
                   canAssignLeadership: canAssignLeadership,
                   onProjectChanged: onProjectChanged,
+                  onProjectMembersChanged: onProjectMembersChanged,
                 ),
               ),
           ],
@@ -503,23 +524,31 @@ class _ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final ProjectsService service;
   final List<MemberModel> allMembers;
+  final List<ProjectMemberModel> projectMembers;
   final bool canManage;
   final bool canAssignLeadership;
   final ValueChanged<ProjectModel> onProjectChanged;
+  final void Function(String projectId, List<ProjectMemberModel> members)
+  onProjectMembersChanged;
 
   const _ProjectCard({
     required this.project,
     required this.service,
     required this.allMembers,
+    required this.projectMembers,
     required this.canManage,
     required this.canAssignLeadership,
     required this.onProjectChanged,
+    required this.onProjectMembersChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final createdAt = DateFormat('dd/MM/yyyy').format(project.createdAt);
     final statusColor = _statusColor(project.status);
+    final activeMembers = _activeProjectMembers(projectMembers);
+    final leader = _firstOrNull(projectMembers.where(_isProjectLead));
+    final deputy = _firstOrNull(projectMembers.where(_isProjectDeputy));
 
     return Card(
       child: Padding(
@@ -578,6 +607,14 @@ class _ProjectCard extends StatelessWidget {
                   icon: Icons.payments_rounded,
                   label: _money(project.budgetEstimated),
                 ),
+                _ProjectChip(
+                  icon: Icons.groups_rounded,
+                  label: '${activeMembers.length} membre(s)',
+                ),
+                _ProjectChip(
+                  icon: Icons.admin_panel_settings_rounded,
+                  label: leader?.displayName ?? 'Chef à désigner',
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -634,21 +671,33 @@ class _ProjectCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _showProjectDetails(
-                  context,
-                  project,
-                  service,
-                  allMembers,
-                  canManage,
-                  canAssignLeadership,
-                  onProjectChanged,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    deputy == null
+                        ? 'Adjoint à désigner'
+                        : 'Adjoint : ${deputy.displayName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
                 ),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Détail projet'),
-              ),
+                TextButton.icon(
+                  onPressed: () => _showProjectDetails(
+                    context,
+                    project,
+                    service,
+                    allMembers,
+                    canManage,
+                    canAssignLeadership,
+                    onProjectChanged,
+                    onProjectMembersChanged,
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Détail'),
+                ),
+              ],
             ),
           ],
         ),
@@ -753,6 +802,8 @@ void _showProjectDetails(
   bool canManage,
   bool canAssignLeadership,
   ValueChanged<ProjectModel> onProjectChanged,
+  void Function(String projectId, List<ProjectMemberModel> members)
+  onProjectMembersChanged,
 ) {
   showModalBottomSheet<void>(
     context: context,
@@ -766,6 +817,7 @@ void _showProjectDetails(
       canManage: canManage,
       canAssignLeadership: canAssignLeadership,
       onProjectChanged: onProjectChanged,
+      onProjectMembersChanged: onProjectMembersChanged,
     ),
   );
 }
@@ -777,6 +829,8 @@ class _ProjectDetailsSheet extends StatefulWidget {
   final bool canManage;
   final bool canAssignLeadership;
   final ValueChanged<ProjectModel> onProjectChanged;
+  final void Function(String projectId, List<ProjectMemberModel> members)
+  onProjectMembersChanged;
 
   const _ProjectDetailsSheet({
     required this.project,
@@ -785,6 +839,7 @@ class _ProjectDetailsSheet extends StatefulWidget {
     required this.canManage,
     required this.canAssignLeadership,
     required this.onProjectChanged,
+    required this.onProjectMembersChanged,
   });
 
   @override
@@ -814,6 +869,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
       final members = await widget.service.getProjectMembers(_project.id);
       if (!mounted) return;
       setState(() => _projectMembers = members);
+      widget.onProjectMembersChanged(_project.id, members);
     } catch (_) {
       if (!mounted) return;
       setState(() => _projectMembers = []);
@@ -916,6 +972,26 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
     }
   }
 
+  Future<void> _openEditProjectSheet() async {
+    final updated = await showModalBottomSheet<ProjectModel>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) =>
+          _EditProjectSheet(project: _project, service: widget.service),
+    );
+
+    if (updated == null) return;
+
+    widget.onProjectChanged(updated);
+    if (!mounted) return;
+    setState(() => _project = updated);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Projet mis à jour.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final project = _project;
@@ -966,6 +1042,17 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                       ),
                     ],
                   ),
+                  if (widget.canManage) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        onPressed: _openEditProjectSheet,
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Modifier'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   _ProgressLine(progress: project.progress, color: statusColor),
                   const SizedBox(height: 12),
@@ -1712,6 +1799,305 @@ class _ProjectChip extends StatelessWidget {
   }
 }
 
+class _EditProjectSheet extends StatefulWidget {
+  final ProjectModel project;
+  final ProjectsService service;
+
+  const _EditProjectSheet({required this.project, required this.service});
+
+  @override
+  State<_EditProjectSheet> createState() => _EditProjectSheetState();
+}
+
+class _EditProjectSheetState extends State<_EditProjectSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _problemController;
+  late final TextEditingController _solutionController;
+  late final TextEditingController _objectivesController;
+  late final TextEditingController _impactController;
+  late final TextEditingController _budgetController;
+
+  late String _status;
+  DateTime? _startedAt;
+  DateTime? _endedAt;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final project = widget.project;
+    _nameController = TextEditingController(text: project.name);
+    _descriptionController = TextEditingController(
+      text: project.description ?? '',
+    );
+    _problemController = TextEditingController(
+      text: project.problemStatement ?? '',
+    );
+    _solutionController = TextEditingController(text: project.solution ?? '');
+    _objectivesController = TextEditingController(
+      text: project.objectives ?? '',
+    );
+    _impactController = TextEditingController(
+      text: project.expectedImpact ?? '',
+    );
+    _budgetController = TextEditingController(
+      text: project.budgetEstimated.round().toString(),
+    );
+    _status = project.status;
+    _startedAt = project.startedAt;
+    _endedAt = project.endedAt;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _problemController.dispose();
+    _solutionController.dispose();
+    _objectivesController.dispose();
+    _impactController.dispose();
+    _budgetController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({required bool start}) async {
+    final current = start ? _startedAt : _endedAt;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      if (start) {
+        _startedAt = picked;
+      } else {
+        _endedAt = picked;
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+
+    try {
+      final updated = await widget.service.updateProject(
+        projectId: widget.project.id,
+        name: _nameController.text,
+        description: _descriptionController.text,
+        problemStatement: _problemController.text,
+        solution: _solutionController.text,
+        objectives: _objectivesController.text,
+        expectedImpact: _impactController.text,
+        budgetEstimated:
+            double.tryParse(
+              _budgetController.text
+                  .trim()
+                  .replaceAll(' ', '')
+                  .replaceAll(',', '.'),
+            ) ??
+            0,
+        status: _status,
+        startedAt: _startedAt,
+        endedAt: _endedAt,
+        clearEndedAt: _endedAt == null && widget.project.endedAt != null,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(updated);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 22,
+          right: 22,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 22,
+        ),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Modifier le projet',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 18),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom du projet',
+                      prefixIcon: Icon(Icons.rocket_launch_rounded),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Le nom est obligatoire.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _status,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Statut',
+                      prefixIcon: Icon(Icons.timeline_rounded),
+                    ),
+                    items: _statusItems(includeAll: false),
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value != null) setState(() => _status = value);
+                          },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _descriptionController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      prefixIcon: Icon(Icons.description_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _problemController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Problématique',
+                      prefixIcon: Icon(Icons.report_problem_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _solutionController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Solution',
+                      prefixIcon: Icon(Icons.lightbulb_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _objectivesController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Objectifs',
+                      prefixIcon: Icon(Icons.flag_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _impactController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Impact attendu / livrables',
+                      prefixIcon: Icon(Icons.public_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _budgetController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Budget estimé',
+                      prefixIcon: Icon(Icons.payments_rounded),
+                      suffixText: 'FCFA',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _pickDate(start: true),
+                        icon: const Icon(Icons.event_rounded),
+                        label: Text(
+                          _startedAt == null
+                              ? 'Début'
+                              : DateFormat('dd/MM/yyyy').format(_startedAt!),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _pickDate(start: false),
+                        icon: const Icon(Icons.event_available_rounded),
+                        label: Text(
+                          _endedAt == null
+                              ? 'Fin'
+                              : DateFormat('dd/MM/yyyy').format(_endedAt!),
+                        ),
+                      ),
+                      if (_endedAt != null)
+                        OutlinedButton.icon(
+                          onPressed: _saving
+                              ? null
+                              : () => setState(() => _endedAt = null),
+                          icon: const Icon(Icons.close_rounded),
+                          label: const Text('Retirer fin'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton.icon(
+                    onPressed: _saving ? null : _submit,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save_rounded),
+                    label: const Text('Enregistrer'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CreateProjectSheet extends StatefulWidget {
   final ProjectsService service;
 
@@ -2100,6 +2486,26 @@ Color _statusColor(String status) {
 String _safeText(String? value, {required String fallback}) {
   if (value == null || value.trim().isEmpty) return fallback;
   return value.trim();
+}
+
+T? _firstOrNull<T>(Iterable<T> values) {
+  final iterator = values.iterator;
+  if (!iterator.moveNext()) return null;
+  return iterator.current;
+}
+
+List<ProjectMemberModel> _activeProjectMembers(
+  List<ProjectMemberModel> members,
+) {
+  return members.where((member) => member.isActive).toList();
+}
+
+bool _isProjectLead(ProjectMemberModel member) {
+  return member.position == 'chef_projet';
+}
+
+bool _isProjectDeputy(ProjectMemberModel member) {
+  return member.position == 'adjoint_chef_projet';
 }
 
 String? _absoluteProjectMemberPhoto(String? value) {

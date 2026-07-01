@@ -59,6 +59,13 @@ class ProjectsService {
 
   Future<ProjectModel> updateProject({
     required String projectId,
+    String? name,
+    String? description,
+    String? problemStatement,
+    String? solution,
+    String? objectives,
+    String? expectedImpact,
+    double? budgetEstimated,
     String? status,
     DateTime? startedAt,
     DateTime? endedAt,
@@ -66,6 +73,17 @@ class ProjectsService {
   }) async {
     final token = await _requireToken();
     final data = <String, dynamic>{};
+    if (name != null) data['name'] = name.trim();
+    if (description != null) data['description'] = _nullable(description);
+    if (problemStatement != null) {
+      data['problem_statement'] = _nullable(problemStatement);
+    }
+    if (solution != null) data['solution'] = _nullable(solution);
+    if (objectives != null) data['objectives'] = _nullable(objectives);
+    if (expectedImpact != null) {
+      data['expected_impact'] = _nullable(expectedImpact);
+    }
+    if (budgetEstimated != null) data['budget_estimated'] = budgetEstimated;
     if (status != null) data['status'] = status;
     if (startedAt != null) data['started_at'] = _dateOnly(startedAt);
     if (endedAt != null) data['ended_at'] = _dateOnly(endedAt);
