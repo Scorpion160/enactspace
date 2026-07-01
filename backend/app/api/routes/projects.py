@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -19,6 +19,7 @@ from app.api.deps import (
 )
 from app.models.role import Role, UserRole
 from app.models.user import User
+from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
 
 
@@ -226,6 +227,7 @@ def list_project_members(
 def assign_project_member(
     project_id: str,
     payload: ProjectMemberAssign,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -263,6 +265,7 @@ def assign_project_member(
 
     previous_position = None
     membership_created = membership is None
+    old_value = None
     if membership is None:
         membership = ProjectMember(
             project_id=project_id,
@@ -272,6 +275,15 @@ def assign_project_member(
         db.add(membership)
     else:
         previous_position = membership.position
+        old_value = {
+            "project_id": str(membership.project_id),
+            "project_name": project.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+            "left_at": membership.left_at.isoformat()
+            if membership.left_at
+            else None,
+        }
         membership.position = payload.position
         membership.is_active = True
         membership.left_at = None
@@ -319,6 +331,22 @@ def assign_project_member(
             related_id=project.id,
         )
 
+    create_audit_log(
+        db=db,
+        action="affectation_projet",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=payload.user_id,
+        old_value=old_value,
+        new_value={
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+        },
+        ip_address=get_client_ip(request),
+    )
+
     db.commit()
     db.refresh(membership)
 
@@ -329,6 +357,7 @@ def assign_project_member(
 def remove_project_member(
     project_id: str,
     user_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -357,6 +386,13 @@ def remove_project_member(
             detail="Seuls Admin, Team Leader ou SG retirent un responsable",
         )
     previous_position = membership.position
+    old_value = {
+        "project_id": str(membership.project_id),
+        "project_name": project.name,
+        "position": previous_position,
+        "is_active": membership.is_active,
+        "left_at": membership.left_at.isoformat() if membership.left_at else None,
+    }
     membership.is_active = False
     membership.left_at = date.today()
     if previous_position in PROJECT_LEADERSHIP_POSITIONS:
@@ -369,6 +405,24 @@ def remove_project_member(
         notification_type="role_assigned",
         related_type="project",
         related_id=project.id,
+    )
+    create_audit_log(
+        db=db,
+        action="retrait_projet",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=membership.user_id,
+        old_value=old_value,
+        new_value={
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+            "left_at": membership.left_at.isoformat()
+            if membership.left_at
+            else None,
+        },
+        ip_address=get_client_ip(request),
     )
     db.commit()
     db.refresh(membership)

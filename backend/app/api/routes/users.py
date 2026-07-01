@@ -369,6 +369,21 @@ def admin_update_user(
         ip_address=get_client_ip(request),
     )
 
+    if (
+        payload.department is not None
+        and payload.department != old_value["department"]
+    ):
+        create_audit_log(
+            db=db,
+            action="changement_pole_coeur",
+            user_id=current_user.id,
+            entity_type="user",
+            entity_id=user.id,
+            old_value={"department": old_value["department"]},
+            new_value={"department": user.department},
+            ip_address=get_client_ip(request),
+        )
+
     db.commit()
     db.refresh(user)
 

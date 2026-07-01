@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -20,6 +20,7 @@ from app.api.deps import (
 )
 from app.models.role import Role, UserRole
 from app.models.user import User
+from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
 
 
@@ -216,6 +217,7 @@ def list_pole_members(
 def assign_pole_member(
     pole_id: str,
     payload: PoleMemberAssign,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -246,6 +248,7 @@ def assign_pole_member(
     )
     previous_position = None
     membership_created = membership is None
+    old_value = None
 
     if membership is None:
         membership = PoleMember(
@@ -256,6 +259,15 @@ def assign_pole_member(
         db.add(membership)
     else:
         previous_position = membership.position
+        old_value = {
+            "pole_id": str(membership.pole_id),
+            "pole_name": pole.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+            "left_at": membership.left_at.isoformat()
+            if membership.left_at
+            else None,
+        }
         membership.position = payload.position
         membership.is_active = True
         membership.left_at = None
@@ -304,6 +316,22 @@ def assign_pole_member(
             related_id=pole.id,
         )
 
+    create_audit_log(
+        db=db,
+        action="affectation_pole",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=payload.user_id,
+        old_value=old_value,
+        new_value={
+            "pole_id": str(pole.id),
+            "pole_name": pole.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+        },
+        ip_address=get_client_ip(request),
+    )
+
     db.commit()
     db.refresh(membership)
 
@@ -314,6 +342,7 @@ def assign_pole_member(
 def remove_pole_member(
     pole_id: str,
     user_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -340,6 +369,13 @@ def remove_pole_member(
         )
 
     previous_position = membership.position
+    old_value = {
+        "pole_id": str(membership.pole_id),
+        "pole_name": pole.name,
+        "position": previous_position,
+        "is_active": membership.is_active,
+        "left_at": membership.left_at.isoformat() if membership.left_at else None,
+    }
     membership.is_active = False
     membership.left_at = date.today()
     if previous_position in POLE_LEADERSHIP_POSITIONS:
@@ -352,6 +388,24 @@ def remove_pole_member(
         notification_type="role_assigned",
         related_type="pole",
         related_id=pole.id,
+    )
+    create_audit_log(
+        db=db,
+        action="retrait_pole",
+        user_id=current_user.id,
+        entity_type="user",
+        entity_id=membership.user_id,
+        old_value=old_value,
+        new_value={
+            "pole_id": str(pole.id),
+            "pole_name": pole.name,
+            "position": membership.position,
+            "is_active": membership.is_active,
+            "left_at": membership.left_at.isoformat()
+            if membership.left_at
+            else None,
+        },
+        ip_address=get_client_ip(request),
     )
     db.commit()
     db.refresh(membership)
