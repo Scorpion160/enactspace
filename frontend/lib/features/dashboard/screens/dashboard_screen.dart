@@ -647,12 +647,14 @@ class _QuickActionData {
   final String subtitle;
   final IconData icon;
   final String route;
+  final bool primary;
 
   const _QuickActionData({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.route,
+    this.primary = false,
   });
 }
 
@@ -663,21 +665,35 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final background = action.primary
+        ? AppTheme.enactusYellow.withValues(alpha: 0.24)
+        : AppTheme.enactusYellow.withValues(alpha: 0.12);
+    final border = action.primary
+        ? AppTheme.enactusYellow.withValues(alpha: 0.58)
+        : AppTheme.enactusYellow.withValues(alpha: 0.30);
+
     return InkWell(
       onTap: () => context.go(action.route),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.12),
+          color: background,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppTheme.enactusYellow.withValues(alpha: 0.30),
-          ),
+          border: Border.all(color: border),
         ),
         child: Row(
           children: [
-            Icon(action.icon),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: action.primary
+                  ? AppTheme.softBlack
+                  : AppTheme.enactusYellow,
+              foregroundColor: action.primary
+                  ? Colors.white
+                  : AppTheme.softBlack,
+              child: Icon(action.icon, size: 19),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1402,6 +1418,38 @@ List<_AttentionItem> _attentionItems(DashboardSummaryModel summary) {
 List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
   final profile = summary.profile;
   return [
+    if (profile.isEnacchef)
+      const _QuickActionData(
+        title: 'Créer une tâche',
+        subtitle: 'Brief et suivi',
+        icon: Icons.add_task_rounded,
+        route: '/tasks',
+        primary: true,
+      ),
+    if (profile.canManageDocuments)
+      const _QuickActionData(
+        title: 'Valider documents',
+        subtitle: 'PV, rapports, fichiers',
+        icon: Icons.verified_rounded,
+        route: '/documents',
+        primary: true,
+      ),
+    if (profile.canViewFinance)
+      const _QuickActionData(
+        title: 'Ouvrir finance',
+        subtitle: 'Paiements et cotisations',
+        icon: Icons.account_balance_wallet_rounded,
+        route: '/finance',
+        primary: true,
+      ),
+    if (profile.canViewRecruitment)
+      const _QuickActionData(
+        title: 'Voir candidatures',
+        subtitle: 'Tri et suivi',
+        icon: Icons.how_to_reg_rounded,
+        route: '/recruitment',
+        primary: true,
+      ),
     const _QuickActionData(
       title: 'Chat',
       subtitle: 'Discussions',
@@ -1409,7 +1457,7 @@ List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
       route: '/chat',
     ),
     const _QuickActionData(
-      title: 'Créer / lire posts',
+      title: 'Créer un post',
       subtitle: 'Communication',
       icon: Icons.campaign_rounded,
       route: '/posts',
@@ -1421,15 +1469,15 @@ List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
       route: '/tasks',
     ),
     const _QuickActionData(
-      title: 'Documents',
-      subtitle: 'PV, rapports, fichiers',
-      icon: Icons.folder_copy_rounded,
+      title: 'Ajouter document',
+      subtitle: 'PV ou ressource',
+      icon: Icons.upload_file_rounded,
       route: '/documents',
     ),
-    if (profile.canViewGlobalMembers)
+    if (profile.canViewGlobalMembers || profile.isEnacchef)
       const _QuickActionData(
         title: 'Membres',
-        subtitle: 'Profils et rôles',
+        subtitle: 'Profils, rôles, affectations',
         icon: Icons.people_alt_rounded,
         route: '/members',
       ),
@@ -1447,19 +1495,12 @@ List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
         icon: Icons.rocket_launch_rounded,
         route: '/projects',
       ),
-    if (profile.canViewFinance)
+    if (profile.canViewAttendance)
       const _QuickActionData(
-        title: 'Finance',
-        subtitle: 'Paiements',
-        icon: Icons.account_balance_wallet_rounded,
-        route: '/finance',
-      ),
-    if (profile.canViewRecruitment)
-      const _QuickActionData(
-        title: 'Recrutement',
-        subtitle: 'Candidatures',
-        icon: Icons.how_to_reg_rounded,
-        route: '/recruitment',
+        title: 'Présences',
+        subtitle: 'Sessions et retards',
+        icon: Icons.fact_check_rounded,
+        route: '/attendance',
       ),
     const _QuickActionData(
       title: 'Événements',
