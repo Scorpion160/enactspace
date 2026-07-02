@@ -107,6 +107,62 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
+  Future<void> _submitJustification(AttendanceRecordModel record) async {
+    final controller = TextEditingController(
+      text: record.justificationReason ?? record.justification ?? '',
+    );
+    final reason = await showDialog<String?>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Justifier l absence'),
+          content: TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Motif',
+              prefixIcon: Icon(Icons.edit_note_rounded),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Envoyer'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+
+    if (reason == null || reason.trim().isEmpty) return;
+
+    try {
+      await _attendanceService.submitJustification(
+        recordId: record.id,
+        reason: reason,
+      );
+      await _loadSessions();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Justification envoyee.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   int get _openCount {
     return _sessions.where((s) => s.status == 'open').length;
   }
@@ -177,6 +233,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               records: _myRecords,
               sessions: _sessions,
               onRefresh: _loadSessions,
+              onSubmitJustification: _submitJustification,
             )
           else
             ..._buildManagementView(),
@@ -249,11 +306,13 @@ class _PersonalAttendanceView extends StatelessWidget {
   final List<AttendanceRecordModel> records;
   final List<AttendanceSessionModel> sessions;
   final VoidCallback onRefresh;
+  final ValueChanged<AttendanceRecordModel> onSubmitJustification;
 
   const _PersonalAttendanceView({
     required this.records,
     required this.sessions,
     required this.onRefresh,
+    required this.onSubmitJustification,
   });
 
   @override
@@ -351,7 +410,11 @@ class _PersonalAttendanceView extends StatelessWidget {
         else
           ...records.map((record) {
             final session = sessionsById[record.sessionId];
-            return _PersonalAttendanceTile(record: record, session: session);
+            return _PersonalAttendanceTile(
+              record: record,
+              session: session,
+              onSubmitJustification: onSubmitJustification,
+            );
           }),
       ],
     );
@@ -395,8 +458,13 @@ class _PersonalMetric extends StatelessWidget {
 class _PersonalAttendanceTile extends StatelessWidget {
   final AttendanceRecordModel record;
   final AttendanceSessionModel? session;
+  final ValueChanged<AttendanceRecordModel> onSubmitJustification;
 
-  const _PersonalAttendanceTile({required this.record, required this.session});
+  const _PersonalAttendanceTile({
+    required this.record,
+    required this.session,
+    required this.onSubmitJustification,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +497,27 @@ class _PersonalAttendanceTile extends StatelessWidget {
       side: BorderSide(color: color.withAlpha(70)),
       labelStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
     );
+    final canJustify =
+        record.isAbsent &&
+        record.justificationStatus != 'pending' &&
+        record.justificationStatus != 'approved';
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        status,
+        if (record.justificationStatus == 'pending')
+          const Chip(label: Text('Justification en attente')),
+        if (record.justificationStatus == 'rejected')
+          const Chip(label: Text('Justification refusee')),
+        if (canJustify)
+          OutlinedButton.icon(
+            onPressed: () => onSubmitJustification(record),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('Justifier'),
+          ),
+      ],
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -450,7 +539,7 @@ class _PersonalAttendanceTile extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(child: details),
                   const SizedBox(width: 10),
-                  status,
+                  Flexible(child: actions),
                 ],
               );
             }
@@ -467,7 +556,7 @@ class _PersonalAttendanceTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Align(alignment: Alignment.centerLeft, child: status),
+                Align(alignment: Alignment.centerLeft, child: actions),
               ],
             );
           },

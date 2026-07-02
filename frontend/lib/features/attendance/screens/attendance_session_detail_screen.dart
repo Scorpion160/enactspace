@@ -274,6 +274,78 @@ class _AttendanceSessionDetailScreenState
     }
   }
 
+  Future<void> _approveJustification(AttendanceRecordModel record) async {
+    try {
+      await _attendanceService.approveJustification(recordId: record.id);
+      await _loadDetails();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Justification approuvee.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectJustification(AttendanceRecordModel record) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String?>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Refuser la justification'),
+          content: TextField(
+            controller: controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Motif du refus',
+              prefixIcon: Icon(Icons.edit_note_rounded),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Refuser'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (reason == null || reason.trim().isEmpty) return;
+
+    try {
+      await _attendanceService.rejectJustification(
+        recordId: record.id,
+        reason: reason,
+      );
+      await _loadDetails();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Justification refusee.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final expectedIds = _expectedUserIds;
@@ -355,6 +427,8 @@ class _AttendanceSessionDetailScreenState
                 members: filteredExpectedMembers,
                 recordByUserId: recordByUserId,
                 onMarkAttendance: _markAttendance,
+                onApproveJustification: _approveJustification,
+                onRejectJustification: _rejectJustification,
                 sessionClosed: _sessionClosed,
               ),
             ],
@@ -906,12 +980,16 @@ class _ExpectedMembersCard extends StatelessWidget {
     required String status,
   })
   onMarkAttendance;
+  final ValueChanged<AttendanceRecordModel> onApproveJustification;
+  final ValueChanged<AttendanceRecordModel> onRejectJustification;
   final bool sessionClosed;
 
   const _ExpectedMembersCard({
     required this.members,
     required this.recordByUserId,
     required this.onMarkAttendance,
+    required this.onApproveJustification,
+    required this.onRejectJustification,
     required this.sessionClosed,
   });
 
@@ -976,6 +1054,24 @@ class _ExpectedMembersCard extends StatelessWidget {
                         backgroundColor: Colors.green.shade50,
                       );
                 final recordDetails = _RecordDetails(record: record);
+                final reviewActions = record?.justificationStatus == 'pending'
+                    ? Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => onApproveJustification(record!),
+                            icon: const Icon(Icons.verified_rounded),
+                            label: const Text('Approuver'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => onRejectJustification(record!),
+                            icon: const Icon(Icons.block_rounded),
+                            label: const Text('Refuser'),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink();
 
                 final actions = Wrap(
                   spacing: 8,
@@ -1028,7 +1124,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [statusChip, recordDetails],
+                          children: [statusChip, recordDetails, reviewActions],
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1044,6 +1140,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     statusChip,
                     recordDetails,
+                    reviewActions,
                     const SizedBox(height: 12),
                     actions,
                   ],
@@ -1067,10 +1164,33 @@ class _RecordDetails extends StatelessWidget {
     if (record == null) return const SizedBox.shrink();
 
     final details = <Widget>[
-      if ((record!.justification ?? '').trim().isNotEmpty)
+      if ((record!.justificationReason ?? record!.justification ?? '')
+          .trim()
+          .isNotEmpty)
         _RecordDetailLine(
           icon: Icons.edit_note_rounded,
-          text: record!.justification!.trim(),
+          text: (record!.justificationReason ?? record!.justification!).trim(),
+        ),
+      if (record!.justificationStatus == 'pending')
+        const _RecordDetailLine(
+          icon: Icons.hourglass_top_rounded,
+          text: 'Justification en attente',
+        ),
+      if (record!.justificationStatus == 'approved')
+        const _RecordDetailLine(
+          icon: Icons.verified_rounded,
+          text: 'Justification approuvee',
+        ),
+      if (record!.justificationStatus == 'rejected')
+        const _RecordDetailLine(
+          icon: Icons.block_rounded,
+          text: 'Justification refusee',
+        ),
+      if ((record!.justificationFileUrl ?? '').trim().isNotEmpty ||
+          (record!.justificationFileId ?? '').trim().isNotEmpty)
+        const _RecordDetailLine(
+          icon: Icons.attach_file_rounded,
+          text: 'Piece jointe disponible',
         ),
       if ((record!.penaltyAmount ?? 0) > 0)
         _RecordDetailLine(

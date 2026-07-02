@@ -27,6 +27,8 @@ from app.schemas.attendance import (
     AttendanceCheckIn,
     AttendanceExpectedMemberCreate,
     AttendanceExpectedMemberRead,
+    AttendanceJustificationReview,
+    AttendanceJustificationSubmit,
     AttendanceManualCreate,
     AttendanceRecordCreate,
     AttendanceRecordRead,
@@ -474,6 +476,35 @@ def _notify_record_change(
             related_id=record.id,
             dedupe=True,
         )
+
+
+def _get_record_or_404(db: Session, record_id: str) -> AttendanceRecord:
+    record = db.query(AttendanceRecord).filter(AttendanceRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ligne de presence introuvable",
+        )
+    return record
+
+
+def _notify_justification_reviewers(
+    db: Session,
+    record: AttendanceRecord,
+    session: AttendanceSession,
+) -> None:
+    reviewer_ids = {value for value in [session.created_by, record.recorded_by] if value}
+    if reviewer_ids:
+        notify_users(
+            db,
+            user_ids=list(reviewer_ids),
+            title="Justification d'absence",
+            message=f"Une justification a ete soumise pour {session.title}.",
+            notification_type="attendance_justification_pending",
+            related_type="attendance_record",
+            related_id=record.id,
+            dedupe=True,
+        )
     elif record.status in ABSENCE_STATUSES:
         notify_user(
             db,
@@ -844,6 +875,122 @@ def update_attendance_record(
         note=payload.note if payload.note is not None else record.note,
     )
     _notify_record_change(db, record, session)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.post("/records/{record_id}/justify", response_model=AttendanceRecordRead)
+def submit_absence_justification(
+    record_id: str,
+    payload: AttendanceJustificationSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    record = _get_record_or_404(db, record_id)
+    if record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez justifier que vos propres absences",
+        )
+    if record.status not in {"absent", "justified_absence"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Seule une absence peut etre justifiee",
+        )
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de justification est obligatoire",
+        )
+
+    session = _get_session_or_404(db, str(record.session_id))
+    record.justification = reason
+    record.justification_reason = reason
+    record.justification_status = "pending"
+    record.justification_file_id = payload.file_id
+    record.justification_file_url = payload.file_url
+    record.is_justified = False
+    record.updated_at = datetime.utcnow()
+    _notify_justification_reviewers(db, record, session)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.post(
+    "/records/{record_id}/justification/approve",
+    response_model=AttendanceRecordRead,
+)
+def approve_absence_justification(
+    record_id: str,
+    payload: AttendanceJustificationReview,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    record = _get_record_or_404(db, record_id)
+    session = _get_session_or_404(db, str(record.session_id))
+    _require_can_manage_session(db, current_user, session)
+
+    record.status = "justified_absence"
+    record.justification_status = "approved"
+    record.is_justified = True
+    if payload.reason and payload.reason.strip():
+        record.note = payload.reason.strip()
+    record.penalty_amount = 0
+    record.updated_at = datetime.utcnow()
+    notify_user(
+        db,
+        user_id=record.user_id,
+        title="Justification approuvee",
+        message=f"Votre justification pour {session.title} a ete approuvee.",
+        notification_type="attendance_justification_approved",
+        related_type="attendance_record",
+        related_id=record.id,
+        dedupe=True,
+    )
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.post(
+    "/records/{record_id}/justification/reject",
+    response_model=AttendanceRecordRead,
+)
+def reject_absence_justification(
+    record_id: str,
+    payload: AttendanceJustificationReview,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    record = _get_record_or_404(db, record_id)
+    session = _get_session_or_404(db, str(record.session_id))
+    _require_can_manage_session(db, current_user, session)
+
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de refus est obligatoire",
+        )
+
+    record.status = "absent"
+    record.justification_status = "rejected"
+    record.is_justified = False
+    record.note = reason
+    record.updated_at = datetime.utcnow()
+    notify_user(
+        db,
+        user_id=record.user_id,
+        title="Justification refusee",
+        message=f"Votre justification pour {session.title} a ete refusee: {reason}",
+        notification_type="attendance_justification_rejected",
+        related_type="attendance_record",
+        related_id=record.id,
+        dedupe=True,
+    )
     db.commit()
     db.refresh(record)
     return record

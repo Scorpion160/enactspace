@@ -129,6 +129,16 @@ class AttendanceRecordUpdate(BaseModel):
     note: Optional[str] = None
 
 
+class AttendanceJustificationSubmit(BaseModel):
+    reason: str
+    file_id: Optional[UUID] = None
+    file_url: Optional[str] = None
+
+
+class AttendanceJustificationReview(BaseModel):
+    reason: Optional[str] = None
+
+
 class AttendanceRecordRead(BaseModel):
     id: UUID
     session_id: UUID

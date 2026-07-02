@@ -255,4 +255,75 @@ class AttendanceService {
 
     throw Exception('RÃ©ponse invalide lors de lâ€™ouverture de la session.');
   }
+
+  Future<AttendanceRecordModel> submitJustification({
+    required String recordId,
+    required String reason,
+    String? fileId,
+    String? fileUrl,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/records/$recordId/justify',
+      token: token,
+      data: {'reason': reason.trim(), 'file_id': fileId, 'file_url': fileUrl},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceRecordModel.fromJson(response);
+    }
+
+    throw Exception('RÃ©ponse invalide lors de la justification.');
+  }
+
+  Future<AttendanceRecordModel> approveJustification({
+    required String recordId,
+    String? reason,
+  }) {
+    return _reviewJustification(
+      recordId: recordId,
+      action: 'approve',
+      reason: reason,
+    );
+  }
+
+  Future<AttendanceRecordModel> rejectJustification({
+    required String recordId,
+    required String reason,
+  }) {
+    return _reviewJustification(
+      recordId: recordId,
+      action: 'reject',
+      reason: reason,
+    );
+  }
+
+  Future<AttendanceRecordModel> _reviewJustification({
+    required String recordId,
+    required String action,
+    String? reason,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/records/$recordId/justification/$action',
+      token: token,
+      data: {'reason': reason?.trim()},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceRecordModel.fromJson(response);
+    }
+
+    throw Exception('RÃ©ponse invalide lors de la revue de justification.');
+  }
 }
