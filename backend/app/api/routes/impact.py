@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -668,4 +671,139 @@ def get_impact_summary(
             "financial_health": 0,
         },
         "historical_impact": HISTORICAL_IMPACT,
+    }
+
+
+def _csv_download(filename: str, rows: list[list]) -> Response:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _impact_export_rows(projects: list[dict]) -> list[list]:
+    rows = [
+        [
+            "Projet",
+            "Statut",
+            "Pole",
+            "Chef projet",
+            "Beneficiaires directs",
+            "Beneficiaires indirects",
+            "Reach",
+            "Vies impactees",
+            "Revenus generes",
+            "Surplus",
+            "Emplois crees",
+            "Arbres plantes",
+            "Impact environnemental",
+            "ODD touches",
+            "Preuves",
+            "Methodologie",
+            "Projection 12 mois",
+        ]
+    ]
+    for project in projects:
+        rows.append(
+            [
+                project["project_name"],
+                project["status"],
+                project["pole_name"],
+                project["project_lead"],
+                project["direct_impact"],
+                project["indirect_impact"],
+                project["reach"],
+                project.get("lives_impacted", 0),
+                project["revenue"],
+                project["surplus"],
+                project.get("jobs_created", 0),
+                project.get("trees_planted", 0),
+                project["planet_impact"],
+                ", ".join(project.get("sdgs", [])),
+                project["evidence_count"],
+                project["methodology"],
+                project["assumptions"],
+            ]
+        )
+    return rows
+
+
+@router.get("/export/projects.csv")
+def export_impact_projects_csv(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    projects = list_impact_projects(db=db, current_user=current_user)
+    return _csv_download("enactspace_impact_projects.csv", _impact_export_rows(projects))
+
+
+@router.get("/export/projects/{project_id}.csv")
+def export_impact_project_csv(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    project = _get_project_or_404(db, project_id)
+    payload = _project_payload(db, project)
+    return _csv_download(
+        f"enactspace_impact_{project.name}.csv",
+        _impact_export_rows([payload]),
+    )
+
+
+@router.get("/report/summary")
+def get_impact_report_summary(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    projects = list_impact_projects(db=db, current_user=current_user)
+    summary = get_impact_summary(db=db, current_user=current_user)
+    organization = summary["organization"]
+    return {
+        "title": "Synthese impact Enactus ESP",
+        "generated_at": datetime.utcnow(),
+        "global_summary": {
+            "active_projects": organization["active_projects"],
+            "direct_beneficiaries": organization["direct_impact_total"],
+            "indirect_beneficiaries": organization["indirect_impact_total"],
+            "reach": organization["reach_total"],
+            "lives_impacted": organization["lives_impacted_total"],
+            "jobs_created": organization["jobs_created_total"],
+            "revenue": organization["revenue_total"],
+            "surplus": organization["surplus_total"],
+            "touched_sdgs": organization["touched_sdgs"],
+            "validated_evidence": organization["validated_evidence_count"],
+        },
+        "projects": [
+            {
+                "project_name": project["project_name"],
+                "summary": project["solution"],
+                "key_indicators": {
+                    "direct": project["direct_impact"],
+                    "indirect": project["indirect_impact"],
+                    "reach": project["reach"],
+                    "revenue": project["revenue"],
+                    "surplus": project["surplus"],
+                    "jobs_created": project.get("jobs_created", 0),
+                    "evidence": project["evidence_count"],
+                },
+                "sdgs": project.get("sdgs", []),
+                "methodology": project["methodology"],
+                "projection": project["assumptions"],
+                "improvement_points": [
+                    *(
+                        ["Ajouter des preuves validees"]
+                        if project["evidence_count"] < 2
+                        else []
+                    ),
+                    *(["Renseigner les ODD"] if not project.get("sdgs") else []),
+                ],
+            }
+            for project in projects
+        ],
+        "todo": "Generation PDF a brancher apres validation du modele de rapport.",
     }
