@@ -955,7 +955,11 @@ class _AccountsCard extends StatelessWidget {
                   leading: const CircleAvatar(
                     child: Icon(Icons.person_rounded),
                   ),
-                  title: Text(memberName(account.userId)),
+                  title: Text(
+                    memberName(account.userId),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   subtitle: Text('Payé : ${_money(account.totalPaid)}'),
                   trailing: Text(
                     _money(account.balanceDue),
@@ -992,8 +996,16 @@ class _FeesCard extends StatelessWidget {
                   leading: const CircleAvatar(
                     child: Icon(Icons.receipt_rounded),
                   ),
-                  title: Text('${fee.typeLabel} — ${memberName(fee.userId)}'),
-                  subtitle: Text('${fee.label} • ${fee.statusLabel}'),
+                  title: Text(
+                    '${fee.typeLabel} — ${memberName(fee.userId)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '${fee.label} • ${fee.statusLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -1069,8 +1081,16 @@ class _PaymentsCard extends StatelessWidget {
                           : Icons.verified_rounded,
                     ),
                   ),
-                  title: Text(memberName(payment.userId)),
-                  subtitle: Text(detailParts.join(' - ')),
+                  title: Text(
+                    memberName(payment.userId),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    detailParts.join(' - '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
