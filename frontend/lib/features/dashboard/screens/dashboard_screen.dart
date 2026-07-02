@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
+import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/dashboard_summary_model.dart';
 import '../services/dashboard_service.dart';
@@ -245,10 +246,19 @@ class _HeroMark extends StatelessWidget {
         color: AppTheme.enactusYellow,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Icon(
-        Icons.dashboard_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Image.asset(
+          BrandAssets.icon,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return const Icon(
+              Icons.dashboard_rounded,
+              color: AppTheme.softBlack,
+              size: 34,
+            );
+          },
+        ),
       ),
     );
   }

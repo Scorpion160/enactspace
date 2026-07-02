@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../recruitment/models/application_model.dart';
 import '../../recruitment/screens/recruitment_screen.dart';
@@ -115,7 +116,7 @@ class _BrandPanel extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _BrandMark(size: logoSize),
+                        _BrandMark(size: logoSize, onDark: true),
                         SizedBox(height: compact ? 24 : 34),
                         const Text(
                           'Enactus ESP',
@@ -1450,7 +1451,7 @@ class _MobileBrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        _BrandMark(size: 96),
+        _BrandMark(size: 112),
         SizedBox(height: 14),
         Text(
           'Enactus ESP',
@@ -1480,8 +1481,9 @@ class _MobileBrandHeader extends StatelessWidget {
 
 class _BrandMark extends StatelessWidget {
   final double size;
+  final bool onDark;
 
-  const _BrandMark({required this.size});
+  const _BrandMark({required this.size, this.onDark = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1490,9 +1492,13 @@ class _BrandMark extends StatelessWidget {
       height: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: onDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
         borderRadius: BorderRadius.circular(size * 0.22),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: onDark
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.16),
@@ -1502,9 +1508,9 @@ class _BrandMark extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(size * 0.10),
+        padding: EdgeInsets.all(size * 0.08),
         child: Image.asset(
-          'assets/img/logo_enactus_esp.png',
+          onDark ? BrandAssets.logoMonoWhite : BrandAssets.logoFull,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) {
             return Container(

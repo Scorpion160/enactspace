@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/user_experience.dart';
+import '../../core/brand/brand_assets.dart';
 import '../../core/realtime/realtime_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/chat/services/chat_service.dart';
@@ -270,7 +271,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Row(
+          children: [
+            Image.asset(
+              BrandAssets.icon,
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         actions: [
           _NotificationIconButton(
             unreadNotifications: _unreadNotifications,
@@ -555,17 +567,10 @@ class _BrandHeader extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppTheme.enactusYellow,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.groups_2_rounded,
-              color: AppTheme.softBlack,
-            ),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: Image.asset(BrandAssets.icon, fit: BoxFit.contain),
           ),
           const SizedBox(width: 12),
           Expanded(
