@@ -831,6 +831,10 @@ class _ProjectImpactCard extends StatelessWidget {
                       Chip(label: Text('${project.directImpact} direct')),
                       Chip(label: Text('${project.indirectImpact} indirect')),
                       Chip(label: Text('${project.reach} reach')),
+                      if (project.jobsCreated > 0)
+                        Chip(label: Text('${project.jobsCreated} emplois')),
+                      if (project.livesImpacted > 0)
+                        Chip(label: Text('${project.livesImpacted} vies')),
                       Chip(label: Text('${project.evidenceCount} preuves')),
                       for (final sdg in project.sdgs) Chip(label: Text(sdg)),
                       if (project.sdgs.isEmpty)
@@ -982,6 +986,16 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                           icon: Icons.savings_rounded,
                         ),
                         _KpiItem(
+                          label: 'Emplois',
+                          value: project.jobsCreated.toString(),
+                          icon: Icons.work_rounded,
+                        ),
+                        _KpiItem(
+                          label: 'Vies impactees',
+                          value: project.livesImpacted.toString(),
+                          icon: Icons.favorite_rounded,
+                        ),
+                        _KpiItem(
                           label: 'Preuves',
                           value: project.evidenceCount.toString(),
                           icon: Icons.verified_rounded,
@@ -1040,12 +1054,33 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                   icon: Icons.diversity_3_rounded,
                 ),
                 _ProjectDetailBlock(
+                  title: 'Preuves disponibles',
+                  text:
+                      '${project.evidenceCount} preuve(s) rattachee(s), ${project.documentsCount} document(s) projet. Les fichiers sont consultables via Documents, sans afficher les liens techniques ici.',
+                  icon: Icons.verified_rounded,
+                ),
+                if (project.hasEnvironmentalImpact)
+                  _ProjectDetailBlock(
+                    title: 'Impact environnemental',
+                    text: [
+                      if (project.treesPlanted > 0)
+                        '${project.treesPlanted} arbre(s) plantes',
+                      if (project.wasteReduced > 0)
+                        '${project.wasteReduced.toStringAsFixed(0)} kg de dechets reduits',
+                      if (project.waterSaved > 0)
+                        '${project.waterSaved.toStringAsFixed(0)} litres economises',
+                      if (project.co2Reduced > 0)
+                        '${project.co2Reduced.toStringAsFixed(0)} kg CO2 reduits',
+                    ].join(' - '),
+                    icon: Icons.eco_rounded,
+                  ),
+                _ProjectDetailBlock(
                   title: 'Methode de mesure',
                   text: project.methodology,
                   icon: Icons.fact_check_rounded,
                 ),
                 _ProjectDetailBlock(
-                  title: 'Hypotheses',
+                  title: 'Projection et hypotheses',
                   text: project.assumptions,
                   icon: Icons.rule_rounded,
                 ),
@@ -1122,6 +1157,9 @@ class _ProjectScoreBreakdown extends StatelessWidget {
       ('Scalabilite', project.scalabilityScore),
       ('Competition', project.competitionReadinessScore),
       ('Planete', project.planetImpact),
+      ('Emplois', project.jobsCreated.toDouble()),
+      ('Vies', project.livesImpacted.toDouble()),
+      ('Arbres', project.treesPlanted.toDouble()),
       ('Budget utilise', project.budgetUsed),
     ];
 

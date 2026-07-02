@@ -14,6 +14,12 @@ class ProjectImpactMetricModel {
   final int reach;
   final double revenue;
   final double surplus;
+  final int jobsCreated;
+  final int livesImpacted;
+  final int treesPlanted;
+  final double wasteReduced;
+  final double waterSaved;
+  final double co2Reduced;
   final double planetImpact;
   final int evidenceCount;
   final String methodology;
@@ -44,6 +50,12 @@ class ProjectImpactMetricModel {
     required this.reach,
     required this.revenue,
     required this.surplus,
+    required this.jobsCreated,
+    required this.livesImpacted,
+    required this.treesPlanted,
+    required this.wasteReduced,
+    required this.waterSaved,
+    required this.co2Reduced,
     required this.planetImpact,
     required this.evidenceCount,
     required this.methodology,
@@ -79,6 +91,9 @@ class ProjectImpactMetricModel {
 
   bool get needsEvidence => evidenceCount < 2;
   bool get needsSdg => sdgs.isEmpty;
+  int get totalBeneficiaries => directImpact + indirectImpact;
+  bool get hasEnvironmentalImpact =>
+      treesPlanted > 0 || wasteReduced > 0 || waterSaved > 0 || co2Reduced > 0;
 
   String get scoreLabel => '${projectImpactScore.toStringAsFixed(0)}/100';
 }
