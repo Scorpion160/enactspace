@@ -29,6 +29,7 @@ from app.schemas.finance import (
     ClubTransactionRead,
     FeeBulkCreate,
     FeeCancelRequest,
+    PaymentRejectRequest,
 )
 from app.api.deps import (
     get_current_active_validated_user,
@@ -67,10 +68,19 @@ VALID_FEE_TYPES = {
 }
 
 FINANCE_MANAGER_ROLES = {"administrateur", "team_leader", "financier"}
+PAYMENT_SUPERVISOR_ROLES = {"administrateur", "team_leader"}
 
 
 def is_finance_manager(db: Session, current_user: User) -> bool:
     return user_has_any_role(db, current_user.id, FINANCE_MANAGER_ROLES)
+
+
+def can_review_payment(db: Session, current_user: User, payment: Payment) -> bool:
+    if not is_finance_manager(db, current_user):
+        return False
+    if payment.user_id != current_user.id:
+        return True
+    return user_has_any_role(db, current_user.id, PAYMENT_SUPERVISOR_ROLES)
 
 
 def get_payment_or_404(db: Session, payment_id: str) -> Payment:
@@ -89,9 +99,11 @@ def payment_payload(
     payment: Payment,
 ) -> dict:
     manager = is_finance_manager(db, current_user)
+    reviewer = can_review_payment(db, current_user, payment)
     data = PaymentRead.model_validate(payment).model_dump()
-    data["can_validate"] = manager and payment.status == "pending"
-    data["can_cancel"] = payment.status == "pending" and (
+    data["can_validate"] = reviewer and payment.status == "pending"
+    data["can_reject"] = reviewer and payment.status == "pending"
+    data["can_cancel"] = payment.status in {"pending", "rejected"} and (
         manager or payment.user_id == current_user.id
     )
     return data
@@ -599,7 +611,7 @@ def create_payment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Les paiements en espèces sont saisis par le financier",
             )
-        if not (payload.reference or payload.proof_url):
+        if not (payload.reference or payload.proof_url or payload.proof_file_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Ajoutez une référence ou une preuve de paiement",
@@ -686,9 +698,20 @@ def validate_payment(
     current_user: User = Depends(require_finance_or_admin),
 ):
     payment = get_payment_or_404(db, payment_id)
+    if not can_review_payment(db, current_user, payment):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas valider votre propre paiement",
+        )
 
     if payment.status == "validated":
         return payment_payload(db, current_user, payment)
+
+    if payment.status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible de valider un paiement rejete",
+        )
 
     if payment.status == "cancelled":
         raise HTTPException(
@@ -699,6 +722,8 @@ def validate_payment(
     payment.status = "validated"
     payment.validated_by = current_user.id
     payment.validated_at = datetime.utcnow()
+    payment.rejected_at = None
+    payment.rejection_reason = None
 
     allocations = allocate_payment_to_unpaid_fees(db, payment)
 
@@ -753,6 +778,75 @@ def validate_payment(
     db.refresh(payment)
 
     return payment_payload(db, current_user, payment)
+
+
+@router.post("/payments/{payment_id}/reject", response_model=PaymentRead)
+def reject_payment(
+    payment_id: str,
+    payload: PaymentRejectRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    payment = get_payment_or_404(db, payment_id)
+    if not can_review_payment(db, current_user, payment):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas rejeter votre propre paiement",
+        )
+
+    if payment.status == "rejected":
+        return payment_payload(db, current_user, payment)
+
+    if payment.status in {"validated", "cancelled"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible de rejeter ce paiement",
+        )
+
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de rejet est obligatoire",
+        )
+
+    old_status = payment.status
+    payment.status = "rejected"
+    payment.rejected_at = datetime.utcnow()
+    payment.rejection_reason = reason
+    payment.validated_by = None
+    payment.validated_at = None
+
+    notify_user(
+        db,
+        user_id=payment.user_id,
+        title="Paiement rejete",
+        message=(
+            f"Votre paiement de {float(payment.amount):.0f} FCFA "
+            f"est rejete: {reason}"
+        ),
+        notification_type="payment_rejected",
+        related_type="payment",
+        related_id=payment.id,
+        dedupe=True,
+    )
+    create_audit_log(
+        db=db,
+        action="rejet_paiement",
+        user_id=current_user.id,
+        entity_type="payment",
+        entity_id=payment.id,
+        old_value={"status": old_status},
+        new_value={"status": payment.status, "reason": reason},
+        ip_address=get_client_ip(request),
+    )
+
+    db.commit()
+    db.refresh(payment)
+
+    return payment_payload(db, current_user, payment)
+
 
 @router.post("/payments/{payment_id}/cancel", response_model=PaymentRead)
 def cancel_payment(

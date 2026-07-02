@@ -38,6 +38,10 @@ class FeeCancelRequest(BaseModel):
     reason: str
 
 
+class PaymentRejectRequest(BaseModel):
+    reason: str
+
+
 class FeeRead(BaseModel):
     id: UUID
     user_id: UUID
@@ -101,6 +105,7 @@ class PaymentRead(BaseModel):
     receipt_url: Optional[str]
     receipt_file_id: Optional[UUID]
     can_validate: bool = False
+    can_reject: bool = False
     can_cancel: bool = False
     created_at: datetime
 
