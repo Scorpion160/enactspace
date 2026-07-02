@@ -839,6 +839,8 @@ class _ProjectImpactCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     '${project.poleName} • ${project.projectLead} / ${project.deputyLead}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.black54),
                   ),
                   const SizedBox(height: 12),
@@ -955,6 +957,8 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                         children: [
                           Text(
                             project.projectName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w900,
@@ -963,6 +967,8 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             '${project.poleName} • ${project.status} • ${project.projectLead} / ${project.deputyLead}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Colors.black54),
                           ),
                         ],
@@ -1239,6 +1245,8 @@ class _QualityAlerts extends StatelessWidget {
                 ),
                 title: Text(
                   project.projectName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 subtitle: Text(
@@ -1380,6 +1388,8 @@ class _EnacteurRow extends StatelessWidget {
       ),
       title: Text(
         enacteur.memberName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w900),
       ),
       subtitle: Text(
