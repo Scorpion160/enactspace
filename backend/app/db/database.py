@@ -96,6 +96,53 @@ def ensure_compatibility_columns() -> None:
         if "media_size_bytes" not in post_columns:
             statements.append("ALTER TABLE posts ADD COLUMN media_size_bytes INTEGER")
 
+    if "attendance_sessions" in inspector.get_table_names():
+        session_columns = {
+            column["name"] for column in inspector.get_columns("attendance_sessions")
+        }
+        if "scope_type" not in session_columns:
+            statements.append(
+                "ALTER TABLE attendance_sessions ADD COLUMN scope_type "
+                "VARCHAR(40) DEFAULT 'club'"
+            )
+        if "group_name" not in session_columns:
+            statements.append(
+                "ALTER TABLE attendance_sessions ADD COLUMN group_name VARCHAR(150)"
+            )
+        if "status" not in session_columns:
+            statements.append(
+                "ALTER TABLE attendance_sessions ADD COLUMN status "
+                "VARCHAR(40) DEFAULT 'draft'"
+            )
+        if "notes" not in session_columns:
+            statements.append("ALTER TABLE attendance_sessions ADD COLUMN notes TEXT")
+
+    if "attendance_records" in inspector.get_table_names():
+        record_columns = {
+            column["name"] for column in inspector.get_columns("attendance_records")
+        }
+        if "delay_minutes" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN delay_minutes INTEGER"
+            )
+        if "recorded_at" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN recorded_at DATETIME"
+            )
+        if "justification_status" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN justification_status "
+                "VARCHAR(40) DEFAULT 'not_submitted'"
+            )
+        if "justification_reason" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN justification_reason TEXT"
+            )
+        if "justification_file_id" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN justification_file_id CHAR(36)"
+            )
+
     if statements:
         with engine.begin() as connection:
             for statement in statements:

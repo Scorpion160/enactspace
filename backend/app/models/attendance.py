@@ -21,6 +21,9 @@ class AttendanceSession(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     session_type: Mapped[str] = mapped_column(String(80), default="general_meeting")
+    scope_type: Mapped[str] = mapped_column(String(40), default="club")
+    group_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="draft")
 
     event_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -56,6 +59,7 @@ class AttendanceSession(Base):
     late_after_minutes: Mapped[int] = mapped_column(Integer, default=15)
 
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -111,14 +115,26 @@ class AttendanceRecord(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False)
 
     checkin_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    delay_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     recorded_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("users.id"),
         nullable=True,
     )
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)
+    justification_status: Mapped[str] = mapped_column(
+        String(40),
+        default="not_submitted",
+    )
+    justification_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    justification_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
     justification_file_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     is_justified: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -135,3 +151,11 @@ class AttendanceRecord(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    @property
+    def member_id(self):
+        return self.user_id
+
+    @property
+    def arrival_time(self):
+        return self.checkin_time
