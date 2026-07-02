@@ -1,14 +1,29 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_enacchef_or_admin
+from app.core.roles import ENACCHEF_ROLES
 from app.db.database import get_db
 from app.models.document import Document
+from app.models.impact import ImpactEvidence, ImpactMetric, ImpactProject
 from app.models.pole import Pole
 from app.models.project import Project, ProjectMember, ProjectPole
+from app.models.role import Role, UserRole
 from app.models.task import Task
 from app.models.user import User
+from app.schemas.impact import (
+    ImpactEvidenceCreate,
+    ImpactEvidenceRead,
+    ImpactMetricCreate,
+    ImpactMetricRead,
+    ImpactProjectCreate,
+    ImpactProjectRead,
+    ImpactProjectUpdate,
+)
+from app.services.notification_service import notify_users
 
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
@@ -40,6 +55,105 @@ HISTORICAL_IMPACT = {
         "Premier Prix d’Excellence Fondation Sonatel",
     ],
 }
+
+VALID_IMPACT_STATUSES = {
+    "draft",
+    "submitted",
+    "under_review",
+    "validated",
+    "rejected",
+    "archived",
+}
+VALID_METRIC_CATEGORIES = {
+    "social",
+    "economique",
+    "environmental",
+    "environnemental",
+    "formation",
+    "sensibilisation",
+    "autre",
+}
+VALID_METRIC_UNITS = {
+    "personnes",
+    "FCFA",
+    "emplois",
+    "arbres",
+    "kg",
+    "litres",
+    "pourcentage",
+    "autre",
+}
+
+
+def _impact_reviewer_ids(db: Session) -> list:
+    rows = (
+        db.query(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(Role.name.in_(ENACCHEF_ROLES))
+        .distinct()
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _get_project_or_404(db: Session, project_id) -> Project:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Projet introuvable",
+        )
+    return project
+
+
+def _get_impact_project_or_404(db: Session, impact_project_id) -> ImpactProject:
+    impact_project = (
+        db.query(ImpactProject).filter(ImpactProject.id == impact_project_id).first()
+    )
+    if not impact_project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fiche impact introuvable",
+        )
+    return impact_project
+
+
+def _validate_impact_status(value: str) -> str:
+    status_value = (value or "draft").strip().lower()
+    if status_value not in VALID_IMPACT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut impact invalide",
+        )
+    return status_value
+
+
+def _validate_metric_payload(payload: ImpactMetricCreate) -> None:
+    if payload.category not in VALID_METRIC_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Categorie d'indicateur invalide",
+        )
+    if payload.unit not in VALID_METRIC_UNITS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unite d'indicateur invalide",
+        )
+
+
+def _validate_linked_metric(
+    db: Session,
+    impact_project_id,
+    metric_id,
+) -> None:
+    if metric_id is None:
+        return
+    metric = db.query(ImpactMetric).filter(ImpactMetric.id == metric_id).first()
+    if not metric or metric.impact_project_id != impact_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Indicateur lie invalide pour cette fiche impact",
+        )
 
 
 def _status_progress(status: str | None) -> float:
@@ -133,6 +247,17 @@ def _project_payload(db: Session, project: Project) -> dict:
         .scalar()
         or 0
     )
+    impact_profile = (
+        db.query(ImpactProject).filter(ImpactProject.project_id == project.id).first()
+    )
+    impact_evidence_count = 0
+    if impact_profile:
+        impact_evidence_count = (
+            db.query(func.count(ImpactEvidence.id))
+            .filter(ImpactEvidence.impact_project_id == impact_profile.id)
+            .scalar()
+            or 0
+        )
     lead, deputy = _project_leaders(db, project.id)
     budget = float(project.budget_estimated or 0)
     progress = _status_progress(project.status)
@@ -171,6 +296,48 @@ def _project_payload(db: Session, project: Project) -> dict:
         "competition_readiness_score": min(100, 30 + evidence_count * 10 + documents_count * 2),
     }
 
+    if impact_profile:
+        direct_impact = int(impact_profile.direct_beneficiaries or 0)
+        indirect_impact = int(impact_profile.indirect_beneficiaries or 0)
+        reach = int(impact_profile.reach or direct_impact + indirect_impact)
+        planet_score = min(
+            100,
+            int(impact_profile.trees_planted or 0) * 0.04
+            + float(impact_profile.waste_reduced or 0) * 0.05
+            + float(impact_profile.water_saved or 0) * 0.001
+            + float(impact_profile.co2_reduced or 0) * 0.08,
+        )
+        payload.update(
+            {
+                "sdgs": impact_profile.sdgs or [],
+                "problem": impact_profile.problem_statement or payload["problem"],
+                "solution": impact_profile.solution_summary or payload["solution"],
+                "target_beneficiaries": (
+                    impact_profile.target_population
+                    or payload["target_beneficiaries"]
+                ),
+                "direct_impact": direct_impact,
+                "indirect_impact": indirect_impact,
+                "reach": reach,
+                "revenue": float(impact_profile.revenue_generated or 0),
+                "surplus": float(impact_profile.profit_or_surplus or 0),
+                "planet_impact": planet_score,
+                "evidence_count": max(int(evidence_count), int(impact_evidence_count)),
+                "methodology": impact_profile.methodology or payload["methodology"],
+                "assumptions": (
+                    impact_profile.projection_next_12_months
+                    or impact_profile.evidence_notes
+                    or payload["assumptions"]
+                ),
+                "business_viability_score": min(
+                    100,
+                    45
+                    + float(impact_profile.revenue_generated or 0) / 100000
+                    + float(impact_profile.profit_or_surplus or 0) / 150000,
+                ),
+            }
+        )
+
     if _is_terrasen(project):
         payload.update(
             {
@@ -207,6 +374,212 @@ def _project_payload(db: Session, project: Project) -> dict:
         )
 
     return payload
+
+
+@router.get("/records", response_model=list[ImpactProjectRead])
+def list_impact_records(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    return db.query(ImpactProject).order_by(ImpactProject.updated_at.desc()).all()
+
+
+@router.post("/records", response_model=ImpactProjectRead)
+def create_impact_record(
+    payload: ImpactProjectCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _get_project_or_404(db, payload.project_id)
+    existing = (
+        db.query(ImpactProject)
+        .filter(ImpactProject.project_id == payload.project_id)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une fiche impact existe deja pour ce projet",
+        )
+
+    data = payload.model_dump()
+    data["status"] = _validate_impact_status(payload.status)
+    impact_project = ImpactProject(**data, created_by_id=current_user.id)
+    db.add(impact_project)
+    db.flush()
+
+    if impact_project.status in {"submitted", "under_review"}:
+        notify_users(
+            db,
+            user_ids=[
+                user_id
+                for user_id in _impact_reviewer_ids(db)
+                if user_id != current_user.id
+            ],
+            title="Donnee impact a verifier",
+            message=f"{impact_project.title} attend une validation.",
+            notification_type="impact_submitted",
+            related_type="impact_project",
+            related_id=impact_project.id,
+        )
+
+    db.commit()
+    db.refresh(impact_project)
+    return impact_project
+
+
+@router.patch("/records/{impact_project_id}", response_model=ImpactProjectRead)
+def update_impact_record(
+    impact_project_id: str,
+    payload: ImpactProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    impact_project = _get_impact_project_or_404(db, impact_project_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "status" in data:
+        data["status"] = _validate_impact_status(data["status"])
+    for field, value in data.items():
+        setattr(impact_project, field, value)
+    impact_project.updated_at = datetime.utcnow()
+
+    if impact_project.status in {"submitted", "under_review"}:
+        notify_users(
+            db,
+            user_ids=[
+                user_id
+                for user_id in _impact_reviewer_ids(db)
+                if user_id != current_user.id
+            ],
+            title="Donnee impact mise a jour",
+            message=f"{impact_project.title} attend une verification.",
+            notification_type="impact_submitted",
+            related_type="impact_project",
+            related_id=impact_project.id,
+        )
+
+    db.commit()
+    db.refresh(impact_project)
+    return impact_project
+
+
+@router.get(
+    "/records/{impact_project_id}/metrics",
+    response_model=list[ImpactMetricRead],
+)
+def list_impact_metrics(
+    impact_project_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _get_impact_project_or_404(db, impact_project_id)
+    return (
+        db.query(ImpactMetric)
+        .filter(ImpactMetric.impact_project_id == impact_project_id)
+        .order_by(ImpactMetric.created_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/records/{impact_project_id}/metrics",
+    response_model=ImpactMetricRead,
+)
+def create_impact_metric(
+    impact_project_id: str,
+    payload: ImpactMetricCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    impact_project = _get_impact_project_or_404(db, impact_project_id)
+    _validate_metric_payload(payload)
+    data = payload.model_dump()
+    data["status"] = _validate_impact_status(payload.status)
+    metric = ImpactMetric(
+        impact_project_id=impact_project.id,
+        **data,
+        created_by_id=current_user.id,
+    )
+    db.add(metric)
+    db.flush()
+
+    if metric.status in {"submitted", "under_review"}:
+        notify_users(
+            db,
+            user_ids=[
+                user_id
+                for user_id in _impact_reviewer_ids(db)
+                if user_id != current_user.id
+            ],
+            title="Indicateur impact a verifier",
+            message=f"{metric.title} attend une validation.",
+            notification_type="impact_metric_submitted",
+            related_type="impact_metric",
+            related_id=metric.id,
+        )
+
+    db.commit()
+    db.refresh(metric)
+    return metric
+
+
+@router.get(
+    "/records/{impact_project_id}/evidence",
+    response_model=list[ImpactEvidenceRead],
+)
+def list_impact_evidence(
+    impact_project_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _get_impact_project_or_404(db, impact_project_id)
+    return (
+        db.query(ImpactEvidence)
+        .filter(ImpactEvidence.impact_project_id == impact_project_id)
+        .order_by(ImpactEvidence.created_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/records/{impact_project_id}/evidence",
+    response_model=ImpactEvidenceRead,
+)
+def create_impact_evidence(
+    impact_project_id: str,
+    payload: ImpactEvidenceCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    impact_project = _get_impact_project_or_404(db, impact_project_id)
+    _validate_linked_metric(db, impact_project.id, payload.metric_id)
+    data = payload.model_dump()
+    data["status"] = _validate_impact_status(payload.status)
+    evidence = ImpactEvidence(
+        impact_project_id=impact_project.id,
+        **data,
+        submitted_by_id=current_user.id,
+    )
+    db.add(evidence)
+    db.flush()
+
+    notify_users(
+        db,
+        user_ids=[
+            user_id
+            for user_id in _impact_reviewer_ids(db)
+            if user_id != current_user.id
+        ],
+        title="Preuve impact ajoutee",
+        message=f"{evidence.title} attend une verification.",
+        notification_type="impact_evidence_submitted",
+        related_type="impact_evidence",
+        related_id=evidence.id,
+    )
+
+    db.commit()
+    db.refresh(evidence)
+    return evidence
 
 
 @router.get("/projects")
