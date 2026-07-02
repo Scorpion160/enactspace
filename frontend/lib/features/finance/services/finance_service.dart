@@ -131,6 +131,23 @@ class FinanceService {
     throw Exception('Réponse invalide lors de la validation du paiement.');
   }
 
+  Future<PaymentModel> rejectPayment(String paymentId, String reason) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connectÃ©.');
+
+    final response = await _apiClient.postJson(
+      '/finance/payments/$paymentId/reject',
+      token: token,
+      data: {'reason': reason.trim()},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PaymentModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide lors du rejet du paiement.');
+  }
+
   Future<PaymentModel> cancelPayment(String paymentId) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

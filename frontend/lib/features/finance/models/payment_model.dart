@@ -8,7 +8,10 @@ class PaymentModel {
   final String? proofUrl;
   final String? createdAt;
   final String? validatedAt;
+  final String? rejectedAt;
+  final String? rejectionReason;
   final bool canValidate;
+  final bool canReject;
   final bool canCancel;
 
   const PaymentModel({
@@ -21,7 +24,10 @@ class PaymentModel {
     this.proofUrl,
     this.createdAt,
     this.validatedAt,
+    this.rejectedAt,
+    this.rejectionReason,
     required this.canValidate,
+    required this.canReject,
     required this.canCancel,
   });
 
@@ -36,7 +42,10 @@ class PaymentModel {
       proofUrl: json['proof_url']?.toString(),
       createdAt: json['created_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
+      rejectedAt: json['rejected_at']?.toString(),
+      rejectionReason: json['rejection_reason']?.toString(),
       canValidate: json['can_validate'] == true,
+      canReject: json['can_reject'] == true,
       canCancel: json['can_cancel'] == true,
     );
   }
@@ -49,6 +58,8 @@ class PaymentModel {
         return 'Validé';
       case 'cancelled':
         return 'Annulé';
+      case 'rejected':
+        return 'Rejete';
       default:
         return status;
     }

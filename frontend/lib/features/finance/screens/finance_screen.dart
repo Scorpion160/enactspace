@@ -272,6 +272,58 @@ class _FinanceScreenState extends State<FinanceScreen> {
     }
   }
 
+  Future<void> _rejectPayment(PaymentModel payment) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rejeter ce paiement ?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Motif',
+            hintText: 'Ex: preuve illisible, montant incorrect...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Retour'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            icon: const Icon(Icons.block_rounded),
+            label: const Text('Rejeter'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reason == null || reason.trim().isEmpty) return;
+
+    try {
+      await _financeService.rejectPayment(payment.id, reason);
+      await _loadFinance();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Paiement rejete.')));
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   Future<void> _cancelPayment(PaymentModel payment) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -382,6 +434,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
               payments: _filteredPayments,
               memberName: _memberName,
               onValidate: _validatePayment,
+              onReject: _rejectPayment,
               onCancel: _cancelPayment,
             ),
           ],
@@ -966,12 +1019,14 @@ class _PaymentsCard extends StatelessWidget {
   final List<PaymentModel> payments;
   final String Function(String userId) memberName;
   final ValueChanged<PaymentModel> onValidate;
+  final ValueChanged<PaymentModel> onReject;
   final ValueChanged<PaymentModel> onCancel;
 
   const _PaymentsCard({
     required this.payments,
     required this.memberName,
     required this.onValidate,
+    required this.onReject,
     required this.onCancel,
   });
 
@@ -986,6 +1041,14 @@ class _PaymentsCard extends StatelessWidget {
               children: payments.take(20).map((payment) {
                 final isPending = payment.status == 'pending';
                 final isCancelled = payment.status == 'cancelled';
+                final isRejected = payment.status == 'rejected';
+                final detailParts = [
+                  payment.methodLabel,
+                  payment.statusLabel,
+                  if (payment.reference != null) payment.reference!,
+                  if (payment.rejectionReason != null)
+                    'Motif: ${payment.rejectionReason}',
+                ];
 
                 return ListTile(
                   leading: CircleAvatar(
@@ -993,20 +1056,21 @@ class _PaymentsCard extends StatelessWidget {
                         ? Colors.orange.shade100
                         : isCancelled
                         ? Colors.red.shade100
+                        : isRejected
+                        ? Colors.deepOrange.shade100
                         : Colors.green.shade100,
                     child: Icon(
                       isPending
                           ? Icons.pending_rounded
                           : isCancelled
                           ? Icons.cancel_rounded
+                          : isRejected
+                          ? Icons.block_rounded
                           : Icons.verified_rounded,
                     ),
                   ),
                   title: Text(memberName(payment.userId)),
-                  subtitle: Text(
-                    '${payment.methodLabel} • ${payment.statusLabel}'
-                    '${payment.reference == null ? '' : ' • ${payment.reference}'}',
-                  ),
+                  subtitle: Text(detailParts.join(' - ')),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1014,12 +1078,16 @@ class _PaymentsCard extends StatelessWidget {
                         _money(payment.amount),
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                      if (payment.canValidate || payment.canCancel)
+                      if (payment.canValidate ||
+                          payment.canReject ||
+                          payment.canCancel)
                         PopupMenuButton<String>(
                           tooltip: 'Actions du paiement',
                           onSelected: (action) {
                             if (action == 'validate') {
                               onValidate(payment);
+                            } else if (action == 'reject') {
+                              onReject(payment);
                             } else if (action == 'cancel') {
                               onCancel(payment);
                             }
@@ -1031,6 +1099,17 @@ class _PaymentsCard extends StatelessWidget {
                                 child: ListTile(
                                   leading: Icon(Icons.verified_rounded),
                                   title: Text('Valider'),
+                                ),
+                              ),
+                            if (payment.canReject)
+                              const PopupMenuItem(
+                                value: 'reject',
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.block_rounded,
+                                    color: Colors.deepOrange,
+                                  ),
+                                  title: Text('Rejeter'),
                                 ),
                               ),
                             if (payment.canCancel)
