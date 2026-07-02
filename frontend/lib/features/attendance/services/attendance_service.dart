@@ -44,9 +44,11 @@ class AttendanceService {
     required String description,
     required String sessionType,
     required DateTime scheduledAt,
+    String scopeType = 'club',
     String? eventId,
     String? poleId,
     String? projectId,
+    String? groupName,
   }) async {
     final token = await _authService.getToken();
 
@@ -60,11 +62,16 @@ class AttendanceService {
       data: {
         'title': title.trim(),
         'description': description.trim(),
-        'session_type': sessionType,
+        'session_type': sessionType == 'activity'
+            ? 'field_activity'
+            : sessionType,
+        'scope_type': scopeType,
+        'group_name': groupName,
         'scheduled_at': scheduledAt.toIso8601String(),
         'event_id': eventId,
         'pole_id': poleId,
         'project_id': projectId,
+        'status': 'draft',
       },
     );
 
@@ -117,7 +124,7 @@ class AttendanceService {
     }
 
     final response = await _apiClient.get(
-      '/attendance/records/$sessionId',
+      '/attendance/sessions/$sessionId/records',
       token: token,
     );
 
@@ -185,6 +192,8 @@ class AttendanceService {
     required String userId,
     required String status,
     String? justification,
+    String? justificationStatus,
+    int? delayMinutes,
   }) async {
     final token = await _authService.getToken();
 
@@ -200,6 +209,9 @@ class AttendanceService {
         'user_id': userId,
         'status': status,
         'justification': justification,
+        'justification_reason': justification,
+        'justification_status': justificationStatus,
+        'delay_minutes': delayMinutes,
       },
     );
 
@@ -222,5 +234,25 @@ class AttendanceService {
       token: token,
       data: {},
     );
+  }
+
+  Future<AttendanceSessionModel> openSession(String sessionId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/sessions/$sessionId/open',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceSessionModel.fromJson(response);
+    }
+
+    throw Exception('RÃ©ponse invalide lors de lâ€™ouverture de la session.');
   }
 }

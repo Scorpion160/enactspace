@@ -25,6 +25,7 @@ class _AttendanceSessionDetailScreenState
 
   bool _loading = true;
   late bool _sessionClosed;
+  late String _sessionStatus;
   String? _error;
   String _statusFilter = 'all';
 
@@ -36,6 +37,7 @@ class _AttendanceSessionDetailScreenState
   void initState() {
     super.initState();
     _sessionClosed = widget.session.status == 'closed';
+    _sessionStatus = widget.session.status ?? 'draft';
     _loadDetails();
   }
 
@@ -119,9 +121,9 @@ class _AttendanceSessionDetailScreenState
   }) async {
     String? justification;
 
-    if (status.contains('absent')) {
+    if (status == 'excused' || status == 'justified_absence') {
       justification = await _askJustification(status: status);
-      if (justification == null && status == 'absent_justifie') {
+      if (justification == null || justification.trim().isEmpty) {
         return;
       }
     }
@@ -132,6 +134,7 @@ class _AttendanceSessionDetailScreenState
         userId: member.id,
         status: status,
         justification: justification,
+        justificationStatus: status == 'excused' ? 'approved' : null,
       );
 
       await _loadDetails();
@@ -167,8 +170,8 @@ class _AttendanceSessionDetailScreenState
             minLines: 2,
             maxLines: 4,
             decoration: InputDecoration(
-              labelText: status == 'absent_justifie'
-                  ? 'Motif de l’absence justifiée'
+              labelText: status == 'excused'
+                  ? 'Motif de l excuse'
                   : 'Commentaire optionnel',
               prefixIcon: const Icon(Icons.edit_note_rounded),
             ),
@@ -225,10 +228,39 @@ class _AttendanceSessionDetailScreenState
       await _loadDetails();
 
       if (!mounted) return;
-      setState(() => _sessionClosed = true);
+      setState(() {
+        _sessionClosed = true;
+        _sessionStatus = 'closed';
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Session clôturée avec succès.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openSession() async {
+    try {
+      final opened = await _attendanceService.openSession(widget.session.id);
+      await _loadDetails();
+
+      if (!mounted) return;
+      setState(() {
+        _sessionClosed = false;
+        _sessionStatus = opened.status ?? 'open';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Appel ouvert avec succes.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -271,6 +303,8 @@ class _AttendanceSessionDetailScreenState
             _SessionHeader(
               session: widget.session,
               isClosed: _sessionClosed,
+              status: _sessionStatus,
+              onOpen: _openSession,
               onClose: _closeSession,
             ),
             const SizedBox(height: 20),
@@ -335,20 +369,15 @@ class _AttendanceSessionDetailScreenState
   }
 
   int get _lateCount {
-    return _records.where((r) => r.status == 'retard').length;
+    return _records.where((r) => r.isLate).length;
   }
 
   int get _justifiedAbsenceCount {
-    return _records.where((r) {
-      return r.status == 'absent_justifie' || r.status == 'absence_justifiee';
-    }).length;
+    return _records.where((r) => r.isJustifiedAbsence || r.isExcused).length;
   }
 
   int get _unjustifiedAbsenceCount {
-    return _records.where((r) {
-      return r.status == 'absent_non_justifie' ||
-          r.status == 'absence_non_justifiee';
-    }).length;
+    return _records.where((r) => r.isAbsent).length;
   }
 
   int get _notFilledCount {
@@ -386,13 +415,10 @@ class _AttendanceSessionDetailScreenState
         'all' => true,
         'not_filled' => record == null,
         'present' => record?.status == 'present',
-        'late' => record?.status == 'retard',
+        'late' => record?.isLate == true,
         'justified' =>
-          record?.status == 'absent_justifie' ||
-              record?.status == 'absence_justifiee',
-        'unjustified' =>
-          record?.status == 'absent_non_justifie' ||
-              record?.status == 'absence_non_justifiee',
+          record?.isJustifiedAbsence == true || record?.isExcused == true,
+        'unjustified' => record?.isAbsent == true,
         _ => true,
       };
 
@@ -404,11 +430,15 @@ class _AttendanceSessionDetailScreenState
 class _SessionHeader extends StatelessWidget {
   final AttendanceSessionModel session;
   final bool isClosed;
+  final String status;
+  final VoidCallback onOpen;
   final VoidCallback onClose;
 
   const _SessionHeader({
     required this.session,
     required this.isClosed,
+    required this.status,
+    required this.onOpen,
     required this.onClose,
   });
 
@@ -471,12 +501,26 @@ class _SessionHeader extends StatelessWidget {
             label: Text(isClosed ? 'Clôturée' : 'Clôturer'),
           );
 
+          final actionButtons = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: isClosed || status == 'open' ? null : onOpen,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Ouvrir'),
+              ),
+              closeButton,
+            ],
+          );
+
           if (isWide) {
             return Row(
               children: [
                 Expanded(child: identity),
                 const SizedBox(width: 16),
-                closeButton,
+                actionButtons,
               ],
             );
           }
@@ -486,7 +530,7 @@ class _SessionHeader extends StatelessWidget {
             children: [
               identity,
               const SizedBox(height: 16),
-              Align(alignment: Alignment.centerRight, child: closeButton),
+              Align(alignment: Alignment.centerRight, child: actionButtons),
             ],
           );
         },
@@ -951,7 +995,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                           ? null
                           : () => onMarkAttendance(
                               member: member,
-                              status: 'retard',
+                              status: 'late',
                             ),
                       child: const Text('Retard'),
                     ),
@@ -960,18 +1004,18 @@ class _ExpectedMembersCard extends StatelessWidget {
                           ? null
                           : () => onMarkAttendance(
                               member: member,
-                              status: 'absent_justifie',
+                              status: 'absent',
                             ),
-                      child: const Text('Abs. justifiée'),
+                      child: const Text('Absent'),
                     ),
                     OutlinedButton(
                       onPressed: sessionClosed
                           ? null
                           : () => onMarkAttendance(
                               member: member,
-                              status: 'absent_non_justifie',
+                              status: 'excused',
                             ),
-                      child: const Text('Abs. non justifiée'),
+                      child: const Text('Excuse'),
                     ),
                   ],
                 );

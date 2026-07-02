@@ -3,6 +3,8 @@ class AttendanceSessionModel {
   final String title;
   final String? description;
   final String? sessionType;
+  final String scopeType;
+  final String? groupName;
   final String? status;
   final String? scheduledAt;
   final String? startTime;
@@ -12,12 +14,16 @@ class AttendanceSessionModel {
   final String? projectId;
   final String? qrToken;
   final bool canManage;
+  final int expectedCount;
+  final int recordedCount;
 
   const AttendanceSessionModel({
     required this.id,
     required this.title,
     this.description,
     this.sessionType,
+    this.scopeType = 'club',
+    this.groupName,
     this.status,
     this.scheduledAt,
     this.startTime,
@@ -27,6 +33,8 @@ class AttendanceSessionModel {
     this.projectId,
     this.qrToken,
     required this.canManage,
+    this.expectedCount = 0,
+    this.recordedCount = 0,
   });
 
   factory AttendanceSessionModel.fromJson(Map<String, dynamic> json) {
@@ -39,6 +47,8 @@ class AttendanceSessionModel {
       title: json['title']?.toString() ?? 'Session sans titre',
       description: json['description']?.toString(),
       sessionType: json['session_type']?.toString(),
+      scopeType: json['scope_type']?.toString() ?? _deriveScope(json),
+      groupName: json['group_name']?.toString(),
       status:
           json['status']?.toString() ??
           _deriveStatus(
@@ -54,23 +64,47 @@ class AttendanceSessionModel {
       projectId: json['project_id']?.toString(),
       qrToken: json['qr_token']?.toString(),
       canManage: json['can_manage'] == true,
+      expectedCount:
+          int.tryParse(json['expected_count']?.toString() ?? '') ?? 0,
+      recordedCount:
+          int.tryParse(json['recorded_count']?.toString() ?? '') ?? 0,
     );
   }
 
   String get typeLabel {
     switch (sessionType) {
       case 'general_meeting':
-        return 'Réunion générale';
+        return 'Reunion generale';
       case 'pole_meeting':
-        return 'Réunion pôle';
+        return 'Reunion pole';
       case 'project_meeting':
-        return 'Réunion projet';
+        return 'Reunion projet';
       case 'training':
         return 'Formation';
+      case 'field_activity':
       case 'activity':
-        return 'Activité';
+        return 'Activite terrain';
+      case 'event':
+        return 'Evenement';
+      case 'exceptional':
+        return 'Seance exceptionnelle';
       default:
         return sessionType ?? 'Session';
+    }
+  }
+
+  String get scopeLabel {
+    switch (scopeType) {
+      case 'club':
+        return 'Tout le club';
+      case 'pole':
+        return 'Pole';
+      case 'project':
+        return 'Projet';
+      case 'group':
+        return groupName ?? 'Groupe';
+      default:
+        return scopeType;
     }
   }
 
@@ -79,11 +113,15 @@ class AttendanceSessionModel {
       case 'open':
         return 'Ouverte';
       case 'closed':
-        return 'Clôturée';
+        return 'Cloturee';
+      case 'draft':
+        return 'Brouillon';
+      case 'archived':
+        return 'Archivee';
       case 'scheduled':
-        return 'Planifiée';
+        return 'Planifiee';
       default:
-        return status ?? 'Non défini';
+        return status ?? 'Non defini';
     }
   }
 
@@ -91,10 +129,10 @@ class AttendanceSessionModel {
     final raw = scheduledAt ?? startTime;
 
     if (raw == null || raw.isEmpty) {
-      return 'Date non définie';
+      return 'Date non definie';
     }
 
-    final date = DateTime.tryParse(raw);
+    final date = DateTime.tryParse(raw)?.toLocal();
 
     if (date == null) {
       return raw;
@@ -106,8 +144,14 @@ class AttendanceSessionModel {
     final hour = date.hour.toString().padLeft(2, '0');
     final minute = date.minute.toString().padLeft(2, '0');
 
-    return '$day/$month/$year à $hour:$minute';
+    return '$day/$month/$year a $hour:$minute';
   }
+}
+
+String _deriveScope(Map<String, dynamic> json) {
+  if (json['project_id'] != null) return 'project';
+  if (json['pole_id'] != null) return 'pole';
+  return 'club';
 }
 
 String _deriveStatus({

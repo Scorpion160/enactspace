@@ -5,6 +5,10 @@ import '../../../core/theme/app_theme.dart';
 import '../models/attendance_record_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import 'attendance_session_detail_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -254,10 +258,8 @@ class _PersonalAttendanceView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final present = records
-        .where((record) => record.status == 'present')
-        .length;
-    final late = records.where((record) => record.status == 'retard').length;
+    final present = records.where((record) => record.isPresent).length;
+    final late = records.where((record) => record.isLate).length;
     final justified = records.where(_isJustifiedAbsence).length;
     final absent = records.where(_isUnjustifiedAbsence).length;
     final attended = present + late;
@@ -502,35 +504,35 @@ class _EmptyPersonalAttendance extends StatelessWidget {
 }
 
 bool _isJustifiedAbsence(AttendanceRecordModel record) {
-  return record.status == 'absent_justifie' ||
-      record.status == 'absence_justifiee';
+  return record.isJustifiedAbsence || record.isExcused;
 }
 
 bool _isUnjustifiedAbsence(AttendanceRecordModel record) {
-  return record.status == 'absent_non_justifie' ||
-      record.status == 'absence_non_justifiee';
+  return record.isAbsent;
 }
 
 Color _attendanceStatusColor(String status) {
   if (status == 'present') return Colors.green.shade700;
-  if (status == 'retard') return Colors.orange.shade800;
+  if (status == 'late') return Colors.orange.shade800;
   if (_isJustifiedStatus(status)) return Colors.blue.shade700;
   return Colors.red.shade700;
 }
 
 IconData _attendanceStatusIcon(String status) {
   if (status == 'present') return Icons.check_rounded;
-  if (status == 'retard') return Icons.schedule_rounded;
+  if (status == 'late') return Icons.schedule_rounded;
   if (_isJustifiedStatus(status)) return Icons.verified_rounded;
   return Icons.close_rounded;
 }
 
 bool _isJustifiedStatus(String status) {
-  return status == 'absent_justifie' || status == 'absence_justifiee';
+  return status == 'justified_absence' || status == 'excused';
 }
 
 String _recordDateLabel(AttendanceRecordModel record) {
-  final date = DateTime.tryParse(record.checkinTime ?? '');
+  final date = DateTime.tryParse(
+    record.arrivalTime ?? record.checkinTime ?? '',
+  );
   if (date == null) return 'Date non disponible';
 
   final day = date.day.toString().padLeft(2, '0');
@@ -966,6 +968,8 @@ class CreateAttendanceSessionDialog extends StatefulWidget {
 class _CreateAttendanceSessionDialogState
     extends State<CreateAttendanceSessionDialog> {
   final _formKey = GlobalKey<FormState>();
+  final PolesService _polesService = PolesService();
+  final ProjectsService _projectsService = ProjectsService();
 
   final _titleController = TextEditingController(text: 'Réunion générale');
   final _descriptionController = TextEditingController(
@@ -973,17 +977,51 @@ class _CreateAttendanceSessionDialogState
   );
 
   String _sessionType = 'general_meeting';
+  String _scopeType = 'club';
+  String? _selectedPoleId;
+  String? _selectedProjectId;
   DateTime _scheduledAt = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _scheduledTime = const TimeOfDay(hour: 15, minute: 0);
 
   bool _loading = false;
+  bool _loadingScopes = true;
   String? _error;
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScopes();
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadScopes() async {
+    try {
+      final results = await Future.wait([
+        _polesService.getPoles(),
+        _projectsService.getProjects(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _poles = results[0] as List<PoleModel>;
+        _projects = results[1] as List<ProjectModel>;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _poles = [];
+        _projects = [];
+      });
+    } finally {
+      if (mounted) setState(() => _loadingScopes = false);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -1029,6 +1067,14 @@ class _CreateAttendanceSessionDialogState
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_scopeType == 'pole' && _selectedPoleId == null) {
+      setState(() => _error = 'Choisis le pole concerne.');
+      return;
+    }
+    if (_scopeType == 'project' && _selectedProjectId == null) {
+      setState(() => _error = 'Choisis le projet concerne.');
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -1040,7 +1086,10 @@ class _CreateAttendanceSessionDialogState
         title: _titleController.text,
         description: _descriptionController.text,
         sessionType: _sessionType,
+        scopeType: _scopeType,
         scheduledAt: _scheduledAt,
+        poleId: _scopeType == 'pole' ? _selectedPoleId : null,
+        projectId: _scopeType == 'project' ? _selectedProjectId : null,
       );
 
       if (!mounted) return;
@@ -1158,6 +1207,93 @@ class _CreateAttendanceSessionDialogState
                           });
                         },
                 ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _scopeType,
+                  decoration: const InputDecoration(
+                    labelText: 'Perimetre',
+                    prefixIcon: Icon(Icons.groups_2_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'club',
+                      child: Text('Tout le club'),
+                    ),
+                    DropdownMenuItem(value: 'pole', child: Text('Pole')),
+                    DropdownMenuItem(value: 'project', child: Text('Projet')),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _scopeType = value;
+                            if (value == 'club') {
+                              _sessionType = 'general_meeting';
+                              _selectedPoleId = null;
+                              _selectedProjectId = null;
+                            } else if (value == 'pole') {
+                              _sessionType = 'pole_meeting';
+                              _selectedProjectId = null;
+                            } else if (value == 'project') {
+                              _sessionType = 'project_meeting';
+                              _selectedPoleId = null;
+                            }
+                          });
+                        },
+                ),
+                if (_scopeType == 'pole') ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedPoleId,
+                    decoration: InputDecoration(
+                      labelText: _loadingScopes
+                          ? 'Chargement des poles...'
+                          : 'Pole concerne',
+                      prefixIcon: const Icon(Icons.hub_rounded),
+                    ),
+                    items: _poles
+                        .map(
+                          (pole) => DropdownMenuItem(
+                            value: pole.id,
+                            child: Text(
+                              pole.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(() => _selectedPoleId = value),
+                  ),
+                ],
+                if (_scopeType == 'project') ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedProjectId,
+                    decoration: InputDecoration(
+                      labelText: _loadingScopes
+                          ? 'Chargement des projets...'
+                          : 'Projet concerne',
+                      prefixIcon: const Icon(Icons.rocket_launch_rounded),
+                    ),
+                    items: _projects
+                        .map(
+                          (project) => DropdownMenuItem(
+                            value: project.id,
+                            child: Text(
+                              project.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(() => _selectedProjectId = value),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Card(
                   child: Padding(
