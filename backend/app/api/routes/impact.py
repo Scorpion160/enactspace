@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_enacchef_or_admin
+from app.api.deps import require_admin_or_team_leader, require_enacchef_or_admin
 from app.core.roles import ENACCHEF_ROLES
 from app.db.database import get_db
 from app.models.document import Document
@@ -25,8 +25,9 @@ from app.schemas.impact import (
     ImpactProjectCreate,
     ImpactProjectRead,
     ImpactProjectUpdate,
+    ImpactValidationRequest,
 )
-from app.services.notification_service import notify_users
+from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
@@ -157,6 +158,40 @@ def _validate_linked_metric(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Indicateur lie invalide pour cette fiche impact",
         )
+
+
+def _require_rejection_reason(payload: ImpactValidationRequest) -> str:
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de rejet est obligatoire",
+        )
+    return reason
+
+
+def _notify_impact_author(
+    db: Session,
+    *,
+    user_id,
+    title: str,
+    message: str,
+    notification_type: str,
+    related_type: str,
+    related_id,
+) -> None:
+    if user_id is None:
+        return
+    notify_user(
+        db,
+        user_id=user_id,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_type=related_type,
+        related_id=related_id,
+        dedupe=True,
+    )
 
 
 def _status_progress(status: str | None) -> float:
@@ -478,6 +513,60 @@ def update_impact_record(
     return impact_project
 
 
+@router.post("/records/{impact_project_id}/validate", response_model=ImpactProjectRead)
+def validate_impact_record(
+    impact_project_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    impact_project = _get_impact_project_or_404(db, impact_project_id)
+    impact_project.status = "validated"
+    impact_project.validated_by_id = current_user.id
+    impact_project.validated_at = datetime.utcnow()
+    impact_project.rejection_reason = None
+    impact_project.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=impact_project.created_by_id,
+        title="Impact valide",
+        message=f"{impact_project.title} a ete valide.",
+        notification_type="impact_validated",
+        related_type="impact_project",
+        related_id=impact_project.id,
+    )
+    db.commit()
+    db.refresh(impact_project)
+    return impact_project
+
+
+@router.post("/records/{impact_project_id}/reject", response_model=ImpactProjectRead)
+def reject_impact_record(
+    impact_project_id: str,
+    payload: ImpactValidationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    impact_project = _get_impact_project_or_404(db, impact_project_id)
+    reason = _require_rejection_reason(payload)
+    impact_project.status = "rejected"
+    impact_project.validated_by_id = current_user.id
+    impact_project.validated_at = datetime.utcnow()
+    impact_project.rejection_reason = reason
+    impact_project.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=impact_project.created_by_id,
+        title="Impact refuse",
+        message=f"{impact_project.title} a ete refuse: {reason}",
+        notification_type="impact_rejected",
+        related_type="impact_project",
+        related_id=impact_project.id,
+    )
+    db.commit()
+    db.refresh(impact_project)
+    return impact_project
+
+
 @router.get(
     "/records/{impact_project_id}/metrics",
     response_model=list[ImpactMetricRead],
@@ -538,6 +627,70 @@ def create_impact_metric(
     return metric
 
 
+@router.post("/metrics/{metric_id}/validate", response_model=ImpactMetricRead)
+def validate_impact_metric(
+    metric_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    metric = db.query(ImpactMetric).filter(ImpactMetric.id == metric_id).first()
+    if not metric:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Indicateur impact introuvable",
+        )
+    metric.status = "validated"
+    metric.validated_by_id = current_user.id
+    metric.validated_at = datetime.utcnow()
+    metric.rejection_reason = None
+    metric.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=metric.created_by_id,
+        title="Indicateur impact valide",
+        message=f"{metric.title} a ete valide.",
+        notification_type="impact_metric_validated",
+        related_type="impact_metric",
+        related_id=metric.id,
+    )
+    db.commit()
+    db.refresh(metric)
+    return metric
+
+
+@router.post("/metrics/{metric_id}/reject", response_model=ImpactMetricRead)
+def reject_impact_metric(
+    metric_id: str,
+    payload: ImpactValidationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    metric = db.query(ImpactMetric).filter(ImpactMetric.id == metric_id).first()
+    if not metric:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Indicateur impact introuvable",
+        )
+    reason = _require_rejection_reason(payload)
+    metric.status = "rejected"
+    metric.validated_by_id = current_user.id
+    metric.validated_at = datetime.utcnow()
+    metric.rejection_reason = reason
+    metric.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=metric.created_by_id,
+        title="Indicateur impact refuse",
+        message=f"{metric.title} a ete refuse: {reason}",
+        notification_type="impact_metric_rejected",
+        related_type="impact_metric",
+        related_id=metric.id,
+    )
+    db.commit()
+    db.refresh(metric)
+    return metric
+
+
 @router.get(
     "/records/{impact_project_id}/evidence",
     response_model=list[ImpactEvidenceRead],
@@ -592,6 +745,74 @@ def create_impact_evidence(
         related_id=evidence.id,
     )
 
+    db.commit()
+    db.refresh(evidence)
+    return evidence
+
+
+@router.post("/evidence/{evidence_id}/validate", response_model=ImpactEvidenceRead)
+def validate_impact_evidence(
+    evidence_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    evidence = (
+        db.query(ImpactEvidence).filter(ImpactEvidence.id == evidence_id).first()
+    )
+    if not evidence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preuve impact introuvable",
+        )
+    evidence.status = "validated"
+    evidence.validated_by_id = current_user.id
+    evidence.validated_at = datetime.utcnow()
+    evidence.rejection_reason = None
+    evidence.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=evidence.submitted_by_id,
+        title="Preuve impact validee",
+        message=f"{evidence.title} a ete validee.",
+        notification_type="impact_evidence_validated",
+        related_type="impact_evidence",
+        related_id=evidence.id,
+    )
+    db.commit()
+    db.refresh(evidence)
+    return evidence
+
+
+@router.post("/evidence/{evidence_id}/reject", response_model=ImpactEvidenceRead)
+def reject_impact_evidence(
+    evidence_id: str,
+    payload: ImpactValidationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_team_leader),
+):
+    evidence = (
+        db.query(ImpactEvidence).filter(ImpactEvidence.id == evidence_id).first()
+    )
+    if not evidence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preuve impact introuvable",
+        )
+    reason = _require_rejection_reason(payload)
+    evidence.status = "rejected"
+    evidence.validated_by_id = current_user.id
+    evidence.validated_at = datetime.utcnow()
+    evidence.rejection_reason = reason
+    evidence.updated_at = datetime.utcnow()
+    _notify_impact_author(
+        db,
+        user_id=evidence.submitted_by_id,
+        title="Preuve impact refusee",
+        message=f"{evidence.title} a ete refusee: {reason}",
+        notification_type="impact_evidence_rejected",
+        related_type="impact_evidence",
+        related_id=evidence.id,
+    )
     db.commit()
     db.refresh(evidence)
     return evidence
