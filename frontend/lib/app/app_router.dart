@@ -20,6 +20,7 @@ import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/projects_screen.dart';
 import '../features/recruitment/screens/recruitment_screen.dart';
 import '../features/recruitment/screens/application_tracking_screen.dart';
+import '../features/splash/screens/splash_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../shared/layout/app_shell.dart';
 
@@ -27,13 +28,18 @@ class AppRouter {
   static final AuthService _authService = AuthService();
 
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     redirect: (context, state) async {
       final loggedIn = await _authService.isLoggedIn();
       final publicPath =
+          state.matchedLocation == '/splash' ||
           state.matchedLocation == '/login' ||
           state.matchedLocation == '/application-tracking';
       final goingToLogin = state.matchedLocation == '/login';
+
+      if (state.matchedLocation == '/splash') {
+        return null;
+      }
 
       if (!loggedIn && !publicPath) {
         return '/login';
@@ -62,6 +68,10 @@ class AppRouter {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/application-tracking',
