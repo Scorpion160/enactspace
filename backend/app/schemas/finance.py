@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import date, datetime
 from typing import Optional
@@ -17,6 +17,25 @@ class FeeCreate(BaseModel):
     source_type: Optional[str] = None
     source_id: Optional[UUID] = None
     proof_file_id: Optional[UUID] = None
+
+
+class FeeBulkCreate(BaseModel):
+    scope_type: str = "club"
+    user_ids: list[UUID] = Field(default_factory=list)
+    pole_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    season_id: Optional[UUID] = None
+    type: str = "membership_fee"
+    category: Optional[str] = None
+    label: str
+    description: Optional[str] = None
+    amount: float
+    currency: str = "FCFA"
+    due_date: Optional[date] = None
+
+
+class FeeCancelRequest(BaseModel):
+    reason: str
 
 
 class FeeRead(BaseModel):

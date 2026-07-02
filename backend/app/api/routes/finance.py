@@ -14,6 +14,8 @@ from app.models.finance import (
     PaymentAllocation,
     ClubTransaction,
 )
+from app.models.pole import PoleMember
+from app.models.project import ProjectMember
 from app.models.role import Role, UserRole
 from app.models.user import User
 from app.schemas.finance import (
@@ -25,6 +27,8 @@ from app.schemas.finance import (
     PaymentAllocationRead,
     ClubTransactionCreate,
     ClubTransactionRead,
+    FeeBulkCreate,
+    FeeCancelRequest,
 )
 from app.api.deps import (
     get_current_active_validated_user,
@@ -49,6 +53,17 @@ VALID_FEE_STATUSES = {
     "partial",
     "paid",
     "cancelled",
+}
+VALID_FEE_TYPES = {
+    "membership_fee",
+    "attendance_penalty",
+    "late_penalty",
+    "manual_penalty",
+    "contribution",
+    "adjustment",
+    "penalite_retard",
+    "penalite_absence",
+    "penalty",
 }
 
 FINANCE_MANAGER_ROLES = {"administrateur", "team_leader", "financier"}
@@ -221,6 +236,145 @@ def create_fee(
     return fee
 
 
+@router.post("/fees/bulk", response_model=list[FeeRead])
+def create_bulk_fees(
+    payload: FeeBulkCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    label = payload.label.strip()
+    if not label:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le libelle est obligatoire",
+        )
+
+    user_ids = target_user_ids_for_fee_scope(db, payload)
+    if not user_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucun membre trouve pour ce perimetre",
+        )
+
+    fees = []
+    source_label = "_".join(label.lower().split())[:40]
+    source_type = f"bulk_{payload.scope_type}_{payload.type}_{source_label}"[:80]
+    source_id = (
+        payload.pole_id
+        or payload.project_id
+        or payload.season_id
+        or current_user.id
+    )
+    for user_id in user_ids:
+        fees.append(
+            create_fee_record(
+                db,
+                user_id=user_id,
+                current_user=current_user,
+                season_id=payload.season_id,
+                fee_type=payload.type,
+                category=payload.category,
+                label=label,
+                description=payload.description,
+                amount=payload.amount,
+                currency=payload.currency,
+                due_date=payload.due_date,
+                source_type=source_type,
+                source_id=source_id,
+            )
+        )
+    db.commit()
+    for fee in fees:
+        db.refresh(fee)
+    return fees
+
+
+@router.post("/penalties", response_model=FeeRead)
+def create_manual_penalty(
+    payload: FeeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    fee = create_fee_record(
+        db,
+        user_id=payload.user_id,
+        current_user=current_user,
+        season_id=payload.season_id,
+        fee_type="manual_penalty",
+        category=payload.category or "manual_penalty",
+        label=payload.label,
+        description=payload.description,
+        amount=payload.amount,
+        currency=payload.currency,
+        due_date=payload.due_date,
+        source_type=payload.source_type or "manual_penalty",
+        source_id=payload.source_id,
+        proof_file_id=payload.proof_file_id,
+    )
+    db.commit()
+    db.refresh(fee)
+    return fee
+
+
+@router.post("/fees/{fee_id}/cancel", response_model=FeeRead)
+def cancel_fee(
+    fee_id: str,
+    payload: FeeCancelRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    fee = db.query(Fee).filter(Fee.id == fee_id).first()
+    if not fee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Frais introuvable",
+        )
+    if fee.status == "paid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible d'annuler un frais deja paye",
+        )
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif d'annulation est obligatoire",
+        )
+    old_status = fee.status
+    remaining = max(0, float(fee.amount or 0) - float(fee.amount_paid or 0))
+    fee.status = "cancelled"
+    fee.cancelled_at = datetime.utcnow()
+    fee.description = f"{fee.description or ''}\nAnnulation: {reason}".strip()
+    fee.updated_at = datetime.utcnow()
+    account = ensure_financial_account(db, fee.user_id)
+    account.balance_due = max(0, float(account.balance_due or 0) - remaining)
+    account.updated_at = datetime.utcnow()
+    notify_user(
+        db,
+        user_id=fee.user_id,
+        title="Montant annule",
+        message=f"{fee.label} a ete annule: {reason}",
+        notification_type="fee_cancelled",
+        related_type="fee",
+        related_id=fee.id,
+        dedupe=True,
+    )
+    create_audit_log(
+        db=db,
+        action="annulation_frais",
+        user_id=current_user.id,
+        entity_type="fee",
+        entity_id=fee.id,
+        old_value={"status": old_status},
+        new_value={"status": fee.status, "reason": reason},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(fee)
+    return fee
+
+
 @router.get("/fees", response_model=list[FeeRead])
 def list_fees(
     db: Session = Depends(get_db),
@@ -270,6 +424,137 @@ def get_user_financial_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def display_user(user: User | None) -> str:
+    if user is None:
+        return ""
+    value = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    return value or user.email
+
+
+def target_user_ids_for_fee_scope(db: Session, payload: FeeBulkCreate) -> list:
+    if payload.scope_type == "members":
+        return list(dict.fromkeys(payload.user_ids))
+    if payload.scope_type == "pole" and payload.pole_id:
+        return [
+            row[0]
+            for row in db.query(PoleMember.user_id)
+            .filter(
+                PoleMember.pole_id == payload.pole_id,
+                PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
+            )
+            .all()
+        ]
+    if payload.scope_type == "project" and payload.project_id:
+        return [
+            row[0]
+            for row in db.query(ProjectMember.user_id)
+            .filter(
+                ProjectMember.project_id == payload.project_id,
+                ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
+            )
+            .all()
+        ]
+    if payload.scope_type == "club":
+        return [
+            row[0]
+            for row in db.query(User.id)
+            .filter(User.is_active.is_(True), User.status == "active")
+            .all()
+        ]
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Perimetre de cotisation invalide",
+    )
+
+
+def create_fee_record(
+    db: Session,
+    *,
+    user_id,
+    current_user: User,
+    season_id=None,
+    fee_type: str,
+    category: str | None,
+    label: str,
+    description: str | None,
+    amount: float,
+    currency: str,
+    due_date=None,
+    source_type: str | None = None,
+    source_id=None,
+    related_attendance_id=None,
+    proof_file_id=None,
+) -> Fee:
+    if amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le montant doit etre superieur a zero",
+        )
+    if fee_type not in VALID_FEE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de frais invalide",
+        )
+    if related_attendance_id:
+        existing = (
+            db.query(Fee)
+            .filter(Fee.related_attendance_id == related_attendance_id)
+            .first()
+        )
+        if existing:
+            return existing
+    if source_type and source_id:
+        existing = (
+            db.query(Fee)
+            .filter(
+                Fee.user_id == user_id,
+                Fee.source_type == source_type,
+                Fee.source_id == source_id,
+                Fee.status != "cancelled",
+            )
+            .first()
+        )
+        if existing:
+            return existing
+
+    fee = Fee(
+        user_id=user_id,
+        season_id=season_id,
+        type=fee_type,
+        category=category,
+        label=label,
+        description=description,
+        amount=amount,
+        currency=currency,
+        amount_paid=0,
+        status="unpaid",
+        due_date=due_date,
+        related_attendance_id=related_attendance_id,
+        source_type=source_type,
+        source_id=source_id,
+        proof_file_id=proof_file_id,
+        created_by=current_user.id,
+    )
+    account = ensure_financial_account(db, user_id)
+    account.balance_due = float(account.balance_due or 0) + amount
+    account.updated_at = datetime.utcnow()
+    db.add(fee)
+    db.flush()
+    notify_user(
+        db,
+        user_id=user_id,
+        title="Nouveau montant a payer",
+        message=f"{label}: {amount:.0f} {currency}.",
+        notification_type="fee_due",
+        related_type="fee",
+        related_id=fee.id,
+        dedupe=True,
+    )
+    return fee
 
 
 @router.get("/accounts/me", response_model=FinancialAccountRead)
