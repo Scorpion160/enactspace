@@ -705,15 +705,17 @@ def _records_query_for_user(db: Session, current_user: User):
     if _is_alumni(db, current_user):
         return query.filter(False)
 
-    visible_session_ids = _session_query_for_user(db, current_user).with_entities(
-        AttendanceSession.id
-    )
-    return query.filter(
-        or_(
-            AttendanceRecord.user_id == current_user.id,
-            AttendanceRecord.session_id.in_(visible_session_ids),
-        )
-    )
+    filters = [
+        AttendanceRecord.user_id == current_user.id,
+        AttendanceSession.created_by == current_user.id,
+    ]
+    managed_poles = _managed_pole_ids(db, current_user)
+    managed_projects = _managed_project_ids(db, current_user)
+    if managed_poles:
+        filters.append(AttendanceSession.pole_id.in_(managed_poles))
+    if managed_projects:
+        filters.append(AttendanceSession.project_id.in_(managed_projects))
+    return query.filter(or_(*filters))
 
 
 def _apply_report_filters(

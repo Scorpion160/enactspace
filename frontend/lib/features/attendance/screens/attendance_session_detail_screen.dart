@@ -731,9 +731,17 @@ class _ActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = (MediaQuery.sizeOf(context).width - 96).clamp(
+      120.0,
+      240.0,
+    );
+
     return Chip(
       avatar: Icon(icon, size: 16),
-      label: Text(label),
+      label: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
       backgroundColor: AppTheme.enactusYellow.withAlpha(40),
       side: BorderSide(color: AppTheme.enactusYellow.withAlpha(120)),
     );

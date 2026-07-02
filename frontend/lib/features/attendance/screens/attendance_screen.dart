@@ -1204,9 +1204,17 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = (MediaQuery.sizeOf(context).width - 96).clamp(
+      120.0,
+      260.0,
+    );
+
     return Chip(
       avatar: Icon(icon, size: 16, color: color),
-      label: Text(label),
+      label: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
       backgroundColor: color?.withAlpha(24),
       side: color == null ? null : BorderSide(color: color!.withAlpha(80)),
     );
