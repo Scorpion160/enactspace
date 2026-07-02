@@ -28,6 +28,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   UserExperience? _user;
   List<AttendanceSessionModel> _sessions = [];
   List<AttendanceRecordModel> _myRecords = [];
+  Map<String, dynamic>? _stats;
   String _view = 'personal';
   bool _viewInitialized = false;
   String _statusFilter = 'all';
@@ -60,14 +61,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
       if (!mounted) return;
 
+      final user = UserExperience.fromJson(results[0] as Map<String, dynamic>);
+      Map<String, dynamic>? stats;
+      if (user.canManageAttendance) {
+        try {
+          stats = await _attendanceService.getStats();
+        } catch (_) {
+          stats = null;
+        }
+      }
+
       setState(() {
-        _user = UserExperience.fromJson(results[0] as Map<String, dynamic>);
+        _user = user;
         _sessions = results[1] as List<AttendanceSessionModel>;
         _myRecords = results[2] as List<AttendanceRecordModel>;
+        _stats = stats;
         if (!_viewInitialized) {
-          _view = _user?.canManageAttendance == true
-              ? 'management'
-              : 'personal';
+          _view = user.canManageAttendance ? 'management' : 'personal';
           _viewInitialized = true;
         }
       });
@@ -253,6 +263,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         onCreate: _openCreateSessionDialog,
       ),
       const SizedBox(height: 22),
+      if (_stats != null) ...[
+        _AttendanceStatsOverview(stats: _stats!),
+        const SizedBox(height: 18),
+      ],
       _AttendanceFiltersCard(
         controller: _searchController,
         statusFilter: _statusFilter,
@@ -300,6 +314,164 @@ class _AttendanceViewSwitch extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AttendanceStatsOverview extends StatelessWidget {
+  final Map<String, dynamic> stats;
+
+  const _AttendanceStatsOverview({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _OverviewItem(
+        label: 'Seances',
+        value: _value('sessions_count'),
+        icon: Icons.event_available_rounded,
+      ),
+      _OverviewItem(
+        label: 'Presents',
+        value: _value('present'),
+        icon: Icons.check_circle_rounded,
+      ),
+      _OverviewItem(
+        label: 'Retards',
+        value: _value('late'),
+        icon: Icons.schedule_rounded,
+      ),
+      _OverviewItem(
+        label: 'Absences',
+        value: _value('unjustified_absences'),
+        icon: Icons.warning_rounded,
+      ),
+      _OverviewItem(
+        label: 'Taux',
+        value: '${_value('attendance_rate')}%',
+        icon: Icons.insights_rounded,
+      ),
+      _OverviewItem(
+        label: 'Sanctions',
+        value: '${_value('sanctions_potential')} FCFA',
+        icon: Icons.payments_rounded,
+      ),
+    ];
+    final watch = stats['members_to_watch'];
+    final watchCount = watch is List ? watch.length : 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.analytics_rounded),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Statistiques du mois',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final count = width >= 980
+                    ? 6
+                    : width >= 720
+                    ? 3
+                    : width >= 460
+                    ? 2
+                    : 1;
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: count,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 2.4,
+                  ),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(10),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(item.icon),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.value,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  item.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            if (watchCount > 0) ...[
+              const SizedBox(height: 12),
+              Chip(
+                avatar: const Icon(Icons.visibility_rounded, size: 16),
+                label: Text('$watchCount membre(s) a surveiller'),
+                backgroundColor: Colors.orange.shade50,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _value(String key) {
+    final value = stats[key];
+    if (value is num) {
+      return value % 1 == 0 ? value.toInt().toString() : value.toString();
+    }
+    return value?.toString() ?? '0';
+  }
+}
+
+class _OverviewItem {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _OverviewItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 }
 
 class _PersonalAttendanceView extends StatelessWidget {

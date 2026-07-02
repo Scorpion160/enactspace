@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -693,6 +693,115 @@ def _compute_checkin_status(session: AttendanceSession, now: datetime) -> str:
     return "late" if now > late_limit else "present"
 
 
+def _records_query_for_user(db: Session, current_user: User):
+    query = db.query(AttendanceRecord).join(
+        AttendanceSession,
+        AttendanceSession.id == AttendanceRecord.session_id,
+    )
+    if _is_global_attendance_manager(db, current_user):
+        return query
+    if _is_alumni(db, current_user):
+        return query.filter(False)
+
+    visible_session_ids = _session_query_for_user(db, current_user).with_entities(
+        AttendanceSession.id
+    )
+    return query.filter(
+        or_(
+            AttendanceRecord.user_id == current_user.id,
+            AttendanceRecord.session_id.in_(visible_session_ids),
+        )
+    )
+
+
+def _apply_report_filters(
+    query,
+    *,
+    month: str | None,
+    pole_id: str | None,
+    project_id: str | None,
+    member_id: str | None,
+    session_type: str | None,
+):
+    if month:
+        try:
+            start = datetime.strptime(month, "%Y-%m")
+            end = datetime(start.year + (1 if start.month == 12 else 0), 1, 1)
+            if start.month < 12:
+                end = datetime(start.year, start.month + 1, 1)
+            query = query.filter(
+                AttendanceSession.scheduled_at >= start,
+                AttendanceSession.scheduled_at < end,
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le mois doit etre au format YYYY-MM",
+            )
+    if pole_id:
+        query = query.filter(AttendanceSession.pole_id == pole_id)
+    if project_id:
+        query = query.filter(AttendanceSession.project_id == project_id)
+    if member_id:
+        query = query.filter(AttendanceRecord.user_id == member_id)
+    if session_type:
+        query = query.filter(AttendanceSession.session_type == session_type)
+    return query
+
+
+def _attendance_stats_from_records(db: Session, records: list[AttendanceRecord]) -> dict:
+    session_ids = {record.session_id for record in records}
+    present = sum(1 for record in records if record.status == "present")
+    late = sum(1 for record in records if record.status == "late")
+    absent = sum(1 for record in records if record.status == "absent")
+    justified = sum(
+        1
+        for record in records
+        if record.status in {"justified_absence", "excused"}
+        or record.justification_status == "approved"
+    )
+    attended = present + late
+    total = len(records)
+    threshold = int(_setting_float(db, "seuil_avertissement_absences") or 3)
+    sanctions_potential = sum(float(record.penalty_amount or 0) for record in records)
+    members_to_watch = []
+    absent_by_user = {}
+    for record in records:
+        if record.status == "absent" and record.justification_status != "approved":
+            absent_by_user[record.user_id] = absent_by_user.get(record.user_id, 0) + 1
+    for user_id, count in absent_by_user.items():
+        if count > threshold:
+            user = db.query(User).filter(User.id == user_id).first()
+            members_to_watch.append(
+                {
+                    "user_id": str(user_id),
+                    "display_name": _display_user(user) if user else str(user_id),
+                    "unjustified_absences": count,
+                }
+            )
+
+    return {
+        "sessions_count": len(session_ids),
+        "records_count": total,
+        "present": present,
+        "late": late,
+        "absent": absent,
+        "justified_absences": justified,
+        "unjustified_absences": absent,
+        "attendance_rate": round((attended / total) * 100, 2) if total else 0,
+        "members_to_watch": members_to_watch,
+        "sanctions_potential": sanctions_potential,
+        "sanctions_validated": sanctions_potential,
+    }
+
+
+def _display_user(user: User) -> str:
+    if not user:
+        return ""
+    value = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    return value or user.email
+
+
 @router.get("/sessions", response_model=list[AttendanceSessionRead])
 def list_attendance_sessions(
     db: Session = Depends(get_db),
@@ -744,6 +853,121 @@ def update_attendance_settings(
             setting.updated_at = datetime.utcnow()
     db.commit()
     return _ensure_attendance_settings(db)
+
+
+@router.get("/stats", response_model=dict)
+def get_attendance_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+    month: Optional[str] = Query(default=None),
+    pole_id: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
+    member_id: Optional[str] = Query(default=None),
+    session_type: Optional[str] = Query(default=None),
+):
+    query = _records_query_for_user(db, current_user)
+    query = _apply_report_filters(
+        query,
+        month=month,
+        pole_id=pole_id,
+        project_id=project_id,
+        member_id=member_id,
+        session_type=session_type,
+    )
+    records = query.all()
+    return _attendance_stats_from_records(db, records)
+
+
+@router.get("/monthly-report", response_model=list[dict])
+def get_attendance_monthly_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+    month: Optional[str] = Query(default=None),
+    pole_id: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
+    session_type: Optional[str] = Query(default=None),
+):
+    query = _records_query_for_user(db, current_user)
+    query = _apply_report_filters(
+        query,
+        month=month,
+        pole_id=pole_id,
+        project_id=project_id,
+        member_id=None,
+        session_type=session_type,
+    )
+    records = query.all()
+    by_user: dict = {}
+    for record in records:
+        item = by_user.setdefault(
+            record.user_id,
+            {
+                "user_id": str(record.user_id),
+                "present": 0,
+                "late": 0,
+                "absent": 0,
+                "justified_absences": 0,
+                "unjustified_absences": 0,
+                "amount_due": 0,
+                "dates": [],
+            },
+        )
+        if record.status == "present":
+            item["present"] += 1
+        elif record.status == "late":
+            item["late"] += 1
+        elif record.status in {"justified_absence", "excused"}:
+            item["justified_absences"] += 1
+        elif record.status == "absent":
+            item["absent"] += 1
+            item["unjustified_absences"] += 1
+        item["amount_due"] += float(record.penalty_amount or 0)
+        session_date = (
+            record.checkin_time
+            or db.query(AttendanceSession.scheduled_at)
+            .filter(AttendanceSession.id == record.session_id)
+            .scalar()
+        )
+        if session_date:
+            item["dates"].append(session_date.date().isoformat())
+
+    rows = []
+    for user_id, item in by_user.items():
+        user = db.query(User).filter(User.id == user_id).first()
+        item["display_name"] = _display_user(user) if user else item["user_id"]
+        item["warning"] = item["unjustified_absences"] > int(
+            _setting_float(db, "seuil_avertissement_absences") or 3
+        )
+        rows.append(item)
+    return sorted(rows, key=lambda row: row["display_name"])
+
+
+@router.get("/member/{member_id}/summary", response_model=dict)
+def get_member_attendance_summary(
+    member_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+    month: Optional[str] = Query(default=None),
+):
+    if str(current_user.id) != member_id and not _is_global_attendance_manager(
+        db,
+        current_user,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Synthese membre non accessible",
+        )
+    query = _records_query_for_user(db, current_user)
+    query = _apply_report_filters(
+        query,
+        month=month,
+        pole_id=None,
+        project_id=None,
+        member_id=member_id,
+        session_type=None,
+    )
+    records = query.all()
+    return _attendance_stats_from_records(db, records)
 
 
 @router.post("/sessions", response_model=AttendanceSessionRead)

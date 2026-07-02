@@ -165,6 +165,26 @@ class AttendanceService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> getStats({String? month}) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final query = month == null ? '' : '?month=$month';
+    final response = await _apiClient.get(
+      '/attendance/stats$query',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+
+    return {};
+  }
+
   Future<void> addExpectedMember({
     required String sessionId,
     required String userId,
