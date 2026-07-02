@@ -52,18 +52,30 @@ class Fee(Base):
     )
 
     type: Mapped[str] = mapped_column(String(80), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     amount_paid: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(10), default="FCFA")
 
     status: Mapped[str] = mapped_column(String(50), default="unpaid")
 
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     related_attendance_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("attendance_records.id"),
+        nullable=True,
+    )
+    source_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    proof_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
         nullable=True,
     )
 
@@ -93,12 +105,18 @@ class Payment(Base):
     )
 
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="FCFA")
 
     method: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="pending")
 
     reference: Mapped[str | None] = mapped_column(String(150), nullable=True)
     proof_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proof_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
 
     validated_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -107,8 +125,15 @@ class Payment(Base):
     )
 
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     receipt_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    receipt_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -157,8 +182,10 @@ class ClubTransaction(Base):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="FCFA")
 
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -179,6 +206,11 @@ class ClubTransaction(Base):
     )
 
     proof_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proof_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),

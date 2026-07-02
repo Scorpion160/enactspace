@@ -120,6 +120,8 @@ def update_fee_status(fee: Fee):
         fee.status = "partial"
     else:
         fee.status = "paid"
+        if fee.paid_at is None:
+            fee.paid_at = datetime.utcnow()
 
     fee.updated_at = datetime.utcnow()
 
@@ -184,11 +186,17 @@ def create_fee(
         user_id=payload.user_id,
         season_id=payload.season_id,
         type=payload.type,
+        category=payload.category,
         label=payload.label,
+        description=payload.description,
         amount=payload.amount,
+        currency=payload.currency,
         amount_paid=0,
         status="unpaid",
         due_date=payload.due_date,
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+        proof_file_id=payload.proof_file_id,
         created_by=current_user.id,
     )
 
@@ -315,10 +323,12 @@ def create_payment(
     payment = Payment(
         user_id=payload.user_id,
         amount=payload.amount,
+        currency=payload.currency,
         method=payload.method,
         status="pending",
         reference=payload.reference,
         proof_url=payload.proof_url,
+        proof_file_id=payload.proof_file_id,
     )
 
     db.add(payment)
@@ -568,10 +578,13 @@ def create_club_transaction(
         type=payload.type,
         category=payload.category,
         label=payload.label,
+        description=payload.description,
         amount=payload.amount,
+        currency=payload.currency,
         project_id=payload.project_id,
         pole_id=payload.pole_id,
         proof_url=payload.proof_url,
+        proof_file_id=payload.proof_file_id,
         created_by=current_user.id,
     )
 

@@ -143,6 +143,57 @@ def ensure_compatibility_columns() -> None:
                 "ALTER TABLE attendance_records ADD COLUMN justification_file_id CHAR(36)"
             )
 
+    if "fees" in inspector.get_table_names():
+        fee_columns = {column["name"] for column in inspector.get_columns("fees")}
+        if "category" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN category VARCHAR(100)")
+        if "description" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN description TEXT")
+        if "currency" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN currency VARCHAR(10) DEFAULT 'FCFA'")
+        if "paid_at" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN paid_at DATETIME")
+        if "cancelled_at" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN cancelled_at DATETIME")
+        if "source_type" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN source_type VARCHAR(80)")
+        if "source_id" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN source_id CHAR(36)")
+        if "proof_file_id" not in fee_columns:
+            statements.append("ALTER TABLE fees ADD COLUMN proof_file_id CHAR(36)")
+
+    if "payments" in inspector.get_table_names():
+        payment_columns = {
+            column["name"] for column in inspector.get_columns("payments")
+        }
+        if "currency" not in payment_columns:
+            statements.append(
+                "ALTER TABLE payments ADD COLUMN currency VARCHAR(10) DEFAULT 'FCFA'"
+            )
+        if "proof_file_id" not in payment_columns:
+            statements.append("ALTER TABLE payments ADD COLUMN proof_file_id CHAR(36)")
+        if "rejected_at" not in payment_columns:
+            statements.append("ALTER TABLE payments ADD COLUMN rejected_at DATETIME")
+        if "rejection_reason" not in payment_columns:
+            statements.append("ALTER TABLE payments ADD COLUMN rejection_reason TEXT")
+        if "receipt_file_id" not in payment_columns:
+            statements.append("ALTER TABLE payments ADD COLUMN receipt_file_id CHAR(36)")
+
+    if "club_transactions" in inspector.get_table_names():
+        transaction_columns = {
+            column["name"] for column in inspector.get_columns("club_transactions")
+        }
+        if "description" not in transaction_columns:
+            statements.append("ALTER TABLE club_transactions ADD COLUMN description TEXT")
+        if "currency" not in transaction_columns:
+            statements.append(
+                "ALTER TABLE club_transactions ADD COLUMN currency VARCHAR(10) DEFAULT 'FCFA'"
+            )
+        if "proof_file_id" not in transaction_columns:
+            statements.append(
+                "ALTER TABLE club_transactions ADD COLUMN proof_file_id CHAR(36)"
+            )
+
     if statements:
         with engine.begin() as connection:
             for statement in statements:
