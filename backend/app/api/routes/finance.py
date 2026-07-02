@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import Response
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user, notify_users
 
@@ -578,6 +581,175 @@ def get_my_financial_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def finance_stats_payload(
+    *,
+    accounts: list[FinancialAccount],
+    fees: list[Fee],
+    payments: list[Payment],
+    transactions: list[ClubTransaction],
+) -> dict:
+    total_due = sum(float(account.balance_due or 0) for account in accounts)
+    total_paid = sum(float(account.total_paid or 0) for account in accounts)
+    pending_payments = [
+        payment for payment in payments if payment.status == "pending"
+    ]
+    validated_payments = [
+        payment for payment in payments if payment.status == "validated"
+    ]
+    rejected_payments = [
+        payment for payment in payments if payment.status == "rejected"
+    ]
+    income = sum(
+        float(transaction.amount or 0)
+        for transaction in transactions
+        if transaction.type == "income"
+    )
+    expenses = sum(
+        float(transaction.amount or 0)
+        for transaction in transactions
+        if transaction.type == "expense"
+    )
+
+    return {
+        "total_due": total_due,
+        "total_paid": total_paid,
+        "pending_payment_amount": sum(
+            float(payment.amount or 0) for payment in pending_payments
+        ),
+        "validated_payment_amount": sum(
+            float(payment.amount or 0) for payment in validated_payments
+        ),
+        "pending_payment_count": len(pending_payments),
+        "rejected_payment_count": len(rejected_payments),
+        "debtor_count": len(
+            [account for account in accounts if float(account.balance_due or 0) > 0]
+        ),
+        "unpaid_fee_count": len(
+            [fee for fee in fees if fee.status in {"unpaid", "partial"}]
+        ),
+        "income": income,
+        "expenses": expenses,
+        "cash_balance": income - expenses,
+    }
+
+
+@router.get("/stats")
+def get_finance_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    return finance_stats_payload(
+        accounts=db.query(FinancialAccount).all(),
+        fees=db.query(Fee).all(),
+        payments=db.query(Payment).all(),
+        transactions=db.query(ClubTransaction).all(),
+    )
+
+
+@router.get("/stats/me")
+def get_my_finance_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    return finance_stats_payload(
+        accounts=[
+            ensure_financial_account(db, current_user.id),
+        ],
+        fees=db.query(Fee).filter(Fee.user_id == current_user.id).all(),
+        payments=db.query(Payment).filter(Payment.user_id == current_user.id).all(),
+        transactions=[],
+    )
+
+
+def csv_download(filename: str, rows: list[list]) -> Response:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get("/export/fees.csv")
+def export_fees_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    rows = [
+        [
+            "id",
+            "user_id",
+            "type",
+            "label",
+            "amount",
+            "amount_paid",
+            "currency",
+            "status",
+            "due_date",
+            "created_at",
+        ]
+    ]
+    for fee in db.query(Fee).order_by(Fee.created_at.desc()).all():
+        rows.append(
+            [
+                fee.id,
+                fee.user_id,
+                fee.type,
+                fee.label,
+                float(fee.amount or 0),
+                float(fee.amount_paid or 0),
+                fee.currency,
+                fee.status,
+                fee.due_date,
+                fee.created_at,
+            ]
+        )
+    return csv_download("enactspace_frais.csv", rows)
+
+
+@router.get("/export/payments.csv")
+def export_payments_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    rows = [
+        [
+            "id",
+            "user_id",
+            "amount",
+            "currency",
+            "method",
+            "status",
+            "reference",
+            "validated_at",
+            "rejected_at",
+            "rejection_reason",
+            "created_at",
+        ]
+    ]
+    for payment in db.query(Payment).order_by(Payment.created_at.desc()).all():
+        rows.append(
+            [
+                payment.id,
+                payment.user_id,
+                float(payment.amount or 0),
+                payment.currency,
+                payment.method,
+                payment.status,
+                payment.reference,
+                payment.validated_at,
+                payment.rejected_at,
+                payment.rejection_reason,
+                payment.created_at,
+            ]
+        )
+    return csv_download("enactspace_paiements.csv", rows)
 
 
 @router.post("/payments", response_model=PaymentRead)
