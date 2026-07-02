@@ -273,6 +273,26 @@ class ImpactService {
           (sum, item) => sum + item.indirectImpact,
         ),
         reachTotal: projects.fold(0, (sum, item) => sum + item.reach),
+        jobsCreatedTotal: projects.fold(
+          0,
+          (sum, item) => sum + item.jobsCreated,
+        ),
+        livesImpactedTotal: projects.fold(
+          0,
+          (sum, item) => sum + item.livesImpacted,
+        ),
+        treesPlantedTotal: projects.fold(
+          0,
+          (sum, item) => sum + item.treesPlanted,
+        ),
+        validatedEvidenceCount: projects.fold(
+          0,
+          (sum, item) => sum + item.evidenceCount,
+        ),
+        touchedSdgs: {
+          for (final project in projects)
+            for (final sdg in project.sdgs) sdg,
+        }.length,
         revenueTotal: projects.fold(0, (sum, item) => sum + item.revenue),
         surplusTotal: projects.fold(0, (sum, item) => sum + item.surplus),
         officialDocuments: projects.fold(
@@ -404,6 +424,29 @@ class ImpactService {
       reachTotal: _int(
         json['reach_total'],
         fallback: projects.fold(0, (sum, item) => sum + item.reach),
+      ),
+      jobsCreatedTotal: _int(
+        json['jobs_created_total'],
+        fallback: projects.fold(0, (sum, item) => sum + item.jobsCreated),
+      ),
+      livesImpactedTotal: _int(
+        json['lives_impacted_total'],
+        fallback: projects.fold(0, (sum, item) => sum + item.livesImpacted),
+      ),
+      treesPlantedTotal: _int(
+        json['trees_planted_total'],
+        fallback: projects.fold(0, (sum, item) => sum + item.treesPlanted),
+      ),
+      validatedEvidenceCount: _int(
+        json['validated_evidence_count'],
+        fallback: projects.fold(0, (sum, item) => sum + item.evidenceCount),
+      ),
+      touchedSdgs: _int(
+        json['touched_sdgs'],
+        fallback: {
+          for (final project in projects)
+            for (final sdg in project.sdgs) sdg,
+        }.length,
       ),
       revenueTotal: _double(
         json['revenue_total'],

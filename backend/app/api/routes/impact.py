@@ -616,6 +616,23 @@ def get_impact_summary(
     direct_impact = sum(project["direct_impact"] for project in projects)
     indirect_impact = sum(project["indirect_impact"] for project in projects)
     reach = sum(project["reach"] for project in projects)
+    jobs_created = sum(project.get("jobs_created", 0) for project in projects)
+    lives_impacted = sum(project.get("lives_impacted", 0) for project in projects)
+    trees_planted = sum(project.get("trees_planted", 0) for project in projects)
+    touched_sdgs = len(
+        {
+            sdg
+            for project in projects
+            for sdg in project.get("sdgs", [])
+            if str(sdg).strip()
+        }
+    )
+    validated_evidence = (
+        db.query(func.count(ImpactEvidence.id))
+        .filter(ImpactEvidence.status == "validated")
+        .scalar()
+        or 0
+    )
     readiness = (
         sum(project["competition_readiness_score"] for project in projects)
         / active_projects
@@ -637,6 +654,11 @@ def get_impact_summary(
             "direct_impact_total": direct_impact,
             "indirect_impact_total": indirect_impact,
             "reach_total": reach,
+            "jobs_created_total": jobs_created,
+            "lives_impacted_total": lives_impacted,
+            "trees_planted_total": trees_planted,
+            "validated_evidence_count": int(validated_evidence),
+            "touched_sdgs": touched_sdgs,
             "revenue_total": sum(project["revenue"] for project in projects),
             "surplus_total": sum(project["surplus"] for project in projects),
             "official_documents": documents,

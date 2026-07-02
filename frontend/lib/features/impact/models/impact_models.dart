@@ -211,6 +211,11 @@ class OrganizationPerformanceModel {
   final int directImpactTotal;
   final int indirectImpactTotal;
   final int reachTotal;
+  final int jobsCreatedTotal;
+  final int livesImpactedTotal;
+  final int treesPlantedTotal;
+  final int validatedEvidenceCount;
+  final int touchedSdgs;
   final double revenueTotal;
   final double surplusTotal;
   final int officialDocuments;
@@ -229,6 +234,11 @@ class OrganizationPerformanceModel {
     required this.directImpactTotal,
     required this.indirectImpactTotal,
     required this.reachTotal,
+    required this.jobsCreatedTotal,
+    required this.livesImpactedTotal,
+    required this.treesPlantedTotal,
+    required this.validatedEvidenceCount,
+    required this.touchedSdgs,
     required this.revenueTotal,
     required this.surplusTotal,
     required this.officialDocuments,

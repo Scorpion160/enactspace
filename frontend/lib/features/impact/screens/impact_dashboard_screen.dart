@@ -233,6 +233,16 @@ class _ImpactContent extends StatelessWidget {
               icon: Icons.public_rounded,
             ),
             _KpiItem(
+              label: 'Vies impactees',
+              value: organization.livesImpactedTotal.toString(),
+              icon: Icons.favorite_rounded,
+            ),
+            _KpiItem(
+              label: 'Emplois crees',
+              value: organization.jobsCreatedTotal.toString(),
+              icon: Icons.work_rounded,
+            ),
+            _KpiItem(
               label: 'Revenus projets',
               value: _money(organization.revenueTotal),
               icon: Icons.trending_up_rounded,
@@ -241,6 +251,21 @@ class _ImpactContent extends StatelessWidget {
               label: 'Surplus',
               value: _money(organization.surplusTotal),
               icon: Icons.savings_rounded,
+            ),
+            _KpiItem(
+              label: 'Arbres plantes',
+              value: organization.treesPlantedTotal.toString(),
+              icon: Icons.park_rounded,
+            ),
+            _KpiItem(
+              label: 'Preuves validees',
+              value: organization.validatedEvidenceCount.toString(),
+              icon: Icons.verified_rounded,
+            ),
+            _KpiItem(
+              label: 'ODD touches',
+              value: organization.touchedSdgs.toString(),
+              icon: Icons.hub_rounded,
             ),
             _KpiItem(
               label: 'Academy',
