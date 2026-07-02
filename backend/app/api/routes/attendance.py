@@ -19,7 +19,9 @@ from app.models.attendance import (
     AttendanceExpectedMember,
     AttendanceRecord,
     AttendanceSession,
+    AttendanceSetting,
 )
+from app.models.finance import Fee, FinancialAccount
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.user import User
@@ -33,6 +35,8 @@ from app.schemas.attendance import (
     AttendanceRecordCreate,
     AttendanceRecordRead,
     AttendanceRecordUpdate,
+    AttendanceSettingRead,
+    AttendanceSettingsUpdate,
     AttendanceSessionCreate,
     AttendanceSessionRead,
     AttendanceSessionUpdate,
@@ -80,6 +84,170 @@ VALID_JUSTIFICATION_STATUSES = {
 ABSENCE_STATUSES = {"absent", "justified_absence"}
 POLE_MANAGER_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
 PROJECT_MANAGER_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
+DEFAULT_ATTENDANCE_SETTINGS = {
+    "montant_absence_non_justifiee": (
+        "500",
+        "Montant applique pour une absence non justifiee.",
+    ),
+    "montant_retard": ("0", "Montant applique pour un retard sanctionnable."),
+    "seuil_avertissement_absences": (
+        "3",
+        "Nombre d'absences non justifiees avant avertissement.",
+    ),
+    "seuil_retards": ("3", "Nombre de retards avant avertissement."),
+    "delai_max_justification": (
+        "72",
+        "Delai maximum de justification en heures.",
+    ),
+    "debut_application_sanctions": (
+        "",
+        "Date ISO de debut d'application des sanctions.",
+    ),
+}
+
+
+def _ensure_attendance_settings(db: Session) -> list[AttendanceSetting]:
+    settings = []
+    for key, (default_value, description) in DEFAULT_ATTENDANCE_SETTINGS.items():
+        setting = db.query(AttendanceSetting).filter(AttendanceSetting.key == key).first()
+        if not setting:
+            setting = AttendanceSetting(
+                key=key,
+                value=default_value,
+                description=description,
+            )
+            db.add(setting)
+            db.flush()
+        settings.append(setting)
+    return settings
+
+
+def _setting_value(db: Session, key: str) -> str:
+    _ensure_attendance_settings(db)
+    setting = db.query(AttendanceSetting).filter(AttendanceSetting.key == key).first()
+    return setting.value if setting else DEFAULT_ATTENDANCE_SETTINGS[key][0]
+
+
+def _setting_float(db: Session, key: str) -> float:
+    try:
+        return float(_setting_value(db, key) or 0)
+    except ValueError:
+        return 0
+
+
+def _sanctions_started(db: Session) -> bool:
+    raw = _setting_value(db, "debut_application_sanctions")
+    if not raw:
+        return True
+    try:
+        started_at = datetime.fromisoformat(raw)
+    except ValueError:
+        return True
+    return datetime.utcnow() >= started_at
+
+
+def _ensure_financial_account(db: Session, user_id) -> FinancialAccount:
+    account = db.query(FinancialAccount).filter(FinancialAccount.user_id == user_id).first()
+    if not account:
+        account = FinancialAccount(user_id=user_id, balance_due=0, total_paid=0)
+        db.add(account)
+        db.flush()
+    return account
+
+
+def _remove_attendance_penalty(db: Session, record: AttendanceRecord) -> None:
+    fee = db.query(Fee).filter(Fee.related_attendance_id == record.id).first()
+    if fee and fee.status == "unpaid":
+        account = _ensure_financial_account(db, record.user_id)
+        account.balance_due = max(0, float(account.balance_due or 0) - float(fee.amount or 0))
+        account.updated_at = datetime.utcnow()
+        db.delete(fee)
+    record.penalty_amount = 0
+    record.penalty_fee_id = None
+
+
+def _attendance_penalty_amount(db: Session, record: AttendanceRecord) -> float:
+    if not _sanctions_started(db):
+        return 0
+    if record.status == "late":
+        return _setting_float(db, "montant_retard")
+    if record.status == "absent" and record.justification_status in {
+        "not_submitted",
+        "rejected",
+        "expired",
+    }:
+        return _setting_float(db, "montant_absence_non_justifiee")
+    return 0
+
+
+def _sync_attendance_penalty(
+    db: Session,
+    record: AttendanceRecord,
+    current_user: User,
+) -> None:
+    amount = _attendance_penalty_amount(db, record)
+    existing_fee = db.query(Fee).filter(Fee.related_attendance_id == record.id).first()
+
+    if amount <= 0:
+        _remove_attendance_penalty(db, record)
+        return
+
+    label = (
+        "Penalite de retard"
+        if record.status == "late"
+        else "Penalite absence non justifiee"
+    )
+    fee_type = "penalite_retard" if record.status == "late" else "penalite_absence"
+
+    if existing_fee:
+        previous_amount = float(existing_fee.amount or 0)
+        existing_fee.amount = amount
+        existing_fee.label = label
+        existing_fee.type = fee_type
+        existing_fee.updated_at = datetime.utcnow()
+        record.penalty_amount = amount
+        record.penalty_fee_id = existing_fee.id
+        account = _ensure_financial_account(db, record.user_id)
+        account.balance_due = max(
+            0,
+            float(account.balance_due or 0) - previous_amount + amount,
+        )
+        account.updated_at = datetime.utcnow()
+        return
+
+    fee = Fee(
+        user_id=record.user_id,
+        type=fee_type,
+        label=label,
+        amount=amount,
+        amount_paid=0,
+        status="unpaid",
+        due_date=datetime.utcnow().date(),
+        related_attendance_id=record.id,
+        created_by=current_user.id,
+    )
+    db.add(fee)
+    db.flush()
+
+    account = _ensure_financial_account(db, record.user_id)
+    account.balance_due = float(account.balance_due or 0) + amount
+    account.updated_at = datetime.utcnow()
+
+    record.penalty_amount = amount
+    record.penalty_fee_id = fee.id
+    notify_user(
+        db,
+        user_id=record.user_id,
+        title="Absence non justifiee" if record.status == "absent" else "Retard",
+        message=(
+            f"Une sanction de {amount:.0f} FCFA peut etre appliquee "
+            "selon le reglement."
+        ),
+        notification_type="finance_penalty",
+        related_type="attendance_record",
+        related_id=record.id,
+        dedupe=True,
+    )
 
 
 def _roles(db: Session, user: User) -> set[str]:
@@ -457,6 +625,7 @@ def _upsert_record(
     record.note = note
     record.updated_at = now
     db.flush()
+    _sync_attendance_penalty(db, record, current_user)
     return record
 
 
@@ -538,6 +707,43 @@ def list_attendance_sessions(
         _attendance_session_payload(db, current_user, session)
         for session in sessions
     ]
+
+
+@router.get("/settings", response_model=list[AttendanceSettingRead])
+def list_attendance_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not _is_global_attendance_manager(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Parametres reserves au secretariat",
+        )
+    settings = _ensure_attendance_settings(db)
+    db.commit()
+    return settings
+
+
+@router.patch("/settings", response_model=list[AttendanceSettingRead])
+def update_attendance_settings(
+    payload: AttendanceSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not _is_global_attendance_manager(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Parametres reserves au secretariat",
+        )
+    _ensure_attendance_settings(db)
+    updates = payload.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setting = db.query(AttendanceSetting).filter(AttendanceSetting.key == key).first()
+        if setting:
+            setting.value = value.isoformat() if hasattr(value, "isoformat") else str(value)
+            setting.updated_at = datetime.utcnow()
+    db.commit()
+    return _ensure_attendance_settings(db)
 
 
 @router.post("/sessions", response_model=AttendanceSessionRead)
@@ -913,6 +1119,7 @@ def submit_absence_justification(
     record.justification_file_url = payload.file_url
     record.is_justified = False
     record.updated_at = datetime.utcnow()
+    _sync_attendance_penalty(db, record, current_user)
     _notify_justification_reviewers(db, record, session)
     db.commit()
     db.refresh(record)
@@ -938,8 +1145,8 @@ def approve_absence_justification(
     record.is_justified = True
     if payload.reason and payload.reason.strip():
         record.note = payload.reason.strip()
-    record.penalty_amount = 0
     record.updated_at = datetime.utcnow()
+    _sync_attendance_penalty(db, record, current_user)
     notify_user(
         db,
         user_id=record.user_id,
@@ -981,6 +1188,7 @@ def reject_absence_justification(
     record.is_justified = False
     record.note = reason
     record.updated_at = datetime.utcnow()
+    _sync_attendance_penalty(db, record, current_user)
     notify_user(
         db,
         user_id=record.user_id,

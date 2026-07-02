@@ -39,6 +39,21 @@ class AttendanceSessionUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class AttendanceSettingRead(BaseModel):
+    key: str
+    value: str
+    description: Optional[str] = None
+
+
+class AttendanceSettingsUpdate(BaseModel):
+    montant_absence_non_justifiee: Optional[float] = None
+    montant_retard: Optional[float] = None
+    seuil_avertissement_absences: Optional[int] = None
+    seuil_retards: Optional[int] = None
+    delai_max_justification: Optional[int] = None
+    debut_application_sanctions: Optional[datetime] = None
+
+
 class AttendanceSessionRead(BaseModel):
     id: UUID
     title: str

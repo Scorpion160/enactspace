@@ -8,6 +8,20 @@ from app.db.database import Base
 from app.db.types import GUID
 
 
+class AttendanceSetting(Base):
+    __tablename__ = "attendance_settings"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    key: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    value: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class AttendanceSession(Base):
     __tablename__ = "attendance_sessions"
 
