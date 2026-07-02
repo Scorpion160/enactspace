@@ -1106,6 +1106,51 @@ def list_payment_allocations(
     ).order_by(PaymentAllocation.created_at.asc()).all()
 
 
+@router.get("/payments/{payment_id}/receipt")
+def get_payment_receipt(
+    payment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    payment = get_payment_or_404(db, payment_id)
+    if not (
+        is_finance_manager(db, current_user)
+        or payment.user_id == current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas consulter ce recu",
+        )
+    if payment.status != "validated":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le recu est disponible apres validation du paiement",
+        )
+
+    allocations = (
+        db.query(PaymentAllocation)
+        .filter(PaymentAllocation.payment_id == payment.id)
+        .order_by(PaymentAllocation.created_at.asc())
+        .all()
+    )
+    member = db.query(User).filter(User.id == payment.user_id).first()
+    return {
+        "payment": payment_payload(db, current_user, payment),
+        "member_name": display_user(member),
+        "generated_at": datetime.utcnow(),
+        "total_allocated": sum(float(item.amount or 0) for item in allocations),
+        "allocations": [
+            {
+                "id": item.id,
+                "fee_id": item.fee_id,
+                "amount": float(item.amount or 0),
+                "created_at": item.created_at,
+            }
+            for item in allocations
+        ],
+    }
+
+
 @router.post("/transactions", response_model=ClubTransactionRead)
 def create_club_transaction(
     payload: ClubTransactionCreate,
