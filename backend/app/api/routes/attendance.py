@@ -1,7 +1,9 @@
+import csv
+from io import StringIO
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -940,6 +942,69 @@ def get_attendance_monthly_report(
         )
         rows.append(item)
     return sorted(rows, key=lambda row: row["display_name"])
+
+
+@router.get("/monthly-export")
+def export_attendance_monthly_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+    month: Optional[str] = Query(default=None),
+    pole_id: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
+    session_type: Optional[str] = Query(default=None),
+):
+    rows = get_attendance_monthly_report(
+        db=db,
+        current_user=current_user,
+        month=month,
+        pole_id=pole_id,
+        project_id=project_id,
+        session_type=session_type,
+    )
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "Nom",
+            "Prenom",
+            "Genre",
+            "Telephone",
+            "Pole coeur",
+            "Nombre presences",
+            "Nombre retards",
+            "Nombre absences",
+            "Nombre absences justifiees",
+            "Nombre absences non justifiees",
+            "Montant a payer",
+            "Avertissement",
+            "Detail des dates",
+        ]
+    )
+    for row in rows:
+        user = db.query(User).filter(User.id == row["user_id"]).first()
+        writer.writerow(
+            [
+                user.last_name if user else "",
+                user.first_name if user else "",
+                user.gender if user else "",
+                user.phone if user else "",
+                user.department if user else "",
+                row["present"],
+                row["late"],
+                row["absent"],
+                row["justified_absences"],
+                row["unjustified_absences"],
+                row["amount_due"],
+                "Oui" if row["warning"] else "Non",
+                ", ".join(row["dates"]),
+            ]
+        )
+    filename = f"attendance-{month or 'report'}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/member/{member_id}/summary", response_model=dict)

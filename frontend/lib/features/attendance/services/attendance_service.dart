@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/attendance_session_model.dart';
@@ -183,6 +187,26 @@ class AttendanceService {
     }
 
     return {};
+  }
+
+  Future<String> getMonthlyExportCsv({String? month}) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final query = month == null ? '' : '?month=$month';
+    final response = await http.get(
+      Uri.parse('${ApiClient.baseUrl}/attendance/monthly-export$query'),
+      headers: {'Accept': 'text/csv', 'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return utf8.decode(response.bodyBytes);
+    }
+
+    throw Exception('Export impossible (${response.statusCode}).');
   }
 
   Future<void> addExpectedMember({
