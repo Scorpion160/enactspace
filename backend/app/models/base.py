@@ -42,3 +42,4 @@ from app.models.alumni import AlumniProfile, Mentorship
 from app.models.notification import Notification
 from app.models.gamification import EngagementPoint, Badge, UserBadge
 from app.models.audit import AuditLog
+from app.models.impact import ImpactProject, ImpactMetric, ImpactEvidence
