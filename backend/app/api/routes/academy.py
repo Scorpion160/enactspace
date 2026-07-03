@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.academy import (
     AcademyCourse,
     AcademyLesson,
+    AcademyProgress,
     AcademyQuestion,
     AcademyQuiz,
     AcademyQuizAttempt,
@@ -19,6 +20,7 @@ from app.schemas.academy import (
     AcademyLessonCreate,
     AcademyLessonRead,
     AcademyLessonUpdate,
+    AcademyProgressRead,
     AcademyQuestionCreate,
     AcademyQuestionRead,
     AcademyQuizCreate,
@@ -303,6 +305,57 @@ def _score_db_quiz(db: Session, quiz: AcademyQuiz, answers: list) -> dict:
     }
 
 
+def _lesson_progress(
+    db: Session,
+    *,
+    user_id,
+    lesson: AcademyLesson,
+) -> AcademyProgress:
+    progress = (
+        db.query(AcademyProgress)
+        .filter(
+            AcademyProgress.user_id == user_id,
+            AcademyProgress.lesson_id == lesson.id,
+        )
+        .first()
+    )
+    if progress:
+        return progress
+    progress = AcademyProgress(
+        user_id=user_id,
+        course_id=lesson.course_id,
+        lesson_id=lesson.id,
+        status="not_started",
+        progress_percent=0,
+    )
+    db.add(progress)
+    db.flush()
+    return progress
+
+
+def _course_completion_percent(db: Session, *, user_id, course_id) -> float:
+    total = (
+        db.query(AcademyLesson)
+        .filter(
+            AcademyLesson.course_id == course_id,
+            AcademyLesson.is_published.is_(True),
+        )
+        .count()
+    )
+    if total <= 0:
+        return 0
+    completed = (
+        db.query(AcademyProgress)
+        .filter(
+            AcademyProgress.user_id == user_id,
+            AcademyProgress.course_id == course_id,
+            AcademyProgress.status.in_(["completed", "validated"]),
+        )
+        .count()
+    )
+    return min(100, (completed / total) * 100)
+
+
 @router.get("/courses")
 def list_courses(
     db: Session = Depends(get_db),
@@ -464,6 +517,62 @@ def update_lesson(
     return lesson
 
 
+@router.post("/lessons/{lesson_id}/start", response_model=AcademyProgressRead)
+def start_lesson(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    lesson = _lesson_or_404(db, lesson_id)
+    progress = _lesson_progress(db, user_id=current_user.id, lesson=lesson)
+    if progress.status == "not_started":
+        progress.status = "in_progress"
+        progress.progress_percent = 10
+        progress.started_at = datetime.utcnow()
+    progress.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(progress)
+    return progress
+
+
+@router.post("/lessons/{lesson_id}/complete", response_model=AcademyProgressRead)
+def complete_lesson(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    lesson = _lesson_or_404(db, lesson_id)
+    progress = _lesson_progress(db, user_id=current_user.id, lesson=lesson)
+    progress.status = "completed"
+    progress.progress_percent = 100
+    if progress.started_at is None:
+        progress.started_at = datetime.utcnow()
+    progress.completed_at = datetime.utcnow()
+    progress.updated_at = datetime.utcnow()
+
+    course = _course_or_404(db, lesson.course_id)
+    completion = _course_completion_percent(
+        db,
+        user_id=current_user.id,
+        course_id=course.id,
+    )
+    if course.is_required and completion >= 100:
+        notify_user(
+            db,
+            user_id=current_user.id,
+            title="Formation obligatoire terminee",
+            message=f"Vous avez termine {course.title}.",
+            notification_type="academy_completed",
+            related_type="academy_course",
+            related_id=course.id,
+            dedupe=True,
+        )
+
+    db.commit()
+    db.refresh(progress)
+    return progress
+
+
 @router.post("/admin/quizzes", response_model=AcademyQuizRead)
 def create_admin_quiz(
     payload: AcademyQuizCreate,
@@ -522,6 +631,23 @@ def get_my_progress(
         .count()
     )
     total_lessons = sum(len(course["lessons"]) for course in COURSES) + db_lessons
+    completed_lessons = (
+        db.query(AcademyProgress)
+        .filter(
+            AcademyProgress.user_id == current_user.id,
+            AcademyProgress.status.in_(["completed", "validated"]),
+            AcademyProgress.lesson_id.isnot(None),
+        )
+        .count()
+    )
+    passed_quizzes = (
+        db.query(AcademyQuizAttempt)
+        .filter(
+            AcademyQuizAttempt.user_id == current_user.id,
+            AcademyQuizAttempt.passed.is_(True),
+        )
+        .count()
+    )
     db_courses = (
         db.query(AcademyCourse)
         .filter(
@@ -531,9 +657,9 @@ def get_my_progress(
         .count()
     )
     return {
-        "completed_lessons": 0,
+        "completed_lessons": completed_lessons,
         "total_lessons": total_lessons,
-        "passed_quizzes": 0,
+        "passed_quizzes": passed_quizzes,
         "total_quizzes": len(COURSES) + db_courses,
         "points": 0,
         "rank": 0,
