@@ -43,3 +43,12 @@ from app.models.notification import Notification
 from app.models.gamification import EngagementPoint, Badge, UserBadge
 from app.models.audit import AuditLog
 from app.models.impact import ImpactProject, ImpactMetric, ImpactEvidence
+from app.models.academy import (
+    AcademyCourse,
+    AcademyLesson,
+    AcademyQuiz,
+    AcademyQuestion,
+    AcademyProgress,
+    AcademyQuizAttempt,
+    AcademyCertificate,
+)
