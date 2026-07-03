@@ -669,7 +669,7 @@ def csv_download(filename: str, rows: list[list]) -> Response:
     writer.writerows(rows)
     return Response(
         content=output.getvalue(),
-        media_type="text/csv",
+        media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
