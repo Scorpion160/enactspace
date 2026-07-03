@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
 import '../core/auth/user_experience.dart';
@@ -29,6 +30,7 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    errorBuilder: (context, state) => const _RouteNotFoundScreen(),
     redirect: (context, state) async {
       final loggedIn = await _authService.isLoggedIn();
       final publicPath =
@@ -168,5 +170,47 @@ class AppRouter {
     );
 
     return allowed ? null : '/dashboard';
+  }
+}
+
+class _RouteNotFoundScreen extends StatelessWidget {
+  const _RouteNotFoundScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Page introuvable')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.explore_off_rounded, size: 56),
+                const SizedBox(height: 16),
+                const Text(
+                  'Cette page n’existe pas ou n’est pas disponible pour ce compte.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Retourne à l’accueil EnactSpace pour continuer.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: () => context.go('/dashboard'),
+                  icon: const Icon(Icons.home_rounded),
+                  label: const Text('Accueil'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
