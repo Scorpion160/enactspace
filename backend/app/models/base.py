@@ -60,4 +60,5 @@ from app.models.archive import (
     MediaArchive,
     HistoricalDocument,
     HallOfFameEntry,
+    HistoricalImpactStatistic,
 )

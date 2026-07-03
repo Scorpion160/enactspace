@@ -301,3 +301,43 @@ class HallOfFameEntry(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+
+class HistoricalImpactStatistic(Base):
+    __tablename__ = "archive_historical_impact_statistics"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    metric_key: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    label: Mapped[str] = mapped_column(String(220), nullable=False)
+    value: Mapped[float] = mapped_column(Numeric(18, 2), default=0)
+    unit: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_label: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    source_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("stored_files.id"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(50), default="validated")
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    validated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )

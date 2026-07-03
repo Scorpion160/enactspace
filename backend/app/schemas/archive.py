@@ -284,3 +284,38 @@ class HallOfFameEntryRead(HallOfFameEntryCreate):
 
     class Config:
         from_attributes = True
+
+
+class HistoricalImpactStatisticCreate(BaseModel):
+    metric_key: str
+    label: str
+    value: float = 0
+    unit: Optional[str] = None
+    description: Optional[str] = None
+    source_label: Optional[str] = None
+    source_file_id: Optional[UUID] = None
+    status: str = "validated"
+    is_featured: bool = True
+
+
+class HistoricalImpactStatisticUpdate(BaseModel):
+    label: Optional[str] = None
+    value: Optional[float] = None
+    unit: Optional[str] = None
+    description: Optional[str] = None
+    source_label: Optional[str] = None
+    source_file_id: Optional[UUID] = None
+    status: Optional[str] = None
+    is_featured: Optional[bool] = None
+
+
+class HistoricalImpactStatisticRead(HistoricalImpactStatisticCreate):
+    id: UUID
+    updated_by_id: Optional[UUID]
+    validated_by_id: Optional[UUID]
+    validated_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

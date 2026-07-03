@@ -22,20 +22,23 @@ class ArchivesService {
 
     final officialDocuments = await _loadOfficialDocuments();
     final apiHallOfFame = await _loadHallOfFame();
+    final apiSummary = await _loadHistoricalSummary();
 
     return ArchivesHomeData(
-      summary: ArchiveImpactSummaryModel(
-        createdProjects: 9,
-        developingProjects: 4,
-        developedProducts: 18,
-        touchedSdgs: 13,
-        createdJobs: 227,
-        savedLives: 206,
-        plantedTrees: 1425,
-        cumulativeUsdGains: 46236.7,
-        cumulativeFcfaGains: 27468761,
-        impactedLives: 15900,
-      ),
+      summary:
+          apiSummary ??
+          ArchiveImpactSummaryModel(
+            createdProjects: 9,
+            developingProjects: 4,
+            developedProducts: 18,
+            touchedSdgs: 13,
+            createdJobs: 227,
+            savedLives: 206,
+            plantedTrees: 1425,
+            cumulativeUsdGains: 46236.7,
+            cumulativeFcfaGains: 27468761,
+            impactedLives: 15900,
+          ),
       projects: [
         ArchiveProjectModel(
           id: 'dimbali',
@@ -595,6 +598,33 @@ class ArchivesService {
     );
   }
 
+  Future<ArchiveImpactSummaryModel?> _loadHistoricalSummary() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final response = await _apiClient.get(
+        '/archives/historical-impact/summary',
+        token: token,
+      );
+      if (response is! Map<String, dynamic>) return null;
+      return ArchiveImpactSummaryModel(
+        createdProjects: _int(response['created_projects']),
+        developingProjects: _int(response['developing_projects']),
+        developedProducts: _int(response['developed_products']),
+        touchedSdgs: _int(response['touched_sdgs']),
+        createdJobs: _int(response['created_jobs']),
+        savedLives: _int(response['saved_lives']),
+        plantedTrees: _int(response['planted_trees']),
+        cumulativeUsdGains: 0,
+        cumulativeFcfaGains: _double(response['cumulative_fcfa_gains']),
+        impactedLives: _int(response['impacted_lives']),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<HallOfFameItemModel>> _loadHallOfFame() async {
     try {
       final token = await _authService.getToken();
@@ -656,4 +686,9 @@ class ArchivesService {
       createdAtLabel: document.createdAtLabel,
     );
   }
+
+  int _int(dynamic value) => int.tryParse(value?.toString() ?? '') ?? 0;
+
+  double _double(dynamic value) =>
+      double.tryParse(value?.toString() ?? '') ?? 0;
 }

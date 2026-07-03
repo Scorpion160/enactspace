@@ -16,6 +16,7 @@ from app.models.archive import (
     CompetitionRecord,
     HistoricalDocument,
     HallOfFameEntry,
+    HistoricalImpactStatistic,
     MediaArchive,
 )
 from app.models.stored_file import StoredFile
@@ -35,6 +36,9 @@ from app.schemas.archive import (
     HallOfFameEntryCreate,
     HallOfFameEntryRead,
     HallOfFameEntryUpdate,
+    HistoricalImpactStatisticCreate,
+    HistoricalImpactStatisticRead,
+    HistoricalImpactStatisticUpdate,
     MediaArchiveCreate,
     MediaArchiveRead,
     MediaArchiveUpdate,
@@ -72,6 +76,32 @@ VALID_HISTORICAL_DOCUMENT_TYPES = {
     "Photo",
     "Vidéo",
     "Autre",
+}
+VALID_HISTORICAL_STATUSES = {"draft", "submitted", "validated", "rejected", "hidden"}
+
+
+DEFAULT_HISTORICAL_IMPACT_SUMMARY = {
+    "created_projects": 5,
+    "developing_projects": 4,
+    "developed_products": 14,
+    "touched_sdgs": 11,
+    "created_jobs": 227,
+    "saved_lives": 206,
+    "planted_trees": 1425,
+    "cumulative_fcfa_gains": 27468761.10,
+    "impacted_lives": 15900,
+}
+
+HISTORICAL_STAT_LABELS = {
+    "created_projects": ("Projets créés", "projets"),
+    "developing_projects": ("Projets en développement", "projets"),
+    "developed_products": ("Produits développés", "produits"),
+    "touched_sdgs": ("ODD touchés", "ODD"),
+    "created_jobs": ("Emplois créés", "emplois"),
+    "saved_lives": ("Vies sauvées", "vies"),
+    "planted_trees": ("Arbres plantés", "arbres"),
+    "cumulative_fcfa_gains": ("Gains cumulés", "FCFA"),
+    "impacted_lives": ("Vies impactées", "vies"),
 }
 
 
@@ -539,6 +569,10 @@ def _hall_of_fame_payload(db: Session, entry: HallOfFameEntry) -> dict:
         stored_file = db.query(StoredFile).filter(StoredFile.id == entry.file_id).first()
     data["file"] = _file_payload(stored_file)
     return data
+
+
+def _historical_statistic_payload(statistic: HistoricalImpactStatistic) -> dict:
+    return HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
 
 
 def _matches_static_project(
@@ -1360,3 +1394,140 @@ def update_hall_of_fame_entry(
     db.commit()
     db.refresh(entry)
     return _hall_of_fame_payload(db, entry)
+
+
+@router.get("/historical-impact/summary")
+def get_historical_impact_summary(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    summary = dict(DEFAULT_HISTORICAL_IMPACT_SUMMARY)
+    statistics = (
+        db.query(HistoricalImpactStatistic)
+        .filter(HistoricalImpactStatistic.status == "validated")
+        .all()
+    )
+    for statistic in statistics:
+        summary[statistic.metric_key] = float(statistic.value or 0)
+    summary["statistics"] = [
+        _historical_statistic_payload(statistic) for statistic in statistics
+    ]
+    return summary
+
+
+@router.get("/historical-impact/statistics")
+def list_historical_impact_statistics(
+    include_defaults: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    db_statistics = {
+        statistic.metric_key: _historical_statistic_payload(statistic)
+        for statistic in db.query(HistoricalImpactStatistic)
+        .order_by(
+            HistoricalImpactStatistic.is_featured.desc(),
+            HistoricalImpactStatistic.metric_key.asc(),
+        )
+        .all()
+    }
+    if include_defaults:
+        for key, value in DEFAULT_HISTORICAL_IMPACT_SUMMARY.items():
+            if key in db_statistics:
+                continue
+            label, unit = HISTORICAL_STAT_LABELS.get(key, (key, None))
+            db_statistics[key] = {
+                "id": key,
+                "metric_key": key,
+                "label": label,
+                "value": value,
+                "unit": unit,
+                "description": "Chiffre historique à confirmer avec les sources disponibles.",
+                "source_label": "Présentation Enactus ESP",
+                "source_file_id": None,
+                "status": "validated",
+                "is_featured": True,
+                "updated_by_id": None,
+                "validated_by_id": None,
+                "validated_at": None,
+                "created_at": None,
+                "updated_at": None,
+            }
+    return {"statistics": list(db_statistics.values())}
+
+
+@router.post("/historical-impact/statistics")
+def create_historical_impact_statistic(
+    payload: HistoricalImpactStatisticCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    if payload.status not in VALID_HISTORICAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut de statistique historique invalide",
+        )
+    existing = (
+        db.query(HistoricalImpactStatistic)
+        .filter(HistoricalImpactStatistic.metric_key == payload.metric_key)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette statistique historique existe déjà",
+        )
+    _mark_file_as_archive(db, payload.source_file_id)
+    statistic = HistoricalImpactStatistic(
+        **payload.model_dump(),
+        updated_by_id=current_user.id,
+    )
+    if payload.status == "validated":
+        statistic.validated_by_id = current_user.id
+        statistic.validated_at = datetime.utcnow()
+    db.add(statistic)
+    db.commit()
+    db.refresh(statistic)
+    return _historical_statistic_payload(statistic)
+
+
+@router.patch("/historical-impact/statistics/{statistic_id}")
+def update_historical_impact_statistic(
+    statistic_id: str,
+    payload: HistoricalImpactStatisticUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    statistic = (
+        db.query(HistoricalImpactStatistic)
+        .filter(HistoricalImpactStatistic.id == statistic_id)
+        .first()
+    )
+    if not statistic:
+        statistic = (
+            db.query(HistoricalImpactStatistic)
+            .filter(HistoricalImpactStatistic.metric_key == statistic_id)
+            .first()
+        )
+    if not statistic:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Statistique historique introuvable",
+        )
+    data = payload.model_dump(exclude_unset=True)
+    if "status" in data and data["status"] not in VALID_HISTORICAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut de statistique historique invalide",
+        )
+    if "source_file_id" in data:
+        _mark_file_as_archive(db, data["source_file_id"])
+    for field, value in data.items():
+        setattr(statistic, field, value)
+    statistic.updated_by_id = current_user.id
+    if data.get("status") == "validated":
+        statistic.validated_by_id = current_user.id
+        statistic.validated_at = datetime.utcnow()
+    statistic.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(statistic)
+    return _historical_statistic_payload(statistic)
