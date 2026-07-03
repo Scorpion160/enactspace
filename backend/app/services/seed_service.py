@@ -127,7 +127,7 @@ DEFAULT_PROJECTS = [
         "status": "prototype",
     },
     {
-        "name": "Terassen",
+        "name": "Terrasen",
         "description": "Projet actif de Enactus ESP.",
         "status": "prototype",
     },
@@ -352,6 +352,170 @@ def seed_admin_user(
     db.flush()
 
     return user, True
+
+
+V1_TEST_USERS = [
+    {
+        "email": "admin.v1@enactspace.local",
+        "first_name": "Admin",
+        "last_name": "V1",
+        "roles": ["administrateur", "team_leader", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "IT",
+    },
+    {
+        "email": "teamleader.v1@enactspace.local",
+        "first_name": "Team",
+        "last_name": "Leader",
+        "roles": ["team_leader", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "Gestion",
+    },
+    {
+        "email": "sg.v1@enactspace.local",
+        "first_name": "Secretaire",
+        "last_name": "Generale",
+        "roles": ["secretaire_generale", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "Gestion",
+    },
+    {
+        "email": "finance.v1@enactspace.local",
+        "first_name": "Finance",
+        "last_name": "V1",
+        "roles": ["financier", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "Gestion",
+    },
+    {
+        "email": "chefpole.v1@enactspace.local",
+        "first_name": "Chef",
+        "last_name": "Pole",
+        "roles": ["chef_pole", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "Technique",
+    },
+    {
+        "email": "chefprojet.v1@enactspace.local",
+        "first_name": "Chef",
+        "last_name": "Projet",
+        "roles": ["chef_projet", "enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "IT",
+    },
+    {
+        "email": "membre.v1@enactspace.local",
+        "first_name": "Membre",
+        "last_name": "Simple",
+        "roles": ["enacteur"],
+        "status": "active",
+        "profile_type": "enacteur",
+        "department": "Chimie",
+    },
+    {
+        "email": "alumni.v1@enactspace.local",
+        "first_name": "Alumni",
+        "last_name": "Valide",
+        "roles": ["alumni"],
+        "status": "alumni",
+        "profile_type": "alumni",
+        "department": "ESP",
+    },
+    {
+        "email": "alumni.pending.v1@enactspace.local",
+        "first_name": "Alumni",
+        "last_name": "En Attente",
+        "roles": ["alumni"],
+        "status": "pending",
+        "profile_type": "alumni",
+        "department": "ESP",
+    },
+    {
+        "email": "candidat.v1@enactspace.local",
+        "first_name": "Candidat",
+        "last_name": "Test",
+        "roles": ["candidat"],
+        "status": "pending",
+        "profile_type": "enacteur",
+        "department": "IT",
+    },
+]
+
+
+def assign_roles(db: Session, user: User, role_names: list[str]) -> int:
+    roles = db.query(Role).filter(Role.name.in_(role_names)).all()
+    existing_role_ids = {
+        row[0]
+        for row in db.query(UserRole.role_id).filter(UserRole.user_id == user.id).all()
+    }
+    created = 0
+    for role in roles:
+        if role.id in existing_role_ids:
+            continue
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+        created += 1
+    db.flush()
+    return created
+
+
+def seed_v1_test_users(db: Session, password: str) -> tuple[int, int]:
+    created_users = 0
+    created_links = 0
+    password_hash = hash_password(password)
+
+    for item in V1_TEST_USERS:
+        user = db.query(User).filter(User.email == item["email"]).first()
+        if not user:
+            user = User(
+                first_name=item["first_name"],
+                last_name=item["last_name"],
+                email=item["email"],
+                password_hash=password_hash,
+                status=item["status"],
+                profile_type=item["profile_type"],
+                email_verified=item["status"] != "pending",
+                is_active=True,
+                department=item["department"],
+                study_level="Compte test V1",
+                promotion="V1",
+                bio="Compte de demonstration V1 sans donnees sensibles.",
+            )
+            db.add(user)
+            db.flush()
+            created_users += 1
+        created_links += assign_roles(db, user, item["roles"])
+
+    return created_users, created_links
+
+
+def run_v1_demo_seed(db: Session, password: str) -> dict:
+    roles_created = seed_roles(db)
+    season, season_created = seed_current_season(db)
+    poles_created = seed_poles(db, season)
+    projects_created = seed_projects(db, season)
+    badges_created = seed_badges(db)
+    users_created, role_links_created = seed_v1_test_users(db, password)
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "roles_created": roles_created,
+        "season_created": season_created,
+        "season_id": str(season.id),
+        "poles_created": poles_created,
+        "projects_created": projects_created,
+        "badges_created": badges_created,
+        "test_users_created": users_created,
+        "role_links_created": role_links_created,
+        "test_password": password,
+    }
 
 
 def run_initial_seed(
