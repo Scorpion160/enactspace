@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_current_active_validated_user,
+    get_user_role_names,
     require_enacchef_or_admin,
 )
+from app.core.roles import SECRETARIAT_ROLES
 from app.db.database import get_db
 from app.models.archive import (
     ArchiveItem,
@@ -24,6 +26,10 @@ from app.schemas.archive import (
     ArchivedProjectCreate,
     ArchivedProjectRead,
     ArchivedProjectUpdate,
+    ArchiveItemCreate,
+    ArchiveItemRead,
+    ArchiveItemUpdate,
+    ArchiveValidationRequest,
     AwardCreate,
     AwardRead,
     AwardUpdate,
@@ -43,6 +49,7 @@ from app.schemas.archive import (
     MediaArchiveRead,
     MediaArchiveUpdate,
 )
+from app.services.notification_service import notify_user
 
 
 router = APIRouter(prefix="/archives", tags=["Archives"])
@@ -78,6 +85,22 @@ VALID_HISTORICAL_DOCUMENT_TYPES = {
     "Autre",
 }
 VALID_HISTORICAL_STATUSES = {"draft", "submitted", "validated", "rejected", "hidden"}
+VALID_ARCHIVE_STATUSES = {"draft", "submitted", "validated", "rejected", "archived", "hidden"}
+VALID_ARCHIVE_VISIBILITIES = {"interne", "enacchefs", "alumni", "public", "privé"}
+VALID_ARCHIVE_CATEGORIES = {
+    "Projet historique",
+    "Prix / distinction",
+    "Compétition",
+    "Rapport annuel",
+    "Article presse",
+    "Photo",
+    "Vidéo",
+    "Document officiel",
+    "Témoignage",
+    "Ancien membre / Alumni",
+    "Événement",
+    "Autre",
+}
 
 
 DEFAULT_HISTORICAL_IMPACT_SUMMARY = {
@@ -575,6 +598,66 @@ def _historical_statistic_payload(statistic: HistoricalImpactStatistic) -> dict:
     return HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
 
 
+def _archive_item_payload(item: ArchiveItem) -> dict:
+    return ArchiveItemRead.model_validate(item).model_dump()
+
+
+def _can_validate_archives(db: Session, user) -> bool:
+    return bool(get_user_role_names(db, user.id).intersection(SECRETARIAT_ROLES))
+
+
+def _can_view_archive_item(db: Session, user, item: ArchiveItem) -> bool:
+    roles = get_user_role_names(db, user.id)
+    if item.created_by_id == user.id:
+        return True
+    if roles.intersection(SECRETARIAT_ROLES):
+        return True
+    if item.status != "validated":
+        return False
+    if item.visibility == "public" and item.is_public:
+        return True
+    if item.visibility == "alumni":
+        return user.status == "alumni" or "alumni" in roles
+    if item.visibility == "enacchefs":
+        return bool(roles.intersection(SECRETARIAT_ROLES))
+    if item.visibility == "interne":
+        return user.status in {"active", "alumni"}
+    return False
+
+
+def _archive_item_or_404(db: Session, archive_id: str) -> ArchiveItem:
+    item = db.query(ArchiveItem).filter(ArchiveItem.id == archive_id).first()
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archive introuvable",
+        )
+    return item
+
+
+def _ensure_archive_values(
+    *,
+    category: str | None = None,
+    visibility: str | None = None,
+    status_value: str | None = None,
+) -> None:
+    if category is not None and category not in VALID_ARCHIVE_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Catégorie d'archive invalide",
+        )
+    if visibility is not None and visibility not in VALID_ARCHIVE_VISIBILITIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Visibilité d'archive invalide",
+        )
+    if status_value is not None and status_value not in VALID_ARCHIVE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut d'archive invalide",
+        )
+
+
 def _matches_static_project(
     project: dict,
     *,
@@ -777,6 +860,237 @@ def _mark_file_as_archive(db: Session, file_id, visibility: str = "internal") ->
     stored_file.visibility = visibility
     stored_file.is_temporary = False
     stored_file.expires_at = None
+
+
+@router.get("/items")
+def list_archive_items(
+    search: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    year: int | None = Query(default=None),
+    visibility: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    featured: bool | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(ArchiveItem)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                ArchiveItem.title.ilike(pattern),
+                ArchiveItem.description.ilike(pattern),
+                ArchiveItem.category.ilike(pattern),
+                ArchiveItem.source_label.ilike(pattern),
+            )
+        )
+    if category:
+        query = query.filter(ArchiveItem.category == category)
+    if year is not None:
+        query = query.filter(ArchiveItem.year == year)
+    if visibility:
+        query = query.filter(ArchiveItem.visibility == visibility)
+    if status_filter:
+        query = query.filter(ArchiveItem.status == status_filter)
+    if featured is not None:
+        query = query.filter(ArchiveItem.is_featured.is_(featured))
+    items = query.order_by(
+        ArchiveItem.is_featured.desc(),
+        ArchiveItem.year.desc().nullslast(),
+        ArchiveItem.updated_at.desc(),
+    ).all()
+    return {
+        "items": [
+            _archive_item_payload(item)
+            for item in items
+            if _can_view_archive_item(db, current_user, item)
+        ]
+    }
+
+
+@router.post("/items", response_model=ArchiveItemRead)
+def create_archive_item(
+    payload: ArchiveItemCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _ensure_archive_values(
+        category=payload.category,
+        visibility=payload.visibility,
+        status_value=payload.status,
+    )
+    if payload.is_public and payload.visibility not in {"public", "alumni"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une archive publique doit avoir une visibilité public ou alumni",
+        )
+    _mark_file_as_archive(db, payload.file_id)
+    archive_item = ArchiveItem(
+        **payload.model_dump(),
+        created_by_id=current_user.id,
+    )
+    db.add(archive_item)
+    db.commit()
+    db.refresh(archive_item)
+    return archive_item
+
+
+@router.get("/items/{archive_id}")
+def get_archive_item(
+    archive_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    archive_item = _archive_item_or_404(db, archive_id)
+    if not _can_view_archive_item(db, current_user, archive_item):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Archive non autorisée",
+        )
+    return _archive_item_payload(archive_item)
+
+
+@router.patch("/items/{archive_id}", response_model=ArchiveItemRead)
+def update_archive_item(
+    archive_id: str,
+    payload: ArchiveItemUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    archive_item = _archive_item_or_404(db, archive_id)
+    data = payload.model_dump(exclude_unset=True)
+    _ensure_archive_values(
+        category=data.get("category"),
+        visibility=data.get("visibility"),
+        status_value=data.get("status"),
+    )
+    if data.get("is_public") is True:
+        next_visibility = data.get("visibility", archive_item.visibility)
+        if next_visibility not in {"public", "alumni"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Une archive publique doit avoir une visibilité public ou alumni",
+            )
+    if "file_id" in data:
+        _mark_file_as_archive(db, data["file_id"])
+    for field, value in data.items():
+        setattr(archive_item, field, value)
+    archive_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(archive_item)
+    return archive_item
+
+
+@router.post("/items/{archive_id}/submit", response_model=ArchiveItemRead)
+def submit_archive_item(
+    archive_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    archive_item = _archive_item_or_404(db, archive_id)
+    archive_item.status = "submitted"
+    archive_item.rejected_by_id = None
+    archive_item.rejected_at = None
+    archive_item.rejection_reason = None
+    archive_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(archive_item)
+    return archive_item
+
+
+@router.post("/items/{archive_id}/validate", response_model=ArchiveItemRead)
+def validate_archive_item(
+    archive_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    if not _can_validate_archives(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Validation d'archive réservée au SG, Team Leader ou Admin",
+        )
+    archive_item = _archive_item_or_404(db, archive_id)
+    archive_item.status = "validated"
+    archive_item.validated_by_id = current_user.id
+    archive_item.validated_at = datetime.utcnow()
+    archive_item.rejected_by_id = None
+    archive_item.rejected_at = None
+    archive_item.rejection_reason = None
+    archive_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(archive_item)
+    if archive_item.created_by_id:
+        notify_user(
+            db,
+            user_id=archive_item.created_by_id,
+            title="Archive validée",
+            message=f"L'archive « {archive_item.title} » est validée.",
+            notification_type="archive_validated",
+            related_type="archive",
+            related_id=archive_item.id,
+            dedupe=True,
+        )
+        db.commit()
+    return archive_item
+
+
+@router.post("/items/{archive_id}/reject", response_model=ArchiveItemRead)
+def reject_archive_item(
+    archive_id: str,
+    payload: ArchiveValidationRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    if not _can_validate_archives(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Refus d'archive réservé au SG, Team Leader ou Admin",
+        )
+    if not payload.reason or not payload.reason.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le motif de refus est obligatoire",
+        )
+    archive_item = _archive_item_or_404(db, archive_id)
+    archive_item.status = "rejected"
+    archive_item.rejected_by_id = current_user.id
+    archive_item.rejected_at = datetime.utcnow()
+    archive_item.rejection_reason = payload.reason.strip()
+    archive_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(archive_item)
+    if archive_item.created_by_id:
+        notify_user(
+            db,
+            user_id=archive_item.created_by_id,
+            title="Archive refusée",
+            message=f"L'archive « {archive_item.title} » a été refusée : {payload.reason.strip()}",
+            notification_type="archive_rejected",
+            related_type="archive",
+            related_id=archive_item.id,
+            dedupe=True,
+        )
+        db.commit()
+    return archive_item
+
+
+@router.post("/items/{archive_id}/archive", response_model=ArchiveItemRead)
+def archive_archive_item(
+    archive_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    if not _can_validate_archives(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Archivage réservé au SG, Team Leader ou Admin",
+        )
+    archive_item = _archive_item_or_404(db, archive_id)
+    archive_item.status = "archived"
+    archive_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(archive_item)
+    return archive_item
 
 
 @router.get("/historical-projects")

@@ -60,6 +60,10 @@ class ArchiveItemRead(ArchiveItemCreate):
         from_attributes = True
 
 
+class ArchiveValidationRequest(BaseModel):
+    reason: Optional[str] = None
+
+
 class ArchivedProjectCreate(BaseModel):
     archive_item_id: Optional[UUID] = None
     name: str
