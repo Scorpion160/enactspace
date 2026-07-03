@@ -31,10 +31,12 @@ class AcademyService {
       final responses = await Future.wait([
         _apiClient.get('/academy/courses', token: token),
         _apiClient.get('/academy/me/progress', token: token),
+        _apiClient.get('/academy/me/paths', token: token),
       ]);
 
       final coursesResponse = responses[0];
       final progressResponse = responses[1];
+      final pathsResponse = responses[2];
       if (coursesResponse is! List ||
           progressResponse is! Map<String, dynamic>) {
         return _demoHome();
@@ -48,9 +50,15 @@ class AcademyService {
       if (courses.isEmpty) return _demoHome();
 
       final fallback = await _demoHome();
+      final paths = pathsResponse is List
+          ? pathsResponse
+                .whereType<Map<String, dynamic>>()
+                .map(_pathFromJson)
+                .toList()
+          : fallback.paths;
       return AcademyHomeData(
         courses: courses,
-        paths: fallback.paths,
+        paths: paths.isEmpty ? fallback.paths : paths,
         badges: fallback.badges,
         caseStudies: fallback.caseStudies,
         progress: _progressFromJson(progressResponse, courses),
@@ -785,6 +793,19 @@ class AcademyService {
     );
   }
 
+  AcademyPathModel _pathFromJson(Map<String, dynamic> json) {
+    return AcademyPathModel(
+      id: _string(json['id'], fallback: 'path'),
+      title: _string(json['title'], fallback: 'Parcours Academy'),
+      description: _string(
+        json['description'],
+        fallback: 'Parcours recommande selon ton role.',
+      ),
+      courseIds: _stringList(json['course_ids']),
+      progress: _double(json['progress']),
+    );
+  }
+
   List<dynamic> _list(dynamic value) {
     return value is List ? value : const [];
   }
@@ -800,6 +821,14 @@ class AcademyService {
 
   double _double(dynamic value, {double fallback = 0}) {
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 
   Future<({bool passed, int points, double score})?> _submitQuiz({

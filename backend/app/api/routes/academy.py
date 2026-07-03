@@ -3,7 +3,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_validated_user, require_enacchef_or_admin
+from app.api.deps import (
+    get_current_active_validated_user,
+    get_user_role_names,
+    require_enacchef_or_admin,
+)
 from app.db.database import get_db
 from app.models.academy import (
     AcademyCourse,
@@ -133,6 +137,64 @@ COURSES = [
         },
     },
 ]
+
+ROLE_BASED_PATHS = {
+    "enacteur": {
+        "id": "new-enacteur",
+        "title": "Nouveau Enacteur",
+        "description": (
+            "Decouvrir Enactus, comprendre ESP, les engagements, EnactSpace "
+            "et les bases de l'impact."
+        ),
+        "course_ids": ["discover-enactus", "sdgs-impact"],
+    },
+    "chef_pole": {
+        "id": "pole-leader",
+        "title": "Chef de pole",
+        "description": (
+            "Gestion d'equipe, taches, documents, communication interne et reporting."
+        ),
+        "course_ids": ["leadership-collaboration", "discover-enactus"],
+    },
+    "adjoint_chef_pole": {
+        "id": "pole-deputy",
+        "title": "Adjoint chef de pole",
+        "description": "Appui operationnel, suivi des taches et passation.",
+        "course_ids": ["leadership-collaboration", "discover-enactus"],
+    },
+    "chef_projet": {
+        "id": "project-leader",
+        "title": "Chef de projet",
+        "description": (
+            "Gestion projet, suivi impact, preuves, rapports et preparation competition."
+        ),
+        "course_ids": ["sdgs-impact", "pitch-competition"],
+    },
+    "adjoint_chef_projet": {
+        "id": "project-deputy",
+        "title": "Adjoint chef de projet",
+        "description": "Contribution projet, preuves d'impact et reporting.",
+        "course_ids": ["sdgs-impact", "pitch-competition"],
+    },
+    "secretaire_generale": {
+        "id": "secretariat",
+        "title": "Secretariat General",
+        "description": "PV, documents officiels, presences et organisation interne.",
+        "course_ids": ["discover-enactus", "leadership-collaboration"],
+    },
+    "financier": {
+        "id": "finance",
+        "title": "Financier",
+        "description": "Cotisations, paiements, sanctions, recus, exports et validation.",
+        "course_ids": ["business-finance", "discover-enactus"],
+    },
+    "alumni": {
+        "id": "alumni",
+        "title": "Alumni",
+        "description": "Presentation du club, archives autorisees, contribution et mentorat.",
+        "course_ids": ["discover-enactus"],
+    },
+}
 
 VALID_COURSE_LEVELS = {"debutant", "intermediaire", "avance", "responsable"}
 VALID_LESSON_TYPES = {"texte", "video", "document", "quiz", "activite"}
@@ -665,6 +727,25 @@ def get_my_progress(
         "rank": 0,
         "monthly_progress": 0,
     }
+
+
+@router.get("/me/paths")
+def get_my_academy_paths(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    roles = get_user_role_names(db, current_user.id) or {"enacteur"}
+    if current_user.status == "alumni":
+        roles.add("alumni")
+    paths = []
+    for role in roles:
+        path = ROLE_BASED_PATHS.get(role)
+        if not path:
+            continue
+        paths.append({**path, "progress": 0})
+    if not paths:
+        paths.append({**ROLE_BASED_PATHS["enacteur"], "progress": 0})
+    return paths
 
 
 @router.get("/quizzes/{quiz_id}")
