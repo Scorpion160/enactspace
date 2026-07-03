@@ -190,6 +190,19 @@ class MediaArchiveCreate(BaseModel):
     is_featured: bool = False
 
 
+class MediaArchiveUpdate(BaseModel):
+    archive_item_id: Optional[UUID] = None
+    title: Optional[str] = None
+    media_type: Optional[str] = None
+    year: Optional[int] = None
+    description: Optional[str] = None
+    file_id: Optional[UUID] = None
+    external_url: Optional[str] = None
+    source_label: Optional[str] = None
+    archived_project_id: Optional[UUID] = None
+    is_featured: Optional[bool] = None
+
+
 class MediaArchiveRead(MediaArchiveCreate):
     id: UUID
     created_at: datetime
@@ -210,6 +223,19 @@ class HistoricalDocumentCreate(BaseModel):
     source_label: Optional[str] = None
     visibility: str = "interne"
     is_featured: bool = False
+
+
+class HistoricalDocumentUpdate(BaseModel):
+    archive_item_id: Optional[UUID] = None
+    title: Optional[str] = None
+    document_type: Optional[str] = None
+    year: Optional[int] = None
+    description: Optional[str] = None
+    document_id: Optional[UUID] = None
+    file_id: Optional[UUID] = None
+    source_label: Optional[str] = None
+    visibility: Optional[str] = None
+    is_featured: Optional[bool] = None
 
 
 class HistoricalDocumentRead(HistoricalDocumentCreate):

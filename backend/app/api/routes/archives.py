@@ -9,7 +9,15 @@ from app.api.deps import (
     require_enacchef_or_admin,
 )
 from app.db.database import get_db
-from app.models.archive import ArchiveItem, ArchivedProject, Award, CompetitionRecord
+from app.models.archive import (
+    ArchiveItem,
+    ArchivedProject,
+    Award,
+    CompetitionRecord,
+    HistoricalDocument,
+    MediaArchive,
+)
+from app.models.stored_file import StoredFile
 from app.schemas.archive import (
     ArchivedProjectCreate,
     ArchivedProjectRead,
@@ -20,6 +28,12 @@ from app.schemas.archive import (
     CompetitionRecordCreate,
     CompetitionRecordRead,
     CompetitionRecordUpdate,
+    HistoricalDocumentCreate,
+    HistoricalDocumentRead,
+    HistoricalDocumentUpdate,
+    MediaArchiveCreate,
+    MediaArchiveRead,
+    MediaArchiveUpdate,
 )
 
 
@@ -34,6 +48,26 @@ VALID_ARCHIVED_PROJECT_STATUSES = {
     "continué",
     "developpement",
     "développement",
+}
+VALID_ARCHIVE_MEDIA_TYPES = {
+    "image",
+    "photo",
+    "video",
+    "lien_video",
+    "article_presse",
+    "rapport",
+    "presentation",
+    "document",
+}
+VALID_HISTORICAL_DOCUMENT_TYPES = {
+    "Document officiel",
+    "Rapport annuel",
+    "Article presse",
+    "Présentation",
+    "Rapport compétition",
+    "Photo",
+    "Vidéo",
+    "Autre",
 }
 
 
@@ -383,6 +417,39 @@ def _competition_payload(competition: CompetitionRecord) -> dict:
     return CompetitionRecordRead.model_validate(competition).model_dump()
 
 
+def _file_payload(stored_file: StoredFile | None) -> dict | None:
+    if stored_file is None:
+        return None
+    return {
+        "id": stored_file.id,
+        "name": stored_file.original_filename,
+        "download_url": f"/api/files/{stored_file.id}/download",
+        "preview_url": f"/api/files/{stored_file.id}/preview",
+        "size_bytes": stored_file.file_size,
+    }
+
+
+def _media_payload(db: Session, media: MediaArchive) -> dict:
+    data = MediaArchiveRead.model_validate(media).model_dump()
+    stored_file = None
+    if media.file_id:
+        stored_file = db.query(StoredFile).filter(StoredFile.id == media.file_id).first()
+    data["file"] = _file_payload(stored_file)
+    return data
+
+
+def _historical_document_payload(
+    db: Session,
+    document: HistoricalDocument,
+) -> dict:
+    data = HistoricalDocumentRead.model_validate(document).model_dump()
+    stored_file = None
+    if document.file_id:
+        stored_file = db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
+    data["file"] = _file_payload(stored_file)
+    return data
+
+
 def _matches_static_project(
     project: dict,
     *,
@@ -493,6 +560,71 @@ def _create_archive_item_for_competition(
     db.add(archive_item)
     db.flush()
     return archive_item
+
+
+def _create_archive_item_for_media(
+    db: Session,
+    payload: MediaArchiveCreate,
+    user_id,
+) -> ArchiveItem:
+    archive_item = ArchiveItem(
+        title=payload.title,
+        description=payload.description,
+        category="Photo" if payload.media_type in {"image", "photo"} else "Vidéo",
+        year=payload.year,
+        file_id=payload.file_id,
+        visibility="interne",
+        status="draft",
+        is_featured=payload.is_featured,
+        created_by_id=user_id,
+        source_label=payload.source_label,
+        source_url=payload.external_url,
+        tags=["media", "archive", payload.media_type],
+        metadata_json={"media_type": payload.media_type},
+    )
+    db.add(archive_item)
+    db.flush()
+    return archive_item
+
+
+def _create_archive_item_for_historical_document(
+    db: Session,
+    payload: HistoricalDocumentCreate,
+    user_id,
+) -> ArchiveItem:
+    archive_item = ArchiveItem(
+        title=payload.title,
+        description=payload.description,
+        category=payload.document_type,
+        year=payload.year,
+        document_id=payload.document_id,
+        file_id=payload.file_id,
+        visibility=payload.visibility,
+        status="draft",
+        is_featured=payload.is_featured,
+        created_by_id=user_id,
+        source_label=payload.source_label,
+        tags=["document", "historique", payload.document_type.lower()],
+        metadata_json={"document_type": payload.document_type},
+    )
+    db.add(archive_item)
+    db.flush()
+    return archive_item
+
+
+def _mark_file_as_archive(db: Session, file_id, visibility: str = "internal") -> None:
+    if file_id is None:
+        return
+    stored_file = db.query(StoredFile).filter(StoredFile.id == file_id).first()
+    if not stored_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fichier d'archive introuvable",
+        )
+    stored_file.storage_scope = "archive"
+    stored_file.visibility = visibility
+    stored_file.is_temporary = False
+    stored_file.expires_at = None
 
 
 @router.get("/historical-projects")
@@ -839,3 +971,190 @@ def update_competition(
     db.commit()
     db.refresh(competition)
     return competition
+
+
+@router.get("/media")
+def list_archive_media(
+    search: str | None = Query(default=None),
+    year: int | None = Query(default=None),
+    media_type: str | None = Query(default=None),
+    project_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(MediaArchive)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                MediaArchive.title.ilike(pattern),
+                MediaArchive.description.ilike(pattern),
+                MediaArchive.source_label.ilike(pattern),
+            )
+        )
+    if year is not None:
+        query = query.filter(MediaArchive.year == year)
+    if media_type:
+        query = query.filter(MediaArchive.media_type == media_type)
+    if project_id:
+        query = query.filter(MediaArchive.archived_project_id == project_id)
+    media = query.order_by(
+        MediaArchive.year.desc().nullslast(),
+        MediaArchive.is_featured.desc(),
+        MediaArchive.created_at.desc(),
+    ).all()
+    return {"media": [_media_payload(db, item) for item in media]}
+
+
+@router.post("/media")
+def create_archive_media(
+    payload: MediaArchiveCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    if payload.media_type not in VALID_ARCHIVE_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de média d'archive invalide",
+        )
+    _mark_file_as_archive(db, payload.file_id)
+    archive_item_id = payload.archive_item_id
+    if archive_item_id is None:
+        archive_item_id = _create_archive_item_for_media(
+            db,
+            payload,
+            current_user.id,
+        ).id
+    media = MediaArchive(
+        **payload.model_dump(exclude={"archive_item_id"}),
+        archive_item_id=archive_item_id,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return _media_payload(db, media)
+
+
+@router.patch("/media/{media_id}")
+def update_archive_media(
+    media_id: str,
+    payload: MediaArchiveUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    media = db.query(MediaArchive).filter(MediaArchive.id == media_id).first()
+    if not media:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Média d'archive introuvable",
+        )
+    data = payload.model_dump(exclude_unset=True)
+    if "media_type" in data and data["media_type"] not in VALID_ARCHIVE_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de média d'archive invalide",
+        )
+    if "file_id" in data:
+        _mark_file_as_archive(db, data["file_id"])
+    for field, value in data.items():
+        setattr(media, field, value)
+    media.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(media)
+    return _media_payload(db, media)
+
+
+@router.get("/documents")
+def list_historical_documents(
+    search: str | None = Query(default=None),
+    year: int | None = Query(default=None),
+    document_type: str | None = Query(default=None),
+    visibility: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(HistoricalDocument)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                HistoricalDocument.title.ilike(pattern),
+                HistoricalDocument.description.ilike(pattern),
+                HistoricalDocument.source_label.ilike(pattern),
+            )
+        )
+    if year is not None:
+        query = query.filter(HistoricalDocument.year == year)
+    if document_type:
+        query = query.filter(HistoricalDocument.document_type == document_type)
+    if visibility:
+        query = query.filter(HistoricalDocument.visibility == visibility)
+    documents = query.order_by(
+        HistoricalDocument.year.desc().nullslast(),
+        HistoricalDocument.is_featured.desc(),
+        HistoricalDocument.created_at.desc(),
+    ).all()
+    return {"documents": [_historical_document_payload(db, item) for item in documents]}
+
+
+@router.post("/documents")
+def create_historical_document(
+    payload: HistoricalDocumentCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    if payload.document_type not in VALID_HISTORICAL_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de document historique invalide",
+        )
+    _mark_file_as_archive(db, payload.file_id)
+    archive_item_id = payload.archive_item_id
+    if archive_item_id is None:
+        archive_item_id = _create_archive_item_for_historical_document(
+            db,
+            payload,
+            current_user.id,
+        ).id
+    document = HistoricalDocument(
+        **payload.model_dump(exclude={"archive_item_id"}),
+        archive_item_id=archive_item_id,
+    )
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    return _historical_document_payload(db, document)
+
+
+@router.patch("/documents/{document_id}")
+def update_historical_document(
+    document_id: str,
+    payload: HistoricalDocumentUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    document = (
+        db.query(HistoricalDocument).filter(HistoricalDocument.id == document_id).first()
+    )
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document historique introuvable",
+        )
+    data = payload.model_dump(exclude_unset=True)
+    if (
+        "document_type" in data
+        and data["document_type"] not in VALID_HISTORICAL_DOCUMENT_TYPES
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de document historique invalide",
+        )
+    if "file_id" in data:
+        _mark_file_as_archive(db, data["file_id"])
+    for field, value in data.items():
+        setattr(document, field, value)
+    document.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(document)
+    return _historical_document_payload(db, document)
