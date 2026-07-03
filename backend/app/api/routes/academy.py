@@ -5,7 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_validated_user, require_enacchef_or_admin
 from app.db.database import get_db
-from app.models.academy import AcademyCourse, AcademyLesson
+from app.models.academy import (
+    AcademyCourse,
+    AcademyLesson,
+    AcademyQuestion,
+    AcademyQuiz,
+    AcademyQuizAttempt,
+)
 from app.schemas.academy import (
     AcademyCourseCreate,
     AcademyCourseRead,
@@ -13,6 +19,11 @@ from app.schemas.academy import (
     AcademyLessonCreate,
     AcademyLessonRead,
     AcademyLessonUpdate,
+    AcademyQuestionCreate,
+    AcademyQuestionRead,
+    AcademyQuizCreate,
+    AcademyQuizRead,
+    AcademyQuizSubmit,
 )
 from app.services.notification_service import notify_user
 
@@ -214,6 +225,84 @@ def _course_payload(db: Session, course: AcademyCourse) -> dict:
     }
 
 
+def _quiz_payload(db: Session, quiz: AcademyQuiz, *, include_answers: bool) -> dict:
+    questions = (
+        db.query(AcademyQuestion)
+        .filter(AcademyQuestion.quiz_id == quiz.id)
+        .order_by(AcademyQuestion.order_index.asc(), AcademyQuestion.created_at.asc())
+        .all()
+    )
+    course = (
+        db.query(AcademyCourse).filter(AcademyCourse.id == quiz.course_id).first()
+        if quiz.course_id
+        else None
+    )
+    return {
+        "id": str(quiz.id),
+        "title": quiz.title,
+        "category": course.category if course else "Academy",
+        "level": course.level if course else "debutant",
+        "time_limit_minutes": int(quiz.time_limit_minutes or 0),
+        "passing_score": float(quiz.passing_score or 60),
+        "questions": [
+            {
+                "id": str(question.id),
+                "question": question.prompt,
+                "question_type": question.question_type,
+                "choices": question.choices or [],
+                "correct_index": (
+                    (question.correct_answers or [0])[0] if include_answers else 0
+                ),
+                "explanation": question.explanation or "",
+            }
+            for question in questions
+        ],
+    }
+
+
+def _quiz_or_404(db: Session, quiz_id: str) -> AcademyQuiz:
+    quiz = db.query(AcademyQuiz).filter(AcademyQuiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quiz introuvable",
+        )
+    return quiz
+
+
+def _score_db_quiz(db: Session, quiz: AcademyQuiz, answers: list) -> dict:
+    questions = (
+        db.query(AcademyQuestion)
+        .filter(AcademyQuestion.quiz_id == quiz.id)
+        .order_by(AcademyQuestion.order_index.asc(), AcademyQuestion.created_at.asc())
+        .all()
+    )
+    max_score = sum(float(question.points or 0) for question in questions)
+    score = 0.0
+    correct = 0
+    for index, question in enumerate(questions):
+        expected = sorted(int(item) for item in (question.correct_answers or []))
+        raw_answer = answers[index] if index < len(answers) else None
+        selected = raw_answer if isinstance(raw_answer, list) else [raw_answer]
+        selected = sorted(
+            int(item)
+            for item in selected
+            if isinstance(item, int) or str(item).isdigit()
+        )
+        if selected == expected:
+            score += float(question.points or 0)
+            correct += 1
+    percent = (score / max_score) * 100 if max_score else 0
+    return {
+        "score": percent,
+        "raw_score": score,
+        "max_score": max_score,
+        "passed": percent >= float(quiz.passing_score or 60),
+        "correct_answers": correct,
+        "total_questions": len(questions),
+    }
+
+
 @router.get("/courses")
 def list_courses(
     db: Session = Depends(get_db),
@@ -375,6 +464,48 @@ def update_lesson(
     return lesson
 
 
+@router.post("/admin/quizzes", response_model=AcademyQuizRead)
+def create_admin_quiz(
+    payload: AcademyQuizCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    if payload.course_id:
+        _course_or_404(db, payload.course_id)
+    if payload.lesson_id:
+        _lesson_or_404(db, payload.lesson_id)
+    quiz = AcademyQuiz(**payload.model_dump(), created_by_id=current_user.id)
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+    data = AcademyQuizRead.model_validate(quiz).model_dump()
+    data["questions"] = []
+    return data
+
+
+@router.post(
+    "/admin/quizzes/{quiz_id}/questions",
+    response_model=AcademyQuestionRead,
+)
+def create_admin_question(
+    quiz_id: str,
+    payload: AcademyQuestionCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _quiz_or_404(db, quiz_id)
+    if payload.question_type not in {"single_choice", "multiple_choice", "true_false"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de question invalide",
+        )
+    question = AcademyQuestion(quiz_id=quiz_id, **payload.model_dump())
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return question
+
+
 @router.get("/me/progress")
 def get_my_progress(
     db: Session = Depends(get_db),
@@ -411,7 +542,15 @@ def get_my_progress(
 
 
 @router.get("/quizzes/{quiz_id}")
-def get_quiz(quiz_id: str, current_user=Depends(get_current_active_validated_user)):
+def get_quiz(
+    quiz_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    db_quiz = db.query(AcademyQuiz).filter(AcademyQuiz.id == quiz_id).first()
+    if db_quiz and db_quiz.is_published:
+        return _quiz_payload(db, db_quiz, include_answers=False)
+
     for course in COURSES:
         if course["quiz"]["id"] == quiz_id:
             return course["quiz"]
@@ -425,12 +564,56 @@ def get_quiz(quiz_id: str, current_user=Depends(get_current_active_validated_use
 @router.post("/quizzes/{quiz_id}/submit")
 def submit_quiz(
     quiz_id: str,
-    payload: dict,
+    payload: AcademyQuizSubmit,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
-    quiz = get_quiz(quiz_id, current_user=current_user)
-    answers = payload.get("answers", [])
+    answers = payload.answers
+    db_quiz = db.query(AcademyQuiz).filter(AcademyQuiz.id == quiz_id).first()
+    if db_quiz and db_quiz.is_published:
+        result = _score_db_quiz(db, db_quiz, answers)
+        attempts_count = (
+            db.query(AcademyQuizAttempt)
+            .filter(
+                AcademyQuizAttempt.quiz_id == db_quiz.id,
+                AcademyQuizAttempt.user_id == current_user.id,
+            )
+            .count()
+        )
+        attempt = AcademyQuizAttempt(
+            quiz_id=db_quiz.id,
+            user_id=current_user.id,
+            answers=answers,
+            score=result["score"],
+            max_score=100,
+            passed=result["passed"],
+            attempt_number=attempts_count + 1,
+            submitted_at=datetime.utcnow(),
+        )
+        db.add(attempt)
+        if result["passed"]:
+            notify_user(
+                db,
+                user_id=current_user.id,
+                title=f"Quiz reussi : {db_quiz.title}",
+                message=f"Score obtenu : {result['score']:.0f}%.",
+                notification_type="quiz_passed",
+                related_type="academy_quiz",
+                related_id=db_quiz.id,
+                dedupe=True,
+            )
+        db.commit()
+        return {
+            "quiz_id": quiz_id,
+            "score": result["score"],
+            "passed": result["passed"],
+            "correct_answers": result["correct_answers"],
+            "total_questions": result["total_questions"],
+            "points": 60 if result["passed"] else 0,
+            "attempt_number": attempt.attempt_number,
+        }
+
+    quiz = get_quiz(quiz_id, db=db, current_user=current_user)
     questions = quiz["questions"]
     correct = 0
 
