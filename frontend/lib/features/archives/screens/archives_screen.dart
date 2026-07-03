@@ -20,6 +20,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
   String? _error;
   ArchivesHomeData? _data;
   String _statusFilter = 'all';
+  String _yearFilter = 'all';
   bool _expansionOnly = false;
 
   @override
@@ -75,10 +76,14 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
               data: _data!,
               searchController: _searchController,
               statusFilter: _statusFilter,
+              yearFilter: _yearFilter,
               expansionOnly: _expansionOnly,
               onChanged: () => setState(() {}),
               onStatusChanged: (value) {
                 setState(() => _statusFilter = value);
+              },
+              onYearChanged: (value) {
+                setState(() => _yearFilter = value);
               },
               onExpansionChanged: (value) {
                 setState(() => _expansionOnly = value);
@@ -170,23 +175,38 @@ class _ArchivesContent extends StatelessWidget {
   final ArchivesHomeData data;
   final TextEditingController searchController;
   final String statusFilter;
+  final String yearFilter;
   final bool expansionOnly;
   final VoidCallback onChanged;
   final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onYearChanged;
   final ValueChanged<bool> onExpansionChanged;
 
   const _ArchivesContent({
     required this.data,
     required this.searchController,
     required this.statusFilter,
+    required this.yearFilter,
     required this.expansionOnly,
     required this.onChanged,
     required this.onStatusChanged,
+    required this.onYearChanged,
     required this.onExpansionChanged,
   });
 
+  List<int> get _availableYears {
+    final years = <int>{};
+    for (final project in data.projects) {
+      years.add(project.launchYear);
+      if (project.archiveYear != null) years.add(project.archiveYear!);
+    }
+    final sorted = years.toList()..sort((a, b) => b.compareTo(a));
+    return sorted.take(8).toList();
+  }
+
   List<ArchiveProjectModel> get _filteredProjects {
     final query = searchController.text.trim().toLowerCase();
+    final selectedYear = int.tryParse(yearFilter);
 
     return data.projects.where((project) {
       final searchable = [
@@ -205,9 +225,13 @@ class _ArchivesContent extends StatelessWidget {
       final matchesQuery = query.isEmpty || searchable.contains(query);
       final matchesStatus =
           statusFilter == 'all' || project.status == statusFilter;
+      final matchesYear =
+          selectedYear == null ||
+          project.launchYear == selectedYear ||
+          project.archiveYear == selectedYear;
       final matchesExpansion = !expansionOnly || project.expansionReady;
 
-      return matchesQuery && matchesStatus && matchesExpansion;
+      return matchesQuery && matchesStatus && matchesYear && matchesExpansion;
     }).toList();
   }
 
@@ -225,9 +249,12 @@ class _ArchivesContent extends StatelessWidget {
         _ArchiveFiltersCard(
           controller: searchController,
           statusFilter: statusFilter,
+          yearFilter: yearFilter,
+          years: _availableYears,
           expansionOnly: expansionOnly,
           onChanged: onChanged,
           onStatusChanged: onStatusChanged,
+          onYearChanged: onYearChanged,
           onExpansionChanged: onExpansionChanged,
         ),
         const SizedBox(height: 22),
@@ -527,17 +554,23 @@ class _OfficialArchiveDocumentTile extends StatelessWidget {
 class _ArchiveFiltersCard extends StatelessWidget {
   final TextEditingController controller;
   final String statusFilter;
+  final String yearFilter;
+  final List<int> years;
   final bool expansionOnly;
   final VoidCallback onChanged;
   final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onYearChanged;
   final ValueChanged<bool> onExpansionChanged;
 
   const _ArchiveFiltersCard({
     required this.controller,
     required this.statusFilter,
+    required this.yearFilter,
+    required this.years,
     required this.expansionOnly,
     required this.onChanged,
     required this.onStatusChanged,
+    required this.onYearChanged,
     required this.onExpansionChanged,
   });
 
@@ -605,23 +638,75 @@ class _ArchiveFiltersCard extends StatelessWidget {
                 ),
               ],
             );
+            final yearFilters = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ArchiveChoiceChip(
+                  label: 'Toutes années',
+                  selected: yearFilter == 'all',
+                  onSelected: () => onYearChanged('all'),
+                ),
+                for (final year in years)
+                  _ArchiveChoiceChip(
+                    label: year.toString(),
+                    selected: yearFilter == year.toString(),
+                    onSelected: () => onYearChanged(year.toString()),
+                  ),
+              ],
+            );
 
             if (isWide) {
               return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: search),
                   const SizedBox(width: 14),
-                  Flexible(child: filters),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        filters,
+                        const SizedBox(height: 10),
+                        yearFilters,
+                      ],
+                    ),
+                  ),
                 ],
               );
             }
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, const SizedBox(height: 12), filters],
+              children: [
+                search,
+                const SizedBox(height: 12),
+                filters,
+                const SizedBox(height: 10),
+                yearFilters,
+              ],
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ArchiveSafeChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final double maxWidth;
+
+  const _ArchiveSafeChip({required this.label, this.icon, this.maxWidth = 220});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Chip(
+        avatar: icon == null ? null : Icon(icon, size: 16),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
     );
   }
@@ -731,7 +816,7 @@ class _ArchiveProjectCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Chip(label: Text(project.status)),
+                  _ArchiveSafeChip(label: project.status, maxWidth: 130),
                 ],
               ),
               const SizedBox(height: 12),
@@ -746,10 +831,13 @@ class _ArchiveProjectCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Chip(label: Text(project.periodLabel)),
-                  Chip(label: Text(project.locality)),
+                  _ArchiveSafeChip(label: project.periodLabel, maxWidth: 150),
+                  _ArchiveSafeChip(label: project.locality),
                   if (project.expansionReady)
-                    const Chip(label: Text('Expansion possible')),
+                    const _ArchiveSafeChip(
+                      label: 'Expansion possible',
+                      icon: Icons.auto_awesome_rounded,
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -757,11 +845,13 @@ class _ArchiveProjectCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Chip(label: Text('${project.impactedLives} vies')),
-                  Chip(label: Text('${project.jobs} emplois')),
-                  Chip(label: Text('${project.products.length} produit(s)')),
+                  _ArchiveSafeChip(label: '${project.impactedLives} vies'),
+                  _ArchiveSafeChip(label: '${project.jobs} emplois'),
+                  _ArchiveSafeChip(
+                    label: '${project.products.length} produit(s)',
+                  ),
                   for (final sdg in project.sdgs.take(2))
-                    Chip(label: Text(sdg)),
+                    _ArchiveSafeChip(label: sdg, maxWidth: 120),
                 ],
               ),
             ],
@@ -1001,7 +1091,7 @@ class _DetailChips extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [for (final chip in chips) Chip(label: Text(chip))],
+            children: [for (final chip in chips) _ArchiveSafeChip(label: chip)],
           ),
         ],
       ),
