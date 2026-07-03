@@ -57,7 +57,16 @@ Resultat:
 - `flutter clean` est reste bloque sans sortie.
 - `flutter --version` est reste bloque sans sortie, meme apres arret des daemons Flutter/Dart visibles.
 - Les processus bloques ont ete arretes pour eviter de laisser des sessions pendantes.
-- Aucun APK n'a ete genere dans cette session.
+- Aucun nouvel APK n'a ete genere dans cette session.
+
+Des artefacts APK existaient deja dans le dossier de build au moment du controle final:
+
+```text
+frontend\build\app\outputs\flutter-apk\app-debug.apk
+frontend\build\app\outputs\flutter-apk\app-release.apk
+```
+
+Ils doivent etre consideres comme des builds precedents tant qu'un nouveau `flutter build apk` ne se termine pas avec succes.
 
 ## Validations projet deja OK
 
