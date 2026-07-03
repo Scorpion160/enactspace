@@ -9,11 +9,17 @@ from app.api.deps import (
     require_enacchef_or_admin,
 )
 from app.db.database import get_db
-from app.models.archive import ArchiveItem, ArchivedProject
+from app.models.archive import ArchiveItem, ArchivedProject, Award, CompetitionRecord
 from app.schemas.archive import (
     ArchivedProjectCreate,
     ArchivedProjectRead,
     ArchivedProjectUpdate,
+    AwardCreate,
+    AwardRead,
+    AwardUpdate,
+    CompetitionRecordCreate,
+    CompetitionRecordRead,
+    CompetitionRecordUpdate,
 )
 
 
@@ -204,9 +210,177 @@ INITIAL_HISTORICAL_PROJECTS = [
     },
 ]
 
+INITIAL_AWARDS = [
+    {
+        "id": "prix-excellence-sonatel",
+        "archive_item_id": None,
+        "title": "Premier Prix d’Excellence Fondation Sonatel",
+        "year": None,
+        "competition": "Fondation Sonatel",
+        "rank": "Premier prix",
+        "result": "Distinction",
+        "description": "Prix historique obtenu par Enactus ESP.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+    {
+        "id": "deuxieme-national-2016",
+        "archive_item_id": None,
+        "title": "Deuxième National compétition nationale 2016",
+        "year": 2016,
+        "competition": "Compétition Nationale Enactus Sénégal",
+        "rank": "Deuxième",
+        "result": "Finaliste national",
+        "description": "Performance nationale majeure de la saison 2016.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+    {
+        "id": "uhodari-2016",
+        "archive_item_id": None,
+        "title": "4 prix sur 5 UHODARI 2016",
+        "year": 2016,
+        "competition": "UHODARI",
+        "rank": "4 prix sur 5",
+        "result": "Distinction multiple",
+        "description": "Série de distinctions obtenues lors de UHODARI 2016.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+    {
+        "id": "champion-national-2017",
+        "archive_item_id": None,
+        "title": "Champion National 2017",
+        "year": 2017,
+        "competition": "Compétition Nationale Enactus Sénégal",
+        "rank": "Champion national",
+        "result": "Qualification internationale",
+        "description": "Titre national majeur dans l'histoire d'Enactus ESP.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+    {
+        "id": "champion-national-2018",
+        "archive_item_id": None,
+        "title": "Champion National 2018",
+        "year": 2018,
+        "competition": "Compétition Nationale Enactus Sénégal",
+        "rank": "Champion national",
+        "result": "Qualification World Cup",
+        "description": "Deuxième titre national consécutif valorisant la solidité du club.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+    {
+        "id": "demi-finaliste-international-2018",
+        "archive_item_id": None,
+        "title": "Demi-finaliste compétition internationale 2018",
+        "year": 2018,
+        "competition": "Enactus World Cup",
+        "rank": "Demi-finaliste",
+        "result": "Performance internationale",
+        "description": "Présence d'Enactus ESP parmi les demi-finalistes internationaux en 2018.",
+        "archived_project_id": None,
+        "file_id": None,
+        "media_url": None,
+        "is_featured": True,
+    },
+]
+
+INITIAL_COMPETITIONS = [
+    {
+        "id": "competition-nationale-2016",
+        "archive_item_id": None,
+        "name": "Compétition Nationale Enactus Sénégal 2016",
+        "year": 2016,
+        "stage": "National",
+        "result": "Deuxième national",
+        "location": "Sénégal",
+        "description": "Saison nationale marquée par une place de deuxième.",
+        "project_ids": [],
+        "award_ids": ["deuxieme-national-2016"],
+        "file_id": None,
+        "is_featured": True,
+    },
+    {
+        "id": "uhodari-2016-record",
+        "archive_item_id": None,
+        "name": "UHODARI 2016",
+        "year": 2016,
+        "stage": "Distinctions",
+        "result": "4 prix sur 5",
+        "location": "Sénégal",
+        "description": "Compétition marquée par quatre prix remportés sur cinq.",
+        "project_ids": [],
+        "award_ids": ["uhodari-2016"],
+        "file_id": None,
+        "is_featured": True,
+    },
+    {
+        "id": "competition-nationale-2017",
+        "archive_item_id": None,
+        "name": "Compétition Nationale Enactus Sénégal 2017",
+        "year": 2017,
+        "stage": "National",
+        "result": "Champion national",
+        "location": "Sénégal",
+        "description": "Titre national 2017.",
+        "project_ids": [],
+        "award_ids": ["champion-national-2017"],
+        "file_id": None,
+        "is_featured": True,
+    },
+    {
+        "id": "competition-nationale-2018",
+        "archive_item_id": None,
+        "name": "Compétition Nationale Enactus Sénégal 2018",
+        "year": 2018,
+        "stage": "National",
+        "result": "Champion national",
+        "location": "Sénégal",
+        "description": "Titre national 2018.",
+        "project_ids": [],
+        "award_ids": ["champion-national-2018"],
+        "file_id": None,
+        "is_featured": True,
+    },
+    {
+        "id": "world-cup-2018",
+        "archive_item_id": None,
+        "name": "Enactus World Cup 2018",
+        "year": 2018,
+        "stage": "International",
+        "result": "Demi-finaliste",
+        "location": "International",
+        "description": "Performance internationale majeure d'Enactus ESP.",
+        "project_ids": [],
+        "award_ids": ["demi-finaliste-international-2018"],
+        "file_id": None,
+        "is_featured": True,
+    },
+]
+
 
 def _project_payload(project: ArchivedProject) -> dict:
     return ArchivedProjectRead.model_validate(project).model_dump()
+
+
+def _award_payload(award: Award) -> dict:
+    return AwardRead.model_validate(award).model_dump()
+
+
+def _competition_payload(competition: CompetitionRecord) -> dict:
+    return CompetitionRecordRead.model_validate(competition).model_dump()
 
 
 def _matches_static_project(
@@ -260,6 +434,60 @@ def _create_archive_item_for_project(
         metadata_json={
             "season_label": payload.season_label,
             "status": payload.status,
+        },
+    )
+    db.add(archive_item)
+    db.flush()
+    return archive_item
+
+
+def _create_archive_item_for_award(
+    db: Session,
+    payload: AwardCreate,
+    user_id,
+) -> ArchiveItem:
+    archive_item = ArchiveItem(
+        title=payload.title,
+        description=payload.description,
+        category="Prix / distinction",
+        year=payload.year,
+        file_id=payload.file_id,
+        visibility="interne",
+        status="draft",
+        is_featured=payload.is_featured,
+        created_by_id=user_id,
+        tags=["prix", "distinction", payload.title.lower()],
+        metadata_json={
+            "competition": payload.competition,
+            "rank": payload.rank,
+            "result": payload.result,
+        },
+    )
+    db.add(archive_item)
+    db.flush()
+    return archive_item
+
+
+def _create_archive_item_for_competition(
+    db: Session,
+    payload: CompetitionRecordCreate,
+    user_id,
+) -> ArchiveItem:
+    archive_item = ArchiveItem(
+        title=payload.name,
+        description=payload.description,
+        category="Compétition",
+        year=payload.year,
+        file_id=payload.file_id,
+        visibility="interne",
+        status="draft",
+        is_featured=payload.is_featured,
+        created_by_id=user_id,
+        tags=["competition", "archives", payload.name.lower()],
+        metadata_json={
+            "stage": payload.stage,
+            "result": payload.result,
+            "location": payload.location,
         },
     )
     db.add(archive_item)
@@ -375,3 +603,239 @@ def update_historical_project(
     db.commit()
     db.refresh(project)
     return project
+
+
+@router.get("/awards")
+def list_awards(
+    search: str | None = Query(default=None),
+    year: int | None = Query(default=None),
+    featured: bool | None = Query(default=None),
+    include_static: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(Award)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Award.title.ilike(pattern),
+                Award.competition.ilike(pattern),
+                Award.result.ilike(pattern),
+                Award.description.ilike(pattern),
+            )
+        )
+    if year is not None:
+        query = query.filter(Award.year == year)
+    if featured is not None:
+        query = query.filter(Award.is_featured.is_(featured))
+
+    db_awards = [
+        _award_payload(award)
+        for award in query.order_by(
+            Award.year.desc().nullslast(),
+            Award.is_featured.desc(),
+            Award.title.asc(),
+        ).all()
+    ]
+    static_awards = []
+    if include_static:
+        static_awards = [
+            award
+            for award in INITIAL_AWARDS
+            if (year is None or award["year"] == year)
+            and (featured is None or award["is_featured"] is featured)
+            and (
+                not search
+                or search.lower()
+                in " ".join(
+                    str(award.get(field) or "")
+                    for field in ("title", "competition", "result", "description")
+                ).lower()
+            )
+        ]
+    return {"awards": db_awards + static_awards}
+
+
+@router.post("/awards", response_model=AwardRead)
+def create_award(
+    payload: AwardCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    archive_item_id = payload.archive_item_id
+    if archive_item_id is None:
+        archive_item_id = _create_archive_item_for_award(
+            db,
+            payload,
+            current_user.id,
+        ).id
+    award = Award(
+        **payload.model_dump(exclude={"archive_item_id"}),
+        archive_item_id=archive_item_id,
+    )
+    db.add(award)
+    db.commit()
+    db.refresh(award)
+    return award
+
+
+@router.get("/awards/{award_id}")
+def get_award(
+    award_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    for award in INITIAL_AWARDS:
+        if award["id"] == award_id:
+            return award
+    award = db.query(Award).filter(Award.id == award_id).first()
+    if not award:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prix ou distinction introuvable",
+        )
+    return _award_payload(award)
+
+
+@router.patch("/awards/{award_id}", response_model=AwardRead)
+def update_award(
+    award_id: str,
+    payload: AwardUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    award = db.query(Award).filter(Award.id == award_id).first()
+    if not award:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prix ou distinction introuvable",
+        )
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(award, field, value)
+    award.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(award)
+    return award
+
+
+@router.get("/competitions")
+def list_competitions(
+    search: str | None = Query(default=None),
+    year: int | None = Query(default=None),
+    featured: bool | None = Query(default=None),
+    include_static: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(CompetitionRecord)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                CompetitionRecord.name.ilike(pattern),
+                CompetitionRecord.stage.ilike(pattern),
+                CompetitionRecord.result.ilike(pattern),
+                CompetitionRecord.description.ilike(pattern),
+            )
+        )
+    if year is not None:
+        query = query.filter(CompetitionRecord.year == year)
+    if featured is not None:
+        query = query.filter(CompetitionRecord.is_featured.is_(featured))
+
+    db_competitions = [
+        _competition_payload(competition)
+        for competition in query.order_by(
+            CompetitionRecord.year.desc().nullslast(),
+            CompetitionRecord.is_featured.desc(),
+            CompetitionRecord.name.asc(),
+        ).all()
+    ]
+    static_competitions = []
+    if include_static:
+        static_competitions = [
+            competition
+            for competition in INITIAL_COMPETITIONS
+            if (year is None or competition["year"] == year)
+            and (featured is None or competition["is_featured"] is featured)
+            and (
+                not search
+                or search.lower()
+                in " ".join(
+                    str(competition.get(field) or "")
+                    for field in ("name", "stage", "result", "description")
+                ).lower()
+            )
+        ]
+    return {"competitions": db_competitions + static_competitions}
+
+
+@router.post("/competitions", response_model=CompetitionRecordRead)
+def create_competition(
+    payload: CompetitionRecordCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    archive_item_id = payload.archive_item_id
+    if archive_item_id is None:
+        archive_item_id = _create_archive_item_for_competition(
+            db,
+            payload,
+            current_user.id,
+        ).id
+    competition = CompetitionRecord(
+        **payload.model_dump(exclude={"archive_item_id"}),
+        archive_item_id=archive_item_id,
+    )
+    db.add(competition)
+    db.commit()
+    db.refresh(competition)
+    return competition
+
+
+@router.get("/competitions/{competition_id}")
+def get_competition(
+    competition_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    for competition in INITIAL_COMPETITIONS:
+        if competition["id"] == competition_id:
+            return competition
+    competition = (
+        db.query(CompetitionRecord)
+        .filter(CompetitionRecord.id == competition_id)
+        .first()
+    )
+    if not competition:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compétition introuvable",
+        )
+    return _competition_payload(competition)
+
+
+@router.patch("/competitions/{competition_id}", response_model=CompetitionRecordRead)
+def update_competition(
+    competition_id: str,
+    payload: CompetitionRecordUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    competition = (
+        db.query(CompetitionRecord)
+        .filter(CompetitionRecord.id == competition_id)
+        .first()
+    )
+    if not competition:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compétition introuvable",
+        )
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(competition, field, value)
+    competition.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(competition)
+    return competition
