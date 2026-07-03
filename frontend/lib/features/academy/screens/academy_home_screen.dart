@@ -921,9 +921,13 @@ class _QuizStrip extends StatelessWidget {
               title: Text(
                 course.quiz.title,
                 style: const TextStyle(fontWeight: FontWeight.w900),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
                 '${course.quiz.level} • ${course.quiz.questions.length} question(s) • ${course.quiz.timeLimitMinutes} min',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               trailing: rewardingActionId == 'quiz-${course.id}'
                   ? const SizedBox(
@@ -1031,6 +1035,8 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
             child: Text(
               quiz.title,
               style: const TextStyle(fontWeight: FontWeight.w900),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1048,6 +1054,8 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
                   color: Colors.black54,
                   fontWeight: FontWeight.w700,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 16),
               if (_submitted) _QuizResultBanner(score: _score, passed: _passed),
@@ -1511,8 +1519,13 @@ class _CaseDetailTile extends StatelessWidget {
           foregroundColor: AppTheme.softBlack,
           child: Icon(icon),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-        subtitle: Text(body),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(body, maxLines: 3, overflow: TextOverflow.ellipsis),
       ),
     );
   }
@@ -1536,7 +1549,19 @@ class _CaseChipBlock extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [for (final item in items) Chip(label: Text(item))],
+            children: [
+              for (final item in items)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 280),
+                  child: Chip(
+                    label: Text(
+                      item,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
