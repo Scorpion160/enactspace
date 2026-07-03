@@ -271,6 +271,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Row(
           children: [
             Image.asset(
@@ -889,11 +890,15 @@ class _MobileBottomNavigation extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final compactLabels = MediaQuery.sizeOf(context).width < 380;
+
     return NavigationBar(
       height: 72,
       selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
       onDestinationSelected: (index) => context.go(destinations[index].path),
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      labelBehavior: compactLabels
+          ? NavigationDestinationLabelBehavior.onlyShowSelected
+          : NavigationDestinationLabelBehavior.alwaysShow,
       destinations: [
         for (final destination in destinations)
           NavigationDestination(

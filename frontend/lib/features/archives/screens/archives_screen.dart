@@ -1064,8 +1064,13 @@ class _DetailSection extends StatelessWidget {
           foregroundColor: AppTheme.softBlack,
           child: Icon(icon),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-        subtitle: Text(body),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(body, maxLines: 3, overflow: TextOverflow.ellipsis),
       ),
     );
   }
@@ -1086,7 +1091,12 @@ class _DetailChips extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
