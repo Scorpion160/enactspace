@@ -52,3 +52,12 @@ from app.models.academy import (
     AcademyQuizAttempt,
     AcademyCertificate,
 )
+from app.models.archive import (
+    ArchiveItem,
+    ArchivedProject,
+    Award,
+    CompetitionRecord,
+    MediaArchive,
+    HistoricalDocument,
+    HallOfFameEntry,
+)
