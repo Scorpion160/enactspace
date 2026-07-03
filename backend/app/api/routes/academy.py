@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -32,6 +35,7 @@ from app.schemas.academy import (
     AcademyQuizSubmit,
 )
 from app.services.notification_service import notify_user
+from app.models.user import User
 
 
 router = APIRouter(prefix="/academy", tags=["Academy"])
@@ -577,6 +581,60 @@ def get_admin_academy_summary(
         "quiz_passed": passed_attempts,
         "lesson_completion_rate": completion_rate,
     }
+
+
+def _csv_download(filename: str, rows: list[list]) -> Response:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/admin/export/progress.csv")
+def export_academy_progress_csv(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    rows = [
+        [
+            "Nom",
+            "Prenom",
+            "Email",
+            "Formation",
+            "Lecon",
+            "Progression",
+            "Statut",
+            "Debut",
+            "Fin",
+        ]
+    ]
+    progress_rows = (
+        db.query(AcademyProgress, User, AcademyCourse, AcademyLesson)
+        .join(User, User.id == AcademyProgress.user_id)
+        .join(AcademyCourse, AcademyCourse.id == AcademyProgress.course_id)
+        .outerjoin(AcademyLesson, AcademyLesson.id == AcademyProgress.lesson_id)
+        .order_by(AcademyProgress.updated_at.desc())
+        .all()
+    )
+    for progress, user, course, lesson in progress_rows:
+        rows.append(
+            [
+                user.last_name,
+                user.first_name,
+                user.email,
+                course.title,
+                lesson.title if lesson else "",
+                float(progress.progress_percent or 0),
+                progress.status,
+                progress.started_at,
+                progress.completed_at,
+            ]
+        )
+    return _csv_download("enactspace_academy_progress.csv", rows)
 
 
 @router.get(
