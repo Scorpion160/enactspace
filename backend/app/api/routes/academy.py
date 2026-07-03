@@ -521,6 +521,64 @@ def archive_course(
     return course
 
 
+@router.post("/admin/courses/{course_id}/restore", response_model=AcademyCourseRead)
+def restore_course(
+    course_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    course = _course_or_404(db, course_id)
+    course.is_archived = False
+    course.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(course)
+    return course
+
+
+@router.get("/admin/summary")
+def get_admin_academy_summary(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    total_courses = db.query(AcademyCourse).count()
+    published_courses = (
+        db.query(AcademyCourse).filter(AcademyCourse.is_published.is_(True)).count()
+    )
+    required_courses = (
+        db.query(AcademyCourse).filter(AcademyCourse.is_required.is_(True)).count()
+    )
+    archived_courses = (
+        db.query(AcademyCourse).filter(AcademyCourse.is_archived.is_(True)).count()
+    )
+    total_lessons = db.query(AcademyLesson).count()
+    quiz_count = db.query(AcademyQuiz).count()
+    attempts = db.query(AcademyQuizAttempt).count()
+    passed_attempts = (
+        db.query(AcademyQuizAttempt)
+        .filter(AcademyQuizAttempt.passed.is_(True))
+        .count()
+    )
+    completed_lessons = (
+        db.query(AcademyProgress)
+        .filter(AcademyProgress.status.in_(["completed", "validated"]))
+        .count()
+    )
+    completion_rate = (
+        (completed_lessons / max(1, total_lessons)) * 100 if total_lessons else 0
+    )
+    return {
+        "total_courses": total_courses,
+        "published_courses": published_courses,
+        "required_courses": required_courses,
+        "archived_courses": archived_courses,
+        "total_lessons": total_lessons,
+        "quiz_count": quiz_count,
+        "quiz_attempts": attempts,
+        "quiz_passed": passed_attempts,
+        "lesson_completion_rate": completion_rate,
+    }
+
+
 @router.get(
     "/admin/courses/{course_id}/lessons",
     response_model=list[AcademyLessonRead],
@@ -577,6 +635,18 @@ def update_lesson(
     db.commit()
     db.refresh(lesson)
     return lesson
+
+
+@router.delete("/admin/lessons/{lesson_id}")
+def delete_lesson(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    lesson = _lesson_or_404(db, lesson_id)
+    db.delete(lesson)
+    db.commit()
+    return {"deleted": True, "lesson_id": lesson_id}
 
 
 @router.post("/lessons/{lesson_id}/start", response_model=AcademyProgressRead)
