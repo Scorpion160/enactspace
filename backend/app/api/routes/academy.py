@@ -66,7 +66,7 @@ COURSES = [
             {
                 "id": "l3",
                 "title": "Rôles dans Enactus ESP",
-                "summary": "Enacteur, EnacChef, alumni, advisor et partenaires.",
+                "summary": "Enacteur, Enacchef, alumni, advisor et partenaires.",
                 "duration_minutes": 7,
             },
         ],

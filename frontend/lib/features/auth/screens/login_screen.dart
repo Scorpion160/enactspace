@@ -1367,7 +1367,7 @@ class _BeginnerGuideDialog extends StatelessWidget {
         icon: Icons.privacy_tip_rounded,
         title: 'Accès adapté',
         body:
-            'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
+            'L’interface change selon ton rôle: Enacteur, Alumni, Enacchef, Financier ou Admin.',
       ),
     ];
 
