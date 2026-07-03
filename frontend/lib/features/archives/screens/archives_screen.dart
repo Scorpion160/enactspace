@@ -1349,8 +1349,8 @@ class _HallOfFameTile extends StatelessWidget {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Chip(label: Text(item.period)),
-                      Chip(label: Text(item.type)),
+                      _ArchiveSafeChip(label: item.period, maxWidth: 130),
+                      _ArchiveSafeChip(label: item.type, maxWidth: 150),
                     ],
                   ),
                   const SizedBox(height: 8),

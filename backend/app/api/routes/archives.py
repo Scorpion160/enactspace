@@ -1,6 +1,9 @@
+import csv
 from datetime import datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -862,6 +865,17 @@ def _mark_file_as_archive(db: Session, file_id, visibility: str = "internal") ->
     stored_file.expires_at = None
 
 
+def _csv_download(filename: str, rows: list[list]) -> Response:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/items")
 def list_archive_items(
     search: str | None = Query(default=None),
@@ -1091,6 +1105,49 @@ def archive_archive_item(
     db.commit()
     db.refresh(archive_item)
     return archive_item
+
+
+@router.get("/export/items.csv")
+def export_archive_items_csv(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    if not _can_validate_archives(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Export archives réservé au SG, Team Leader ou Admin",
+        )
+    rows = [
+        [
+            "Titre",
+            "Categorie",
+            "Annee",
+            "Visibilite",
+            "Statut",
+            "Mis en avant",
+            "Public",
+            "Source",
+            "Creation",
+            "Validation",
+        ]
+    ]
+    items = db.query(ArchiveItem).order_by(ArchiveItem.updated_at.desc()).all()
+    for item in items:
+        rows.append(
+            [
+                item.title,
+                item.category,
+                item.year or "",
+                item.visibility,
+                item.status,
+                "oui" if item.is_featured else "non",
+                "oui" if item.is_public else "non",
+                item.source_label or "",
+                item.created_at,
+                item.validated_at or "",
+            ]
+        )
+    return _csv_download("enactspace_archives.csv", rows)
 
 
 @router.get("/historical-projects")
