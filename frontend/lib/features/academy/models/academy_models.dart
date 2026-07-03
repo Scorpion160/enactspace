@@ -6,6 +6,7 @@ class AcademyCourseModel {
   final String description;
   final int durationMinutes;
   final int points;
+  final bool isRequired;
   final List<AcademyLessonModel> lessons;
   final AcademyQuizModel quiz;
 
@@ -17,11 +18,21 @@ class AcademyCourseModel {
     required this.description,
     required this.durationMinutes,
     required this.points,
+    required this.isRequired,
     required this.lessons,
     required this.quiz,
   });
 
   int get lessonCount => lessons.length;
+  int get completedLessonCount =>
+      lessons.where((lesson) => lesson.completed).length;
+  bool get isCompleted =>
+      lessonCount > 0 && completedLessonCount == lessonCount;
+  bool get isInProgress => completedLessonCount > 0 && !isCompleted;
+  double get progress {
+    if (lessonCount == 0) return 0;
+    return completedLessonCount / lessonCount;
+  }
 }
 
 class AcademyLessonModel {

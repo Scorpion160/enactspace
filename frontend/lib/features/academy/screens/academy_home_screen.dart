@@ -19,6 +19,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
   String? _rewardingActionId;
   String? _error;
   AcademyHomeData? _data;
+  String _courseFilter = 'all';
   String _levelFilter = 'all';
   String _categoryFilter = 'all';
 
@@ -160,9 +161,13 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
             _AcademyContent(
               data: _data!,
               searchController: _searchController,
+              courseFilter: _courseFilter,
               levelFilter: _levelFilter,
               categoryFilter: _categoryFilter,
               onFiltersChanged: () => setState(() {}),
+              onCourseFilterChanged: (value) {
+                setState(() => _courseFilter = value);
+              },
               onLevelChanged: (value) => setState(() => _levelFilter = value),
               onCategoryChanged: (value) {
                 setState(() => _categoryFilter = value);
@@ -278,9 +283,11 @@ class _HeaderCopy extends StatelessWidget {
 class _AcademyContent extends StatelessWidget {
   final AcademyHomeData data;
   final TextEditingController searchController;
+  final String courseFilter;
   final String levelFilter;
   final String categoryFilter;
   final VoidCallback onFiltersChanged;
+  final ValueChanged<String> onCourseFilterChanged;
   final ValueChanged<String> onLevelChanged;
   final ValueChanged<String> onCategoryChanged;
   final String? rewardingActionId;
@@ -290,9 +297,11 @@ class _AcademyContent extends StatelessWidget {
   const _AcademyContent({
     required this.data,
     required this.searchController,
+    required this.courseFilter,
     required this.levelFilter,
     required this.categoryFilter,
     required this.onFiltersChanged,
+    required this.onCourseFilterChanged,
     required this.onLevelChanged,
     required this.onCategoryChanged,
     required this.rewardingActionId,
@@ -318,8 +327,17 @@ class _AcademyContent extends StatelessWidget {
       final matchesCategory =
           categoryFilter == 'all' ||
           _academyKey(course.category) == categoryFilter;
+      final matchesCourseFilter = switch (courseFilter) {
+        'required' => course.isRequired,
+        'in_progress' => course.isInProgress,
+        'completed' => course.isCompleted,
+        _ => true,
+      };
 
-      return matchesQuery && matchesLevel && matchesCategory;
+      return matchesQuery &&
+          matchesLevel &&
+          matchesCategory &&
+          matchesCourseFilter;
     }).toList();
   }
 
@@ -352,9 +370,11 @@ class _AcademyContent extends StatelessWidget {
         const SizedBox(height: 22),
         _AcademyFiltersCard(
           controller: searchController,
+          courseFilter: courseFilter,
           levelFilter: levelFilter,
           categoryFilter: categoryFilter,
           onChanged: onFiltersChanged,
+          onCourseFilterChanged: onCourseFilterChanged,
           onLevelChanged: onLevelChanged,
           onCategoryChanged: onCategoryChanged,
         ),
@@ -531,17 +551,21 @@ class _ProgressMeter extends StatelessWidget {
 
 class _AcademyFiltersCard extends StatelessWidget {
   final TextEditingController controller;
+  final String courseFilter;
   final String levelFilter;
   final String categoryFilter;
   final VoidCallback onChanged;
+  final ValueChanged<String> onCourseFilterChanged;
   final ValueChanged<String> onLevelChanged;
   final ValueChanged<String> onCategoryChanged;
 
   const _AcademyFiltersCard({
     required this.controller,
+    required this.courseFilter,
     required this.levelFilter,
     required this.categoryFilter,
     required this.onChanged,
+    required this.onCourseFilterChanged,
     required this.onLevelChanged,
     required this.onCategoryChanged,
   });
@@ -576,6 +600,26 @@ class _AcademyFiltersCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                _AcademyChoiceChip(
+                  label: 'Tous',
+                  selected: courseFilter == 'all',
+                  onSelected: () => onCourseFilterChanged('all'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'Obligatoires',
+                  selected: courseFilter == 'required',
+                  onSelected: () => onCourseFilterChanged('required'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'En cours',
+                  selected: courseFilter == 'in_progress',
+                  onSelected: () => onCourseFilterChanged('in_progress'),
+                ),
+                _AcademyChoiceChip(
+                  label: 'Termines',
+                  selected: courseFilter == 'completed',
+                  onSelected: () => onCourseFilterChanged('completed'),
+                ),
                 _AcademyChoiceChip(
                   label: 'Tous niveaux',
                   selected: levelFilter == 'all',
@@ -789,11 +833,14 @@ class _CourseCard extends StatelessWidget {
               children: [
                 Chip(label: Text(course.level)),
                 Chip(label: Text(course.category)),
+                if (course.isRequired) const Chip(label: Text('Obligatoire')),
               ],
             ),
             const SizedBox(height: 10),
             Text(
               course.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
@@ -804,6 +851,14 @@ class _CourseCard extends StatelessWidget {
               style: const TextStyle(color: Colors.black54, height: 1.35),
             ),
             const SizedBox(height: 14),
+            LinearProgressIndicator(
+              value: course.progress.clamp(0.0, 1.0),
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(99),
+              color: AppTheme.enactusYellow,
+              backgroundColor: Colors.black.withValues(alpha: 0.08),
+            ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,

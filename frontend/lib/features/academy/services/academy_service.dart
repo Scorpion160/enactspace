@@ -657,6 +657,7 @@ class AcademyService {
         (sum, lesson) => sum + lesson.durationMinutes,
       ),
       points: lessons.length * 40 + questions.length * 60,
+      isRequired: false,
       lessons: lessons,
       quiz: AcademyQuizModel(
         id: '$id-quiz',
@@ -678,6 +679,7 @@ class AcademyService {
       description: course.description,
       durationMinutes: course.durationMinutes,
       points: course.points,
+      isRequired: course.isRequired,
       lessons: course.lessons
           .map(
             (lesson) => AcademyLessonModel(
@@ -715,6 +717,7 @@ class AcademyService {
         ),
       ),
       points: _int(json['points'], fallback: lessons.length * 40),
+      isRequired: json['is_required'] == true,
       lessons: lessons,
       quiz: _quizFromJson(json['quiz']),
     );
