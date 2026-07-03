@@ -1,17 +1,27 @@
 import '../models/archive_models.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../documents/models/document_model.dart';
 import '../../documents/services/documents_service.dart';
 
 class ArchivesService {
+  final ApiClient _apiClient;
+  final AuthService _authService;
   final DocumentsService _documentsService;
 
-  ArchivesService({DocumentsService? documentsService})
-    : _documentsService = documentsService ?? DocumentsService();
+  ArchivesService({
+    ApiClient? apiClient,
+    AuthService? authService,
+    DocumentsService? documentsService,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _authService = authService ?? AuthService(),
+       _documentsService = documentsService ?? DocumentsService();
 
   Future<ArchivesHomeData> getArchives() async {
     await Future<void>.delayed(const Duration(milliseconds: 240));
 
     final officialDocuments = await _loadOfficialDocuments();
+    final apiHallOfFame = await _loadHallOfFame();
 
     return ArchivesHomeData(
       summary: ArchiveImpactSummaryModel(
@@ -514,69 +524,111 @@ class ArchivesService {
           expansionReady: true,
         ),
       ],
-      hallOfFame: [
-        HallOfFameItemModel(
-          title: 'Création d’Enactus ESP',
-          period: '2015',
-          description:
-              'Naissance de l’équipe à l’École Supérieure Polytechnique de Dakar.',
-          type: 'Histoire',
-        ),
-        HallOfFameItemModel(
-          title: 'Premier Prix d’Excellence Fondation Sonatel',
-          period: 'Historique',
-          description: 'Reconnaissance de l’excellence et de l’impact terrain.',
-          type: 'Prix',
-        ),
-        HallOfFameItemModel(
-          title: 'Deuxième National Compétition Nationale',
-          period: '2016',
-          description: 'Performance nationale majeure pour Enactus ESP.',
-          type: 'Compétition',
-          imageAsset: 'assets/img/prix_enactus_national_2016.png',
-        ),
-        HallOfFameItemModel(
-          title: '4 prix sur 5 à la compétition Uhodari',
-          period: '2016',
-          description: 'Palmarès remarquable sur plusieurs catégories.',
-          type: 'Compétition',
-          imageAsset: 'assets/img/prix_uhodari_2016.png',
-        ),
-        HallOfFameItemModel(
-          title: 'Champion National',
-          period: '2017',
-          description:
-              'Titre obtenu après audit des projets et qualification pour la World Cup de Londres.',
-          type: 'Titre',
-        ),
-        HallOfFameItemModel(
-          title: 'Participation à la World Cup',
-          period: '2018',
-          description:
-              'Enactus ESP représente le Sénégal lors de la compétition internationale aux États-Unis.',
-          type: 'International',
-        ),
-        HallOfFameItemModel(
-          title: 'Demi-finaliste compétition internationale',
-          period: '2018',
-          description: 'Rayonnement international des projets Enactus ESP.',
-          type: 'International',
-        ),
-        HallOfFameItemModel(
-          title: 'Parution presse, passage TV et intervention RFI',
-          period: 'Historique',
-          description: 'Visibilité médiatique et crédibilité publique du club.',
-          type: 'Média',
-        ),
-        HallOfFameItemModel(
-          title: 'Retour à la compétition nationale',
-          period: '2022',
-          description:
-              'Reprise de la compétition après les années de consolidation et la période Covid-19.',
-          type: 'Compétition',
-        ),
-      ],
+      hallOfFame: apiHallOfFame.isNotEmpty
+          ? apiHallOfFame
+          : [
+              HallOfFameItemModel(
+                title: 'Création d’Enactus ESP',
+                period: '2015',
+                description:
+                    'Naissance de l’équipe à l’École Supérieure Polytechnique de Dakar.',
+                type: 'Histoire',
+              ),
+              HallOfFameItemModel(
+                title: 'Premier Prix d’Excellence Fondation Sonatel',
+                period: 'Historique',
+                description:
+                    'Reconnaissance de l’excellence et de l’impact terrain.',
+                type: 'Prix',
+              ),
+              HallOfFameItemModel(
+                title: 'Deuxième National Compétition Nationale',
+                period: '2016',
+                description: 'Performance nationale majeure pour Enactus ESP.',
+                type: 'Compétition',
+                imageAsset: 'assets/img/prix_enactus_national_2016.png',
+              ),
+              HallOfFameItemModel(
+                title: '4 prix sur 5 à la compétition Uhodari',
+                period: '2016',
+                description: 'Palmarès remarquable sur plusieurs catégories.',
+                type: 'Compétition',
+                imageAsset: 'assets/img/prix_uhodari_2016.png',
+              ),
+              HallOfFameItemModel(
+                title: 'Champion National',
+                period: '2017',
+                description:
+                    'Titre obtenu après audit des projets et qualification pour la World Cup de Londres.',
+                type: 'Titre',
+              ),
+              HallOfFameItemModel(
+                title: 'Participation à la World Cup',
+                period: '2018',
+                description:
+                    'Enactus ESP représente le Sénégal lors de la compétition internationale aux États-Unis.',
+                type: 'International',
+              ),
+              HallOfFameItemModel(
+                title: 'Demi-finaliste compétition internationale',
+                period: '2018',
+                description:
+                    'Rayonnement international des projets Enactus ESP.',
+                type: 'International',
+              ),
+              HallOfFameItemModel(
+                title: 'Parution presse, passage TV et intervention RFI',
+                period: 'Historique',
+                description:
+                    'Visibilité médiatique et crédibilité publique du club.',
+                type: 'Média',
+              ),
+              HallOfFameItemModel(
+                title: 'Retour à la compétition nationale',
+                period: '2022',
+                description:
+                    'Reprise de la compétition après les années de consolidation et la période Covid-19.',
+                type: 'Compétition',
+              ),
+            ],
       officialDocuments: officialDocuments,
+    );
+  }
+
+  Future<List<HallOfFameItemModel>> _loadHallOfFame() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return const [];
+
+      final response = await _apiClient.get(
+        '/archives/hall-of-fame',
+        token: token,
+      );
+      if (response is! Map<String, dynamic>) return const [];
+      final items = response['items'];
+      if (items is! List) return const [];
+
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(_hallOfFameFromJson)
+          .where((item) => item.title.trim().isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  HallOfFameItemModel _hallOfFameFromJson(Map<String, dynamic> json) {
+    final year = int.tryParse(json['year']?.toString() ?? '');
+    final subtitle = json['subtitle']?.toString();
+    final description = json['description']?.toString();
+    return HallOfFameItemModel(
+      title: json['title']?.toString() ?? '',
+      period: year?.toString() ?? 'Historique',
+      description: (description != null && description.trim().isNotEmpty)
+          ? description
+          : (subtitle ?? 'Moment fort Enactus ESP.'),
+      type: json['entry_type']?.toString() ?? 'Histoire',
     );
   }
 

@@ -15,6 +15,7 @@ from app.models.archive import (
     Award,
     CompetitionRecord,
     HistoricalDocument,
+    HallOfFameEntry,
     MediaArchive,
 )
 from app.models.stored_file import StoredFile
@@ -31,6 +32,9 @@ from app.schemas.archive import (
     HistoricalDocumentCreate,
     HistoricalDocumentRead,
     HistoricalDocumentUpdate,
+    HallOfFameEntryCreate,
+    HallOfFameEntryRead,
+    HallOfFameEntryUpdate,
     MediaArchiveCreate,
     MediaArchiveRead,
     MediaArchiveUpdate,
@@ -404,6 +408,84 @@ INITIAL_COMPETITIONS = [
     },
 ]
 
+INITIAL_HALL_OF_FAME = [
+    {
+        "id": "creation-enactus-esp",
+        "archive_item_id": None,
+        "title": "Création d’Enactus ESP",
+        "subtitle": "Naissance du club à l'École Supérieure Polytechnique de Dakar",
+        "entry_type": "Histoire",
+        "year": 2015,
+        "description": "Point de départ de l'aventure Enactus ESP et de sa mémoire collective.",
+        "score_value": None,
+        "score_label": None,
+        "file_id": None,
+        "external_url": None,
+        "order_index": 10,
+        "is_featured": True,
+    },
+    {
+        "id": "champion-national-2017-hall",
+        "archive_item_id": None,
+        "title": "Champion National 2017",
+        "subtitle": "Titre national et qualification internationale",
+        "entry_type": "Prix",
+        "year": 2017,
+        "description": "Titre majeur obtenu après la défense des projets Enactus ESP.",
+        "score_value": None,
+        "score_label": None,
+        "file_id": None,
+        "external_url": None,
+        "order_index": 20,
+        "is_featured": True,
+    },
+    {
+        "id": "champion-national-2018-hall",
+        "archive_item_id": None,
+        "title": "Champion National 2018",
+        "subtitle": "Deuxième titre national consécutif",
+        "entry_type": "Prix",
+        "year": 2018,
+        "description": "Confirmation du niveau d'excellence et de la maturité des projets du club.",
+        "score_value": None,
+        "score_label": None,
+        "file_id": None,
+        "external_url": None,
+        "order_index": 30,
+        "is_featured": True,
+    },
+    {
+        "id": "demi-finaliste-world-cup-2018-hall",
+        "archive_item_id": None,
+        "title": "Demi-finaliste compétition internationale 2018",
+        "subtitle": "Rayonnement international",
+        "entry_type": "International",
+        "year": 2018,
+        "description": "Performance internationale qui installe Enactus ESP parmi les références.",
+        "score_value": None,
+        "score_label": None,
+        "file_id": None,
+        "external_url": None,
+        "order_index": 40,
+        "is_featured": True,
+    },
+    {
+        "id": "visibilite-media-hall",
+        "archive_item_id": None,
+        "title": "Parution presse, passage TV et intervention RFI",
+        "subtitle": "Présences médiatiques",
+        "entry_type": "Média",
+        "year": None,
+        "description": "Visibilité médiatique historique dans la presse, à la télévision et à la radio.",
+        "score_value": None,
+        "score_label": None,
+        "file_id": None,
+        "external_url": None,
+        "order_index": 50,
+        "is_featured": True,
+    },
+]
+
 
 def _project_payload(project: ArchivedProject) -> dict:
     return ArchivedProjectRead.model_validate(project).model_dump()
@@ -446,6 +528,15 @@ def _historical_document_payload(
     stored_file = None
     if document.file_id:
         stored_file = db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
+    data["file"] = _file_payload(stored_file)
+    return data
+
+
+def _hall_of_fame_payload(db: Session, entry: HallOfFameEntry) -> dict:
+    data = HallOfFameEntryRead.model_validate(entry).model_dump()
+    stored_file = None
+    if entry.file_id:
+        stored_file = db.query(StoredFile).filter(StoredFile.id == entry.file_id).first()
     data["file"] = _file_payload(stored_file)
     return data
 
@@ -606,6 +697,33 @@ def _create_archive_item_for_historical_document(
         source_label=payload.source_label,
         tags=["document", "historique", payload.document_type.lower()],
         metadata_json={"document_type": payload.document_type},
+    )
+    db.add(archive_item)
+    db.flush()
+    return archive_item
+
+
+def _create_archive_item_for_hall_entry(
+    db: Session,
+    payload: HallOfFameEntryCreate,
+    user_id,
+) -> ArchiveItem:
+    archive_item = ArchiveItem(
+        title=payload.title,
+        description=payload.description,
+        category=payload.entry_type,
+        year=payload.year,
+        file_id=payload.file_id,
+        visibility="interne",
+        status="draft",
+        is_featured=payload.is_featured,
+        created_by_id=user_id,
+        source_url=payload.external_url,
+        tags=["hall_of_fame", payload.entry_type.lower(), payload.title.lower()],
+        metadata_json={
+            "subtitle": payload.subtitle,
+            "score_label": payload.score_label,
+        },
     )
     db.add(archive_item)
     db.flush()
@@ -1158,3 +1276,87 @@ def update_historical_document(
     db.commit()
     db.refresh(document)
     return _historical_document_payload(db, document)
+
+
+@router.get("/hall-of-fame")
+def list_hall_of_fame(
+    year: int | None = Query(default=None),
+    entry_type: str | None = Query(default=None),
+    featured: bool | None = Query(default=None),
+    include_static: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_validated_user),
+):
+    query = db.query(HallOfFameEntry)
+    if year is not None:
+        query = query.filter(HallOfFameEntry.year == year)
+    if entry_type:
+        query = query.filter(HallOfFameEntry.entry_type == entry_type)
+    if featured is not None:
+        query = query.filter(HallOfFameEntry.is_featured.is_(featured))
+    entries = [
+        _hall_of_fame_payload(db, entry)
+        for entry in query.order_by(
+            HallOfFameEntry.order_index.asc(),
+            HallOfFameEntry.year.desc().nullslast(),
+            HallOfFameEntry.created_at.desc(),
+        ).all()
+    ]
+    static_entries = []
+    if include_static:
+        static_entries = [
+            entry
+            for entry in INITIAL_HALL_OF_FAME
+            if (year is None or entry["year"] == year)
+            and (entry_type is None or entry["entry_type"] == entry_type)
+            and (featured is None or entry["is_featured"] is featured)
+        ]
+    return {"items": entries + static_entries}
+
+
+@router.post("/hall-of-fame")
+def create_hall_of_fame_entry(
+    payload: HallOfFameEntryCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    _mark_file_as_archive(db, payload.file_id)
+    archive_item_id = payload.archive_item_id
+    if archive_item_id is None:
+        archive_item_id = _create_archive_item_for_hall_entry(
+            db,
+            payload,
+            current_user.id,
+        ).id
+    entry = HallOfFameEntry(
+        **payload.model_dump(exclude={"archive_item_id"}),
+        archive_item_id=archive_item_id,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return _hall_of_fame_payload(db, entry)
+
+
+@router.patch("/hall-of-fame/{entry_id}")
+def update_hall_of_fame_entry(
+    entry_id: str,
+    payload: HallOfFameEntryUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    entry = db.query(HallOfFameEntry).filter(HallOfFameEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Entrée Hall of Fame introuvable",
+        )
+    data = payload.model_dump(exclude_unset=True)
+    if "file_id" in data:
+        _mark_file_as_archive(db, data["file_id"])
+    for field, value in data.items():
+        setattr(entry, field, value)
+    entry.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(entry)
+    return _hall_of_fame_payload(db, entry)

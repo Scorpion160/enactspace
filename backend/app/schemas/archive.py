@@ -262,6 +262,21 @@ class HallOfFameEntryCreate(BaseModel):
     is_featured: bool = True
 
 
+class HallOfFameEntryUpdate(BaseModel):
+    archive_item_id: Optional[UUID] = None
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    entry_type: Optional[str] = None
+    year: Optional[int] = None
+    description: Optional[str] = None
+    score_value: Optional[float] = None
+    score_label: Optional[str] = None
+    file_id: Optional[UUID] = None
+    external_url: Optional[str] = None
+    order_index: Optional[int] = None
+    is_featured: Optional[bool] = None
+
+
 class HallOfFameEntryRead(HallOfFameEntryCreate):
     id: UUID
     created_at: datetime
