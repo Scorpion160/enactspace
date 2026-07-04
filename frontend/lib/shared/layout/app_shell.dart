@@ -34,6 +34,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int? _unreadChatMessages;
   int? _lateTasks;
   UserExperience? _userExperience;
+  bool _hasSession = false;
   Timer? _metricsTimer;
   Timer? _notificationTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
@@ -111,6 +112,29 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     UserExperience? userExperience;
 
     try {
+      try {
+        final token = await _authService.getToken();
+        if (mounted) {
+          setState(() => _hasSession = token != null && token.isNotEmpty);
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _hasSession = false);
+        }
+      }
+
+      try {
+        final cachedUser = await _authService.getCachedCurrentUser();
+        if (cachedUser != null) {
+          userExperience = UserExperience.fromJson(cachedUser);
+          if (mounted) {
+            setState(() => _userExperience = userExperience);
+          }
+        }
+      } catch (_) {
+        userExperience = null;
+      }
+
       await _loadNotificationMetric();
       await _loadChatMetric();
 
@@ -246,6 +270,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _SideMenu(
               currentPath: widget.currentPath,
               userExperience: _userExperience,
+              hasSession: _hasSession,
               unreadNotifications: _unreadNotifications,
               unreadChatMessages: _unreadChatMessages,
               lateTasks: _lateTasks,
@@ -307,6 +332,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         child: _SideMenu(
           currentPath: widget.currentPath,
           userExperience: _userExperience,
+          hasSession: _hasSession,
           unreadNotifications: _unreadNotifications,
           unreadChatMessages: _unreadChatMessages,
           lateTasks: _lateTasks,
@@ -373,6 +399,7 @@ class _TopBar extends StatelessWidget {
 class _SideMenu extends StatelessWidget {
   final String currentPath;
   final UserExperience? userExperience;
+  final bool hasSession;
   final int? unreadNotifications;
   final int? unreadChatMessages;
   final int? lateTasks;
@@ -382,6 +409,7 @@ class _SideMenu extends StatelessWidget {
   const _SideMenu({
     required this.currentPath,
     required this.userExperience,
+    required this.hasSession,
     required this.unreadNotifications,
     required this.unreadChatMessages,
     required this.lateTasks,
@@ -391,9 +419,7 @@ class _SideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allowedRoutes = UserExperience.visibleRoutesFor(
-      userExperience,
-    ).toSet();
+    final allowedRoutes = _visibleShellRoutes(userExperience, hasSession);
     final sections =
         [
               _MenuSection(
@@ -555,6 +581,37 @@ class _SideMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+Set<String> _visibleShellRoutes(UserExperience? user, bool hasSession) {
+  if (user != null) {
+    return UserExperience.visibleRoutesFor(user).toSet();
+  }
+
+  if (!hasSession) {
+    return UserExperience.visibleRoutesFor(null).toSet();
+  }
+
+  return const {
+    '/dashboard',
+    '/notifications',
+    '/posts',
+    '/chat',
+    '/tasks',
+    '/documents',
+    '/gamification',
+    '/academy',
+    '/archives',
+    '/members',
+    '/finance',
+    '/attendance',
+    '/poles',
+    '/projects',
+    '/events',
+    '/recruitment',
+    '/impact',
+    '/alumni',
+  };
 }
 
 class _BrandHeader extends StatelessWidget {

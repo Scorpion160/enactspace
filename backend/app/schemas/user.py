@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -7,7 +7,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     first_name: str
     last_name: str
-    email: EmailStr
+    email: str
     phone: Optional[str] = None
     gender: Optional[str] = None
     profile_type: str = "enacteur"
@@ -74,7 +74,7 @@ class UserDirectoryRead(BaseModel):
     id: UUID
     first_name: str
     last_name: str
-    email: EmailStr
+    email: str
     phone: Optional[str] = None
     photo_url: Optional[str] = None
     gender: Optional[str] = None

@@ -52,9 +52,17 @@ class AppRouter {
       }
 
       if (loggedIn) {
-        final cachedUser = await _authService.getCachedCurrentUser();
-        if (cachedUser != null) {
-          final user = UserExperience.fromJson(cachedUser);
+        var userData = await _authService.getCachedCurrentUser();
+        if (userData == null) {
+          try {
+            userData = await _authService.getCurrentUser();
+          } catch (_) {
+            userData = null;
+          }
+        }
+
+        if (userData != null) {
+          final user = UserExperience.fromJson(userData);
           final visibleRoutes = UserExperience.visibleRoutesFor(user);
           final path = state.uri.path;
           final allowed = visibleRoutes.any(
@@ -62,8 +70,8 @@ class AppRouter {
           );
 
           if (!allowed) return '/dashboard';
-        } else {
-          return _offlineRedirect(state.uri.path);
+        } else if (!_authenticatedFallbackAllows(state.uri.path)) {
+          return '/dashboard';
         }
       }
 
@@ -163,13 +171,31 @@ class AppRouter {
     ],
   );
 
-  static String? _offlineRedirect(String path) {
-    final offlineRoutes = UserExperience.visibleRoutesFor(null);
-    final allowed = offlineRoutes.any(
+  static bool _authenticatedFallbackAllows(String path) {
+    const fallbackRoutes = {
+      '/dashboard',
+      '/notifications',
+      '/posts',
+      '/chat',
+      '/tasks',
+      '/documents',
+      '/gamification',
+      '/academy',
+      '/archives',
+      '/members',
+      '/finance',
+      '/attendance',
+      '/poles',
+      '/projects',
+      '/events',
+      '/recruitment',
+      '/impact',
+      '/alumni',
+    };
+
+    return fallbackRoutes.any(
       (route) => path == route || path.startsWith('$route/'),
     );
-
-    return allowed ? null : '/dashboard';
   }
 }
 

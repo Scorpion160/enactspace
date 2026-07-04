@@ -45,18 +45,35 @@ Resultat API apres correction:
 - Apres seed local V1, le login retourne un token en local et via LAN.
 - Le backend LAN repond sur `127.0.0.1:8000` et `10.7.7.228:8000`.
 
+Reprise smoke test sur `SM_A065F`:
+
+- `adb devices -l` retourne `R83XA0BB4FK device`.
+- Login Admin V1 OK sur l'APK installe.
+- Dashboard Admin V1 OK.
+- Drawer responsive OK apres correction: les routes internes principales sont visibles sur mobile.
+- Bug bloquant detecte: apres login, le drawer restait parfois en mode limite et les routes comme `/chat` revenaient vers `/dashboard`.
+- Cause 1: le profil utilisateur n'etait pas hydrate assez tot apres login.
+- Cause 2: `GET /api/users/me` plantait en 500 pour `admin.v1@enactspace.local`, car `UserRead.email` utilisait encore `EmailStr`.
+
+Corrections appliquees:
+
+- `AuthService.login` recharge maintenant `/users/me` juste apres sauvegarde du token pour alimenter le cache utilisateur.
+- `AppShell` lit le token et le profil cache avant de construire le menu.
+- `AppRouter` tente de recuperer `/users/me` si le cache utilisateur est absent, puis autorise temporairement les routes internes authentifiees pendant l'hydratation du profil.
+- `backend/app/schemas/user.py` expose les emails utilisateur en `str` pour accepter les comptes seed internes `.local`.
+
 Etat telephone:
 
 - L'app installee demarre correctement.
 - L'ecran login s'affiche avec le logo EnactSpace lisible.
 - Aucun crash Flutter/Dart visible au lancement.
-- Le test de navigation apres login doit etre repris apres revalidation ADB, car le telephone est repasse en etat `unauthorized` apres redemarrage du serveur ADB.
+- Le test de navigation complet doit etre repris apres redemarrage manuel du backend pour charger la correction `UserRead.email`.
 
 ## Points non executes automatiquement
 
 `flutter doctor -v` et `flutter devices` sont restes bloques sans sortie dans cette session. Comme `adb devices -l` detecte correctement le telephone, la suite du test Android reel peut continuer via l'ID ADB `R83XA0BB4FK`.
 
-Le backend n'etait pas lance pendant l'audit. Les tests fonctionnels complets doivent etre faits apres lancement de FastAPI avec:
+Pendant la reprise, le backend etait joignable sur `http://10.7.7.228:8000`, mais l'environnement Codex a refuse le redemarrage du process serveur apres correction a cause d'une limite d'approbation. Les tests fonctionnels complets doivent etre repris apres relance manuelle de FastAPI avec:
 
 ```powershell
 cd C:\Users\DIOP\Documents\Enactus\enactspace\backend

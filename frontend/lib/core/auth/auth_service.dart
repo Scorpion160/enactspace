@@ -29,6 +29,13 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token.toString());
 
+    try {
+      await getCurrentUser();
+    } catch (_) {
+      // The token is enough to enter the app; navigation can refresh the
+      // profile again once the shell is mounted.
+    }
+
     return token.toString();
   }
 
