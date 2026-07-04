@@ -43,8 +43,19 @@ def join_request_bio(payload: JoinRequestCreate) -> str | None:
     return content or None
 
 
+def normalize_login_email(email: str) -> str:
+    normalized = email.strip().lower()
+    if not normalized or "@" not in normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Identifiant email invalide.",
+        )
+    return normalized
+
+
 def authenticate_user(email: str, password: str, db: Session) -> User:
-    user = db.query(User).filter(User.email == email.strip()).first()
+    normalized_email = normalize_login_email(email)
+    user = db.query(User).filter(User.email == normalized_email).first()
 
     if not user:
         raise HTTPException(

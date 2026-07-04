@@ -43,7 +43,7 @@ frontend\build\app\outputs\flutter-apk\app-debug.apk
 frontend\build\app\outputs\flutter-apk\app-release.apk
 ```
 
-## Etat de cette session
+## Etat de la premiere session
 
 Les commandes suivantes ont ete tentees:
 
@@ -67,6 +67,32 @@ frontend\build\app\outputs\flutter-apk\app-release.apk
 ```
 
 Ils doivent etre consideres comme des builds precedents tant qu'un nouveau `flutter build apk` ne se termine pas avec succes.
+
+## Etat APK V1 genere
+
+La tranche courte APK V1 a ensuite ete relancee avec Flutter Tools directement via:
+
+```powershell
+C:\flutter\bin\cache\dart-sdk\bin\dart.exe C:\flutter\bin\cache\flutter_tools.snapshot
+```
+
+Resultat:
+
+- `flutter clean`: OK avec acces hors sandbox.
+- `flutter pub get`: OK.
+- `flutter analyze --no-pub`: OK.
+- `flutter build apk --debug --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:8000`: OK.
+- `flutter build apk --release --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:8000`: OK.
+- `adb install -r build\app\outputs\flutter-apk\app-debug.apk`: OK sur `SM_A065F`.
+
+Copies hors repo:
+
+```text
+C:\Users\DIOP\Downloads\EnactSpace_V1_APK\EnactSpace_V1_debug.apk
+C:\Users\DIOP\Downloads\EnactSpace_V1_APK\EnactSpace_V1_release.apk
+```
+
+Le bug de login des comptes internes `@enactspace.local` detecte pendant le smoke test a ete corrige cote backend sans assouplir l'inscription publique.
 
 ## Validations projet deja OK
 

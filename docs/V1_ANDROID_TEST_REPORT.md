@@ -24,6 +24,33 @@ Resultat:
 - Compilation backend: OK avec le Python embarque Codex.
 - Verification whitespace Git: OK.
 - Detection ADB: OK.
+- APK debug genere et installe sur `SM_A065F`.
+- APK release genere pour release candidate interne.
+- Backend LAN verifie sur `http://10.7.7.228:8000/health`.
+
+## Smoke test APK V1
+
+Le smoke test APK a revele que les comptes internes en `@enactspace.local` etaient rejetes par la validation `EmailStr` au login avant meme l'authentification.
+
+Correction appliquee:
+
+- Le schema de login accepte maintenant un identifiant email en `str`.
+- Le backend normalise le login avec trim et lowercase.
+- Le backend refuse encore les identifiants vides ou sans `@`.
+- L'inscription publique garde sa validation email stricte avec `EmailStr`.
+
+Resultat API apres correction:
+
+- `POST /api/auth/login` avec `admin.v1@enactspace.local` ne retourne plus `422` a cause du domaine `.local`.
+- Apres seed local V1, le login retourne un token en local et via LAN.
+- Le backend LAN repond sur `127.0.0.1:8000` et `10.7.7.228:8000`.
+
+Etat telephone:
+
+- L'app installee demarre correctement.
+- L'ecran login s'affiche avec le logo EnactSpace lisible.
+- Aucun crash Flutter/Dart visible au lancement.
+- Le test de navigation apres login doit etre repris apres revalidation ADB, car le telephone est repasse en etat `unauthorized` apres redemarrage du serveur ADB.
 
 ## Points non executes automatiquement
 
@@ -85,4 +112,4 @@ flutter run -d R83XA0BB4FK --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:80
 
 ## Statut V1
 
-La base Android est prete pour test reel. Les tests manuels doivent maintenant etre faits avec le backend actif et l'URL API locale transmise par `--dart-define`.
+La base Android est prete pour test reel. Les APK V1 sont generes et conserves hors repo dans `C:\Users\DIOP\Downloads\EnactSpace_V1_APK`. Les tests manuels complets doivent reprendre apres autorisation USB ADB sur le telephone.
