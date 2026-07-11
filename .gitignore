@@ -20,6 +20,10 @@ backend/uploads/
 # SQLite dev database
 backend/enactspace_dev.db
 
+# Real member imports
+data/import/*.csv
+!data/import/membres_enactus_template.csv
+
 # IDE
 .vscode/
 .idea/
