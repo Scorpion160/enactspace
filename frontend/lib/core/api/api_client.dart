@@ -11,7 +11,7 @@ class ApiClient {
 
   static String get serverUrl {
     if (_configuredServerUrl.trim().isNotEmpty) {
-      return _configuredServerUrl.trim().replaceFirst(RegExp(r'/$'), '');
+      return _normalizeServerUrl(_configuredServerUrl);
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -22,6 +22,11 @@ class ApiClient {
   }
 
   static String get baseUrl => '$serverUrl/api';
+
+  static String _normalizeServerUrl(String value) {
+    final withoutTrailingSlash = value.trim().replaceFirst(RegExp(r'/+$'), '');
+    return withoutTrailingSlash.replaceFirst(RegExp(r'/api$'), '');
+  }
 
   final http.Client _client;
 
