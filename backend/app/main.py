@@ -34,6 +34,27 @@ from app.api.routes import (
 )
 
 
+DEV_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "http://localhost:5173",
+    "http://localhost:51833",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:51833",
+]
+
+IS_PRODUCTION = settings.APP_ENV.lower() == "production"
+CORS_ALLOW_ORIGINS = (
+    settings.cors_origins_list
+    if IS_PRODUCTION
+    else DEV_CORS_ORIGINS + settings.cors_origins_list
+)
+CORS_ALLOW_ORIGIN_REGEX = (
+    None if IS_PRODUCTION else r"http://(localhost|127\.0\.0\.1):\d+"
+)
+
 app = FastAPI(
     title=settings.APP_NAME,
     debug=settings.APP_DEBUG,
@@ -44,24 +65,20 @@ app = FastAPI(
 def ensure_database_compatibility() -> None:
     ensure_compatibility_columns()
 
-UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads"
+configured_storage_path = Path(settings.FILE_STORAGE_PATH)
+UPLOADS_DIR = (
+    configured_storage_path
+    if configured_storage_path.is_absolute()
+    else Path(__file__).resolve().parents[1] / configured_storage_path
+)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5000",
-        "http://localhost:5173",
-        "http://localhost:51833",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:51833",
-    ],
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

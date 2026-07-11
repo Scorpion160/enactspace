@@ -20,7 +20,7 @@ def dispatch_notification_channels(
 
 
 def _dispatch_email(notification: Notification, recipient: User | None) -> bool:
-    if not settings.NOTIFICATION_EMAIL_ENABLED:
+    if not settings.email_enabled:
         return False
 
     if not recipient or not recipient.email:
@@ -40,7 +40,7 @@ def _dispatch_email(notification: Notification, recipient: User | None) -> bool:
 
 
 def _dispatch_push(notification: Notification, recipient: User | None) -> bool:
-    if not settings.NOTIFICATION_PUSH_ENABLED:
+    if not settings.push_enabled:
         return False
 
     if not recipient:

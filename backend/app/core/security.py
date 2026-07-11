@@ -31,7 +31,7 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 
     return jwt.encode(
         payload,
-        settings.SECRET_KEY,
+        settings.signing_secret,
         algorithm=settings.ALGORITHM,
     )
 
@@ -40,7 +40,7 @@ def decode_access_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.signing_secret,
             algorithms=[settings.ALGORITHM],
         )
         return payload.get("sub")

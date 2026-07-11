@@ -10,6 +10,7 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.document import Document
 from app.models.post import Post
 from app.models.stored_file import StoredFile
@@ -18,7 +19,12 @@ from app.models.user import User
 
 MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024
 TEMPORARY_RETENTION_DAYS = 90
-UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads" / "files"
+configured_storage_path = Path(settings.FILE_STORAGE_PATH)
+UPLOAD_ROOT = (
+    configured_storage_path
+    if configured_storage_path.is_absolute()
+    else Path(__file__).resolve().parents[2] / configured_storage_path
+) / "files"
 ALLOWED_STORAGE_SCOPES = {
     "chat",
     "document",
