@@ -10,6 +10,7 @@ import '../../projects/models/project_model.dart';
 import '../../projects/services/projects_service.dart';
 import '../models/member_model.dart';
 import '../services/members_service.dart';
+import 'member_import_panel.dart';
 
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
@@ -93,6 +94,24 @@ class _MembersScreenState extends State<MembersScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Membre ajouté avec succès.')),
+      );
+    }
+  }
+
+  Future<void> _openImportMembersPanel() async {
+    final imported = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) => MemberImportPanel(membersService: _membersService),
+    );
+
+    if (imported == true) {
+      await _loadMembers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Import membres termine avec succes.')),
       );
     }
   }
@@ -410,6 +429,7 @@ class _MembersScreenState extends State<MembersScreen> {
               setState(() => _roleFilter = value);
             },
             onAdd: canManageMembers ? _openAddMemberDialog : null,
+            onImport: canManageMembers ? _openImportMembersPanel : null,
           ),
           const SizedBox(height: 20),
           if (_loading)
@@ -518,6 +538,7 @@ class _SearchAndActions extends StatelessWidget {
   final ValueChanged<String> onStatusChanged;
   final ValueChanged<String> onRoleChanged;
   final VoidCallback? onAdd;
+  final VoidCallback? onImport;
 
   const _SearchAndActions({
     required this.onChanged,
@@ -526,11 +547,12 @@ class _SearchAndActions extends StatelessWidget {
     required this.onStatusChanged,
     required this.onRoleChanged,
     required this.onAdd,
+    required this.onImport,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 700;
+    final isWide = MediaQuery.of(context).size.width >= 980;
 
     final searchField = TextField(
       onChanged: onChanged,
@@ -591,8 +613,15 @@ class _SearchAndActions extends StatelessWidget {
             icon: const Icon(Icons.person_add_alt_1_rounded),
             label: const Text('Ajouter'),
           );
+    final importButton = onImport == null
+        ? null
+        : OutlinedButton.icon(
+            onPressed: onImport,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text('Importer'),
+          );
 
-    if (isWide && addButton != null) {
+    if (isWide && (addButton != null || importButton != null)) {
       return Row(
         children: [
           Expanded(child: searchField),
@@ -601,7 +630,10 @@ class _SearchAndActions extends StatelessWidget {
           const SizedBox(width: 12),
           SizedBox(width: 210, child: roleFilterField),
           const SizedBox(width: 14),
-          addButton,
+          ?importButton,
+          if (importButton != null && addButton != null)
+            const SizedBox(width: 10),
+          ?addButton,
         ],
       );
     }
@@ -614,7 +646,9 @@ class _SearchAndActions extends StatelessWidget {
       roleFilterField,
     ];
 
-    if (addButton == null) {
+    final actionButtons = [?importButton, ?addButton];
+
+    if (actionButtons.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: filters,
@@ -623,7 +657,11 @@ class _SearchAndActions extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [...filters, const SizedBox(height: 12), addButton],
+      children: [
+        ...filters,
+        const SizedBox(height: 12),
+        Wrap(spacing: 10, runSpacing: 10, children: actionButtons),
+      ],
     );
   }
 }

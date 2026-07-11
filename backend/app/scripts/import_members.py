@@ -1,9 +1,10 @@
 import argparse
 import csv
+import io
 import re
 import secrets
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
@@ -20,11 +21,12 @@ from app.models.user import User
 REQUIRED_COLUMNS = {
     "prenom",
     "nom",
-    "email",
 }
 OPTIONAL_COLUMNS = {
+    "email",
     "telephone",
     "genre",
+    "niveau_etude",
     "role",
     "statut",
     "pole_coeur",
@@ -35,6 +37,51 @@ OPTIONAL_COLUMNS = {
 }
 ALL_COLUMNS = REQUIRED_COLUMNS | OPTIONAL_COLUMNS
 VALID_STATUSES = {"active", "pending", "alumni", "inactive"}
+STATUS_ALIASES = {
+    "actif": "active",
+    "active": "active",
+    "inactif": "inactive",
+    "inactive": "inactive",
+    "alumni": "alumni",
+    "pending": "pending",
+    "en_attente": "pending",
+}
+GENDER_ALIASES = {
+    "m": "masculin",
+    "homme": "masculin",
+    "masculin": "masculin",
+    "f": "feminin",
+    "femme": "feminin",
+    "feminin": "feminin",
+}
+RESPONSIBILITY_ROLE_ALIASES = {
+    "team_leader": "team_leader",
+    "tl": "team_leader",
+    "chef_pole": "chef_pole",
+    "chef_de_pole": "chef_pole",
+    "adjoint": "adjoint_chef_pole",
+    "adjoint_chef_pole": "adjoint_chef_pole",
+    "chef_projet": "chef_projet",
+    "chef_de_projet": "chef_projet",
+    "adjoint_chef_projet": "adjoint_chef_projet",
+    "sg": "secretaire_generale",
+    "secretaire_generale": "secretaire_generale",
+    "secretaire_general": "secretaire_generale",
+    "financier": "financier",
+    "finance": "financier",
+}
+
+
+@dataclass
+class ImportIssue:
+    row: int | None
+    field: str | None
+    message: str
+
+    def as_text(self) -> str:
+        prefix = f"Ligne {self.row}: " if self.row is not None else ""
+        field = f"{self.field}: " if self.field else ""
+        return f"{prefix}{field}{self.message}"
 
 
 @dataclass
@@ -45,12 +92,38 @@ class ImportReport:
     role_links: int = 0
     pole_links: int = 0
     project_links: int = 0
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    errors: list[ImportIssue] = field(default_factory=list)
+    warnings: list[ImportIssue] = field(default_factory=list)
+    duplicates: int = 0
+    preview: list[dict] = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
         return bool(self.errors)
+
+    def error_rows(self) -> int:
+        return len({issue.row for issue in self.errors if issue.row is not None})
+
+    def warning_rows(self) -> int:
+        return len({issue.row for issue in self.warnings if issue.row is not None})
+
+    def to_dict(self) -> dict:
+        valid_rows = max(self.rows - self.error_rows(), 0)
+        return {
+            "total_rows": self.rows,
+            "valid_rows": valid_rows,
+            "error_rows": self.error_rows(),
+            "warning_rows": self.warning_rows(),
+            "duplicates": self.duplicates,
+            "created_users": self.created_users,
+            "updated_users": self.updated_users,
+            "role_links": self.role_links,
+            "pole_links": self.pole_links,
+            "project_links": self.project_links,
+            "errors": [asdict(issue) for issue in self.errors],
+            "warnings": [asdict(issue) for issue in self.warnings],
+            "preview": self.preview[:50],
+        }
 
 
 @dataclass
@@ -68,6 +141,21 @@ class MemberRow:
     project: str | None
     responsibility: str
     joined_at: date | None
+    study_level: str | None = None
+
+    def preview_item(self) -> dict:
+        return {
+            "row": self.row_number,
+            "name": f"{self.first_name} {self.last_name}".strip(),
+            "email": self.email,
+            "phone": self.phone,
+            "status": self.status,
+            "roles": self.roles,
+            "core_pole": self.core_pole,
+            "support_poles": self.support_poles,
+            "project": self.project,
+            "responsibility": self.responsibility,
+        }
 
 
 def normalize_text(value: str | None) -> str:
@@ -76,6 +164,12 @@ def normalize_text(value: str | None) -> str:
 
 def normalize_email(value: str | None) -> str:
     return normalize_text(value).lower()
+
+
+def make_internal_email(first_name: str, last_name: str) -> str:
+    base = normalize_role(f"{first_name}.{last_name}").strip("_") or "membre"
+    base = re.sub(r"[^a-z0-9._-]+", "", base)
+    return f"{base}@enactspace.local"
 
 
 def normalize_phone(value: str | None) -> str | None:
@@ -102,6 +196,36 @@ def normalize_role(value: str) -> str:
     return normalized
 
 
+def normalize_gender(value: str | None) -> str | None:
+    normalized = normalize_role(value or "")
+    if not normalized:
+        return None
+    return GENDER_ALIASES.get(normalized, normalized)
+
+
+def normalize_status(value: str | None, report: ImportReport, row_number: int) -> str:
+    raw = normalize_role(value or "")
+    if not raw:
+        report.warnings.append(
+            ImportIssue(
+                row=row_number,
+                field="statut",
+                message="Statut manquant: active utilise par defaut.",
+            )
+        )
+        return "active"
+    return STATUS_ALIASES.get(raw, raw)
+
+
+def roles_from_responsibility(value: str | None) -> tuple[str, list[str]]:
+    responsibility = normalize_role(value or "membre") or "membre"
+    roles = []
+    for key, role in RESPONSIBILITY_ROLE_ALIASES.items():
+        if key in responsibility and role not in roles:
+            roles.append(role)
+    return responsibility, roles
+
+
 def split_values(value: str | None) -> list[str]:
     raw = normalize_text(value)
     if not raw:
@@ -123,7 +247,11 @@ def parse_date(value: str | None, report: ImportReport, row_number: int) -> date
         except ValueError:
             continue
     report.errors.append(
-        f"Ligne {row_number}: date_adhesion invalide '{raw}'. Formats: YYYY-MM-DD, DD/MM/YYYY."
+        ImportIssue(
+            row=row_number,
+            field="date_adhesion",
+            message=f"Date invalide '{raw}'. Formats: YYYY-MM-DD, DD/MM/YYYY.",
+        )
     )
     return None
 
@@ -135,23 +263,70 @@ def parse_member_row(row: dict[str, str], row_number: int, report: ImportReport)
     email = normalize_email(row.get("email"))
 
     if not first_name:
-        report.errors.append(f"Ligne {row_number}: prenom obligatoire.")
+        report.errors.append(
+            ImportIssue(row=row_number, field="prenom", message="Prenom obligatoire.")
+        )
     if not last_name:
-        report.errors.append(f"Ligne {row_number}: nom obligatoire.")
-    if not email or "@" not in email:
-        report.errors.append(f"Ligne {row_number}: email invalide.")
+        report.errors.append(
+            ImportIssue(row=row_number, field="nom", message="Nom obligatoire.")
+        )
+    if not email:
+        email = make_internal_email(first_name, last_name)
+        report.warnings.append(
+            ImportIssue(
+                row=row_number,
+                field="email",
+                message=(
+                    "Email manquant: un identifiant interne temporaire sera propose."
+                ),
+            )
+        )
+    elif "@" not in email:
+        report.errors.append(
+            ImportIssue(row=row_number, field="email", message="Email invalide.")
+        )
 
-    status_value = normalize_role(row.get("statut") or "active")
+    status_value = normalize_status(row.get("statut"), report, row_number)
     if status_value not in VALID_STATUSES:
         report.errors.append(
-            f"Ligne {row_number}: statut '{status_value}' invalide. Valeurs: {sorted(VALID_STATUSES)}."
+            ImportIssue(
+                row=row_number,
+                field="statut",
+                message=f"Statut '{status_value}' invalide. Valeurs: {sorted(VALID_STATUSES)}.",
+            )
         )
 
     roles = [normalize_role(role) for role in split_values(row.get("role"))]
+    responsibility, responsibility_roles = roles_from_responsibility(
+        row.get("responsabilite")
+    )
+    for role in responsibility_roles:
+        if role not in roles:
+            roles.append(role)
     if status_value == "alumni" and "alumni" not in roles:
         roles.append("alumni")
     if status_value != "alumni" and "enacteur" not in roles:
         roles.append("enacteur")
+
+    core_pole = normalize_text(row.get("pole_coeur")) or None
+    if not core_pole:
+        report.errors.append(
+            ImportIssue(
+                row=row_number,
+                field="pole_coeur",
+                message="Pole coeur obligatoire.",
+            )
+        )
+
+    phone = normalize_phone(row.get("telephone"))
+    if not phone:
+        report.warnings.append(
+            ImportIssue(
+                row=row_number,
+                field="telephone",
+                message="Telephone manquant.",
+            )
+        )
 
     joined_at = parse_date(row.get("date_adhesion"), report, row_number)
     if len(report.errors) > error_count_before:
@@ -162,33 +337,42 @@ def parse_member_row(row: dict[str, str], row_number: int, report: ImportReport)
         first_name=first_name,
         last_name=last_name,
         email=email,
-        phone=normalize_phone(row.get("telephone")),
-        gender=normalize_role(row.get("genre") or "") or None,
+        phone=phone,
+        gender=normalize_gender(row.get("genre")),
         roles=roles,
         status=status_value,
-        core_pole=normalize_text(row.get("pole_coeur")) or None,
+        core_pole=core_pole,
         support_poles=split_values(row.get("poles_support")),
         project=normalize_text(row.get("projet")) or None,
-        responsibility=normalize_role(row.get("responsabilite") or "membre"),
+        responsibility=responsibility,
         joined_at=joined_at,
+        study_level=normalize_text(row.get("niveau_etude")) or None,
     )
 
 
-def load_csv(path: Path, report: ImportReport) -> list[MemberRow]:
-    if not path.exists():
-        report.errors.append(f"Fichier introuvable: {path}")
-        return []
-
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+def load_csv_text(content: str, report: ImportReport) -> list[MemberRow]:
+    with io.StringIO(content, newline="") as handle:
         reader = csv.DictReader(handle)
         headers = set(reader.fieldnames or [])
         missing = REQUIRED_COLUMNS - headers
         unknown = headers - ALL_COLUMNS
         if missing:
-            report.errors.append(f"Colonnes obligatoires manquantes: {sorted(missing)}")
+            report.errors.append(
+                ImportIssue(
+                    row=None,
+                    field=None,
+                    message=f"Colonnes obligatoires manquantes: {sorted(missing)}",
+                )
+            )
             return []
         if unknown:
-            report.warnings.append(f"Colonnes ignorees: {sorted(unknown)}")
+            report.warnings.append(
+                ImportIssue(
+                    row=None,
+                    field=None,
+                    message=f"Colonnes ignorees: {sorted(unknown)}",
+                )
+            )
 
         rows = []
         seen_emails: set[str] = set()
@@ -199,17 +383,41 @@ def load_csv(path: Path, report: ImportReport) -> list[MemberRow]:
             if member is None:
                 continue
             if member.email in seen_emails:
-                report.errors.append(f"Ligne {row_number}: email duplique dans le CSV.")
+                report.duplicates += 1
+                report.errors.append(
+                    ImportIssue(
+                        row=row_number,
+                        field="email",
+                        message="Email duplique dans le CSV.",
+                    )
+                )
                 continue
             seen_emails.add(member.email)
             if member.phone:
                 if member.phone in seen_phones:
-                    report.errors.append(f"Ligne {row_number}: telephone duplique dans le CSV.")
+                    report.duplicates += 1
+                    report.errors.append(
+                        ImportIssue(
+                            row=row_number,
+                            field="telephone",
+                            message="Telephone duplique dans le CSV.",
+                        )
+                    )
                     continue
                 seen_phones.add(member.phone)
             rows.append(member)
 
     return rows
+
+
+def load_csv(path: Path, report: ImportReport) -> list[MemberRow]:
+    if not path.exists():
+        report.errors.append(
+            ImportIssue(row=None, field=None, message=f"Fichier introuvable: {path}")
+        )
+        return []
+
+    return load_csv_text(path.read_text(encoding="utf-8-sig"), report)
 
 
 def find_pole(db: Session, name: str | None) -> Pole | None:
@@ -240,7 +448,13 @@ def ensure_roles(db: Session, role_names: list[str], report: ImportReport, row_n
     for role_name in role_names:
         role = db.query(Role).filter(Role.name == role_name).first()
         if not role:
-            report.errors.append(f"Ligne {row_number}: role inconnu '{role_name}'.")
+            report.errors.append(
+                ImportIssue(
+                    row=row_number,
+                    field="role",
+                    message=f"Role inconnu '{role_name}'.",
+                )
+            )
             continue
         roles.append(role)
     return roles
@@ -257,7 +471,11 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
         )
     if phone_owner:
         report.errors.append(
-            f"Ligne {member.row_number}: telephone deja utilise par {phone_owner.email}."
+            ImportIssue(
+                row=member.row_number,
+                field="telephone",
+                message="Telephone deja utilise par un autre compte.",
+            )
         )
         return None
 
@@ -266,7 +484,11 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
     if existing:
         if not update_existing:
             report.warnings.append(
-                f"Ligne {member.row_number}: utilisateur existant ignore ({member.email})."
+                ImportIssue(
+                    row=member.row_number,
+                    field="email",
+                    message="Utilisateur existant ignore.",
+                )
             )
             return existing
         existing.first_name = member.first_name
@@ -276,6 +498,7 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
         existing.profile_type = profile_type
         existing.status = member.status
         existing.department = existing.department or member.core_pole
+        existing.study_level = member.study_level or existing.study_level
         existing.is_active = member.status != "inactive"
         report.updated_users += 1
         return existing
@@ -289,6 +512,7 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
         profile_type=profile_type,
         password_hash=hash_password(secrets.token_urlsafe(24)),
         department=member.core_pole,
+        study_level=member.study_level,
         status=member.status,
         email_verified=False,
         is_active=member.status != "inactive",
@@ -369,6 +593,7 @@ def import_members(
     update_existing: bool,
 ) -> None:
     for member in rows:
+        report.preview.append(member.preview_item())
         error_count_before = len(report.errors)
         roles = ensure_roles(db, member.roles, report, member.row_number)
         if len(report.errors) > error_count_before:
@@ -383,7 +608,11 @@ def import_members(
         core_pole = find_pole(db, member.core_pole)
         if member.core_pole and not core_pole:
             report.errors.append(
-                f"Ligne {member.row_number}: pole_coeur inconnu '{member.core_pole}'."
+                ImportIssue(
+                    row=member.row_number,
+                    field="pole_coeur",
+                    message=f"Pole coeur inconnu '{member.core_pole}'.",
+                )
             )
         if core_pole:
             link_pole(db, user, core_pole, member.responsibility, member.joined_at, report)
@@ -392,7 +621,11 @@ def import_members(
             support_pole = find_pole(db, support_pole_name)
             if not support_pole:
                 report.errors.append(
-                    f"Ligne {member.row_number}: pole support inconnu '{support_pole_name}'."
+                    ImportIssue(
+                        row=member.row_number,
+                        field="poles_support",
+                        message=f"Pole support inconnu '{support_pole_name}'.",
+                    )
                 )
                 continue
             link_pole(db, user, support_pole, "support", member.joined_at, report)
@@ -400,10 +633,39 @@ def import_members(
         project = find_project(db, member.project)
         if member.project and not project:
             report.errors.append(
-                f"Ligne {member.row_number}: projet inconnu '{member.project}'."
+                ImportIssue(
+                    row=member.row_number,
+                    field="projet",
+                    message=f"Projet inconnu '{member.project}'.",
+                )
             )
         if project:
             link_project(db, user, project, member.responsibility, member.joined_at, report)
+
+
+def run_members_import(
+    db: Session,
+    csv_content: str,
+    *,
+    dry_run: bool,
+    update_existing: bool = False,
+) -> ImportReport:
+    report = ImportReport()
+    rows = load_csv_text(csv_content, report)
+    if report.has_errors:
+        return report
+
+    import_members(
+        db,
+        rows,
+        report,
+        update_existing=update_existing,
+    )
+    if report.has_errors or dry_run:
+        db.rollback()
+    else:
+        db.commit()
+    return report
 
 
 def print_report(report: ImportReport, *, dry_run: bool) -> None:
@@ -418,11 +680,11 @@ def print_report(report: ImportReport, *, dry_run: bool) -> None:
     if report.warnings:
         print("\nWarnings:")
         for warning in report.warnings:
-            print(f"- {warning}")
+            print(f"- {warning.as_text()}")
     if report.errors:
         print("\nErrors:")
         for error in report.errors:
-            print(f"- {error}")
+            print(f"- {error.as_text()}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -453,12 +715,7 @@ def main() -> int:
     ensure_compatibility_columns()
     db = SessionLocal()
     try:
-        import_members(
-            db,
-            rows,
-            report,
-            update_existing=args.update_existing,
-        )
+        import_members(db, rows, report, update_existing=args.update_existing)
         if report.has_errors or args.dry_run:
             db.rollback()
         else:

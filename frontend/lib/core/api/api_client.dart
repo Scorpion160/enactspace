@@ -46,7 +46,7 @@ class ApiClient {
       body: data,
     );
 
-    return _handleResponse(response);
+    return decodeResponse(response);
   }
 
   Future<dynamic> postJson(
@@ -64,7 +64,7 @@ class ApiClient {
       body: jsonEncode(data),
     );
 
-    return _handleResponse(response);
+    return decodeResponse(response);
   }
 
   Future<dynamic> patchJson(
@@ -82,7 +82,7 @@ class ApiClient {
       body: jsonEncode(data),
     );
 
-    return _handleResponse(response);
+    return decodeResponse(response);
   }
 
   Future<dynamic> get(String path, {String? token}) async {
@@ -94,7 +94,7 @@ class ApiClient {
       },
     );
 
-    return _handleResponse(response);
+    return decodeResponse(response);
   }
 
   Future<dynamic> delete(String path, {String? token}) async {
@@ -106,10 +106,10 @@ class ApiClient {
       },
     );
 
-    return _handleResponse(response);
+    return decodeResponse(response);
   }
 
-  dynamic _handleResponse(http.Response response) {
+  dynamic decodeResponse(http.Response response) {
     final dynamic body = response.body.isNotEmpty
         ? jsonDecode(response.body)
         : {};

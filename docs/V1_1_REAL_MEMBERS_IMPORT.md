@@ -110,6 +110,71 @@ Mettre a jour les comptes existants par email:
 python -m app.scripts.import_members --file ..\data\import\membres_enactus.csv --apply --update-existing
 ```
 
+## Interface Admin
+
+L'import est disponible depuis:
+
+```text
+Membres > Importer
+```
+
+Roles autorises:
+
+- Administrateur
+- Team Leader
+- Secretaire generale
+
+Roles interdits:
+
+- membre simple
+- alumni
+- candidat
+
+Fonctionnement:
+
+1. Ouvrir `Membres`.
+2. Cliquer `Importer`.
+3. Charger ou copier le modele CSV.
+4. Selectionner un CSV.
+5. Lancer `Apercu`.
+6. Lire le resume, les erreurs et les avertissements.
+7. Corriger le CSV si necessaire.
+8. Confirmer avec `Importer` uniquement si aucune erreur bloquante n'est presente.
+
+Endpoints backend:
+
+```text
+GET  /api/members/import/template
+POST /api/members/import/preview
+POST /api/members/import/apply
+```
+
+Le backend reste la source de verite: l'UI ne fait qu'afficher les rapports.
+
+## Lecture des erreurs
+
+Une erreur bloque l'import definitif.
+
+Exemples:
+
+- pole coeur manquant;
+- pole inconnu;
+- role inconnu;
+- email invalide;
+- telephone deja utilise par un autre compte;
+- doublon email ou telephone dans le CSV.
+
+## Lecture des avertissements
+
+Un avertissement n'empeche pas forcement l'import, mais demande une verification.
+
+Exemples:
+
+- email manquant: un identifiant interne temporaire est propose;
+- telephone manquant;
+- statut manquant: `active` est utilise par defaut;
+- utilisateur existant ignore sans `--update-existing`.
+
 ## Ce que fait le script
 
 1. Lit le CSV en UTF-8.
@@ -149,6 +214,59 @@ Avant `--apply`:
 6. Corriger le CSV.
 7. Relancer le dry-run.
 8. Appliquer uniquement quand le rapport ne contient aucune erreur.
+
+## Conversion du fichier ODS reel
+
+Le fichier reel local est:
+
+```text
+C:\Users\DIOP\Documents\Enactus\documents\listes_enacteurs.ods
+```
+
+Il contient des donnees personnelles et ne doit jamais etre copie dans le depot.
+
+Convertir vers un CSV ignore par Git:
+
+```powershell
+cd C:\Users\DIOP\Documents\Enactus\enactspace
+python tools\convert_members_ods_to_csv.py `
+  --input C:\Users\DIOP\Documents\Enactus\documents\listes_enacteurs.ods `
+  --output data\import\private\membres_enactus_import.csv
+```
+
+Le dossier suivant est ignore par Git:
+
+```text
+data/import/private/
+```
+
+Mapping applique:
+
+```text
+Nom -> nom
+Prenoms -> prenom
+Sexe -> genre
+Classse/Classe -> niveau_etude
+Telephone -> telephone
+Email -> email
+Pole coeur -> pole_coeur
+Com/Orga/Veille -> poles_support
+Projet principal -> projet
+Fonction / responsabilite -> responsabilite + roles
+Statut -> statut
+```
+
+Normalisations:
+
+- `M` devient `masculin`.
+- `F` devient `feminin`.
+- `Actif` devient `active`.
+- `Inactif` devient `inactive`.
+- `Com=Oui` ajoute `Communication`.
+- `Orga=Oui` ajoute `Organisation`.
+- `Veille=Oui` ajoute `Veille`.
+
+Le convertisseur detecte automatiquement la ligne d'en-tetes dans l'ODS.
 
 ## Exemple minimal
 

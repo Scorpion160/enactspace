@@ -1,5 +1,8 @@
+import 'package:http/http.dart' as http;
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../models/member_import_model.dart';
 import '../models/member_model.dart';
 
 class MembersService {
@@ -205,5 +208,82 @@ class MembersService {
     }
 
     throw Exception('Réponse invalide lors de la mise à jour du membre.');
+  }
+
+  Future<String> downloadImportTemplate() async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final response = await http.get(
+      Uri.parse('${ApiClient.baseUrl}/members/import/template'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body;
+    }
+
+    throw Exception('Impossible de charger le modÃ¨le CSV.');
+  }
+
+  Future<MemberImportReport> previewImport({
+    required List<int> bytes,
+    required String fileName,
+    bool updateExisting = false,
+  }) {
+    return _uploadImport(
+      action: 'preview',
+      bytes: bytes,
+      fileName: fileName,
+      updateExisting: updateExisting,
+    );
+  }
+
+  Future<MemberImportReport> applyImport({
+    required List<int> bytes,
+    required String fileName,
+    bool updateExisting = false,
+  }) {
+    return _uploadImport(
+      action: 'apply',
+      bytes: bytes,
+      fileName: fileName,
+      updateExisting: updateExisting,
+    );
+  }
+
+  Future<MemberImportReport> _uploadImport({
+    required String action,
+    required List<int> bytes,
+    required String fileName,
+    required bool updateExisting,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connectÃ©.');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(
+        '${ApiClient.baseUrl}/members/import/$action'
+        '?update_existing=$updateExisting',
+      ),
+    );
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+    );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final decoded = _apiClient.decodeResponse(response);
+    if (decoded is Map<String, dynamic>) {
+      return MemberImportReport.fromJson(decoded);
+    }
+
+    throw Exception('RÃ©ponse invalide lors de lâ€™import des membres.');
   }
 }

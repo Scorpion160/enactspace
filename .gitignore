@@ -22,6 +22,7 @@ backend/enactspace_dev.db
 
 # Real member imports
 data/import/*.csv
+data/import/private/
 !data/import/membres_enactus_template.csv
 
 # IDE
