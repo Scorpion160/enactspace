@@ -268,6 +268,26 @@ Normalisations:
 
 Le convertisseur detecte automatiquement la ligne d'en-tetes dans l'ODS.
 
+## Resultat du test local reel
+
+Le 2026-07-11, le fichier `listes_enacteurs.ods` a ete converti localement en CSV prive ignore par Git.
+
+Resultat:
+
+- 26 lignes reconnues.
+- dry-run CLI OK.
+- preview API OK.
+- 0 erreur bloquante.
+- 16 avertissements email manquant avec identifiants internes temporaires proposes.
+
+Rapport detaille sans donnees personnelles:
+
+```text
+docs/V1_1_REAL_MEMBERS_IMPORT_TEST_REPORT.md
+```
+
+Avant tout `apply`, valider manuellement les avertissements, sauvegarder la base cible, puis refaire un preview sur l'environnement cible.
+
 ## Exemple minimal
 
 ```csv

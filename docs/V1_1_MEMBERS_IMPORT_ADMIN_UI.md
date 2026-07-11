@@ -62,3 +62,21 @@ Le backend protege aussi les endpoints via les memes permissions.
 8. CSV avec email manquant: avertissement visible.
 9. CSV avec doublon: erreur visible.
 10. CSV valide fictif: import possible apres confirmation.
+
+## Test local fichier reel
+
+Le preview API a ete teste localement avec le CSV prive genere depuis `listes_enacteurs.ods`.
+
+Resultat agrege:
+
+- 26 lignes totales.
+- 26 lignes valides.
+- 0 erreur.
+- 16 avertissements.
+- 0 doublon.
+
+Le rapport complet, sans donnees personnelles, est dans:
+
+```text
+docs/V1_1_REAL_MEMBERS_IMPORT_TEST_REPORT.md
+```
