@@ -30,6 +30,7 @@ from app.api.routes import (
     archives,
     audit,
     seed,
+    system,
     realtime,
 )
 
@@ -99,6 +100,8 @@ def health():
     return {
         "ok": True,
         "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "environment": settings.APP_ENV,
     }
 
 
@@ -125,4 +128,5 @@ app.include_router(academy.router, prefix="/api")
 app.include_router(archives.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
+app.include_router(system.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
