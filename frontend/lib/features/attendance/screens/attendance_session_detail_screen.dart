@@ -35,6 +35,7 @@ class _AttendanceSessionDetailScreenState
   String? _qrError;
   String _statusFilter = 'all';
   Timer? _qrRefreshTimer;
+  Timer? _qrStatusTimer;
 
   List<MemberModel> _members = [];
   List<AttendanceExpectedMemberModel> _expectedMembers = [];
@@ -53,6 +54,7 @@ class _AttendanceSessionDetailScreenState
   @override
   void dispose() {
     _qrRefreshTimer?.cancel();
+    _qrStatusTimer?.cancel();
     _memberSearchController.dispose();
     super.dispose();
   }
@@ -78,6 +80,7 @@ class _AttendanceSessionDetailScreenState
         _records = results[2] as List<AttendanceRecordModel>;
       });
       unawaited(_refreshQrStatus(silent: true));
+      _syncQrStatusPolling();
     } catch (e) {
       if (!mounted) return;
 
@@ -91,6 +94,20 @@ class _AttendanceSessionDetailScreenState
         });
       }
     }
+  }
+
+  void _syncQrStatusPolling() {
+    _qrStatusTimer?.cancel();
+    if (!widget.session.canManage ||
+        _sessionClosed ||
+        _sessionStatus != 'open') {
+      return;
+    }
+
+    _qrStatusTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _sessionClosed || _sessionStatus != 'open') return;
+      unawaited(_refreshQrStatus(silent: true));
+    });
   }
 
   Future<void> _refreshQrStatus({bool silent = false}) async {
@@ -330,6 +347,7 @@ class _AttendanceSessionDetailScreenState
         _qrToken = null;
       });
       _qrRefreshTimer?.cancel();
+      _qrStatusTimer?.cancel();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Session clôturée avec succès.')),
@@ -357,6 +375,7 @@ class _AttendanceSessionDetailScreenState
         _sessionStatus = opened.status ?? 'open';
       });
       unawaited(_generateQrToken(silent: true));
+      _syncQrStatusPolling();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Appel ouvert avec succes.')),
@@ -904,7 +923,7 @@ class _SessionQrPanel extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   isOpen
-                      ? 'QR dynamique pret pour le scan des membres attendus.'
+                      ? 'QR dynamique pret. Les compteurs se mettent a jour automatiquement.'
                       : 'Ouvrez la session pour activer le pointage QR.',
                   style: const TextStyle(
                     color: Colors.black54,
