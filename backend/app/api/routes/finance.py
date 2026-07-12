@@ -1,11 +1,19 @@
 import csv
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from io import StringIO
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import Response
+from app.core.config import settings
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user, notify_users
+from app.services.payments import (
+    PaymentProviderError,
+    PaymentProviderRequest,
+    get_payment_provider,
+)
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +24,10 @@ from app.models.finance import (
     Payment,
     PaymentAllocation,
     ClubTransaction,
+)
+from app.models.mobile_money import (
+    MobileMoneyTransaction,
+    MobileMoneyTransactionEvent,
 )
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
@@ -33,6 +45,10 @@ from app.schemas.finance import (
     FeeBulkCreate,
     FeeCancelRequest,
     PaymentRejectRequest,
+)
+from app.schemas.mobile_money import (
+    MobileMoneyInitiateRequest,
+    MobileMoneyInitiationRead,
 )
 from app.api.deps import (
     get_current_active_validated_user,
@@ -69,6 +85,7 @@ VALID_FEE_TYPES = {
     "penalite_absence",
     "penalty",
 }
+ACTIVE_MOBILE_MONEY_STATUSES = {"created", "pending", "processing"}
 
 FINANCE_MANAGER_ROLES = {"administrateur", "team_leader", "financier"}
 PAYMENT_SUPERVISOR_ROLES = {"administrateur", "team_leader"}
@@ -581,6 +598,331 @@ def get_my_financial_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def normalize_mobile_money_currency(currency: str | None) -> str:
+    value = (currency or "").upper()
+    if value in {"XOF", "FCFA", "CFA"}:
+        return "XOF"
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Devise non prise en charge pour Mobile Money",
+    )
+
+
+def fee_remaining_xof_amount(fee: Fee) -> int:
+    normalize_mobile_money_currency(fee.currency)
+    try:
+        amount = Decimal(str(fee.amount or 0))
+        amount_paid = Decimal(str(fee.amount_paid or 0))
+    except InvalidOperation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Montant invalide sur une dette",
+        ) from exc
+    remaining = amount - amount_paid
+    if remaining <= 0:
+        return 0
+    if remaining != remaining.to_integral_value():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le montant Mobile Money doit etre un entier en FCFA",
+        )
+    return int(remaining)
+
+
+def mobile_money_event(
+    db: Session,
+    transaction: MobileMoneyTransaction,
+    *,
+    event_type: str,
+    old_status: str | None = None,
+    new_status: str | None = None,
+    error_message: str | None = None,
+    metadata_json: dict | None = None,
+) -> MobileMoneyTransactionEvent:
+    event = MobileMoneyTransactionEvent(
+        transaction_id=transaction.id,
+        event_type=event_type,
+        old_status=old_status,
+        new_status=new_status,
+        processed_at=datetime.utcnow(),
+        error_message=error_message,
+        metadata_json=metadata_json or {},
+    )
+    db.add(event)
+    return event
+
+
+def mobile_money_public_payload(
+    transaction: MobileMoneyTransaction,
+    *,
+    message: str | None = None,
+) -> dict:
+    status_messages = {
+        "created": "Paiement cree.",
+        "pending": "Le paiement est en cours de verification.",
+        "processing": "Le paiement est en cours de verification.",
+        "successful": "Le paiement a ete confirme.",
+        "failed": "Le paiement n'a pas ete finalise.",
+        "cancelled": "Le paiement a ete annule.",
+        "expired": "La transaction a expire.",
+        "refunded": "Le paiement a ete rembourse.",
+    }
+    return {
+        "transaction_id": transaction.id,
+        "amount": transaction.amount,
+        "currency": transaction.currency,
+        "status": transaction.status,
+        "checkout_url": transaction.checkout_url,
+        "expires_at": transaction.expires_at,
+        "message": message or status_messages.get(transaction.status, "Paiement."),
+    }
+
+
+def mobile_money_default_urls() -> dict[str, str | None]:
+    api_base = (settings.PUBLIC_API_BASE_URL or "").rstrip("/")
+    return {
+        "callback_url": settings.PAYDUNYA_CALLBACK_URL
+        or (f"{api_base}/api/payments/paydunya/ipn" if api_base else None),
+        "return_url": settings.PAYDUNYA_RETURN_URL,
+        "cancel_url": settings.PAYDUNYA_CANCEL_URL,
+    }
+
+
+def active_mobile_money_transaction_for_fees(
+    db: Session,
+    *,
+    member_id,
+    finance_item_ids: list[str],
+    amount: int,
+) -> MobileMoneyTransaction | None:
+    expected_ids = sorted(finance_item_ids)
+    candidates = (
+        db.query(MobileMoneyTransaction)
+        .filter(
+            MobileMoneyTransaction.member_id == member_id,
+            MobileMoneyTransaction.amount == amount,
+            MobileMoneyTransaction.status.in_(ACTIVE_MOBILE_MONEY_STATUSES),
+        )
+        .order_by(MobileMoneyTransaction.created_at.desc())
+        .all()
+    )
+    now = datetime.utcnow()
+    for transaction in candidates:
+        if transaction.expires_at and transaction.expires_at <= now:
+            continue
+        metadata_ids = sorted(
+            str(item_id)
+            for item_id in (transaction.metadata_json or {}).get("finance_item_ids", [])
+        )
+        if metadata_ids == expected_ids:
+            return transaction
+    return None
+
+
+@router.post(
+    "/mobile-money/initiate",
+    response_model=MobileMoneyInitiationRead,
+)
+async def initiate_mobile_money_payment(
+    payload: MobileMoneyInitiateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not settings.MOBILE_MONEY_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Le paiement Mobile Money est indisponible pour le moment",
+        )
+    if payload.channel and payload.channel not in settings.paydunya_allowed_channels_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Canal Mobile Money non autorise",
+        )
+
+    requested_ids = list(payload.finance_item_ids)
+    if payload.finance_item_id:
+        requested_ids.append(payload.finance_item_id)
+    fee_ids = list(dict.fromkeys(requested_ids))
+
+    target_member_id = payload.member_id or current_user.id
+    assisted_payment = target_member_id != current_user.id
+    if assisted_payment and not is_finance_manager(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez initier un paiement que pour votre compte",
+        )
+
+    fees = db.query(Fee).filter(Fee.id.in_(fee_ids)).all()
+    if len(fees) != len(fee_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Une dette selectionnee est introuvable",
+        )
+    for fee in fees:
+        if fee.user_id != target_member_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Vous ne pouvez pas payer la dette d'un autre membre",
+            )
+        if fee.status in {"paid", "cancelled"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Une dette selectionnee est deja soldee ou annulee",
+            )
+
+    fee_ids_as_text = [str(fee.id) for fee in fees]
+    amount = sum(fee_remaining_xof_amount(fee) for fee in fees)
+    if amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucun montant restant a payer",
+        )
+
+    existing = active_mobile_money_transaction_for_fees(
+        db,
+        member_id=target_member_id,
+        finance_item_ids=fee_ids_as_text,
+        amount=amount,
+    )
+    if existing:
+        return mobile_money_public_payload(existing)
+
+    member = db.query(User).filter(User.id == target_member_id).first()
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Membre introuvable",
+        )
+
+    transaction = MobileMoneyTransaction(
+        member_id=target_member_id,
+        finance_item_id=fees[0].id if len(fees) == 1 else None,
+        provider=settings.MOBILE_MONEY_PROVIDER,
+        idempotency_key=str(uuid.uuid4()),
+        amount=amount,
+        currency=settings.PAYMENT_CURRENCY,
+        channel=payload.channel,
+        status="created",
+        metadata_json={
+            "finance_item_ids": fee_ids_as_text,
+            "finance_item_labels": [fee.label for fee in fees],
+            "initiated_by": str(current_user.id),
+            "assisted_payment": assisted_payment,
+        },
+    )
+    db.add(transaction)
+    db.flush()
+    mobile_money_event(
+        db,
+        transaction,
+        event_type="created",
+        new_status="created",
+        metadata_json={"finance_item_count": len(fees)},
+    )
+
+    urls = mobile_money_default_urls()
+    provider_request = PaymentProviderRequest(
+        transaction_id=str(transaction.id),
+        amount=amount,
+        currency=settings.PAYMENT_CURRENCY,
+        description="; ".join(fee.label for fee in fees)[:240],
+        customer_name=display_user(member),
+        customer_email=member.email,
+        customer_phone=member.phone,
+        callback_url=urls["callback_url"],
+        return_url=urls["return_url"],
+        cancel_url=urls["cancel_url"],
+        channel=payload.channel,
+        custom_data={
+            "finance_item_ids": fee_ids_as_text,
+            "member_reference": str(target_member_id),
+        },
+    )
+
+    try:
+        provider = get_payment_provider(settings.MOBILE_MONEY_PROVIDER)
+        provider_result = await provider.create_payment(provider_request)
+    except (PaymentProviderError, ValueError) as exc:
+        old_status = transaction.status
+        transaction.status = "failed"
+        transaction.failure_code = getattr(exc, "code", "provider_error")
+        transaction.failure_message = getattr(
+            exc,
+            "public_message",
+            "Le paiement Mobile Money est indisponible pour le moment.",
+        )
+        transaction.updated_at = datetime.utcnow()
+        mobile_money_event(
+            db,
+            transaction,
+            event_type="provider_error",
+            old_status=old_status,
+            new_status=transaction.status,
+            error_message=transaction.failure_code,
+        )
+        create_audit_log(
+            db=db,
+            action="mobile_money_initiation_failed",
+            user_id=current_user.id,
+            entity_type="mobile_money_transaction",
+            entity_id=transaction.id,
+            old_value={"status": old_status},
+            new_value={
+                "status": transaction.status,
+                "provider": transaction.provider,
+                "failure_code": transaction.failure_code,
+            },
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=transaction.failure_message,
+        ) from exc
+
+    old_status = transaction.status
+    transaction.status = provider_result.status
+    transaction.provider_invoice_token = provider_result.provider_token
+    transaction.provider_transaction_id = provider_result.provider_transaction_id
+    transaction.provider_status = provider_result.provider_status
+    transaction.checkout_url = provider_result.checkout_url
+    transaction.expires_at = provider_result.expires_at
+    transaction.updated_at = datetime.utcnow()
+    transaction.metadata_json = {
+        **(transaction.metadata_json or {}),
+        "provider_metadata": provider_result.metadata,
+    }
+    mobile_money_event(
+        db,
+        transaction,
+        event_type="provider_created",
+        old_status=old_status,
+        new_status=transaction.status,
+        metadata_json=provider_result.metadata,
+    )
+    create_audit_log(
+        db=db,
+        action="mobile_money_initiated",
+        user_id=current_user.id,
+        entity_type="mobile_money_transaction",
+        entity_id=transaction.id,
+        old_value={"status": old_status},
+        new_value={
+            "status": transaction.status,
+            "amount": transaction.amount,
+            "currency": transaction.currency,
+            "provider": transaction.provider,
+            "channel": transaction.channel,
+            "finance_item_count": len(fees),
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(transaction)
+    return mobile_money_public_payload(transaction)
 
 
 def finance_stats_payload(

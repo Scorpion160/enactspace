@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 MOBILE_MONEY_STATUSES = {
@@ -44,6 +44,34 @@ class MobileMoneyTransactionRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MobileMoneyInitiateRequest(BaseModel):
+    finance_item_id: UUID | None = None
+    finance_item_ids: list[UUID] = Field(default_factory=list)
+    member_id: UUID | None = None
+    channel: str | None = None
+
+    @model_validator(mode="after")
+    def validate_finance_items(self):
+        item_ids = list(self.finance_item_ids)
+        if self.finance_item_id:
+            item_ids.append(self.finance_item_id)
+        if not item_ids:
+            raise ValueError("Au moins une dette est obligatoire")
+        if len(set(item_ids)) != len(item_ids):
+            raise ValueError("Une dette ne peut pas etre selectionnee deux fois")
+        return self
+
+
+class MobileMoneyInitiationRead(BaseModel):
+    transaction_id: UUID
+    amount: int
+    currency: str
+    status: str
+    checkout_url: str | None
+    expires_at: datetime | None
+    message: str
 
 
 class MobileMoneyTransactionEventRead(BaseModel):
