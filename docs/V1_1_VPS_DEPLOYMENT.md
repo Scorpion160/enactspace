@@ -86,6 +86,9 @@ Points obligatoires:
 - `CORS_ORIGINS` avec les domaines reels
 - `PUBLIC_API_BASE_URL=https://api.enactspace.example.com`
 - `FILE_STORAGE_PATH=/var/lib/enactspace/uploads`
+- `ATTENDANCE_QR_SECRET` long, aleatoire et different du secret JWT
+- `ATTENDANCE_QR_TTL_SECONDS=60`
+- `ATTENDANCE_QR_ROTATION_SECONDS=45`
 
 Creer le stockage persistant:
 

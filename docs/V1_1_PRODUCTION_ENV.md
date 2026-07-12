@@ -46,11 +46,25 @@ chmod 600 .env
 - `PAYMENT_PROVIDER`: `manual_proof`, `mock` ou nom du futur fournisseur Mobile Money.
 - `PAYMENT_WEBHOOK_SECRET`: secret utilise pour verifier les webhooks paiement.
 
+## Pointage QR
+
+- `ATTENDANCE_QR_ENABLED`: active ou desactive le pointage par QR.
+- `ATTENDANCE_QR_SECRET`: secret HMAC dedie aux QR de presence. En production, il doit etre long, aleatoire et different de `SECRET_KEY` / `JWT_SECRET_KEY`.
+- `ATTENDANCE_QR_TTL_SECONDS`: duree de validite d'un jeton QR.
+- `ATTENDANCE_QR_ROTATION_SECONDS`: frequence de rotation affichee cote responsable.
+- `ATTENDANCE_LATE_GRACE_MINUTES`: delai de grace avant de marquer un scan en retard.
+- `ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE`: limite de scans QR par utilisateur et par minute.
+- `ATTENDANCE_QR_REQUIRE_MANUAL_CONFIRMATION`: option future de confirmation responsable.
+- `ATTENDANCE_QR_REQUIRE_SESSION_PIN`: option future de code session.
+- `ATTENDANCE_QR_REQUIRE_LOCATION_CHECK`: option future de controle de position.
+
 ## Valeurs interdites en production
 
 - `APP_DEBUG=true`
 - `ENABLE_SEED=true`
 - secrets courts ou reutilises
+- `ATTENDANCE_QR_SECRET=CHANGE_ME`
+- `ATTENDANCE_QR_SECRET` identique au secret JWT
 - `CORS_ORIGINS=*`
 - stockage dans un dossier temporaire
 - base SQLite pour les donnees reelles

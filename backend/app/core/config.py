@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,11 +38,38 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER: str = "manual_proof"
     PAYMENT_WEBHOOK_SECRET: str | None = None
 
+    ATTENDANCE_QR_ENABLED: bool = True
+    ATTENDANCE_QR_SECRET: str | None = None
+    ATTENDANCE_QR_TTL_SECONDS: int = 60
+    ATTENDANCE_QR_ROTATION_SECONDS: int = 45
+    ATTENDANCE_LATE_GRACE_MINUTES: int = 10
+    ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE: int = 10
+    ATTENDANCE_QR_REQUIRE_MANUAL_CONFIRMATION: bool = False
+    ATTENDANCE_QR_REQUIRE_SESSION_PIN: bool = False
+    ATTENDANCE_QR_REQUIRE_LOCATION_CHECK: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_attendance_qr_settings(self):
+        if self.ATTENDANCE_QR_TTL_SECONDS < 15:
+            raise ValueError("ATTENDANCE_QR_TTL_SECONDS must be at least 15")
+        if self.ATTENDANCE_QR_ROTATION_SECONDS < 10:
+            raise ValueError("ATTENDANCE_QR_ROTATION_SECONDS must be at least 10")
+        if self.ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE < 1:
+            raise ValueError("ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE must be positive")
+        if self.APP_ENV == "production" and self.ATTENDANCE_QR_ENABLED:
+            if not self.ATTENDANCE_QR_SECRET:
+                raise ValueError("ATTENDANCE_QR_SECRET is required in production")
+            if self.ATTENDANCE_QR_SECRET == self.signing_secret:
+                raise ValueError("ATTENDANCE_QR_SECRET must differ from JWT secret")
+            if self.ATTENDANCE_QR_SECRET == "CHANGE_ME":
+                raise ValueError("ATTENDANCE_QR_SECRET must be changed in production")
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -57,6 +85,10 @@ class Settings(BaseSettings):
     @property
     def signing_secret(self) -> str:
         return self.JWT_SECRET_KEY or self.SECRET_KEY
+
+    @property
+    def attendance_qr_secret(self) -> str:
+        return self.ATTENDANCE_QR_SECRET or self.signing_secret
 
     @property
     def email_enabled(self) -> bool:
