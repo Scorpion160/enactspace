@@ -72,3 +72,35 @@ class AttendanceNfcCheckInResultModel {
     );
   }
 }
+
+class AttendanceNfcAuditLogModel {
+  final String id;
+  final String? memberId;
+  final String? maskedTag;
+  final String result;
+  final DateTime createdAt;
+
+  const AttendanceNfcAuditLogModel({
+    required this.id,
+    this.memberId,
+    this.maskedTag,
+    required this.result,
+    required this.createdAt,
+  });
+
+  factory AttendanceNfcAuditLogModel.fromJson(Map<String, dynamic> json) {
+    final newValue = json['new_value'] is Map
+        ? Map<String, dynamic>.from(json['new_value'] as Map)
+        : const <String, dynamic>{};
+    return AttendanceNfcAuditLogModel(
+      id: json['id']?.toString() ?? '',
+      memberId: newValue['member_id']?.toString(),
+      maskedTag: newValue['masked_tag']?.toString(),
+      result:
+          newValue['result']?.toString() ?? json['action']?.toString() ?? '',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}

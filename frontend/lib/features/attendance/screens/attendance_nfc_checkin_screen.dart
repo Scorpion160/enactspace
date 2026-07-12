@@ -33,6 +33,7 @@ class _AttendanceNfcCheckInScreenState
   AttendanceQrStatusModel? _status;
   AttendanceNfcCheckInResultModel? _lastResult;
   final List<AttendanceNfcCheckInResultModel> _history = [];
+  List<AttendanceNfcAuditLogModel> _auditLogs = [];
 
   @override
   void initState() {
@@ -51,11 +52,15 @@ class _AttendanceNfcCheckInScreenState
   Future<void> _load() async {
     try {
       final availability = await NfcManager.instance.checkAvailability();
-      final status = await _attendanceService.getQrStatus(widget.session.id);
+      final results = await Future.wait([
+        _attendanceService.getQrStatus(widget.session.id),
+        _attendanceService.getNfcAuditLogs(widget.session.id),
+      ]);
       if (!mounted) return;
       setState(() {
         _nfcAvailable = availability == NfcAvailability.enabled;
-        _status = status;
+        _status = results[0] as AttendanceQrStatusModel;
+        _auditLogs = results[1] as List<AttendanceNfcAuditLogModel>;
         _error = null;
       });
       if (_nfcAvailable && widget.session.status == 'open') {
@@ -100,13 +105,17 @@ class _AttendanceNfcCheckInScreenState
         sessionId: widget.session.id,
         tagPayload: tagPayload,
       );
-      final status = await _attendanceService.getQrStatus(widget.session.id);
+      final results = await Future.wait([
+        _attendanceService.getQrStatus(widget.session.id),
+        _attendanceService.getNfcAuditLogs(widget.session.id),
+      ]);
       if (!mounted) return;
       setState(() {
         _lastResult = result;
         _history.insert(0, result);
         if (_history.length > 8) _history.removeLast();
-        _status = status;
+        _status = results[0] as AttendanceQrStatusModel;
+        _auditLogs = results[1] as List<AttendanceNfcAuditLogModel>;
         _error = null;
       });
     } catch (e) {
@@ -178,6 +187,7 @@ class _AttendanceNfcCheckInScreenState
                     child: _NfcResultPanel(
                       lastResult: _lastResult,
                       history: _history,
+                      auditLogs: _auditLogs,
                     ),
                   ),
                 ],
@@ -185,7 +195,11 @@ class _AttendanceNfcCheckInScreenState
             else ...[
               _NfcCounters(status: _status),
               const SizedBox(height: 18),
-              _NfcResultPanel(lastResult: _lastResult, history: _history),
+              _NfcResultPanel(
+                lastResult: _lastResult,
+                history: _history,
+                auditLogs: _auditLogs,
+              ),
             ],
           ],
         ),
@@ -361,8 +375,13 @@ class _NfcCounters extends StatelessWidget {
 class _NfcResultPanel extends StatelessWidget {
   final AttendanceNfcCheckInResultModel? lastResult;
   final List<AttendanceNfcCheckInResultModel> history;
+  final List<AttendanceNfcAuditLogModel> auditLogs;
 
-  const _NfcResultPanel({required this.lastResult, required this.history});
+  const _NfcResultPanel({
+    required this.lastResult,
+    required this.history,
+    required this.auditLogs,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -420,6 +439,31 @@ class _NfcResultPanel extends StatelessWidget {
                   subtitle: Text(item.message),
                 ),
               ),
+            const SizedBox(height: 18),
+            const Text(
+              'Derniers pointages NFC',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            if (auditLogs.isEmpty)
+              const Text('Aucun log NFC pour le moment.')
+            else
+              ...auditLogs
+                  .take(6)
+                  .map(
+                    (item) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        _auditIcon(item.result),
+                        color: _auditColor(item.result),
+                      ),
+                      title: Text(_auditLabel(item.result)),
+                      subtitle: Text(
+                        '${item.maskedTag ?? 'Badge masque'} - '
+                        '${_formatShortTime(item.createdAt)}',
+                      ),
+                    ),
+                  ),
           ],
         ),
       ),
@@ -448,4 +492,60 @@ String _readerStatusLabel({
   if (paused) return 'Lecture NFC en pause.';
   if (listening) return 'Approchez un badge NFC.';
   return 'Lecteur pret.';
+}
+
+String _formatShortTime(DateTime value) {
+  final local = value.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+IconData _auditIcon(String result) {
+  switch (result) {
+    case 'present':
+      return Icons.check_circle_rounded;
+    case 'late':
+      return Icons.schedule_rounded;
+    case 'already_recorded':
+      return Icons.done_all_rounded;
+    default:
+      return Icons.info_rounded;
+  }
+}
+
+Color _auditColor(String result) {
+  switch (result) {
+    case 'present':
+      return Colors.green.shade700;
+    case 'late':
+      return Colors.orange.shade800;
+    case 'unknown_tag':
+    case 'revoked_tag':
+    case 'not_eligible':
+      return Colors.red.shade700;
+    default:
+      return AppTheme.softBlack;
+  }
+}
+
+String _auditLabel(String result) {
+  switch (result) {
+    case 'present':
+      return 'Presence NFC';
+    case 'late':
+      return 'Retard NFC';
+    case 'already_recorded':
+      return 'Deja pointe';
+    case 'unknown_tag':
+      return 'Badge inconnu';
+    case 'revoked_tag':
+      return 'Badge revoque';
+    case 'not_eligible':
+      return 'Non attendu';
+    case 'session_closed':
+      return 'Session fermee';
+    default:
+      return result;
+  }
 }

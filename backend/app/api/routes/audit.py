@@ -74,11 +74,20 @@ def _ensure_can_read_audit(
         entity_type == "attendance_session"
         and entity_id
         and (
-            (action is not None and action.startswith("attendance_qr"))
+            (
+                action is not None
+                and (
+                    action.startswith("attendance_qr")
+                    or action.startswith("attendance_nfc")
+                )
+            )
             or (
                 action is None
                 and action_prefix is not None
-                and action_prefix.startswith("attendance_qr")
+                and (
+                    action_prefix.startswith("attendance_qr")
+                    or action_prefix.startswith("attendance_nfc")
+                )
             )
         )
         and _can_manage_attendance_session_audit(db, current_user, entity_id, roles)

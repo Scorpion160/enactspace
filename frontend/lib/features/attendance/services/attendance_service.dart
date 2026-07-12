@@ -456,6 +456,30 @@ class AttendanceService {
     throw Exception('Pointage NFC invalide.');
   }
 
+  Future<List<AttendanceNfcAuditLogModel>> getNfcAuditLogs(
+    String sessionId,
+  ) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.get(
+      '/audit/logs?entity_type=attendance_session'
+      '&entity_id=$sessionId'
+      '&action_prefix=attendance_nfc'
+      '&limit=50',
+      token: token,
+    );
+
+    final rawList = response is List ? response : const <dynamic>[];
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceNfcAuditLogModel.fromJson)
+        .toList();
+  }
+
   Future<List<AttendanceQrAuditLogModel>> getQrAuditLogs(
     String sessionId,
   ) async {
