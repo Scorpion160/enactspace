@@ -28,3 +28,7 @@ Chaque nouvelle candidature crée une notification interne pour les rôles recru
 ## Confidentialité
 
 Le suivi public affiche seulement les informations utiles au candidat. Les notes internes, scores et avis restent absents du suivi public.
+
+## Suivi candidature
+
+Le portail public accepte le code `ESP-AAAA-XXXXXXXX` et reste compatible avec les anciennes références UUID. Il affiche le statut, la date de soumission, la dernière mise à jour, la prochaine étape, les informations publiques d'entretien si disponibles et le résultat final lorsque la décision est terminée.

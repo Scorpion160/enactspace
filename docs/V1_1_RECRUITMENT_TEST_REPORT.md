@@ -8,6 +8,15 @@
 - Notifications internes conservées pour les responsables recrutement.
 - Champs nouveaux ajoutés avec compatibilité base existante.
 
+## Tranche: suivi candidature
+
+- Date de soumission visible.
+- Dernière mise à jour visible.
+- Message public par statut.
+- Bloc entretien prévu si statut `interview_scheduled`.
+- Résultat final public pour `accepted`, `rejected`, `waiting_list` et `cancelled`.
+- Notes internes, scores et avis non exposés au candidat.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK

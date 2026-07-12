@@ -366,6 +366,23 @@ class _TrackingResult extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _TrackingInfoPill(
+                  icon: Icons.calendar_month_rounded,
+                  label: 'Soumise',
+                  value: _formatDate(tracking.submittedAt),
+                ),
+                _TrackingInfoPill(
+                  icon: Icons.update_rounded,
+                  label: 'Mise à jour',
+                  value: _formatDate(tracking.updatedAt),
+                ),
+              ],
+            ),
             const SizedBox(height: 22),
             for (var index = 0; index < _steps.length; index++)
               _TrackingStep(
@@ -378,6 +395,15 @@ class _TrackingResult extends StatelessWidget {
                 cancelled: tracking.isCancelled && index == 3,
               ),
             const SizedBox(height: 18),
+            if (tracking.candidateMessage?.trim().isNotEmpty == true) ...[
+              _TrackingMessageCard(
+                icon: Icons.mark_email_read_rounded,
+                title: 'Message',
+                message: tracking.candidateMessage!.trim(),
+                color: Colors.grey.shade50,
+              ),
+              const SizedBox(height: 12),
+            ],
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -397,6 +423,28 @@ class _TrackingResult extends StatelessWidget {
                 ],
               ),
             ),
+            if (tracking.hasInterviewDetails) ...[
+              const SizedBox(height: 12),
+              _TrackingMessageCard(
+                icon: Icons.record_voice_over_rounded,
+                title: 'Entretien',
+                message: tracking.interviewDetails!.trim(),
+                color: Colors.blueGrey.shade50,
+              ),
+            ],
+            if (tracking.hasFinalResult) ...[
+              const SizedBox(height: 12),
+              _TrackingMessageCard(
+                icon: tracking.isAccepted
+                    ? Icons.verified_rounded
+                    : Icons.flag_rounded,
+                title: 'Résultat',
+                message: tracking.finalResult!.trim(),
+                color: tracking.isAccepted
+                    ? Colors.green.shade50
+                    : Colors.orange.shade50,
+              ),
+            ],
             const SizedBox(height: 14),
             Text(
               'Dernière mise à jour : ${_formatDate(tracking.updatedAt)}',
@@ -417,6 +465,108 @@ class _TrackingResult extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TrackingInfoPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _TrackingInfoPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 160),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: AppTheme.softBlack),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingMessageCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color color;
+
+  const _TrackingMessageCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppTheme.softBlack),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(message, style: const TextStyle(height: 1.35)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

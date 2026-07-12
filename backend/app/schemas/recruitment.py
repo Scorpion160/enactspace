@@ -152,6 +152,9 @@ class ApplicationTrackingRead(BaseModel):
     submitted_at: datetime
     updated_at: datetime
     next_step: str
+    candidate_message: Optional[str] = None
+    interview_details: Optional[str] = None
+    final_result: Optional[str] = None
     account_created: bool
 
 

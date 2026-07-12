@@ -71,6 +71,23 @@ APPLICATION_TRACKING_NEXT_STEPS = {
     "cancelled": "Cette candidature est clôturée pour cette campagne.",
 }
 
+APPLICATION_TRACKING_MESSAGES = {
+    "submitted": "Candidature reçue.",
+    "under_review": "Candidature en cours d'étude.",
+    "interview_scheduled": "Entretien programmé.",
+    "accepted": "Candidature acceptée.",
+    "rejected": "Candidature non retenue.",
+    "waiting_list": "Candidature placée en liste d'attente.",
+    "cancelled": "Candidature annulée ou clôturée.",
+}
+
+APPLICATION_FINAL_RESULTS = {
+    "accepted": "Profil retenu pour la prochaine étape d'intégration.",
+    "rejected": "Profil non retenu pour cette campagne.",
+    "waiting_list": "Profil conservé en attente selon les places disponibles.",
+    "cancelled": "Dossier clôturé.",
+}
+
 VALID_RECOMMENDATIONS = {
     "favorable",
     "reserve",
@@ -533,6 +550,13 @@ def track_application(
             normalized_status,
             "Votre dossier est en cours de traitement.",
         ),
+        "candidate_message": APPLICATION_TRACKING_MESSAGES.get(normalized_status),
+        "interview_details": (
+            "Les détails de l'entretien seront communiqués dès validation interne."
+            if normalized_status == "interview_scheduled"
+            else None
+        ),
+        "final_result": APPLICATION_FINAL_RESULTS.get(normalized_status),
         "account_created": application.converted_user_id is not None,
     }
 

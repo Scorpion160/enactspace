@@ -13,6 +13,9 @@ class ApplicationTrackingModel {
   final DateTime? submittedAt;
   final DateTime? updatedAt;
   final String nextStep;
+  final String? candidateMessage;
+  final String? interviewDetails;
+  final String? finalResult;
   final bool accountCreated;
 
   const ApplicationTrackingModel({
@@ -30,6 +33,9 @@ class ApplicationTrackingModel {
     required this.submittedAt,
     required this.updatedAt,
     required this.nextStep,
+    required this.candidateMessage,
+    required this.interviewDetails,
+    required this.finalResult,
     required this.accountCreated,
   });
 
@@ -49,6 +55,9 @@ class ApplicationTrackingModel {
       submittedAt: DateTime.tryParse(json['submitted_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
       nextStep: json['next_step']?.toString() ?? '',
+      candidateMessage: json['candidate_message']?.toString(),
+      interviewDetails: json['interview_details']?.toString(),
+      finalResult: json['final_result']?.toString(),
       accountCreated: json['account_created'] == true,
     );
   }
@@ -102,6 +111,8 @@ class ApplicationTrackingModel {
   bool get isRejected => status == 'rejected';
   bool get isWaitingList => status == 'waiting_list';
   bool get isCancelled => status == 'cancelled';
+  bool get hasFinalResult => finalResult?.trim().isNotEmpty == true;
+  bool get hasInterviewDetails => interviewDetails?.trim().isNotEmpty == true;
 
   int get currentStep {
     switch (status) {
