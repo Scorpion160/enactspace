@@ -264,6 +264,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         onRefresh: _loadSessions,
         onCreate: _openCreateSessionDialog,
         onScanQr: () => context.push('/attendance/scan'),
+        onManageNfc: () => context.push('/attendance/nfc'),
       ),
       const SizedBox(height: 22),
       if (_stats != null) ...[
@@ -825,6 +826,7 @@ class _AttendanceHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCreate;
   final VoidCallback onScanQr;
+  final VoidCallback onManageNfc;
 
   const _AttendanceHeader({
     required this.total,
@@ -834,6 +836,7 @@ class _AttendanceHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onCreate,
     required this.onScanQr,
+    required this.onManageNfc,
   });
 
   @override
@@ -853,6 +856,11 @@ class _AttendanceHeader extends StatelessWidget {
           onPressed: onScanQr,
           icon: const Icon(Icons.qr_code_scanner_rounded),
           label: const Text('Scanner QR'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onManageNfc,
+          icon: const Icon(Icons.nfc_rounded),
+          label: const Text('Badges NFC'),
         ),
         ElevatedButton.icon(
           onPressed: onCreate,

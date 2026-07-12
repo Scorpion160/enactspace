@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../models/attendance_nfc_model.dart';
 import '../models/attendance_session_model.dart';
 import '../models/attendance_expected_member_model.dart';
 import '../models/attendance_qr_model.dart';
@@ -358,6 +359,78 @@ class AttendanceService {
     }
 
     throw Exception('Scan QR invalide.');
+  }
+
+  Future<AttendanceNfcTagModel?> getMemberNfcTag(String memberId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.get(
+      '/attendance/nfc/members/$memberId/tag',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceNfcTagModel.fromJson(response);
+    }
+
+    return null;
+  }
+
+  Future<AttendanceNfcTagModel> enrollNfcTag({
+    required String memberId,
+    required String tagPayload,
+    String label = 'Badge principal',
+    bool replaceExisting = true,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/nfc/tags/enroll',
+      token: token,
+      data: {
+        'member_id': memberId,
+        'tag_payload': tagPayload,
+        'label': label,
+        'replace_existing': replaceExisting,
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceNfcTagModel.fromJson(response);
+    }
+
+    throw Exception('Reponse NFC invalide.');
+  }
+
+  Future<AttendanceNfcTagModel> revokeNfcTag({
+    required String tagId,
+    String status = 'revoked',
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/nfc/tags/$tagId/revoke',
+      token: token,
+      data: {'status': status},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceNfcTagModel.fromJson(response);
+    }
+
+    throw Exception('Revocation NFC invalide.');
   }
 
   Future<List<AttendanceQrAuditLogModel>> getQrAuditLogs(
