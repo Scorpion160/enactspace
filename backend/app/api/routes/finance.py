@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from app.core.config import settings
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user, notify_users
+import app.services.mobile_money_service as mm_service
 from app.services.payments import (
     PaymentProviderError,
     PaymentProviderRequest,
@@ -928,6 +929,99 @@ async def initiate_mobile_money_payment(
     db.commit()
     db.refresh(transaction)
     return mobile_money_public_payload(transaction)
+
+
+@router.post("/mobile-money/reconcile")
+async def reconcile_mobile_money_payments(
+    request: Request,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    if not settings.PAYMENT_RECONCILIATION_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Le rapprochement Mobile Money est desactive",
+        )
+    safe_limit = min(max(limit, 1), 100)
+    summary = await mm_service.reconcile_pending_transactions(
+        db,
+        request=request,
+        limit=safe_limit,
+    )
+    create_audit_log(
+        db=db,
+        action="mobile_money_reconciliation",
+        user_id=current_user.id,
+        entity_type="mobile_money_transaction",
+        entity_id=None,
+        new_value=summary,
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    return summary
+
+
+@router.get(
+    "/mobile-money/{transaction_id}",
+    response_model=MobileMoneyInitiationRead,
+)
+def get_mobile_money_payment_status(
+    transaction_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    transaction = (
+        db.query(MobileMoneyTransaction)
+        .filter(MobileMoneyTransaction.id == transaction_id)
+        .first()
+    )
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction Mobile Money introuvable",
+        )
+    if not mm_service.can_access_transaction(db, current_user, transaction):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas consulter cette transaction",
+        )
+    return mm_service.public_payload(transaction)
+
+
+@router.post(
+    "/mobile-money/{transaction_id}/refresh",
+    response_model=MobileMoneyInitiationRead,
+)
+async def refresh_mobile_money_payment_status(
+    transaction_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    transaction = (
+        db.query(MobileMoneyTransaction)
+        .filter(MobileMoneyTransaction.id == transaction_id)
+        .first()
+    )
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction Mobile Money introuvable",
+        )
+    if not mm_service.can_access_transaction(db, current_user, transaction):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas actualiser cette transaction",
+        )
+    await mm_service.refresh_transaction(
+        db,
+        transaction=transaction,
+        request=request,
+    )
+    db.commit()
+    db.refresh(transaction)
+    return mm_service.public_payload(transaction)
 
 
 def finance_stats_payload(
