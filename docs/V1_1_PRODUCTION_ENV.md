@@ -45,6 +45,18 @@ chmod 600 .env
 - `PAYMENT_PROVIDER_ENABLED`: active ou desactive un provider de paiement reel.
 - `PAYMENT_PROVIDER`: `manual_proof`, `mock` ou nom du futur fournisseur Mobile Money.
 - `PAYMENT_WEBHOOK_SECRET`: secret utilise pour verifier les webhooks paiement.
+- `MOBILE_MONEY_ENABLED`: active le parcours Mobile Money cote backend.
+- `MOBILE_MONEY_PROVIDER`: `manual_proof`, `mock` ou `paydunya` en V1.1. `wave_direct` et `orange_money_direct` sont reserves.
+- `PAYDUNYA_MODE`: `test` en sandbox, `live` uniquement apres activation marchand et audit VPS.
+- `PAYDUNYA_MASTER_KEY`, `PAYDUNYA_PUBLIC_KEY`, `PAYDUNYA_PRIVATE_KEY`, `PAYDUNYA_TOKEN`: cles serveur PayDunya. Elles restent uniquement dans l'environnement backend.
+- `PAYDUNYA_CALLBACK_URL`: endpoint IPN public. En live, utiliser obligatoirement HTTPS.
+- `PAYDUNYA_RETURN_URL`, `PAYDUNYA_CANCEL_URL`: pages de retour utilisateur. Elles ne confirment jamais un paiement.
+- `PAYDUNYA_ALLOWED_CHANNELS`: canaux proposes via le checkout, par exemple `wave-senegal,orange-money-senegal`.
+- `PAYMENT_CURRENCY`: `XOF` pour la V1.1.
+- `PAYMENT_TRANSACTION_TTL_MINUTES`: duree de validite interne d'une transaction.
+- `PAYMENT_RECONCILIATION_ENABLED`: active le rapprochement periodique.
+
+Les vraies cles PayDunya ne doivent jamais etre commitees, affichees dans Flutter ou exposees dans une reponse API.
 
 ## Pointage QR
 
@@ -65,6 +77,8 @@ chmod 600 .env
 - secrets courts ou reutilises
 - `ATTENDANCE_QR_SECRET=CHANGE_ME`
 - `ATTENDANCE_QR_SECRET` identique au secret JWT
+- cles PayDunya dans Git ou dans l'application Flutter
+- `PAYDUNYA_MODE=live` sans HTTPS public et IPN teste
 - `CORS_ORIGINS=*`
 - stockage dans un dossier temporaire
 - base SQLite pour les donnees reelles

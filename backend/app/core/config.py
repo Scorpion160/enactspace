@@ -37,6 +37,20 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_ENABLED: bool = False
     PAYMENT_PROVIDER: str = "manual_proof"
     PAYMENT_WEBHOOK_SECRET: str | None = None
+    MOBILE_MONEY_ENABLED: bool = False
+    MOBILE_MONEY_PROVIDER: str = "paydunya"
+    PAYDUNYA_MODE: str = "test"
+    PAYDUNYA_MASTER_KEY: str | None = None
+    PAYDUNYA_PUBLIC_KEY: str | None = None
+    PAYDUNYA_PRIVATE_KEY: str | None = None
+    PAYDUNYA_TOKEN: str | None = None
+    PAYDUNYA_CALLBACK_URL: str | None = None
+    PAYDUNYA_RETURN_URL: str | None = None
+    PAYDUNYA_CANCEL_URL: str | None = None
+    PAYDUNYA_ALLOWED_CHANNELS: str = "wave-senegal,orange-money-senegal"
+    PAYMENT_CURRENCY: str = "XOF"
+    PAYMENT_TRANSACTION_TTL_MINUTES: int = 30
+    PAYMENT_RECONCILIATION_ENABLED: bool = True
 
     ATTENDANCE_QR_ENABLED: bool = True
     ATTENDANCE_QR_SECRET: str | None = None
@@ -68,6 +82,34 @@ class Settings(BaseSettings):
             raise ValueError("ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE must be positive")
         if self.ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE < 1:
             raise ValueError("ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE must be positive")
+        if self.PAYMENT_TRANSACTION_TTL_MINUTES < 1:
+            raise ValueError("PAYMENT_TRANSACTION_TTL_MINUTES must be positive")
+        if self.PAYDUNYA_MODE not in {"test", "live"}:
+            raise ValueError("PAYDUNYA_MODE must be test or live")
+        if self.MOBILE_MONEY_PROVIDER not in {
+            "manual_proof",
+            "mock",
+            "paydunya",
+            "wave_direct",
+            "orange_money_direct",
+        }:
+            raise ValueError("MOBILE_MONEY_PROVIDER is not supported")
+        if self.PAYMENT_CURRENCY != "XOF":
+            raise ValueError("PAYMENT_CURRENCY must be XOF for Mobile Money V1.1")
+        if self.APP_ENV == "production" and self.MOBILE_MONEY_ENABLED:
+            if self.PAYDUNYA_MODE == "live" and self.MOBILE_MONEY_PROVIDER == "paydunya":
+                required_keys = [
+                    self.PAYDUNYA_MASTER_KEY,
+                    self.PAYDUNYA_PUBLIC_KEY,
+                    self.PAYDUNYA_PRIVATE_KEY,
+                    self.PAYDUNYA_TOKEN,
+                ]
+                if not all(required_keys):
+                    raise ValueError("PayDunya live keys are required in production")
+            if self.PAYDUNYA_MODE == "live" and not (
+                self.PAYDUNYA_CALLBACK_URL and self.PAYDUNYA_CALLBACK_URL.startswith("https://")
+            ):
+                raise ValueError("PAYDUNYA_CALLBACK_URL must be HTTPS in live mode")
         if self.APP_ENV == "production" and self.ATTENDANCE_QR_ENABLED:
             if not self.ATTENDANCE_QR_SECRET:
                 raise ValueError("ATTENDANCE_QR_SECRET is required in production")
@@ -116,6 +158,16 @@ class Settings(BaseSettings):
     @property
     def attendance_nfc_hash_secret(self) -> str:
         return self.ATTENDANCE_NFC_HASH_SECRET or self.signing_secret
+
+    @property
+    def paydunya_allowed_channels_list(self) -> list[str]:
+        if not self.PAYDUNYA_ALLOWED_CHANNELS:
+            return []
+        return [
+            channel.strip()
+            for channel in self.PAYDUNYA_ALLOWED_CHANNELS.split(",")
+            if channel.strip()
+        ]
 
     @property
     def email_enabled(self) -> bool:
