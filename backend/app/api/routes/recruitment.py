@@ -20,6 +20,7 @@ from app.schemas.recruitment import (
     RecruitmentCampaignRead,
     ApplicationCreate,
     ApplicationUpdate,
+    ApplicationInterviewSchedule,
     ApplicationRead,
     ApplicationStatusChange,
     ApplicationTrackingRequest,
@@ -460,6 +461,18 @@ def candidate_email_ready() -> bool:
     return bool(settings.email_enabled and settings.SMTP_HOST)
 
 
+def public_interview_details(application: Application) -> str | None:
+    if not application.interview_at:
+        return None
+
+    parts = [f"Entretien prévu le {application.interview_at:%d/%m/%Y à %H:%M}"]
+    if application.interview_location:
+        parts.append(f"Lieu: {application.interview_location}")
+    if application.interview_link:
+        parts.append(f"Lien: {application.interview_link}")
+    return " · ".join(parts)
+
+
 def anonymous_code(application: Application) -> str:
     return f"Candidat #{str(application.id).replace('-', '')[:6].upper()}"
 
@@ -552,9 +565,12 @@ def track_application(
         ),
         "candidate_message": APPLICATION_TRACKING_MESSAGES.get(normalized_status),
         "interview_details": (
-            "Les détails de l'entretien seront communiqués dès validation interne."
-            if normalized_status == "interview_scheduled"
-            else None
+            public_interview_details(application)
+            or (
+                "Les détails de l'entretien seront communiqués dès validation interne."
+                if normalized_status == "interview_scheduled"
+                else None
+            )
         ),
         "final_result": APPLICATION_FINAL_RESULTS.get(normalized_status),
         "account_created": application.converted_user_id is not None,
@@ -638,6 +654,30 @@ def get_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
+    return application_payload(db, current_user, application)
+
+
+@router.post("/applications/{application_id}/interview", response_model=ApplicationRead)
+def schedule_application_interview(
+    application_id: str,
+    payload: ApplicationInterviewSchedule,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_recruitment_access),
+):
+    application = get_application_or_404(db, application_id)
+
+    application.interview_at = payload.interview_at
+    application.interview_location = payload.interview_location
+    application.interview_link = payload.interview_link
+    application.interview_jury = payload.interview_jury
+    application.interview_note = payload.interview_note
+    application.status = "interview_scheduled"
+    application.updated_at = datetime.utcnow()
+    notify_application_status_if_linked(db, application)
+
+    db.commit()
+    db.refresh(application)
+
     return application_payload(db, current_user, application)
 
 

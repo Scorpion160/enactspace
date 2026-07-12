@@ -21,6 +21,11 @@ class ApplicationModel {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final DateTime? interviewAt;
+  final String? interviewLocation;
+  final String? interviewLink;
+  final String? interviewJury;
+  final String? interviewNote;
   final String? cvUrl;
   final String? motivationLetterUrl;
   final String? attachmentUrl;
@@ -57,6 +62,11 @@ class ApplicationModel {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.interviewAt,
+    this.interviewLocation,
+    this.interviewLink,
+    this.interviewJury,
+    this.interviewNote,
     this.cvUrl,
     this.motivationLetterUrl,
     this.attachmentUrl,
@@ -95,6 +105,11 @@ class ApplicationModel {
       associativeExperience: json['associative_experience']?.toString(),
       availability: json['availability']?.toString(),
       publicComment: json['public_comment']?.toString(),
+      interviewAt: DateTime.tryParse(json['interview_at']?.toString() ?? ''),
+      interviewLocation: json['interview_location']?.toString(),
+      interviewLink: json['interview_link']?.toString(),
+      interviewJury: json['interview_jury']?.toString(),
+      interviewNote: json['interview_note']?.toString(),
       cvUrl: json['cv_url']?.toString(),
       motivationLetterUrl: json['motivation_letter_url']?.toString(),
       attachmentUrl: json['attachment_url']?.toString(),
@@ -230,5 +245,15 @@ class ApplicationModel {
 
   bool get isConverted {
     return convertedUserId != null && convertedUserId!.isNotEmpty;
+  }
+
+  String get interviewLabel {
+    if (interviewAt == null) return 'Entretien à programmer';
+    final local = interviewAt!.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/${local.year} $hour:$minute';
   }
 }

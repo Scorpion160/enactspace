@@ -79,6 +79,11 @@ class Application(Base):
     associative_experience: Mapped[str | None] = mapped_column(Text, nullable=True)
     availability: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    interview_location: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    interview_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_jury: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     cv_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     motivation_letter_url: Mapped[str | None] = mapped_column(Text, nullable=True)

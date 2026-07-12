@@ -88,6 +88,14 @@ class ApplicationUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class ApplicationInterviewSchedule(BaseModel):
+    interview_at: datetime
+    interview_location: Optional[str] = None
+    interview_link: Optional[str] = None
+    interview_jury: Optional[str] = None
+    interview_note: Optional[str] = None
+
+
 class ApplicationRead(BaseModel):
     id: UUID
     campaign_id: UUID
@@ -111,6 +119,11 @@ class ApplicationRead(BaseModel):
     associative_experience: Optional[str]
     availability: Optional[str]
     public_comment: Optional[str]
+    interview_at: Optional[datetime]
+    interview_location: Optional[str]
+    interview_link: Optional[str]
+    interview_jury: Optional[str]
+    interview_note: Optional[str]
     cv_url: Optional[str]
     motivation_letter_url: Optional[str]
     attachment_url: Optional[str]

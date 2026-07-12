@@ -36,3 +36,7 @@ Le portail public accepte le code `ESP-AAAA-XXXXXXXX` et reste compatible avec l
 ## Évaluation et sélection
 
 La liste interne des candidatures peut être filtrée par campagne, statut, recherche, genre, pôle souhaité, projet d'intérêt, département et classe. Les évaluateurs autorisés peuvent ajouter un score sur 20, une note interne et un avis `favorable`, `reserve` ou `defavorable`.
+
+## Entretiens
+
+Les responsables recrutement peuvent programmer un entretien depuis une carte candidat avec date, heure, lieu, lien visio, jury et note interne. La programmation passe automatiquement la candidature en `interview_scheduled`. Le suivi public affiche uniquement la date, le lieu et le lien, jamais la note interne.

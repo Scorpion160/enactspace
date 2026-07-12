@@ -273,6 +273,36 @@ class RecruitmentService {
     throw Exception('Réponse invalide lors de l’évaluation.');
   }
 
+  Future<ApplicationModel> scheduleInterview({
+    required String applicationId,
+    required DateTime interviewAt,
+    String? location,
+    String? link,
+    String? jury,
+    String? note,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.postJson(
+      '/recruitment/applications/$applicationId/interview',
+      token: token,
+      data: {
+        'interview_at': interviewAt.toIso8601String(),
+        'interview_location': _nullIfEmpty(location),
+        'interview_link': _nullIfEmpty(link),
+        'interview_jury': _nullIfEmpty(jury),
+        'interview_note': _nullIfEmpty(note),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ApplicationModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la programmation entretien.');
+  }
+
   Future<Map<String, dynamic>> convertToUser({
     required String applicationId,
     required String password,

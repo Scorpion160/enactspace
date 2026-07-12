@@ -212,6 +212,16 @@ def ensure_compatibility_columns() -> None:
             statements.append("ALTER TABLE applications ADD COLUMN availability TEXT")
         if "public_comment" not in application_columns:
             statements.append("ALTER TABLE applications ADD COLUMN public_comment TEXT")
+        if "interview_at" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN interview_at DATETIME")
+        if "interview_location" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN interview_location VARCHAR(180)")
+        if "interview_link" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN interview_link TEXT")
+        if "interview_jury" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN interview_jury TEXT")
+        if "interview_note" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN interview_note TEXT")
         if "attachment_url" not in application_columns:
             statements.append("ALTER TABLE applications ADD COLUMN attachment_url TEXT")
         if "tracking_code" not in application_columns:

@@ -24,6 +24,14 @@
 - Dialogue d'évaluation enrichi avec avis favorable/réservé/défavorable.
 - Les cartes candidat affichent les critères utiles au tri quand ils sont disponibles.
 
+## Tranche: entretiens
+
+- Programmation entretien ajoutée sur les candidatures.
+- Champs backend ajoutés: date/heure, lieu, lien, jury et note interne.
+- Statut `interview_scheduled` appliqué automatiquement.
+- Suivi public enrichi avec date/lieu/lien uniquement.
+- Note interne non exposée au candidat.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK

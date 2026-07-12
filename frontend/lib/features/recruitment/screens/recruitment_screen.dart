@@ -204,6 +204,27 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
     }
   }
 
+  Future<void> _openInterviewDialog(ApplicationModel application) async {
+    final scheduled = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return ScheduleInterviewDialog(
+          service: _service,
+          application: application,
+        );
+      },
+    );
+
+    if (scheduled == true) {
+      await _loadRecruitment();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Entretien programmé.')));
+    }
+  }
+
   Future<void> _openConvertDialog(ApplicationModel application) async {
     if (application.status != 'accepted') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -344,6 +365,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
               campaignTitle: _campaignTitle,
               onStatusChanged: _changeStatus,
               onReview: _openReviewDialog,
+              onInterview: _openInterviewDialog,
               onConvert: _openConvertDialog,
             ),
         ],
@@ -1127,6 +1149,7 @@ class _ApplicationsGrid extends StatelessWidget {
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
   final ValueChanged<ApplicationModel> onReview;
+  final ValueChanged<ApplicationModel> onInterview;
   final ValueChanged<ApplicationModel> onConvert;
 
   const _ApplicationsGrid({
@@ -1134,6 +1157,7 @@ class _ApplicationsGrid extends StatelessWidget {
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
+    required this.onInterview,
     required this.onConvert,
   });
 
@@ -1162,6 +1186,7 @@ class _ApplicationsGrid extends StatelessWidget {
                   campaignTitle: campaignTitle(application.campaignId),
                   onStatusChanged: onStatusChanged,
                   onReview: onReview,
+                  onInterview: onInterview,
                   onConvert: onConvert,
                 ),
               ),
@@ -1178,6 +1203,7 @@ class _ApplicationCard extends StatelessWidget {
   final void Function(ApplicationModel application, String status)
   onStatusChanged;
   final ValueChanged<ApplicationModel> onReview;
+  final ValueChanged<ApplicationModel> onInterview;
   final ValueChanged<ApplicationModel> onConvert;
 
   const _ApplicationCard({
@@ -1185,6 +1211,7 @@ class _ApplicationCard extends StatelessWidget {
     required this.campaignTitle,
     required this.onStatusChanged,
     required this.onReview,
+    required this.onInterview,
     required this.onConvert,
   });
 
@@ -1261,6 +1288,8 @@ class _ApplicationCard extends StatelessWidget {
                   Chip(label: Text(application.preferredPole!.trim())),
                 if (application.projectInterest?.trim().isNotEmpty == true)
                   Chip(label: Text(application.projectInterest!.trim())),
+                if (application.interviewAt != null)
+                  Chip(label: Text(application.interviewLabel)),
                 if (application.isConverted)
                   const Chip(label: Text('Compte créé')),
               ],
@@ -1313,6 +1342,11 @@ class _ApplicationCard extends StatelessWidget {
                   onPressed: () => onReview(application),
                   icon: const Icon(Icons.rate_review_rounded),
                   label: const Text('Évaluer'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => onInterview(application),
+                  icon: const Icon(Icons.event_available_rounded),
+                  label: const Text('Entretien'),
                 ),
                 ElevatedButton.icon(
                   onPressed:
@@ -2227,6 +2261,212 @@ class _AdaptiveFieldRow extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class ScheduleInterviewDialog extends StatefulWidget {
+  final RecruitmentService service;
+  final ApplicationModel application;
+
+  const ScheduleInterviewDialog({
+    super.key,
+    required this.service,
+    required this.application,
+  });
+
+  @override
+  State<ScheduleInterviewDialog> createState() =>
+      _ScheduleInterviewDialogState();
+}
+
+class _ScheduleInterviewDialogState extends State<ScheduleInterviewDialog> {
+  final _locationController = TextEditingController();
+  final _linkController = TextEditingController();
+  final _juryController = TextEditingController();
+  final _noteController = TextEditingController();
+
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.application.interviewAt;
+    if (existing != null) {
+      final local = existing.toLocal();
+      _selectedDate = DateTime(local.year, local.month, local.day);
+      _selectedTime = TimeOfDay(hour: local.hour, minute: local.minute);
+    }
+    _locationController.text = widget.application.interviewLocation ?? '';
+    _linkController.text = widget.application.interviewLink ?? '';
+    _juryController.text = widget.application.interviewJury ?? '';
+    _noteController.text = widget.application.interviewNote ?? '';
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    _linkController.dispose();
+    _juryController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) setState(() => _selectedTime = picked);
+  }
+
+  Future<void> _submit() async {
+    if (_selectedDate == null || _selectedTime == null) {
+      setState(() => _error = 'Choisissez une date et une heure.');
+      return;
+    }
+
+    final scheduledAt = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await widget.service.scheduleInterview(
+        applicationId: widget.application.id,
+        interviewAt: scheduledAt,
+        location: _locationController.text,
+        link: _linkController.text,
+        jury: _juryController.text,
+        note: _noteController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String get _dateLabel {
+    if (_selectedDate == null) return 'Date';
+    final date = _selectedDate!;
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
+  String get _timeLabel {
+    if (_selectedTime == null) return 'Heure';
+    final hour = _selectedTime!.hour.toString().padLeft(2, '0');
+    final minute = _selectedTime!.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text('Entretien - ${widget.application.fullName}'),
+      content: SizedBox(
+        width: _dialogWidth(context, 520),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_error != null) _DialogError(message: _error!),
+              _AdaptiveFieldRow(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _pickDate,
+                      icon: const Icon(Icons.calendar_month_rounded),
+                      label: Text(_dateLabel),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _pickTime,
+                      icon: const Icon(Icons.schedule_rounded),
+                      label: Text(_timeLabel),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Lieu',
+                  prefixIcon: Icon(Icons.place_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _linkController,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Lien visio',
+                  prefixIcon: Icon(Icons.link_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _juryController,
+                decoration: const InputDecoration(
+                  labelText: 'Jury / responsables',
+                  prefixIcon: Icon(Icons.groups_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _noteController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Note interne',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _loading ? null : _submit,
+          icon: const Icon(Icons.event_available_rounded),
+          label: Text(_loading ? 'Programmation...' : 'Programmer'),
+        ),
+      ],
     );
   }
 }
