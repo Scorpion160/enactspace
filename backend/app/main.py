@@ -16,6 +16,7 @@ from app.api.routes import (
     attendance,
     attendance_nfc,
     finance,
+    payments,
     tasks,
     files,
     documents,
@@ -116,6 +117,7 @@ app.include_router(events.router, prefix="/api")
 app.include_router(attendance.router, prefix="/api")
 app.include_router(attendance_nfc.router, prefix="/api")
 app.include_router(finance.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")

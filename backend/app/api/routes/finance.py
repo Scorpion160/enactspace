@@ -66,6 +66,7 @@ VALID_PAYMENT_METHODS = {
     "orange_money",
     "free_money",
     "bank_transfer",
+    "mobile_money",
 }
 
 VALID_FEE_STATUSES = {
@@ -638,6 +639,8 @@ def mobile_money_event(
     event_type: str,
     old_status: str | None = None,
     new_status: str | None = None,
+    provider_event_id: str | None = None,
+    is_duplicate: bool = False,
     error_message: str | None = None,
     metadata_json: dict | None = None,
 ) -> MobileMoneyTransactionEvent:
@@ -646,7 +649,9 @@ def mobile_money_event(
         event_type=event_type,
         old_status=old_status,
         new_status=new_status,
+        provider_event_id=provider_event_id,
         processed_at=datetime.utcnow(),
+        is_duplicate=is_duplicate,
         error_message=error_message,
         metadata_json=metadata_json or {},
     )

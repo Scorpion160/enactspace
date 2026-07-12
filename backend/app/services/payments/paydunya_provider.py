@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import hmac
 import json
 from datetime import datetime, timedelta
 from typing import Any
@@ -150,6 +152,30 @@ class PayDunyaProvider:
             return "refunded"
         return "pending"
 
+    def _callback_data(self, payload: dict[str, Any]) -> dict[str, Any]:
+        data = payload.get("data", payload)
+        if not isinstance(data, dict):
+            raise PaymentProviderError(
+                "PayDunya callback payload is invalid",
+                code="invalid_callback",
+            )
+        return data
+
+    def _callback_hash(self, data: dict[str, Any]) -> str | None:
+        hash_value = data.get("hash")
+        if hash_value:
+            return str(hash_value)
+        nested = data.get("data")
+        if isinstance(nested, dict) and nested.get("hash"):
+            return str(nested.get("hash"))
+        return None
+
+    def _callback_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
+        invoice = data.get("invoice")
+        if isinstance(invoice, dict):
+            return invoice
+        return {}
+
     async def create_payment(
         self,
         request: PaymentProviderRequest,
@@ -240,9 +266,66 @@ class PayDunyaProvider:
 
     async def verify_callback(self, payload: dict) -> PaymentProviderResult:
         self._ensure_configured()
-        raise PaymentProviderError(
-            "PayDunya callback verification is implemented in the webhook tranche",
-            code="provider_not_implemented",
+        data = self._callback_data(payload)
+        received_hash = self._callback_hash(data)
+        expected_hash = hashlib.sha512(
+            (settings.PAYDUNYA_MASTER_KEY or "").encode("utf-8")
+        ).hexdigest()
+        if not received_hash or not hmac.compare_digest(received_hash, expected_hash):
+            raise PaymentProviderError(
+                "Invalid PayDunya callback hash",
+                code="invalid_callback_hash",
+                public_message="Callback paiement invalide.",
+            )
+
+        invoice = self._callback_invoice(data)
+        custom_data = data.get("custom_data") or invoice.get("custom_data") or {}
+        if not isinstance(custom_data, dict):
+            custom_data = {}
+        token = (
+            invoice.get("token")
+            or data.get("token")
+            or data.get("invoice_token")
+            or custom_data.get("provider_token")
+        )
+        provider_status = (
+            data.get("status")
+            or invoice.get("status")
+            or data.get("response_text")
+            or data.get("response_code")
+        )
+        amount = (
+            invoice.get("total_amount")
+            or data.get("total_amount")
+            or data.get("amount")
+        )
+        currency = (
+            invoice.get("currency")
+            or data.get("currency")
+            or custom_data.get("currency")
+            or "XOF"
+        )
+        provider_transaction_id = (
+            invoice.get("receipt_url")
+            or invoice.get("transaction_id")
+            or data.get("transaction_id")
+        )
+        return PaymentProviderResult(
+            provider=self.name,
+            provider_token=str(token) if token else None,
+            provider_transaction_id=(
+                str(provider_transaction_id) if provider_transaction_id else None
+            ),
+            status=self._status_from_paydunya(str(provider_status)),
+            provider_status=str(provider_status) if provider_status else None,
+            metadata={
+                "amount": amount,
+                "currency": currency,
+                "custom_data": custom_data,
+                "event_id": data.get("event_id") or data.get("reference"),
+                "response_code": data.get("response_code"),
+                "mode": settings.PAYDUNYA_MODE,
+            },
         )
 
     async def cancel_payment(
