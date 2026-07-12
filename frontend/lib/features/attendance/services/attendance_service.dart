@@ -370,7 +370,10 @@ class AttendanceService {
     }
 
     final response = await _apiClient.get(
-      '/audit/logs?entity_type=attendance_session&entity_id=$sessionId&limit=50',
+      '/audit/logs?entity_type=attendance_session'
+      '&entity_id=$sessionId'
+      '&action_prefix=attendance_qr'
+      '&limit=50',
       token: token,
     );
 
