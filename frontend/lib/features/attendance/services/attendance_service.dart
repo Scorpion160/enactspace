@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/attendance_session_model.dart';
 import '../models/attendance_expected_member_model.dart';
+import '../models/attendance_qr_model.dart';
 import '../models/attendance_record_model.dart';
 
 class AttendanceService {
@@ -298,6 +299,45 @@ class AttendanceService {
     }
 
     throw Exception('RÃ©ponse invalide lors de lâ€™ouverture de la session.');
+  }
+
+  Future<AttendanceQrTokenModel> createQrToken(String sessionId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/sessions/$sessionId/qr-token',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceQrTokenModel.fromJson(response);
+    }
+
+    throw Exception('Reponse QR invalide.');
+  }
+
+  Future<AttendanceQrStatusModel> getQrStatus(String sessionId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.get(
+      '/attendance/sessions/$sessionId/qr-status',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceQrStatusModel.fromJson(response);
+    }
+
+    throw Exception('Statut QR indisponible.');
   }
 
   Future<AttendanceRecordModel> submitJustification({
