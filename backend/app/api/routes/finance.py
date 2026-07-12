@@ -1547,6 +1547,14 @@ def list_payment_allocations(
     ).order_by(PaymentAllocation.created_at.asc()).all()
 
 
+def masked_reference(value: str | None) -> str | None:
+    if not value:
+        return None
+    if len(value) <= 8:
+        return f"***{value[-4:]}"
+    return f"{value[:4]}***{value[-4:]}"
+
+
 @router.get("/payments/{payment_id}/receipt")
 def get_payment_receipt(
     payment_id: str,
@@ -1574,12 +1582,32 @@ def get_payment_receipt(
         .order_by(PaymentAllocation.created_at.asc())
         .all()
     )
+    mobile_money_transaction = (
+        db.query(MobileMoneyTransaction)
+        .filter(MobileMoneyTransaction.payment_id == payment.id)
+        .first()
+    )
     member = db.query(User).filter(User.id == payment.user_id).first()
     return {
         "payment": payment_payload(db, current_user, payment),
         "member_name": display_user(member),
         "generated_at": datetime.utcnow(),
         "total_allocated": sum(float(item.amount or 0) for item in allocations),
+        "mobile_money": (
+            {
+                "transaction_id": mobile_money_transaction.id,
+                "provider": mobile_money_transaction.provider,
+                "channel": mobile_money_transaction.channel,
+                "status": mobile_money_transaction.status,
+                "provider_reference": masked_reference(
+                    mobile_money_transaction.provider_transaction_id
+                    or mobile_money_transaction.provider_invoice_token
+                ),
+                "completed_at": mobile_money_transaction.completed_at,
+            }
+            if mobile_money_transaction
+            else None
+        ),
         "allocations": [
             {
                 "id": item.id,

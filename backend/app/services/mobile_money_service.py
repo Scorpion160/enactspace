@@ -251,6 +251,20 @@ def mark_not_successful(
     transaction.updated_at = datetime.utcnow()
     if new_status == "cancelled":
         transaction.cancelled_at = datetime.utcnow()
+    if new_status in {"failed", "cancelled", "expired"}:
+        notify_user(
+            db,
+            user_id=transaction.member_id,
+            title="Paiement non confirme",
+            message=(
+                "Votre paiement n'a pas pu etre confirme. "
+                "Aucun reglement n'a ete enregistre."
+            ),
+            notification_type="payment_not_confirmed",
+            related_type="mobile_money_transaction",
+            related_id=transaction.id,
+            dedupe=True,
+        )
     create_event(
         db,
         transaction,
@@ -292,6 +306,7 @@ def confirm_transaction(
     )
     db.add(payment)
     db.flush()
+    payment.receipt_url = f"/api/finance/payments/{payment.id}/receipt"
     allocated_total = allocate_payment(db, payment=payment, transaction=transaction)
 
     account = ensure_financial_account(db, transaction.member_id)
