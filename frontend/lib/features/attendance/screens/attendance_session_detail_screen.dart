@@ -33,6 +33,7 @@ class _AttendanceSessionDetailScreenState
   late String _sessionStatus;
   String? _error;
   String? _qrError;
+  String? _qrAuditError;
   String _statusFilter = 'all';
   Timer? _qrRefreshTimer;
   Timer? _qrStatusTimer;
@@ -40,6 +41,7 @@ class _AttendanceSessionDetailScreenState
   List<MemberModel> _members = [];
   List<AttendanceExpectedMemberModel> _expectedMembers = [];
   List<AttendanceRecordModel> _records = [];
+  List<AttendanceQrAuditLogModel> _qrAuditLogs = [];
   AttendanceQrTokenModel? _qrToken;
   AttendanceQrStatusModel? _qrStatus;
 
@@ -80,6 +82,7 @@ class _AttendanceSessionDetailScreenState
         _records = results[2] as List<AttendanceRecordModel>;
       });
       unawaited(_refreshQrStatus(silent: true));
+      unawaited(_refreshQrAudit(silent: true));
       _syncQrStatusPolling();
     } catch (e) {
       if (!mounted) return;
@@ -141,6 +144,28 @@ class _AttendanceSessionDetailScreenState
     }
   }
 
+  Future<void> _refreshQrAudit({bool silent = false}) async {
+    if (!widget.session.canManage) return;
+
+    try {
+      final logs = await _attendanceService.getQrAuditLogs(widget.session.id);
+      if (!mounted) return;
+      setState(() {
+        _qrAuditLogs = logs;
+        _qrAuditError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _qrAuditError = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _refreshQrPanel() async {
+    await Future.wait([_refreshQrStatus(), _refreshQrAudit()]);
+  }
+
   Future<void> _generateQrToken({bool silent = false}) async {
     if (!widget.session.canManage ||
         _sessionClosed ||
@@ -164,6 +189,7 @@ class _AttendanceSessionDetailScreenState
       });
       _scheduleQrRefresh(token);
       unawaited(_refreshQrStatus(silent: true));
+      unawaited(_refreshQrAudit(silent: true));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -521,9 +547,11 @@ class _AttendanceSessionDetailScreenState
                 status: _qrStatus,
                 loading: _qrLoading,
                 error: _qrError,
+                auditError: _qrAuditError,
+                auditLogs: _qrAuditLogs,
                 isOpen: !_sessionClosed && _sessionStatus == 'open',
                 onGenerate: () => _generateQrToken(),
-                onRefresh: () => _refreshQrStatus(),
+                onRefresh: _refreshQrPanel,
               ),
             ],
             const SizedBox(height: 20),
@@ -856,8 +884,10 @@ class _SessionActionPanel extends StatelessWidget {
 class _SessionQrPanel extends StatelessWidget {
   final AttendanceQrTokenModel? token;
   final AttendanceQrStatusModel? status;
+  final List<AttendanceQrAuditLogModel> auditLogs;
   final bool loading;
   final String? error;
+  final String? auditError;
   final bool isOpen;
   final Future<void> Function() onGenerate;
   final Future<void> Function() onRefresh;
@@ -865,8 +895,10 @@ class _SessionQrPanel extends StatelessWidget {
   const _SessionQrPanel({
     required this.token,
     required this.status,
+    required this.auditLogs,
     required this.loading,
     required this.error,
+    required this.auditError,
     required this.isOpen,
     required this.onGenerate,
     required this.onRefresh,
@@ -979,6 +1011,16 @@ class _SessionQrPanel extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (auditError != null && auditError!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    auditError!,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 10,
@@ -996,6 +1038,8 @@ class _SessionQrPanel extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 18),
+                _QrAuditTrail(logs: auditLogs.take(6).toList()),
               ],
             );
 
@@ -1020,6 +1064,83 @@ class _SessionQrPanel extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _QrAuditTrail extends StatelessWidget {
+  final List<AttendanceQrAuditLogModel> logs;
+
+  const _QrAuditTrail({required this.logs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.history_rounded, size: 18),
+              SizedBox(width: 8),
+              Text('Journal QR', style: TextStyle(fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (logs.isEmpty)
+            const Text(
+              'Aucun scan QR pour le moment.',
+              style: TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            ...logs.map(
+              (log) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(_auditIcon(log), color: _auditColor(log), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _auditLabel(log),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            '${_formatShortTime(log.createdAt)}'
+                            '${log.userId == null ? '' : ' • ${_shortUserId(log.userId!)}'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1851,6 +1972,69 @@ String _formatShortTime(DateTime value) {
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+IconData _auditIcon(AttendanceQrAuditLogModel log) {
+  switch (log.result ?? log.action) {
+    case 'present':
+    case 'late':
+      return Icons.verified_rounded;
+    case 'already_recorded':
+      return Icons.done_all_rounded;
+    case 'attendance_qr_token_generated':
+      return Icons.qr_code_2_rounded;
+    default:
+      return Icons.info_rounded;
+  }
+}
+
+Color _auditColor(AttendanceQrAuditLogModel log) {
+  switch (log.result ?? log.action) {
+    case 'present':
+      return Colors.green.shade700;
+    case 'late':
+      return Colors.orange.shade800;
+    case 'expired_token':
+    case 'invalid_token':
+    case 'not_eligible':
+    case 'rate_limited':
+      return Colors.red.shade700;
+    default:
+      return AppTheme.softBlack;
+  }
+}
+
+String _auditLabel(AttendanceQrAuditLogModel log) {
+  if (log.action == 'attendance_qr_token_generated') {
+    return 'QR genere';
+  }
+  switch (log.result) {
+    case 'present':
+      return 'Presence enregistree';
+    case 'late':
+      return 'Retard enregistre';
+    case 'already_recorded':
+      return 'Pointage deja effectue';
+    case 'expired_token':
+      return 'QR expire';
+    case 'invalid_token':
+      return 'QR invalide';
+    case 'not_eligible':
+      return 'Membre non attendu';
+    case 'rate_limited':
+      return 'Tentatives limitees';
+    case 'session_closed':
+      return 'Session fermee';
+    case 'qr_disabled':
+      return 'Pointage QR desactive';
+    default:
+      return log.result ?? log.action;
+  }
+}
+
+String _shortUserId(String value) {
+  if (value.length <= 8) return value;
+  return value.substring(0, 8);
 }
 
 String _scanStatusLabel(String? value) {

@@ -89,6 +89,40 @@ class AttendanceQrScanResultModel {
   }
 }
 
+class AttendanceQrAuditLogModel {
+  final String id;
+  final String? userId;
+  final String action;
+  final String? result;
+  final String? recordId;
+  final DateTime createdAt;
+
+  const AttendanceQrAuditLogModel({
+    required this.id,
+    required this.userId,
+    required this.action,
+    required this.result,
+    required this.recordId,
+    required this.createdAt,
+  });
+
+  factory AttendanceQrAuditLogModel.fromJson(Map<String, dynamic> json) {
+    final newValue = json['new_value'] is Map
+        ? Map<String, dynamic>.from(json['new_value'] as Map)
+        : const <String, dynamic>{};
+    return AttendanceQrAuditLogModel(
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString(),
+      action: json['action']?.toString() ?? '',
+      result: newValue['result']?.toString(),
+      recordId: newValue['record_id']?.toString(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.round();

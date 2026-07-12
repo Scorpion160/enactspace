@@ -360,6 +360,28 @@ class AttendanceService {
     throw Exception('Scan QR invalide.');
   }
 
+  Future<List<AttendanceQrAuditLogModel>> getQrAuditLogs(
+    String sessionId,
+  ) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.get(
+      '/audit/logs?entity_type=attendance_session&entity_id=$sessionId&limit=50',
+      token: token,
+    );
+
+    final rawList = response is List ? response : const <dynamic>[];
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceQrAuditLogModel.fromJson)
+        .where((log) => log.action.startsWith('attendance_qr'))
+        .toList();
+  }
+
   Future<AttendanceRecordModel> submitJustification({
     required String recordId,
     required String reason,
