@@ -200,3 +200,7 @@ class ApplicationReviewRead(BaseModel):
 
 class ConvertApplicationToUserRequest(BaseModel):
     password: str
+    profile_type: Optional[str] = None
+    core_pole_id: Optional[UUID] = None
+    support_pole_ids: list[UUID] = []
+    project_id: Optional[UUID] = None

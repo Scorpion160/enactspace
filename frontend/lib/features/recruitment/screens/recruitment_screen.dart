@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../poles/models/pole_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/models/project_model.dart';
+import '../../projects/services/projects_service.dart';
 import '../models/application_model.dart';
 import '../models/recruitment_campaign_model.dart';
 import '../services/recruitment_service.dart';
@@ -2627,14 +2631,49 @@ class ConvertApplicationDialog extends StatefulWidget {
 
 class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
   final _passwordController = TextEditingController();
+  final _polesService = PolesService();
+  final _projectsService = ProjectsService();
 
   bool _loading = false;
+  bool _loadingScopes = true;
   String? _error;
+  String _profileType = 'enacteur';
+  String? _corePoleId;
+  String? _projectId;
+  List<PoleModel> _poles = [];
+  List<ProjectModel> _projects = [];
+  final Set<String> _supportPoleIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final gender = (widget.application.gender ?? '').toLowerCase();
+    _profileType = gender.startsWith('f') || gender.contains('femme')
+        ? 'enactrice'
+        : 'enacteur';
+    _loadScopes();
+  }
 
   @override
   void dispose() {
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadScopes() async {
+    try {
+      final poles = await _polesService.getPoles();
+      final projects = await _projectsService.getProjects();
+      if (!mounted) return;
+      setState(() {
+        _poles = poles;
+        _projects = projects;
+        _loadingScopes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingScopes = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -2654,6 +2693,10 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
       final response = await widget.service.convertToUser(
         applicationId: widget.application.id,
         password: _passwordController.text.trim(),
+        profileType: _profileType,
+        corePoleId: _corePoleId,
+        supportPoleIds: _supportPoleIds.toList(),
+        projectId: _projectId,
       );
       final userId = response['user_id']?.toString();
 
@@ -2685,43 +2728,145 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Créer un compte membre'),
       content: SizedBox(
-        width: _dialogWidth(context, 460),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Créer un compte pour ${widget.application.fullName}.'),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.enactusYellow.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.school_rounded, color: AppTheme.softBlack),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Le parcours Academy "Nouveau membre" sera préparé avec notification et email si le backend est disponible.',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+        width: _dialogWidth(context, 560),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Créer un compte pour ${widget.application.fullName}.'),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.enactusYellow.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.school_rounded, color: AppTheme.softBlack),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Le parcours Academy "Nouveau membre" sera préparé avec notification et email si le backend est disponible.',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (_error != null) _DialogError(message: _error!),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Mot de passe initial',
+                  prefixIcon: Icon(Icons.lock_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _profileType,
+                decoration: const InputDecoration(
+                  labelText: 'Profil',
+                  prefixIcon: Icon(Icons.badge_rounded),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'enacteur', child: Text('Enacteur')),
+                  DropdownMenuItem(
+                    value: 'enactrice',
+                    child: Text('Enactrice'),
                   ),
                 ],
+                onChanged: _loading
+                    ? null
+                    : (value) {
+                        if (value != null) setState(() => _profileType = value);
+                      },
               ),
-            ),
-            const SizedBox(height: 14),
-            if (_error != null) _DialogError(message: _error!),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Mot de passe initial',
-                prefixIcon: Icon(Icons.lock_rounded),
-              ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              if (_loadingScopes)
+                const LinearProgressIndicator()
+              else ...[
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _corePoleId,
+                  decoration: const InputDecoration(
+                    labelText: 'Pôle cœur',
+                    prefixIcon: Icon(Icons.hub_rounded),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Aucun pour le moment'),
+                    ),
+                    ..._poles.map(
+                      (pole) => DropdownMenuItem(
+                        value: pole.id,
+                        child: Text(pole.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) => setState(() => _corePoleId = value),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final pole in _poles.where(
+                        (pole) => pole.isSupportPole,
+                      ))
+                        FilterChip(
+                          label: Text(pole.displayShortName),
+                          selected: _supportPoleIds.contains(pole.id),
+                          onSelected: _loading
+                              ? null
+                              : (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _supportPoleIds.add(pole.id);
+                                    } else {
+                                      _supportPoleIds.remove(pole.id);
+                                    }
+                                  });
+                                },
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _projectId,
+                  decoration: const InputDecoration(
+                    labelText: 'Projet',
+                    prefixIcon: Icon(Icons.workspaces_rounded),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Aucun projet'),
+                    ),
+                    ..._projects.map(
+                      (project) => DropdownMenuItem(
+                        value: project.id,
+                        child: Text(project.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) => setState(() => _projectId = value),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
       actions: [

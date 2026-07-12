@@ -306,6 +306,10 @@ class RecruitmentService {
   Future<Map<String, dynamic>> convertToUser({
     required String applicationId,
     required String password,
+    String? profileType,
+    String? corePoleId,
+    List<String> supportPoleIds = const [],
+    String? projectId,
   }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -313,7 +317,15 @@ class RecruitmentService {
     final response = await _apiClient.postJson(
       '/recruitment/applications/$applicationId/convert-to-user',
       token: token,
-      data: {'password': password},
+      data: {
+        'password': password,
+        'profile_type': _nullIfEmpty(profileType),
+        'core_pole_id': _nullIfEmpty(corePoleId),
+        'support_pole_ids': supportPoleIds
+            .where((id) => id.trim().isNotEmpty)
+            .toList(),
+        'project_id': _nullIfEmpty(projectId),
+      },
     );
 
     if (response is Map<String, dynamic>) {

@@ -11,6 +11,8 @@ from app.models.recruitment import (
     Application,
     ApplicationReview,
 )
+from app.models.pole import Pole, PoleMember
+from app.models.project import Project, ProjectMember
 from app.models.role import Role, UserRole
 from app.models.user import User
 from app.core.security import hash_password
@@ -36,7 +38,7 @@ from app.api.deps import (
     user_has_any_role,
 )
 from app.core.config import settings
-from app.core.roles import RECRUITMENT_ACCESS_ROLES
+from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES
 from app.services.notification_service import notify_user, notify_users
 
 
@@ -471,6 +473,77 @@ def public_interview_details(application: Application) -> str | None:
     if application.interview_link:
         parts.append(f"Lien: {application.interview_link}")
     return " · ".join(parts)
+
+
+def profile_type_from_application(
+    application: Application,
+    requested_profile_type: str | None,
+) -> str:
+    if requested_profile_type and requested_profile_type.strip():
+        return requested_profile_type.strip().lower()
+
+    gender = (application.gender or "").strip().lower()
+    if gender.startswith("f") or "femme" in gender:
+        return "enactrice"
+    return "enacteur"
+
+
+def ensure_user_role(db: Session, user: User, role_name: str) -> None:
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        role = Role(name=role_name)
+        db.add(role)
+        db.flush()
+
+    exists = (
+        db.query(UserRole.id)
+        .filter(UserRole.user_id == user.id, UserRole.role_id == role.id)
+        .first()
+    )
+    if not exists:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+
+
+def ensure_pole_membership(db: Session, user: User, pole_id) -> None:
+    pole = db.query(Pole.id).filter(Pole.id == pole_id).first()
+    if not pole:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pôle introuvable pour la conversion",
+        )
+
+    membership = (
+        db.query(PoleMember)
+        .filter(PoleMember.pole_id == pole_id, PoleMember.user_id == user.id)
+        .first()
+    )
+    if membership:
+        membership.position = "membre"
+        membership.left_at = None
+        membership.is_active = True
+    else:
+        db.add(PoleMember(pole_id=pole_id, user_id=user.id, position="membre"))
+
+
+def ensure_project_membership(db: Session, user: User, project_id) -> None:
+    project = db.query(Project.id).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Projet introuvable pour la conversion",
+        )
+
+    membership = (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)
+        .first()
+    )
+    if membership:
+        membership.position = "membre"
+        membership.left_at = None
+        membership.is_active = True
+    else:
+        db.add(ProjectMember(project_id=project_id, user_id=user.id, position="membre"))
 
 
 def anonymous_code(application: Application) -> str:
@@ -966,6 +1039,23 @@ def convert_application_to_user(
 
     if existing_user:
         application.converted_user_id = existing_user.id
+        existing_user.gender = existing_user.gender or application.gender
+        existing_user.profile_type = profile_type_from_application(
+            application,
+            payload.profile_type,
+        )
+        existing_user.department = existing_user.department or application.department
+        existing_user.study_level = existing_user.study_level or application.study_level
+        existing_user.promotion = existing_user.promotion or application.class_name
+        existing_user.status = "active"
+        existing_user.is_active = True
+        ensure_user_role(db, existing_user, BASE_ACTIVE_ROLE)
+        if payload.core_pole_id:
+            ensure_pole_membership(db, existing_user, payload.core_pole_id)
+        for pole_id in payload.support_pole_ids:
+            ensure_pole_membership(db, existing_user, pole_id)
+        if payload.project_id:
+            ensure_project_membership(db, existing_user, payload.project_id)
         application.updated_at = datetime.utcnow()
         notify_user(
             db,
@@ -983,6 +1073,9 @@ def convert_application_to_user(
             "ok": True,
             "message": "Un compte existait déjà avec cet email",
             "user_id": str(existing_user.id),
+            "profile_type": existing_user.profile_type,
+            "core_pole_id": str(payload.core_pole_id) if payload.core_pole_id else None,
+            "project_id": str(payload.project_id) if payload.project_id else None,
         }
 
     user = User(
@@ -990,16 +1083,26 @@ def convert_application_to_user(
         last_name=application.last_name,
         email=application.email,
         phone=application.phone,
+        gender=application.gender,
+        profile_type=profile_type_from_application(application, payload.profile_type),
         password_hash=hash_password(payload.password.strip()),
         department=application.department,
         study_level=application.study_level,
-        status="pending",
-        email_verified=False,
+        promotion=application.class_name,
+        status="active",
+        email_verified=True,
         is_active=True,
     )
 
     db.add(user)
     db.flush()
+    ensure_user_role(db, user, BASE_ACTIVE_ROLE)
+    if payload.core_pole_id:
+        ensure_pole_membership(db, user, payload.core_pole_id)
+    for pole_id in payload.support_pole_ids:
+        ensure_pole_membership(db, user, pole_id)
+    if payload.project_id:
+        ensure_project_membership(db, user, payload.project_id)
 
     application.converted_user_id = user.id
     application.updated_at = datetime.utcnow()
@@ -1019,6 +1122,9 @@ def convert_application_to_user(
 
     return {
         "ok": True,
-        "message": "Compte créé avec succès. Il doit être validé par la Secrétaire Générale.",
+        "message": "Compte membre créé avec succès.",
         "user_id": str(user.id),
+        "profile_type": user.profile_type,
+        "core_pole_id": str(payload.core_pole_id) if payload.core_pole_id else None,
+        "project_id": str(payload.project_id) if payload.project_id else None,
     }

@@ -32,6 +32,14 @@
 - Suivi public enrichi avec date/lieu/lien uniquement.
 - Note interne non exposée au candidat.
 
+## Tranche: conversion candidat vers membre
+
+- Conversion enrichie avec profil enacteur/enactrice.
+- Compte converti activé avec rôle membre.
+- Pôle cœur, pôles support et projet optionnels ajoutés.
+- Protection doublon conservée via `converted_user_id` et email existant.
+- Parcours Academy Nouveau membre conservé côté frontend après conversion.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK

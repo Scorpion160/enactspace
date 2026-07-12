@@ -40,3 +40,7 @@ La liste interne des candidatures peut être filtrée par campagne, statut, rech
 ## Entretiens
 
 Les responsables recrutement peuvent programmer un entretien depuis une carte candidat avec date, heure, lieu, lien visio, jury et note interne. La programmation passe automatiquement la candidature en `interview_scheduled`. Le suivi public affiche uniquement la date, le lieu et le lien, jamais la note interne.
+
+## Conversion en membre
+
+Une candidature acceptée peut être convertie explicitement en compte EnactSpace actif. La conversion déduit ou permet de choisir le profil `enacteur` / `enactrice`, ajoute le rôle membre, affecte le pôle cœur, les pôles support et le projet choisis, puis garde l'historique de candidature lié au compte.
