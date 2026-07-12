@@ -433,6 +433,29 @@ class AttendanceService {
     throw Exception('Revocation NFC invalide.');
   }
 
+  Future<AttendanceNfcCheckInResultModel> nfcCheckIn({
+    required String sessionId,
+    required String tagPayload,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/nfc/check-in',
+      token: token,
+      data: {'session_id': sessionId, 'tag_payload': tagPayload},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceNfcCheckInResultModel.fromJson(response);
+    }
+
+    throw Exception('Pointage NFC invalide.');
+  }
+
   Future<List<AttendanceQrAuditLogModel>> getQrAuditLogs(
     String sessionId,
   ) async {

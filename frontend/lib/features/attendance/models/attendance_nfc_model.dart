@@ -43,3 +43,32 @@ class AttendanceNfcTagModel {
 
   bool get isActive => status == 'active';
 }
+
+class AttendanceNfcCheckInResultModel {
+  final bool success;
+  final String result;
+  final String? memberDisplayName;
+  final String? attendanceStatus;
+  final String message;
+  final DateTime? recordedAt;
+
+  const AttendanceNfcCheckInResultModel({
+    required this.success,
+    required this.result,
+    this.memberDisplayName,
+    this.attendanceStatus,
+    required this.message,
+    this.recordedAt,
+  });
+
+  factory AttendanceNfcCheckInResultModel.fromJson(Map<String, dynamic> json) {
+    return AttendanceNfcCheckInResultModel(
+      success: json['success'] == true,
+      result: json['result']?.toString() ?? 'unknown',
+      memberDisplayName: json['member_display_name']?.toString(),
+      attendanceStatus: json['attendance_status']?.toString(),
+      message: json['message']?.toString() ?? 'Pointage NFC traite.',
+      recordedAt: DateTime.tryParse(json['recorded_at']?.toString() ?? ''),
+    );
+  }
+}

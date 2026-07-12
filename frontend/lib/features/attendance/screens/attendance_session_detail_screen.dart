@@ -11,6 +11,7 @@ import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
 import '../widgets/qr_attendance_section.dart';
 import '../widgets/session_stats_cards.dart';
+import 'attendance_nfc_checkin_screen.dart';
 
 class AttendanceSessionDetailScreen extends StatefulWidget {
   final AttendanceSessionModel session;
@@ -419,6 +420,18 @@ class _AttendanceSessionDetailScreenState
     }
   }
 
+  Future<void> _openNfcCheckIn() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AttendanceNfcCheckInScreen(session: widget.session),
+      ),
+    );
+    if (mounted) {
+      await _loadDetails();
+    }
+  }
+
   Future<void> _approveJustification(AttendanceRecordModel record) async {
     try {
       await _attendanceService.approveJustification(recordId: record.id);
@@ -540,6 +553,7 @@ class _AttendanceSessionDetailScreenState
               expectedCount: _expectedMembers.length,
               recordedCount: _records.length,
               completionRate: _completionRate,
+              onNfcCheckIn: _openNfcCheckIn,
             ),
             if (widget.session.canManage) ...[
               const SizedBox(height: 20),
@@ -777,12 +791,14 @@ class _SessionActionPanel extends StatelessWidget {
   final int expectedCount;
   final int recordedCount;
   final double completionRate;
+  final VoidCallback onNfcCheckIn;
 
   const _SessionActionPanel({
     required this.session,
     required this.expectedCount,
     required this.recordedCount,
     required this.completionRate,
+    required this.onNfcCheckIn,
   });
 
   @override
@@ -839,6 +855,15 @@ class _SessionActionPanel extends StatelessWidget {
               spacing: 10,
               runSpacing: 10,
               children: [
+                ActionChip(
+                  avatar: const Icon(Icons.nfc_rounded, size: 16),
+                  label: const Text('Pointage NFC'),
+                  onPressed: session.status == 'open' ? onNfcCheckIn : null,
+                  backgroundColor: AppTheme.enactusYellow.withAlpha(40),
+                  side: BorderSide(
+                    color: AppTheme.enactusYellow.withAlpha(120),
+                  ),
+                ),
                 _ActionChip(
                   icon: Icons.qr_code_2_rounded,
                   label: session.qrToken == null || session.qrToken!.isEmpty
