@@ -380,6 +380,26 @@ class AttendanceService {
     return null;
   }
 
+  Future<List<AttendanceNfcTagModel>> listNfcTags({String? status}) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final query = status == null || status == 'all' ? '' : '?status=$status';
+    final response = await _apiClient.get(
+      '/attendance/nfc/tags$query',
+      token: token,
+    );
+
+    final rawList = response is List ? response : const <dynamic>[];
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceNfcTagModel.fromJson)
+        .toList();
+  }
+
   Future<AttendanceNfcTagModel> enrollNfcTag({
     required String memberId,
     required String tagPayload,

@@ -30,6 +30,8 @@ class _AttendanceNfcEnrollmentScreenState
   MemberModel? _selectedMember;
   AttendanceNfcTagModel? _selectedTag;
   List<MemberModel> _members = [];
+  List<AttendanceNfcTagModel> _tags = [];
+  String _tagStatusFilter = 'active';
 
   @override
   void initState() {
@@ -54,8 +56,12 @@ class _AttendanceNfcEnrollmentScreenState
 
     try {
       final availability = await NfcManager.instance.checkAvailability();
-      final members = await _membersService.getMembers();
+      final results = await Future.wait([
+        _membersService.getMembers(),
+        _attendanceService.listNfcTags(status: _tagStatusFilter),
+      ]);
       if (!mounted) return;
+      final members = results[0] as List<MemberModel>;
       setState(() {
         _nfcAvailable = availability == NfcAvailability.enabled;
         _members = members
@@ -63,6 +69,7 @@ class _AttendanceNfcEnrollmentScreenState
               (member) => member.isActive != false && member.status == 'active',
             )
             .toList();
+        _tags = results[1] as List<AttendanceNfcTagModel>;
       });
     } catch (e) {
       if (!mounted) return;
@@ -140,6 +147,8 @@ class _AttendanceNfcEnrollmentScreenState
         _selectedTag = tag;
         _error = null;
       });
+      await _refreshTags();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Badge associe avec succes.')),
       );
@@ -162,6 +171,8 @@ class _AttendanceNfcEnrollmentScreenState
         _selectedTag = revoked;
         _error = null;
       });
+      await _refreshTags();
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Badge revoque.')));
@@ -182,6 +193,12 @@ class _AttendanceNfcEnrollmentScreenState
           member.rolesLabel.toLowerCase().contains(query) ||
           member.departmentLabel.toLowerCase().contains(query);
     }).toList();
+  }
+
+  Future<void> _refreshTags() async {
+    final tags = await _attendanceService.listNfcTags(status: _tagStatusFilter);
+    if (!mounted) return;
+    setState(() => _tags = tags);
   }
 
   @override
@@ -221,6 +238,22 @@ class _AttendanceNfcEnrollmentScreenState
                       const SizedBox(height: 18),
                       _buildEnrollmentPanel(),
                     ],
+                    const SizedBox(height: 18),
+                    _NfcTagsList(
+                      tags: _tags,
+                      membersById: {
+                        for (final member in _members) member.id: member,
+                      },
+                      statusFilter: _tagStatusFilter,
+                      onStatusChanged: (value) async {
+                        setState(() => _tagStatusFilter = value);
+                        await _refreshTags();
+                      },
+                      onRevoke: (tag) async {
+                        await _attendanceService.revokeNfcTag(tagId: tag.id);
+                        await _refreshTags();
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -446,6 +479,141 @@ class _NfcTagStatus extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NfcTagsList extends StatelessWidget {
+  final List<AttendanceNfcTagModel> tags;
+  final Map<String, MemberModel> membersById;
+  final String statusFilter;
+  final ValueChanged<String> onStatusChanged;
+  final Future<void> Function(AttendanceNfcTagModel tag) onRevoke;
+
+  const _NfcTagsList({
+    required this.tags,
+    required this.membersById,
+    required this.statusFilter,
+    required this.onStatusChanged,
+    required this.onRevoke,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final title = const Text(
+                  'Gestion des badges',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                );
+                final filters = Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _StatusButton(
+                      value: 'active',
+                      label: 'Actifs',
+                      selected: statusFilter == 'active',
+                      onSelected: onStatusChanged,
+                    ),
+                    _StatusButton(
+                      value: 'lost',
+                      label: 'Perdus',
+                      selected: statusFilter == 'lost',
+                      onSelected: onStatusChanged,
+                    ),
+                    _StatusButton(
+                      value: 'revoked',
+                      label: 'Revoques',
+                      selected: statusFilter == 'revoked',
+                      onSelected: onStatusChanged,
+                    ),
+                    _StatusButton(
+                      value: 'replaced',
+                      label: 'Remplaces',
+                      selected: statusFilter == 'replaced',
+                      onSelected: onStatusChanged,
+                    ),
+                    _StatusButton(
+                      value: 'all',
+                      label: 'Tous',
+                      selected: statusFilter == 'all',
+                      onSelected: onStatusChanged,
+                    ),
+                  ],
+                );
+                if (constraints.maxWidth >= 700) {
+                  return Row(
+                    children: [
+                      Expanded(child: title),
+                      filters,
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [title, const SizedBox(height: 12), filters],
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            if (tags.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('Aucun badge pour ce filtre.'),
+              )
+            else
+              ...tags.map((tag) {
+                final member = membersById[tag.memberId];
+                return ListTile(
+                  leading: Icon(
+                    tag.isActive ? Icons.nfc_rounded : Icons.block_rounded,
+                    color: tag.isActive ? AppTheme.softBlack : Colors.black45,
+                  ),
+                  title: Text(member?.displayName ?? tag.maskedTag),
+                  subtitle: Text('${tag.maskedTag} - ${tag.status}'),
+                  trailing: tag.isActive
+                      ? IconButton(
+                          tooltip: 'Revoquer',
+                          onPressed: () => onRevoke(tag),
+                          icon: const Icon(Icons.block_rounded),
+                        )
+                      : null,
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusButton extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool selected;
+  final ValueChanged<String> onSelected;
+
+  const _StatusButton({
+    required this.value,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      selected: selected,
+      label: Text(label),
+      onSelected: (_) => onSelected(value),
+      selectedColor: AppTheme.enactusYellow.withAlpha(80),
     );
   }
 }
