@@ -16,6 +16,7 @@ from app.core.roles import (
     GLOBAL_MANAGEMENT_ROLES,
     SECRETARIAT_ROLES,
 )
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.attendance import (
     AttendanceExpectedMember,
@@ -31,6 +32,10 @@ from app.schemas.attendance import (
     AttendanceCheckIn,
     AttendanceExpectedMemberCreate,
     AttendanceExpectedMemberRead,
+    AttendanceQrScanRequest,
+    AttendanceQrScanResult,
+    AttendanceQrStatusRead,
+    AttendanceQrTokenRead,
     AttendanceJustificationReview,
     AttendanceJustificationSubmit,
     AttendanceManualCreate,
@@ -44,6 +49,12 @@ from app.schemas.attendance import (
     AttendanceSessionUpdate,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.attendance_qr_service import (
+    AttendanceQrExpiredError,
+    AttendanceQrInvalidError,
+    generate_attendance_qr_token,
+    validate_attendance_qr_token,
+)
 from app.services.notification_service import notify_user, notify_users
 
 router = APIRouter(prefix="/attendance", tags=["Presences"])
@@ -106,6 +117,7 @@ DEFAULT_ATTENDANCE_SETTINGS = {
         "Date ISO de debut d'application des sanctions.",
     ),
 }
+QR_SCAN_RATE_LIMIT: dict[tuple[str, str], list[datetime]] = {}
 
 
 def _ensure_attendance_settings(db: Session) -> list[AttendanceSetting]:
@@ -583,6 +595,7 @@ def _upsert_record(
     justification_file_id=None,
     justification_file_url: str | None = None,
     note: str | None = None,
+    source: str = "manual",
 ) -> AttendanceRecord:
     normalized_status = _normalize_attendance_status(attendance_status)
     normalized_justification = _normalize_justification_status(
@@ -615,6 +628,7 @@ def _upsert_record(
         delay_minutes,
     )
     record.recorded_by = current_user.id
+    record.source = source
     record.recorded_at = now
     record.justification = justification
     record.justification_status = normalized_justification
@@ -693,6 +707,115 @@ def _compute_checkin_status(session: AttendanceSession, now: datetime) -> str:
     reference_time = session.checkin_start or session.scheduled_at or session.created_at
     late_limit = reference_time + timedelta(minutes=session.late_after_minutes)
     return "late" if now > late_limit else "present"
+
+
+def _qr_scan_message(result: str, attendance_status: str | None = None) -> str:
+    if result == "present" or attendance_status == "present":
+        return "Votre présence a été enregistrée."
+    if result == "late" or attendance_status == "late":
+        return "Votre retard a été enregistré."
+    messages = {
+        "already_recorded": "Vous avez déjà été pointé(e).",
+        "expired_token": "Le QR a expiré.",
+        "invalid_token": "Ce QR n'est pas valide.",
+        "session_closed": "Cette séance est fermée.",
+        "not_eligible": "Vous n'êtes pas concerné(e) par cette séance.",
+        "qr_disabled": "Le pointage QR est désactivé.",
+        "rate_limited": "Trop de tentatives. Réessayez dans un instant.",
+    }
+    return messages.get(result, "Pointage QR indisponible.")
+
+
+def _qr_scan_result(
+    result: str,
+    *,
+    success: bool = False,
+    attendance_status: str | None = None,
+    recorded_at: datetime | None = None,
+) -> AttendanceQrScanResult:
+    return AttendanceQrScanResult(
+        success=success,
+        result=result,
+        attendance_status=attendance_status,
+        message=_qr_scan_message(result, attendance_status),
+        recorded_at=recorded_at,
+    )
+
+
+def _rate_limit_qr_scan(current_user: User, request: Request) -> bool:
+    key = (str(current_user.id), get_client_ip(request) or "unknown")
+    now = datetime.utcnow()
+    window_start = now - timedelta(minutes=1)
+    attempts = [
+        value
+        for value in QR_SCAN_RATE_LIMIT.get(key, [])
+        if value >= window_start
+    ]
+    if len(attempts) >= settings.ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE:
+        QR_SCAN_RATE_LIMIT[key] = attempts
+        return False
+    attempts.append(now)
+    QR_SCAN_RATE_LIMIT[key] = attempts
+    return True
+
+
+def _audit_qr_scan(
+    db: Session,
+    *,
+    request: Request,
+    current_user: User,
+    result: str,
+    session: AttendanceSession | None = None,
+    record: AttendanceRecord | None = None,
+) -> None:
+    create_audit_log(
+        db,
+        action="attendance_qr_scan",
+        user_id=current_user.id,
+        entity_type="attendance_session",
+        entity_id=session.id if session else None,
+        new_value={
+            "result": result,
+            "source": "qr",
+            "record_id": str(record.id) if record else None,
+        },
+        ip_address=get_client_ip(request),
+    )
+
+
+def _attendance_qr_status_payload(
+    db: Session,
+    session: AttendanceSession,
+) -> AttendanceQrStatusRead:
+    records = (
+        db.query(AttendanceRecord)
+        .filter(AttendanceRecord.session_id == session.id)
+        .all()
+    )
+    expected_count = (
+        db.query(AttendanceExpectedMember.id)
+        .filter(AttendanceExpectedMember.session_id == session.id)
+        .count()
+    )
+    present_count = sum(1 for record in records if record.status == "present")
+    late_count = sum(1 for record in records if record.status == "late")
+    qr_records = [record for record in records if record.source == "qr"]
+    last_qr_record = max(
+        qr_records,
+        key=lambda record: record.recorded_at or record.created_at,
+        default=None,
+    )
+    return AttendanceQrStatusRead(
+        qr_enabled=settings.ATTENDANCE_QR_ENABLED,
+        session_id=session.id,
+        session_status="closed" if session.is_closed else session.status,
+        expected_count=expected_count,
+        present_count=present_count,
+        late_count=late_count,
+        remaining_count=max(0, expected_count - present_count - late_count),
+        last_scan_at=last_qr_record.recorded_at if last_qr_record else None,
+        last_scan_status=last_qr_record.status if last_qr_record else None,
+    )
 
 
 def _records_query_for_user(db: Session, current_user: User):
@@ -1270,6 +1393,216 @@ def close_attendance_session(
     }
 
 
+@router.post("/sessions/{session_id}/qr-token", response_model=AttendanceQrTokenRead)
+def create_attendance_qr_token(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not settings.ATTENDANCE_QR_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pointage QR desactive",
+        )
+
+    session = _get_session_or_404(db, session_id)
+    _require_can_manage_session(db, current_user, session)
+    if session.is_closed or session.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La seance doit etre ouverte pour afficher un QR",
+        )
+
+    _ensure_expected_members(db, session)
+    token, payload = generate_attendance_qr_token(session_id=str(session.id))
+    create_audit_log(
+        db=db,
+        action="attendance_qr_token_generated",
+        user_id=current_user.id,
+        entity_type="attendance_session",
+        entity_id=session.id,
+        new_value={
+            "expires_at": payload.expires_at.isoformat(),
+            "rotation_seconds": settings.ATTENDANCE_QR_ROTATION_SECONDS,
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    return AttendanceQrTokenRead(
+        token=token,
+        expires_at=payload.expires_at,
+        rotation_seconds=settings.ATTENDANCE_QR_ROTATION_SECONDS,
+        session_id=session.id,
+    )
+
+
+@router.get("/sessions/{session_id}/qr-status", response_model=AttendanceQrStatusRead)
+def get_attendance_qr_status(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    session = _get_session_or_404(db, session_id)
+    _require_can_manage_session(db, current_user, session)
+    _ensure_expected_members(db, session)
+    db.commit()
+    return _attendance_qr_status_payload(db, session)
+
+
+@router.post("/scan-qr", response_model=AttendanceQrScanResult)
+def scan_attendance_qr(
+    payload: AttendanceQrScanRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    if not settings.ATTENDANCE_QR_ENABLED:
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="qr_disabled",
+        )
+        db.commit()
+        return _qr_scan_result("qr_disabled")
+
+    if not _rate_limit_qr_scan(current_user, request):
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="rate_limited",
+        )
+        db.commit()
+        return _qr_scan_result("rate_limited")
+
+    try:
+        qr_payload = validate_attendance_qr_token(payload.token)
+    except AttendanceQrExpiredError:
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="expired_token",
+        )
+        db.commit()
+        return _qr_scan_result("expired_token")
+    except AttendanceQrInvalidError:
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="invalid_token",
+        )
+        db.commit()
+        return _qr_scan_result("invalid_token")
+
+    session = (
+        db.query(AttendanceSession)
+        .filter(AttendanceSession.id == qr_payload.session_id)
+        .first()
+    )
+    if not session:
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="invalid_token",
+        )
+        db.commit()
+        return _qr_scan_result("invalid_token")
+
+    now = datetime.utcnow()
+    if (
+        session.is_closed
+        or session.status != "open"
+        or (session.checkin_start and now < session.checkin_start)
+        or (session.checkin_end and now > session.checkin_end)
+    ):
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="session_closed",
+            session=session,
+        )
+        db.commit()
+        return _qr_scan_result("session_closed")
+
+    _ensure_expected_members(db, session)
+    expected = (
+        db.query(AttendanceExpectedMember.id)
+        .filter(
+            AttendanceExpectedMember.session_id == session.id,
+            AttendanceExpectedMember.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not expected:
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="not_eligible",
+            session=session,
+        )
+        db.commit()
+        return _qr_scan_result("not_eligible")
+
+    existing = (
+        db.query(AttendanceRecord)
+        .filter(
+            AttendanceRecord.session_id == session.id,
+            AttendanceRecord.user_id == current_user.id,
+        )
+        .first()
+    )
+    if existing and existing.status != "not_recorded":
+        _audit_qr_scan(
+            db,
+            request=request,
+            current_user=current_user,
+            result="already_recorded",
+            session=session,
+            record=existing,
+        )
+        db.commit()
+        return _qr_scan_result(
+            "already_recorded",
+            attendance_status=existing.status,
+            recorded_at=existing.recorded_at,
+        )
+
+    attendance_status = _compute_checkin_status(session, now)
+    record = _upsert_record(
+        db,
+        session,
+        current_user,
+        user_id=current_user.id,
+        attendance_status=attendance_status,
+        arrival_time=now,
+        source="qr",
+    )
+    _notify_record_change(db, record, session)
+    _audit_qr_scan(
+        db,
+        request=request,
+        current_user=current_user,
+        result=attendance_status,
+        session=session,
+        record=record,
+    )
+    db.commit()
+    db.refresh(record)
+    return _qr_scan_result(
+        attendance_status,
+        success=True,
+        attendance_status=attendance_status,
+        recorded_at=record.recorded_at,
+    )
+
+
 @router.get(
     "/sessions/{session_id}/records",
     response_model=list[AttendanceRecordRead],
@@ -1609,6 +1942,7 @@ def qr_check_in(
         user_id=current_user.id,
         attendance_status=_compute_checkin_status(session, now),
         arrival_time=now,
+        source="qr",
     )
     _notify_record_change(db, record, session)
     db.commit()

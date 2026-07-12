@@ -164,6 +164,7 @@ class AttendanceRecordRead(BaseModel):
     arrival_time: Optional[datetime]
     delay_minutes: Optional[int] = None
     recorded_by: Optional[UUID]
+    source: str = "manual"
     recorded_at: Optional[datetime] = None
     justification: Optional[str]
     justification_status: str = "not_submitted"
@@ -184,3 +185,34 @@ class AttendanceRecordRead(BaseModel):
 # Alias pour compatibilité avec attendance.py
 AttendanceExpectedMembersCreate = AttendanceExpectedMemberCreate
 AttendanceRead = AttendanceRecordRead
+
+
+class AttendanceQrTokenRead(BaseModel):
+    token: str
+    expires_at: datetime
+    rotation_seconds: int
+    session_id: UUID
+
+
+class AttendanceQrStatusRead(BaseModel):
+    qr_enabled: bool
+    session_id: UUID
+    session_status: str
+    expected_count: int
+    present_count: int
+    late_count: int
+    remaining_count: int
+    last_scan_at: Optional[datetime] = None
+    last_scan_status: Optional[str] = None
+
+
+class AttendanceQrScanRequest(BaseModel):
+    token: str
+
+
+class AttendanceQrScanResult(BaseModel):
+    success: bool
+    result: str
+    attendance_status: Optional[str] = None
+    message: str
+    recorded_at: Optional[datetime] = None

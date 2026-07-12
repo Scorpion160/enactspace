@@ -136,6 +136,7 @@ class AttendanceRecord(Base):
         ForeignKey("users.id"),
         nullable=True,
     )
+    source: Mapped[str] = mapped_column(String(40), default="manual")
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     justification: Mapped[str | None] = mapped_column(Text, nullable=True)

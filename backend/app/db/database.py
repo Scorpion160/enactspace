@@ -129,6 +129,10 @@ def ensure_compatibility_columns() -> None:
             statements.append(
                 "ALTER TABLE attendance_records ADD COLUMN recorded_at DATETIME"
             )
+        if "source" not in record_columns:
+            statements.append(
+                "ALTER TABLE attendance_records ADD COLUMN source VARCHAR(40) DEFAULT 'manual'"
+            )
         if "justification_status" not in record_columns:
             statements.append(
                 "ALTER TABLE attendance_records ADD COLUMN justification_status "
