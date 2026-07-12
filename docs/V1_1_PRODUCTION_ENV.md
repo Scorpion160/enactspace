@@ -52,6 +52,7 @@ chmod 600 .env
 - `PAYDUNYA_CALLBACK_URL`: endpoint IPN public. En live, utiliser obligatoirement HTTPS.
 - `PAYDUNYA_RETURN_URL`, `PAYDUNYA_CANCEL_URL`: pages de retour utilisateur. Elles ne confirment jamais un paiement.
 - `PAYDUNYA_ALLOWED_CHANNELS`: canaux proposes via le checkout, par exemple `wave-senegal,orange-money-senegal`.
+- `PAYDUNYA_TIMEOUT_SECONDS`: timeout HTTP serveur vers PayDunya.
 - `PAYMENT_CURRENCY`: `XOF` pour la V1.1.
 - `PAYMENT_TRANSACTION_TTL_MINUTES`: duree de validite interne d'une transaction.
 - `PAYMENT_RECONCILIATION_ENABLED`: active le rapprochement periodique.

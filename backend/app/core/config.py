@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     PAYDUNYA_RETURN_URL: str | None = None
     PAYDUNYA_CANCEL_URL: str | None = None
     PAYDUNYA_ALLOWED_CHANNELS: str = "wave-senegal,orange-money-senegal"
+    PAYDUNYA_TIMEOUT_SECONDS: int = 15
     PAYMENT_CURRENCY: str = "XOF"
     PAYMENT_TRANSACTION_TTL_MINUTES: int = 30
     PAYMENT_RECONCILIATION_ENABLED: bool = True
@@ -84,6 +85,8 @@ class Settings(BaseSettings):
             raise ValueError("ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE must be positive")
         if self.PAYMENT_TRANSACTION_TTL_MINUTES < 1:
             raise ValueError("PAYMENT_TRANSACTION_TTL_MINUTES must be positive")
+        if self.PAYDUNYA_TIMEOUT_SECONDS < 1:
+            raise ValueError("PAYDUNYA_TIMEOUT_SECONDS must be positive")
         if self.PAYDUNYA_MODE not in {"test", "live"}:
             raise ValueError("PAYDUNYA_MODE must be test or live")
         if self.MOBILE_MONEY_PROVIDER not in {
