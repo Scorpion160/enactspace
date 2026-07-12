@@ -8,6 +8,7 @@ import '../models/fee_model.dart';
 import '../models/financial_account_model.dart';
 import '../models/payment_model.dart';
 import '../services/finance_service.dart';
+import '../widgets/mobile_money_payment_sheet.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key});
@@ -250,6 +251,34 @@ class _FinanceScreenState extends State<FinanceScreen> {
     }
   }
 
+  Future<void> _openMobileMoneySheet(FeeModel fee) async {
+    final payableFees = _fees
+        .where(
+          (item) =>
+              item.userId == fee.userId &&
+              item.remainingAmount > 0 &&
+              item.status != 'paid' &&
+              item.status != 'cancelled',
+        )
+        .toList();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return MobileMoneyPaymentSheet(
+          financeService: _financeService,
+          fees: payableFees,
+          initialFee: fee,
+          memberName: _memberName,
+          onChanged: () {
+            _loadFinance();
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _validatePayment(PaymentModel payment) async {
     try {
       await _financeService.validatePayment(payment.id);
@@ -428,7 +457,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ],
             _AccountsCard(accounts: _filteredAccounts, memberName: _memberName),
             const SizedBox(height: 18),
-            _FeesCard(fees: _filteredFees, memberName: _memberName),
+            _FeesCard(
+              fees: _filteredFees,
+              memberName: _memberName,
+              onPayMobileMoney: _openMobileMoneySheet,
+            ),
             const SizedBox(height: 18),
             _PaymentsCard(
               payments: _filteredPayments,
@@ -980,8 +1013,13 @@ class _AccountsCard extends StatelessWidget {
 class _FeesCard extends StatelessWidget {
   final List<FeeModel> fees;
   final String Function(String userId) memberName;
+  final ValueChanged<FeeModel> onPayMobileMoney;
 
-  const _FeesCard({required this.fees, required this.memberName});
+  const _FeesCard({
+    required this.fees,
+    required this.memberName,
+    required this.onPayMobileMoney,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -992,6 +1030,10 @@ class _FeesCard extends StatelessWidget {
           ? const _EmptyText('Aucun frais ou pénalité.')
           : Column(
               children: fees.take(20).map((fee) {
+                final canPay =
+                    fee.remainingAmount > 0 &&
+                    fee.status != 'paid' &&
+                    fee.status != 'cancelled';
                 return ListTile(
                   leading: const CircleAvatar(
                     child: Icon(Icons.receipt_rounded),
@@ -1006,19 +1048,47 @@ class _FeesCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _money(fee.amount),
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        'reste ${_money(fee.remainingAmount)}',
-                        style: const TextStyle(color: Colors.black54),
-                      ),
-                    ],
+                  trailing: SizedBox(
+                    width: canPay ? 156 : 96,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _money(fee.amount),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'reste ${_money(fee.remainingAmount)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (canPay) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: 'Payer par Mobile Money',
+                            child: IconButton.filledTonal(
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(Icons.phone_android_rounded),
+                              onPressed: () => onPayMobileMoney(fee),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),

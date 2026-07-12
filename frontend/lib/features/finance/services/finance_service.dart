@@ -2,6 +2,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/fee_model.dart';
 import '../models/financial_account_model.dart';
+import '../models/mobile_money_transaction_model.dart';
 import '../models/payment_model.dart';
 
 class FinanceService {
@@ -163,6 +164,72 @@ class FinanceService {
     }
 
     throw Exception('Réponse invalide lors de l’annulation du paiement.');
+  }
+
+  Future<MobileMoneyTransactionModel> initiateMobileMoneyPayment({
+    required List<String> feeIds,
+    required String channel,
+    String? memberId,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final data = <String, dynamic>{
+      'finance_item_ids': feeIds,
+      'channel': channel,
+    };
+    if (memberId != null) {
+      data['member_id'] = memberId;
+    }
+
+    final response = await _apiClient.postJson(
+      '/finance/mobile-money/initiate',
+      token: token,
+      data: data,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MobileMoneyTransactionModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide lors de l initialisation du paiement.');
+  }
+
+  Future<MobileMoneyTransactionModel> getMobileMoneyTransaction(
+    String transactionId,
+  ) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final response = await _apiClient.get(
+      '/finance/mobile-money/$transactionId',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MobileMoneyTransactionModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide pour le statut du paiement.');
+  }
+
+  Future<MobileMoneyTransactionModel> refreshMobileMoneyTransaction(
+    String transactionId,
+  ) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final response = await _apiClient.postJson(
+      '/finance/mobile-money/$transactionId/refresh',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MobileMoneyTransactionModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide lors de la verification du paiement.');
   }
 
   List<dynamic> _extractList(dynamic response) {
