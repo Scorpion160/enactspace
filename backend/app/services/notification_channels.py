@@ -32,8 +32,8 @@ def _dispatch_email(notification: Notification, recipient: User | None) -> bool:
         return False
 
     logger.info(
-        "Notification email queued for %s: %s",
-        recipient.email,
+        "Notification email queued for user %s: %s",
+        recipient.id,
         notification.title,
     )
     return True

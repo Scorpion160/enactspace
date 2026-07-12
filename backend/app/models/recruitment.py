@@ -58,12 +58,14 @@ class Application(Base):
 
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    gender: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     email: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     department: Mapped[str | None] = mapped_column(String(150), nullable=True)
     study_level: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    class_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     motivation: Mapped[str | None] = mapped_column(Text, nullable=True)
     known_enactus_from: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -72,11 +74,23 @@ class Application(Base):
     contribution: Mapped[str | None] = mapped_column(Text, nullable=True)
     project_ideas: Mapped[str | None] = mapped_column(Text, nullable=True)
     leadership_profile: Mapped[str | None] = mapped_column(Text, nullable=True)
+    preferred_pole: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    project_interest: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    associative_experience: Mapped[str | None] = mapped_column(Text, nullable=True)
+    availability: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     cv_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     motivation_letter_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attachment_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[str] = mapped_column(String(50), default="received")
+    tracking_code: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     final_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
 
     converted_user_id: Mapped[uuid.UUID | None] = mapped_column(

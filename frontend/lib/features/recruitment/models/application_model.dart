@@ -3,10 +3,12 @@ class ApplicationModel {
   final String campaignId;
   final String firstName;
   final String lastName;
+  final String? gender;
   final String email;
   final String? phone;
   final String? department;
   final String? studyLevel;
+  final String? className;
   final String? motivation;
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
@@ -14,9 +16,16 @@ class ApplicationModel {
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
+  final String? preferredPole;
+  final String? projectInterest;
+  final String? associativeExperience;
+  final String? availability;
+  final String? publicComment;
   final String? cvUrl;
   final String? motivationLetterUrl;
+  final String? attachmentUrl;
   final String status;
+  final String? trackingCode;
   final double? finalScore;
   final String? convertedUserId;
   final String? createdAt;
@@ -30,10 +39,12 @@ class ApplicationModel {
     required this.campaignId,
     required this.firstName,
     required this.lastName,
+    this.gender,
     required this.email,
     this.phone,
     this.department,
     this.studyLevel,
+    this.className,
     this.motivation,
     this.knownEnactusFrom,
     this.enactusKnowledge,
@@ -41,9 +52,16 @@ class ApplicationModel {
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,
+    this.preferredPole,
+    this.projectInterest,
+    this.associativeExperience,
+    this.availability,
+    this.publicComment,
     this.cvUrl,
     this.motivationLetterUrl,
+    this.attachmentUrl,
     required this.status,
+    this.trackingCode,
     this.finalScore,
     this.convertedUserId,
     this.createdAt,
@@ -59,10 +77,12 @@ class ApplicationModel {
       campaignId: json['campaign_id']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
       lastName: json['last_name']?.toString() ?? '',
+      gender: json['gender']?.toString(),
       email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString(),
       department: json['department']?.toString(),
       studyLevel: json['study_level']?.toString(),
+      className: json['class_name']?.toString(),
       motivation: json['motivation']?.toString(),
       knownEnactusFrom: json['known_enactus_from']?.toString(),
       enactusKnowledge: json['enactus_knowledge']?.toString(),
@@ -70,9 +90,16 @@ class ApplicationModel {
       contribution: json['contribution']?.toString(),
       projectIdeas: json['project_ideas']?.toString(),
       leadershipProfile: json['leadership_profile']?.toString(),
+      preferredPole: json['preferred_pole']?.toString(),
+      projectInterest: json['project_interest']?.toString(),
+      associativeExperience: json['associative_experience']?.toString(),
+      availability: json['availability']?.toString(),
+      publicComment: json['public_comment']?.toString(),
       cvUrl: json['cv_url']?.toString(),
       motivationLetterUrl: json['motivation_letter_url']?.toString(),
+      attachmentUrl: json['attachment_url']?.toString(),
       status: json['status']?.toString() ?? 'submitted',
+      trackingCode: json['tracking_code']?.toString(),
       finalScore: double.tryParse(json['final_score']?.toString() ?? ''),
       convertedUserId: json['converted_user_id']?.toString(),
       createdAt: json['created_at']?.toString(),
@@ -129,6 +156,12 @@ class ApplicationModel {
       (value, unit) => (value * 31 + unit) % 9999,
     );
     return 'Candidat #${seed.toString().padLeft(4, '0')}';
+  }
+
+  String get publicTrackingCode {
+    final value = trackingCode?.trim();
+    if (value != null && value.isNotEmpty) return value;
+    return id;
   }
 
   String get stabilityLabel {

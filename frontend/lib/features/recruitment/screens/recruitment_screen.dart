@@ -125,8 +125,8 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Candidature enregistrée'),
           content: SelectableText(
-            'Référence de suivi : ${created.id}\n\n'
-            'Le candidat doit conserver cette référence et utiliser son '
+            'Code de suivi : ${created.publicTrackingCode}\n\n'
+            'Le candidat doit conserver ce code et utiliser son '
             'adresse email pour suivre son dossier.',
           ),
           actions: [
@@ -1570,10 +1570,12 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _genderController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _departmentController = TextEditingController();
   final _studyLevelController = TextEditingController();
+  final _classNameController = TextEditingController();
   final _motivationController = TextEditingController();
   final _knownFromController = TextEditingController();
   final _knowledgeController = TextEditingController();
@@ -1581,8 +1583,14 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   final _contributionController = TextEditingController();
   final _projectIdeasController = TextEditingController();
   final _leadershipController = TextEditingController();
+  final _preferredPoleController = TextEditingController();
+  final _projectInterestController = TextEditingController();
+  final _associativeExperienceController = TextEditingController();
+  final _availabilityController = TextEditingController();
+  final _publicCommentController = TextEditingController();
   final _cvUrlController = TextEditingController();
   final _motivationLetterUrlController = TextEditingController();
+  final _attachmentUrlController = TextEditingController();
 
   String? _campaignId;
 
@@ -1599,10 +1607,12 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _genderController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _departmentController.dispose();
     _studyLevelController.dispose();
+    _classNameController.dispose();
     _motivationController.dispose();
     _knownFromController.dispose();
     _knowledgeController.dispose();
@@ -1610,8 +1620,14 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
     _contributionController.dispose();
     _projectIdeasController.dispose();
     _leadershipController.dispose();
+    _preferredPoleController.dispose();
+    _projectInterestController.dispose();
+    _associativeExperienceController.dispose();
+    _availabilityController.dispose();
+    _publicCommentController.dispose();
     _cvUrlController.dispose();
     _motivationLetterUrlController.dispose();
+    _attachmentUrlController.dispose();
     super.dispose();
   }
 
@@ -1636,9 +1652,11 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         email: _emailController.text,
+        gender: _genderController.text,
         phone: _phoneController.text,
         department: _departmentController.text,
         studyLevel: _studyLevelController.text,
+        className: _classNameController.text,
         motivation: _motivationController.text,
         knownEnactusFrom: _knownFromController.text,
         enactusKnowledge: _knowledgeController.text,
@@ -1646,8 +1664,14 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
         contribution: _contributionController.text,
         projectIdeas: _projectIdeasController.text,
         leadershipProfile: _leadershipController.text,
+        preferredPole: _preferredPoleController.text,
+        projectInterest: _projectInterestController.text,
+        associativeExperience: _associativeExperienceController.text,
+        availability: _availabilityController.text,
+        publicComment: _publicCommentController.text,
         cvUrl: _cvUrlController.text,
         motivationLetterUrl: _motivationLetterUrlController.text,
+        attachmentUrl: _attachmentUrlController.text,
       );
 
       if (!mounted) return;
@@ -1758,6 +1782,13 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                         },
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _genderController,
+                        decoration: const InputDecoration(labelText: 'Genre'),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -1805,6 +1836,36 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                         controller: _studyLevelController,
                         decoration: const InputDecoration(labelText: 'Niveau'),
                         validator: _requiredText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _AdaptiveFieldRow(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _classNameController,
+                        decoration: const InputDecoration(labelText: 'Classe'),
+                        validator: _requiredText,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _preferredPoleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Pôle souhaité',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _projectInterestController,
+                        decoration: const InputDecoration(
+                          labelText: 'Projet d’intérêt',
+                        ),
                       ),
                     ),
                   ],
@@ -1868,9 +1929,35 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
+                  controller: _associativeExperienceController,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Expérience associative',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
                   controller: _leadershipController,
                   decoration: const InputDecoration(
                     labelText: 'Profil leadership',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _availabilityController,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Disponibilité'),
+                  validator: _requiredText,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _publicCommentController,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Commentaire complémentaire',
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -1895,6 +1982,15 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Lien lettre de motivation',
                     prefixIcon: Icon(Icons.link_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _attachmentUrlController,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    labelText: 'Lien pièce jointe complémentaire',
+                    prefixIcon: Icon(Icons.attach_file_rounded),
                   ),
                 ),
               ],

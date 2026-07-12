@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -33,6 +34,8 @@ from app.api.deps import (
     require_sg_or_admin,
     user_has_any_role,
 )
+from app.core.config import settings
+from app.core.roles import RECRUITMENT_ACCESS_ROLES
 from app.services.notification_service import notify_user, notify_users
 
 
@@ -74,13 +77,7 @@ VALID_RECOMMENDATIONS = {
     "defavorable",
 }
 
-RECRUITMENT_NOTIFICATION_ROLES = {
-    "administrateur",
-    "team_leader",
-    "secretaire_generale",
-    "chef_pole",
-    "adjoint_chef_pole",
-}
+RECRUITMENT_NOTIFICATION_ROLES = RECRUITMENT_ACCESS_ROLES
 RECRUITMENT_CONVERSION_ROLES = {
     "administrateur",
     "team_leader",
@@ -356,10 +353,12 @@ def submit_application(
         campaign_id=payload.campaign_id,
         first_name=payload.first_name,
         last_name=payload.last_name,
+        gender=payload.gender,
         email=payload.email,
         phone=payload.phone,
         department=payload.department,
         study_level=payload.study_level,
+        class_name=payload.class_name,
         motivation=payload.motivation,
         known_enactus_from=payload.known_enactus_from,
         enactus_knowledge=payload.enactus_knowledge,
@@ -367,18 +366,81 @@ def submit_application(
         contribution=payload.contribution,
         project_ideas=payload.project_ideas,
         leadership_profile=payload.leadership_profile,
+        preferred_pole=payload.preferred_pole,
+        project_interest=payload.project_interest,
+        associative_experience=payload.associative_experience,
+        availability=payload.availability,
+        public_comment=payload.public_comment,
         cv_url=payload.cv_url,
         motivation_letter_url=payload.motivation_letter_url,
+        attachment_url=payload.attachment_url,
         status="submitted",
     )
 
     db.add(application)
     db.flush()
+    ensure_tracking_code(db, application)
     notify_recruitment_responsibles(db, application, campaign)
+    candidate_email_ready()
     db.commit()
     db.refresh(application)
 
-    return application
+    return application_payload(db, None, application)
+
+
+def build_tracking_code(application: Application | None = None) -> str:
+    year = datetime.utcnow().year
+    if application and application.created_at:
+        year = application.created_at.year
+    return f"ESP-{year}-{uuid.uuid4().hex[:8].upper()}"
+
+
+def ensure_tracking_code(db: Session, application: Application) -> str:
+    if application.tracking_code:
+        return application.tracking_code
+
+    for _ in range(8):
+        candidate = build_tracking_code(application)
+        exists = (
+            db.query(Application.id)
+            .filter(Application.tracking_code == candidate)
+            .first()
+        )
+        if not exists:
+            application.tracking_code = candidate
+            return candidate
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Impossible de générer un code de suivi unique",
+    )
+
+
+def get_application_by_public_reference(
+    db: Session,
+    reference: str,
+    email: str,
+) -> Application | None:
+    normalized_reference = reference.strip()
+    if not normalized_reference:
+        return None
+
+    query = db.query(Application).filter(
+        func.lower(Application.email) == email.lower(),
+    )
+
+    try:
+        application_uuid = uuid.UUID(normalized_reference)
+    except ValueError:
+        return query.filter(
+            func.upper(Application.tracking_code) == normalized_reference.upper()
+        ).first()
+
+    return query.filter(Application.id == application_uuid).first()
+
+
+def candidate_email_ready() -> bool:
+    return bool(settings.email_enabled and settings.SMTP_HOST)
 
 
 def anonymous_code(application: Application) -> str:
@@ -387,16 +449,17 @@ def anonymous_code(application: Application) -> str:
 
 def application_payload(
     db: Session,
-    current_user: User,
+    current_user: User | None,
     application: Application,
     *,
     anonymized: bool = False,
 ) -> dict:
     data = ApplicationRead.model_validate(application).model_dump()
     data["status"] = normalize_application_status(application.status)
+    data["tracking_code"] = application.tracking_code or str(application.id)
     data["is_anonymized"] = anonymized
     data["anonymous_code"] = anonymous_code(application)
-    data["can_convert"] = not anonymized and user_has_any_role(
+    data["can_convert"] = bool(current_user) and not anonymized and user_has_any_role(
         db,
         current_user.id,
         RECRUITMENT_CONVERSION_ROLES,
@@ -409,10 +472,15 @@ def application_payload(
                 "last_name": anonymous_code(application).split("#")[-1].strip(),
                 "email": f"candidate-{code}@example.com",
                 "phone": None,
+                "tracking_code": anonymous_code(application),
                 "cv_url": None,
                 "motivation_letter_url": None,
                 "known_enactus_from": None,
                 "other_clubs": None,
+                "associative_experience": None,
+                "availability": None,
+                "public_comment": None,
+                "attachment_url": None,
             }
         )
     return data
@@ -431,13 +499,10 @@ def track_application(
     payload: ApplicationTrackingRequest,
     db: Session = Depends(get_db),
 ):
-    application = (
-        db.query(Application)
-        .filter(
-            Application.id == payload.application_id,
-            func.lower(Application.email) == payload.email.lower(),
-        )
-        .first()
+    application = get_application_by_public_reference(
+        db,
+        payload.application_id,
+        payload.email,
     )
 
     if not application:
@@ -448,14 +513,19 @@ def track_application(
 
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     normalized_status = normalize_application_status(application.status)
+    tracking_code = ensure_tracking_code(db, application)
+    db.commit()
     return {
         "application_id": application.id,
+        "tracking_code": tracking_code,
         "campaign_title": campaign.title,
         "first_name": application.first_name,
         "last_name": application.last_name,
         "email": application.email,
         "department": application.department,
         "study_level": application.study_level,
+        "preferred_pole": application.preferred_pole,
+        "project_interest": application.project_interest,
         "status": normalized_status,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
@@ -543,9 +613,11 @@ def update_application(
         application.status = next_status
 
     fields = [
+        "gender",
         "phone",
         "department",
         "study_level",
+        "class_name",
         "motivation",
         "known_enactus_from",
         "enactus_knowledge",
@@ -553,8 +625,14 @@ def update_application(
         "contribution",
         "project_ideas",
         "leadership_profile",
+        "preferred_pole",
+        "project_interest",
+        "associative_experience",
+        "availability",
+        "public_comment",
         "cv_url",
         "motivation_letter_url",
+        "attachment_url",
     ]
 
     for field in fields:

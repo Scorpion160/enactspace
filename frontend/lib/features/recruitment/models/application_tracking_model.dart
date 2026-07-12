@@ -1,11 +1,14 @@
 class ApplicationTrackingModel {
   final String applicationId;
+  final String trackingCode;
   final String campaignTitle;
   final String firstName;
   final String lastName;
   final String email;
   final String? department;
   final String? studyLevel;
+  final String? preferredPole;
+  final String? projectInterest;
   final String status;
   final DateTime? submittedAt;
   final DateTime? updatedAt;
@@ -14,12 +17,15 @@ class ApplicationTrackingModel {
 
   const ApplicationTrackingModel({
     required this.applicationId,
+    required this.trackingCode,
     required this.campaignTitle,
     required this.firstName,
     required this.lastName,
     required this.email,
     required this.department,
     required this.studyLevel,
+    required this.preferredPole,
+    required this.projectInterest,
     required this.status,
     required this.submittedAt,
     required this.updatedAt,
@@ -30,12 +36,15 @@ class ApplicationTrackingModel {
   factory ApplicationTrackingModel.fromJson(Map<String, dynamic> json) {
     return ApplicationTrackingModel(
       applicationId: json['application_id']?.toString() ?? '',
+      trackingCode: json['tracking_code']?.toString() ?? '',
       campaignTitle: json['campaign_title']?.toString() ?? 'Recrutement',
       firstName: json['first_name']?.toString() ?? '',
       lastName: json['last_name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       department: json['department']?.toString(),
       studyLevel: json['study_level']?.toString(),
+      preferredPole: json['preferred_pole']?.toString(),
+      projectInterest: json['project_interest']?.toString(),
       status: json['status']?.toString() ?? 'submitted',
       submittedAt: DateTime.tryParse(json['submitted_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
@@ -82,6 +91,8 @@ class ApplicationTrackingModel {
     final items = [
       if (department?.trim().isNotEmpty == true) department!.trim(),
       if (studyLevel?.trim().isNotEmpty == true) studyLevel!.trim(),
+      if (preferredPole?.trim().isNotEmpty == true) preferredPole!.trim(),
+      if (projectInterest?.trim().isNotEmpty == true) projectInterest!.trim(),
       if (email.trim().isNotEmpty) email.trim(),
     ];
     return items.join(' · ');

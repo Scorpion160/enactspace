@@ -194,6 +194,29 @@ def ensure_compatibility_columns() -> None:
                 "ALTER TABLE club_transactions ADD COLUMN proof_file_id CHAR(36)"
             )
 
+    if "applications" in inspector.get_table_names():
+        application_columns = {
+            column["name"] for column in inspector.get_columns("applications")
+        }
+        if "gender" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN gender VARCHAR(40)")
+        if "class_name" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN class_name VARCHAR(120)")
+        if "preferred_pole" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN preferred_pole VARCHAR(150)")
+        if "project_interest" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN project_interest VARCHAR(180)")
+        if "associative_experience" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN associative_experience TEXT")
+        if "availability" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN availability TEXT")
+        if "public_comment" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN public_comment TEXT")
+        if "attachment_url" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN attachment_url TEXT")
+        if "tracking_code" not in application_columns:
+            statements.append("ALTER TABLE applications ADD COLUMN tracking_code VARCHAR(32)")
+
     if statements:
         with engine.begin() as connection:
             for statement in statements:

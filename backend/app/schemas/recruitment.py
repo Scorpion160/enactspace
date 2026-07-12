@@ -41,10 +41,12 @@ class ApplicationCreate(BaseModel):
     campaign_id: UUID
     first_name: str
     last_name: str
+    gender: Optional[str] = None
     email: EmailStr
     phone: Optional[str] = None
     department: Optional[str] = None
     study_level: Optional[str] = None
+    class_name: Optional[str] = None
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
@@ -52,14 +54,22 @@ class ApplicationCreate(BaseModel):
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
+    preferred_pole: Optional[str] = None
+    project_interest: Optional[str] = None
+    associative_experience: Optional[str] = None
+    availability: Optional[str] = None
+    public_comment: Optional[str] = None
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
+    attachment_url: Optional[str] = None
 
 
 class ApplicationUpdate(BaseModel):
+    gender: Optional[str] = None
     phone: Optional[str] = None
     department: Optional[str] = None
     study_level: Optional[str] = None
+    class_name: Optional[str] = None
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
@@ -67,8 +77,14 @@ class ApplicationUpdate(BaseModel):
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
+    preferred_pole: Optional[str] = None
+    project_interest: Optional[str] = None
+    associative_experience: Optional[str] = None
+    availability: Optional[str] = None
+    public_comment: Optional[str] = None
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
+    attachment_url: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -77,10 +93,12 @@ class ApplicationRead(BaseModel):
     campaign_id: UUID
     first_name: str
     last_name: str
+    gender: Optional[str]
     email: EmailStr
     phone: Optional[str]
     department: Optional[str]
     study_level: Optional[str]
+    class_name: Optional[str]
     motivation: Optional[str]
     known_enactus_from: Optional[str]
     enactus_knowledge: Optional[str]
@@ -88,9 +106,16 @@ class ApplicationRead(BaseModel):
     contribution: Optional[str]
     project_ideas: Optional[str]
     leadership_profile: Optional[str]
+    preferred_pole: Optional[str]
+    project_interest: Optional[str]
+    associative_experience: Optional[str]
+    availability: Optional[str]
+    public_comment: Optional[str]
     cv_url: Optional[str]
     motivation_letter_url: Optional[str]
+    attachment_url: Optional[str]
     status: str
+    tracking_code: Optional[str]
     final_score: Optional[float]
     converted_user_id: Optional[UUID]
     is_anonymized: bool = False
@@ -108,18 +133,21 @@ class ApplicationStatusChange(BaseModel):
 
 
 class ApplicationTrackingRequest(BaseModel):
-    application_id: UUID
+    application_id: str
     email: EmailStr
 
 
 class ApplicationTrackingRead(BaseModel):
     application_id: UUID
+    tracking_code: str
     campaign_title: str
     first_name: str
     last_name: str
     email: EmailStr
     department: Optional[str] = None
     study_level: Optional[str] = None
+    preferred_pole: Optional[str] = None
+    project_interest: Optional[str] = None
     status: str
     submitted_at: datetime
     updated_at: datetime

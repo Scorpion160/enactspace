@@ -127,7 +127,7 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Utilisez la référence reçue après votre inscription et le même email.',
+                'Utilisez le code reçu après votre inscription et le même email.',
                 style: TextStyle(color: Colors.black54, height: 1.4),
               ),
               const SizedBox(height: 22),
@@ -135,13 +135,13 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                 controller: _referenceController,
                 autocorrect: false,
                 decoration: const InputDecoration(
-                  labelText: 'Référence de candidature',
+                  labelText: 'Code de suivi',
                   prefixIcon: Icon(Icons.confirmation_number_outlined),
                 ),
                 validator: (value) {
                   final reference = value?.trim() ?? '';
-                  if (reference.isEmpty) return 'Référence obligatoire.';
-                  if (reference.length < 30) return 'Référence invalide.';
+                  if (reference.isEmpty) return 'Code obligatoire.';
+                  if (reference.length < 8) return 'Code invalide.';
                   return null;
                 },
               ),
@@ -360,7 +360,7 @@ class _TrackingResult extends StatelessWidget {
                   ],
                   const SizedBox(height: 8),
                   SelectableText(
-                    'Référence : ${tracking.applicationId}',
+                    'Code de suivi : ${tracking.trackingCode.isEmpty ? tracking.applicationId : tracking.trackingCode}',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],

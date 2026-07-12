@@ -289,11 +289,11 @@ class _LoginPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Conservez cette référence avec votre email pour suivre le dossier.',
+                  'Conservez ce code avec votre email pour suivre le dossier.',
                 ),
                 const SizedBox(height: 14),
                 SelectableText(
-                  application.id,
+                  application.publicTrackingCode,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     color: AppTheme.softBlack,
