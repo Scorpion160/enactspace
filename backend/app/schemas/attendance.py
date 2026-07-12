@@ -253,3 +253,17 @@ class AttendanceNfcTagReplaceRequest(BaseModel):
     tag_payload: str
     label: Optional[str] = "Badge principal"
     tag_type: str = "nfc_uid"
+
+
+class AttendanceNfcCheckInRequest(BaseModel):
+    session_id: UUID
+    tag_payload: str
+
+
+class AttendanceNfcCheckInResult(BaseModel):
+    success: bool
+    result: str
+    member_display_name: Optional[str] = None
+    attendance_status: Optional[str] = None
+    message: str
+    recorded_at: Optional[datetime] = None

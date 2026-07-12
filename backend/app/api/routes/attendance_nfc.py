@@ -8,14 +8,30 @@ from app.api.deps import (
     get_user_role_names,
 )
 from app.core.roles import SECRETARIAT_ROLES
+from app.core.config import settings
 from app.db.database import get_db
-from app.models.attendance import AttendanceNfcTag
+from app.models.attendance import (
+    AttendanceExpectedMember,
+    AttendanceNfcTag,
+    AttendanceRecord,
+    AttendanceSession,
+)
+from app.models.pole import PoleMember
+from app.models.project import ProjectMember
 from app.models.user import User
 from app.schemas.attendance import (
+    AttendanceNfcCheckInRequest,
+    AttendanceNfcCheckInResult,
     AttendanceNfcTagEnrollRequest,
     AttendanceNfcTagRead,
     AttendanceNfcTagReplaceRequest,
     AttendanceNfcTagRevokeRequest,
+)
+from app.api.routes.attendance import (
+    _compute_checkin_status,
+    _ensure_expected_members,
+    _notify_record_change,
+    _upsert_record,
 )
 from app.services.attendance_nfc_service import (
     ACTIVE_NFC_TAG_STATUS,
@@ -29,6 +45,113 @@ from app.services.audit_service import create_audit_log, get_client_ip
 
 
 router = APIRouter(prefix="/attendance/nfc", tags=["Presences NFC"])
+POLE_MANAGER_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
+PROJECT_MANAGER_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
+
+
+def _display_user(user: User | None) -> str | None:
+    if not user:
+        return None
+    return f"{user.first_name} {user.last_name}".strip() or user.email
+
+
+def _nfc_scan_message(result: str, attendance_status: str | None = None) -> str:
+    if result == "present" or attendance_status == "present":
+        return "Presence enregistree par NFC."
+    if result == "late" or attendance_status == "late":
+        return "Retard enregistre par NFC."
+    messages = {
+        "already_recorded": "Ce membre a deja ete pointe.",
+        "unknown_tag": "Badge NFC inconnu.",
+        "revoked_tag": "Badge NFC revoque ou inactif.",
+        "session_closed": "Cette seance est fermee.",
+        "not_eligible": "Ce membre n'est pas attendu pour cette seance.",
+        "nfc_disabled": "Le pointage NFC est desactive.",
+    }
+    return messages.get(result, "Pointage NFC indisponible.")
+
+
+def _nfc_scan_result(
+    result: str,
+    *,
+    success: bool = False,
+    member: User | None = None,
+    attendance_status: str | None = None,
+    recorded_at: datetime | None = None,
+) -> AttendanceNfcCheckInResult:
+    return AttendanceNfcCheckInResult(
+        success=success,
+        result=result,
+        member_display_name=_display_user(member),
+        attendance_status=attendance_status,
+        message=_nfc_scan_message(result, attendance_status),
+        recorded_at=recorded_at,
+    )
+
+
+def _can_manage_session(db: Session, current_user: User, session: AttendanceSession):
+    roles = get_user_role_names(db, current_user.id)
+    if roles.intersection(SECRETARIAT_ROLES):
+        return True
+    if session.created_by == current_user.id:
+        return True
+    if session.pole_id:
+        pole_manager = (
+            db.query(PoleMember.id)
+            .filter(
+                PoleMember.user_id == current_user.id,
+                PoleMember.pole_id == session.pole_id,
+                PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
+                PoleMember.position.in_(POLE_MANAGER_POSITIONS),
+            )
+            .first()
+        )
+        if pole_manager:
+            return True
+    if session.project_id:
+        project_manager = (
+            db.query(ProjectMember.id)
+            .filter(
+                ProjectMember.user_id == current_user.id,
+                ProjectMember.project_id == session.project_id,
+                ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
+                ProjectMember.position.in_(PROJECT_MANAGER_POSITIONS),
+            )
+            .first()
+        )
+        if project_manager:
+            return True
+    return False
+
+
+def _audit_nfc_check_in(
+    db: Session,
+    *,
+    request: Request,
+    current_user: User,
+    result: str,
+    session: AttendanceSession | None = None,
+    tag: AttendanceNfcTag | None = None,
+    record: AttendanceRecord | None = None,
+) -> None:
+    create_audit_log(
+        db,
+        action="attendance_nfc_check_in",
+        user_id=current_user.id,
+        entity_type="attendance_session",
+        entity_id=session.id if session else None,
+        new_value={
+            "result": result,
+            "source": "nfc",
+            "member_id": str(tag.member_id) if tag else None,
+            "tag_id": str(tag.id) if tag else None,
+            "masked_tag": mask_nfc_tag_hash(tag.tag_uid_hash) if tag else None,
+            "record_id": str(record.id) if record else None,
+        },
+        ip_address=get_client_ip(request),
+    )
 
 
 def _require_nfc_manager(db: Session, current_user: User) -> None:
@@ -153,6 +276,181 @@ def _create_tag(
     db.add(tag)
     db.flush()
     return tag
+
+
+@router.post("/check-in", response_model=AttendanceNfcCheckInResult)
+def nfc_check_in(
+    payload: AttendanceNfcCheckInRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    session = (
+        db.query(AttendanceSession)
+        .filter(AttendanceSession.id == payload.session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Seance de presence introuvable",
+        )
+    if not _can_manage_session(db, current_user, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission insuffisante pour pointer cette seance",
+        )
+
+    if not settings.ATTENDANCE_NFC_ENABLED:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="nfc_disabled",
+            session=session,
+        )
+        db.commit()
+        return _nfc_scan_result("nfc_disabled")
+
+    try:
+        tag_uid_hash = hash_nfc_tag_payload(payload.tag_payload)
+    except ValueError:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="unknown_tag",
+            session=session,
+        )
+        db.commit()
+        return _nfc_scan_result("unknown_tag")
+
+    tag = (
+        db.query(AttendanceNfcTag)
+        .filter(AttendanceNfcTag.tag_uid_hash == tag_uid_hash)
+        .order_by(AttendanceNfcTag.created_at.desc())
+        .first()
+    )
+    if not tag:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="unknown_tag",
+            session=session,
+        )
+        db.commit()
+        return _nfc_scan_result("unknown_tag")
+
+    member = db.query(User).filter(User.id == tag.member_id).first()
+    if tag.status != ACTIVE_NFC_TAG_STATUS:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="revoked_tag",
+            session=session,
+            tag=tag,
+        )
+        db.commit()
+        return _nfc_scan_result("revoked_tag", member=member)
+
+    now = datetime.utcnow()
+    if (
+        session.is_closed
+        or session.status != "open"
+        or (session.checkin_start and now < session.checkin_start)
+        or (session.checkin_end and now > session.checkin_end)
+    ):
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="session_closed",
+            session=session,
+            tag=tag,
+        )
+        db.commit()
+        return _nfc_scan_result("session_closed", member=member)
+
+    _ensure_expected_members(db, session)
+    expected = (
+        db.query(AttendanceExpectedMember.id)
+        .filter(
+            AttendanceExpectedMember.session_id == session.id,
+            AttendanceExpectedMember.user_id == tag.member_id,
+        )
+        .first()
+    )
+    if not expected:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="not_eligible",
+            session=session,
+            tag=tag,
+        )
+        db.commit()
+        return _nfc_scan_result("not_eligible", member=member)
+
+    existing = (
+        db.query(AttendanceRecord)
+        .filter(
+            AttendanceRecord.session_id == session.id,
+            AttendanceRecord.user_id == tag.member_id,
+        )
+        .first()
+    )
+    if existing and existing.status != "not_recorded":
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="already_recorded",
+            session=session,
+            tag=tag,
+            record=existing,
+        )
+        db.commit()
+        return _nfc_scan_result(
+            "already_recorded",
+            member=member,
+            attendance_status=existing.status,
+            recorded_at=existing.recorded_at,
+        )
+
+    attendance_status = _compute_checkin_status(session, now)
+    record = _upsert_record(
+        db,
+        session,
+        current_user,
+        user_id=tag.member_id,
+        attendance_status=attendance_status,
+        arrival_time=now,
+        source="nfc",
+    )
+    tag.last_used_at = now
+    tag.updated_at = now
+    _notify_record_change(db, record, session)
+    _audit_nfc_check_in(
+        db,
+        request=request,
+        current_user=current_user,
+        result=attendance_status,
+        session=session,
+        tag=tag,
+        record=record,
+    )
+    db.commit()
+    db.refresh(record)
+    return _nfc_scan_result(
+        attendance_status,
+        success=True,
+        member=member,
+        attendance_status=attendance_status,
+        recorded_at=record.recorded_at,
+    )
 
 
 @router.post("/tags/enroll", response_model=AttendanceNfcTagRead)
