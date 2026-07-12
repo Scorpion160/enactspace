@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Numeric
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -174,3 +184,58 @@ class AttendanceRecord(Base):
     @property
     def arrival_time(self):
         return self.checkin_time
+
+
+class AttendanceNfcTag(Base):
+    __tablename__ = "attendance_nfc_tags"
+    __table_args__ = (
+        Index(
+            "ux_attendance_nfc_tags_active_hash",
+            "tag_uid_hash",
+            unique=True,
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
+        ),
+        Index(
+            "ux_attendance_nfc_tags_active_member",
+            "member_id",
+            unique=True,
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    member_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    tag_uid_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    tag_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tag_type: Mapped[str] = mapped_column(String(40), default="nfc_uid")
+    status: Mapped[str] = mapped_column(String(40), default="active")
+
+    assigned_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    revoked_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

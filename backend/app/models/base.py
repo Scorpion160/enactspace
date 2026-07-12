@@ -10,6 +10,7 @@ from app.models.attendance import (
     AttendanceSession,
     AttendanceExpectedMember,
     AttendanceRecord,
+    AttendanceNfcTag,
 )
 from app.models.finance import (
     FinancialAccount,
