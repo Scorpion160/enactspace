@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     ATTENDANCE_QR_REQUIRE_SESSION_PIN: bool = False
     ATTENDANCE_QR_REQUIRE_LOCATION_CHECK: bool = False
 
+    ATTENDANCE_NFC_ENABLED: bool = True
+    ATTENDANCE_NFC_HASH_SECRET: str | None = None
+    ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -62,6 +66,8 @@ class Settings(BaseSettings):
             raise ValueError("ATTENDANCE_QR_ROTATION_SECONDS must be at least 10")
         if self.ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE < 1:
             raise ValueError("ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE must be positive")
+        if self.ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE < 1:
+            raise ValueError("ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE must be positive")
         if self.APP_ENV == "production" and self.ATTENDANCE_QR_ENABLED:
             if not self.ATTENDANCE_QR_SECRET:
                 raise ValueError("ATTENDANCE_QR_SECRET is required in production")
@@ -69,6 +75,23 @@ class Settings(BaseSettings):
                 raise ValueError("ATTENDANCE_QR_SECRET must differ from JWT secret")
             if self.ATTENDANCE_QR_SECRET == "CHANGE_ME":
                 raise ValueError("ATTENDANCE_QR_SECRET must be changed in production")
+        if self.APP_ENV == "production" and self.ATTENDANCE_NFC_ENABLED:
+            if not self.ATTENDANCE_NFC_HASH_SECRET:
+                raise ValueError("ATTENDANCE_NFC_HASH_SECRET is required in production")
+            if self.ATTENDANCE_NFC_HASH_SECRET == self.signing_secret:
+                raise ValueError(
+                    "ATTENDANCE_NFC_HASH_SECRET must differ from JWT secret"
+                )
+            if self.ATTENDANCE_QR_SECRET and (
+                self.ATTENDANCE_NFC_HASH_SECRET == self.ATTENDANCE_QR_SECRET
+            ):
+                raise ValueError(
+                    "ATTENDANCE_NFC_HASH_SECRET must differ from QR secret"
+                )
+            if self.ATTENDANCE_NFC_HASH_SECRET == "CHANGE_ME":
+                raise ValueError(
+                    "ATTENDANCE_NFC_HASH_SECRET must be changed in production"
+                )
         return self
 
     @property
@@ -89,6 +112,10 @@ class Settings(BaseSettings):
     @property
     def attendance_qr_secret(self) -> str:
         return self.ATTENDANCE_QR_SECRET or self.signing_secret
+
+    @property
+    def attendance_nfc_hash_secret(self) -> str:
+        return self.ATTENDANCE_NFC_HASH_SECRET or self.signing_secret
 
     @property
     def email_enabled(self) -> bool:

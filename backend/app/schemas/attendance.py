@@ -216,3 +216,40 @@ class AttendanceQrScanResult(BaseModel):
     attendance_status: Optional[str] = None
     message: str
     recorded_at: Optional[datetime] = None
+
+
+class AttendanceNfcTagEnrollRequest(BaseModel):
+    member_id: UUID
+    tag_payload: str
+    label: Optional[str] = "Badge principal"
+    tag_type: str = "nfc_uid"
+    replace_existing: bool = True
+
+
+class AttendanceNfcTagRead(BaseModel):
+    id: UUID
+    member_id: UUID
+    tag_label: Optional[str] = None
+    tag_type: str
+    status: str
+    masked_tag: str
+    assigned_by_id: Optional[UUID] = None
+    assigned_at: datetime
+    revoked_by_id: Optional[UUID] = None
+    revoked_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AttendanceNfcTagRevokeRequest(BaseModel):
+    status: str = "revoked"
+
+
+class AttendanceNfcTagReplaceRequest(BaseModel):
+    tag_payload: str
+    label: Optional[str] = "Badge principal"
+    tag_type: str = "nfc_uid"

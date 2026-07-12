@@ -14,6 +14,7 @@ from app.api.routes import (
     projects,
     events,
     attendance,
+    attendance_nfc,
     finance,
     tasks,
     files,
@@ -113,6 +114,7 @@ app.include_router(poles.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(attendance.router, prefix="/api")
+app.include_router(attendance_nfc.router, prefix="/api")
 app.include_router(finance.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
