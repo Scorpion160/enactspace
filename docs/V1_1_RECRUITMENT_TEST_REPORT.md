@@ -47,6 +47,12 @@
 - Colonnes exportées alignées sur le besoin recrutement.
 - Données exportées non incluses dans la documentation.
 
+## Tranche: responsive et audit permissions
+
+- Audit permissions créé dans `docs/recruitment_permissions_audit.md`.
+- Routes publiques et internes documentées.
+- Contrôles responsive documentés pour formulaire, suivi, liste et filtres.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK
