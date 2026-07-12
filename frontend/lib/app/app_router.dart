@@ -5,6 +5,7 @@ import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/archives/screens/archives_screen.dart';
+import '../features/attendance/screens/attendance_qr_scanner_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
@@ -103,6 +104,10 @@ class AppRouter {
           GoRoute(
             path: '/attendance',
             builder: (context, state) => const AttendanceScreen(),
+          ),
+          GoRoute(
+            path: '/attendance/scan',
+            builder: (context, state) => const AttendanceQrScannerScreen(),
           ),
           GoRoute(
             path: '/tasks',

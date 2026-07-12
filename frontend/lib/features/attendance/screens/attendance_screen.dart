@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -243,6 +244,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               records: _myRecords,
               sessions: _sessions,
               onRefresh: _loadSessions,
+              onScanQr: () => context.push('/attendance/scan'),
               onSubmitJustification: _submitJustification,
             )
           else
@@ -261,6 +263,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         scheduledSoon: _scheduledSoonCount,
         onRefresh: _loadSessions,
         onCreate: _openCreateSessionDialog,
+        onScanQr: () => context.push('/attendance/scan'),
       ),
       const SizedBox(height: 22),
       if (_stats != null) ...[
@@ -478,12 +481,14 @@ class _PersonalAttendanceView extends StatelessWidget {
   final List<AttendanceRecordModel> records;
   final List<AttendanceSessionModel> sessions;
   final VoidCallback onRefresh;
+  final VoidCallback onScanQr;
   final ValueChanged<AttendanceRecordModel> onSubmitJustification;
 
   const _PersonalAttendanceView({
     required this.records,
     required this.sessions,
     required this.onRefresh,
+    required this.onScanQr,
     required this.onSubmitJustification,
   });
 
@@ -561,6 +566,15 @@ class _PersonalAttendanceView extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
+                  ElevatedButton.icon(
+                    onPressed: onScanQr,
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: const Text('Scanner QR'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.enactusYellow,
+                      foregroundColor: AppTheme.softBlack,
+                    ),
+                  ),
                   _PersonalMetric(label: 'Assiduité', value: '$rate%'),
                   _PersonalMetric(label: 'Présences', value: '$present'),
                   _PersonalMetric(label: 'Retards', value: '$late'),
@@ -810,6 +824,7 @@ class _AttendanceHeader extends StatelessWidget {
   final int scheduledSoon;
   final VoidCallback onRefresh;
   final VoidCallback onCreate;
+  final VoidCallback onScanQr;
 
   const _AttendanceHeader({
     required this.total,
@@ -818,6 +833,7 @@ class _AttendanceHeader extends StatelessWidget {
     required this.scheduledSoon,
     required this.onRefresh,
     required this.onCreate,
+    required this.onScanQr,
   });
 
   @override
@@ -832,6 +848,11 @@ class _AttendanceHeader extends StatelessWidget {
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onScanQr,
+          icon: const Icon(Icons.qr_code_scanner_rounded),
+          label: const Text('Scanner QR'),
         ),
         ElevatedButton.icon(
           onPressed: onCreate,

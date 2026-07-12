@@ -63,6 +63,32 @@ class AttendanceQrStatusModel {
   int get scannedCount => presentCount + lateCount;
 }
 
+class AttendanceQrScanResultModel {
+  final bool success;
+  final String result;
+  final String? attendanceStatus;
+  final String message;
+  final DateTime? recordedAt;
+
+  const AttendanceQrScanResultModel({
+    required this.success,
+    required this.result,
+    this.attendanceStatus,
+    required this.message,
+    this.recordedAt,
+  });
+
+  factory AttendanceQrScanResultModel.fromJson(Map<String, dynamic> json) {
+    return AttendanceQrScanResultModel(
+      success: json['success'] == true,
+      result: json['result']?.toString() ?? 'unknown',
+      attendanceStatus: json['attendance_status']?.toString(),
+      message: json['message']?.toString() ?? 'Pointage QR traite.',
+      recordedAt: DateTime.tryParse(json['recorded_at']?.toString() ?? ''),
+    );
+  }
+}
+
 int _asInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.round();

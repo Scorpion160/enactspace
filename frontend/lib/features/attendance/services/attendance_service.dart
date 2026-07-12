@@ -340,6 +340,26 @@ class AttendanceService {
     throw Exception('Statut QR indisponible.');
   }
 
+  Future<AttendanceQrScanResultModel> scanQrToken(String qrToken) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecte.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/attendance/scan-qr',
+      token: token,
+      data: {'token': qrToken},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return AttendanceQrScanResultModel.fromJson(response);
+    }
+
+    throw Exception('Scan QR invalide.');
+  }
+
   Future<AttendanceRecordModel> submitJustification({
     required String recordId,
     required String reason,
