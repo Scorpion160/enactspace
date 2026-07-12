@@ -19,6 +19,10 @@ from app.models.finance import (
     PaymentAllocation,
     ClubTransaction,
 )
+from app.models.mobile_money import (
+    MobileMoneyTransaction,
+    MobileMoneyTransactionEvent,
+)
 from app.models.task import (
     Task,
     TaskAssignee,
