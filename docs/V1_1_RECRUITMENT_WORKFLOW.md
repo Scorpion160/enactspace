@@ -32,3 +32,7 @@ Le suivi public affiche seulement les informations utiles au candidat. Les notes
 ## Suivi candidature
 
 Le portail public accepte le code `ESP-AAAA-XXXXXXXX` et reste compatible avec les anciennes références UUID. Il affiche le statut, la date de soumission, la dernière mise à jour, la prochaine étape, les informations publiques d'entretien si disponibles et le résultat final lorsque la décision est terminée.
+
+## Évaluation et sélection
+
+La liste interne des candidatures peut être filtrée par campagne, statut, recherche, genre, pôle souhaité, projet d'intérêt, département et classe. Les évaluateurs autorisés peuvent ajouter un score sur 20, une note interne et un avis `favorable`, `reserve` ou `defavorable`.

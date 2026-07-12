@@ -14,6 +14,12 @@ class RecruitmentScreen extends StatefulWidget {
 class _RecruitmentScreenState extends State<RecruitmentScreen> {
   final RecruitmentService _service = RecruitmentService();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _poleFilterController = TextEditingController();
+  final TextEditingController _projectFilterController =
+      TextEditingController();
+  final TextEditingController _departmentFilterController =
+      TextEditingController();
+  final TextEditingController _classFilterController = TextEditingController();
 
   bool _loading = true;
   bool _anonymousReview = false;
@@ -24,6 +30,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
 
   String _selectedCampaign = 'all';
   String _selectedStatus = 'all';
+  String _selectedGender = 'all';
 
   @override
   void initState() {
@@ -34,6 +41,10 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _poleFilterController.dispose();
+    _projectFilterController.dispose();
+    _departmentFilterController.dispose();
+    _classFilterController.dispose();
     super.dispose();
   }
 
@@ -50,6 +61,11 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
         campaignId: _selectedCampaign,
         status: _selectedStatus,
         search: _searchController.text,
+        preferredPole: _poleFilterController.text,
+        projectInterest: _projectFilterController.text,
+        department: _departmentFilterController.text,
+        className: _classFilterController.text,
+        gender: _selectedGender,
         anonymized: _anonymousReview,
       );
 
@@ -281,6 +297,11 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             campaigns: _campaigns,
             selectedCampaign: _selectedCampaign,
             selectedStatus: _selectedStatus,
+            selectedGender: _selectedGender,
+            poleController: _poleFilterController,
+            projectController: _projectFilterController,
+            departmentController: _departmentFilterController,
+            classController: _classFilterController,
             anonymousReview: _anonymousReview,
             onCampaignChanged: (value) async {
               setState(() => _selectedCampaign = value);
@@ -288,6 +309,10 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             },
             onStatusChanged: (value) async {
               setState(() => _selectedStatus = value);
+              await _loadRecruitment();
+            },
+            onGenderChanged: (value) async {
+              setState(() => _selectedGender = value);
               await _loadRecruitment();
             },
             onAnonymousChanged: (value) async {
@@ -575,9 +600,15 @@ class _RecruitmentFilters extends StatelessWidget {
   final List<RecruitmentCampaignModel> campaigns;
   final String selectedCampaign;
   final String selectedStatus;
+  final String selectedGender;
+  final TextEditingController poleController;
+  final TextEditingController projectController;
+  final TextEditingController departmentController;
+  final TextEditingController classController;
   final bool anonymousReview;
   final ValueChanged<String> onCampaignChanged;
   final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onGenderChanged;
   final ValueChanged<bool> onAnonymousChanged;
   final VoidCallback onSearch;
 
@@ -586,9 +617,15 @@ class _RecruitmentFilters extends StatelessWidget {
     required this.campaigns,
     required this.selectedCampaign,
     required this.selectedStatus,
+    required this.selectedGender,
+    required this.poleController,
+    required this.projectController,
+    required this.departmentController,
+    required this.classController,
     required this.anonymousReview,
     required this.onCampaignChanged,
     required this.onStatusChanged,
+    required this.onGenderChanged,
     required this.onAnonymousChanged,
     required this.onSearch,
   });
@@ -604,6 +641,7 @@ class _RecruitmentFilters extends StatelessWidget {
             final searchWidth = isCompact ? constraints.maxWidth : 280.0;
             final campaignWidth = isCompact ? constraints.maxWidth : 260.0;
             final statusWidth = isCompact ? constraints.maxWidth : 230.0;
+            final textFilterWidth = isCompact ? constraints.maxWidth : 180.0;
             final switchWidth = isCompact ? constraints.maxWidth : 250.0;
 
             return Wrap(
@@ -695,6 +733,47 @@ class _RecruitmentFilters extends StatelessWidget {
                   ),
                 ),
                 SizedBox(
+                  width: statusWidth,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: selectedGender,
+                    decoration: const InputDecoration(labelText: 'Genre'),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Tous')),
+                      DropdownMenuItem(value: 'femme', child: Text('Femme')),
+                      DropdownMenuItem(value: 'homme', child: Text('Homme')),
+                      DropdownMenuItem(value: 'autre', child: Text('Autre')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onGenderChanged(value);
+                    },
+                  ),
+                ),
+                _RecruitmentTextFilter(
+                  width: textFilterWidth,
+                  controller: poleController,
+                  label: 'Pôle souhaité',
+                  onSearch: onSearch,
+                ),
+                _RecruitmentTextFilter(
+                  width: textFilterWidth,
+                  controller: projectController,
+                  label: 'Projet',
+                  onSearch: onSearch,
+                ),
+                _RecruitmentTextFilter(
+                  width: textFilterWidth,
+                  controller: departmentController,
+                  label: 'Département',
+                  onSearch: onSearch,
+                ),
+                _RecruitmentTextFilter(
+                  width: textFilterWidth,
+                  controller: classController,
+                  label: 'Classe',
+                  onSearch: onSearch,
+                ),
+                SizedBox(
                   width: switchWidth,
                   child: SwitchListTile(
                     value: anonymousReview,
@@ -712,6 +791,40 @@ class _RecruitmentFilters extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _RecruitmentTextFilter extends StatelessWidget {
+  final double width;
+  final TextEditingController controller;
+  final String label;
+  final VoidCallback onSearch;
+
+  const _RecruitmentTextFilter({
+    required this.width,
+    required this.controller,
+    required this.label,
+    required this.onSearch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          suffixIcon: IconButton(
+            tooltip: 'Filtrer',
+            onPressed: onSearch,
+            icon: const Icon(Icons.filter_alt_rounded),
+          ),
+        ),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => onSearch(),
       ),
     );
   }
@@ -1142,6 +1255,12 @@ class _ApplicationCard extends StatelessWidget {
                 Chip(label: Text(application.stabilityLabel)),
                 if (application.department != null)
                   Chip(label: Text(application.department!)),
+                if (application.className?.trim().isNotEmpty == true)
+                  Chip(label: Text(application.className!.trim())),
+                if (application.preferredPole?.trim().isNotEmpty == true)
+                  Chip(label: Text(application.preferredPole!.trim())),
+                if (application.projectInterest?.trim().isNotEmpty == true)
+                  Chip(label: Text(application.projectInterest!.trim())),
                 if (application.isConverted)
                   const Chip(label: Text('Compte créé')),
               ],
@@ -2130,6 +2249,7 @@ class ReviewApplicationDialog extends StatefulWidget {
 class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
   final _scoreController = TextEditingController(text: '15');
   final _commentController = TextEditingController();
+  String _recommendation = 'reserve';
 
   bool _loading = false;
   String? _error;
@@ -2161,7 +2281,7 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
         applicationId: widget.application.id,
         score: score,
         comment: _commentController.text,
-        recommendation: 'reserve',
+        recommendation: _recommendation,
       );
 
       if (!mounted) return;
@@ -2198,6 +2318,29 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
                 suffixText: '/20',
                 prefixIcon: Icon(Icons.star_rounded),
               ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _recommendation,
+              decoration: const InputDecoration(
+                labelText: 'Avis',
+                prefixIcon: Icon(Icons.how_to_vote_rounded),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'favorable', child: Text('Favorable')),
+                DropdownMenuItem(value: 'reserve', child: Text('Réservé')),
+                DropdownMenuItem(
+                  value: 'defavorable',
+                  child: Text('Défavorable'),
+                ),
+              ],
+              onChanged: _loading
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        setState(() => _recommendation = value);
+                      }
+                    },
             ),
             const SizedBox(height: 14),
             TextFormField(

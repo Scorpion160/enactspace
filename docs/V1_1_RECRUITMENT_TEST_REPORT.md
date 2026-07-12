@@ -17,6 +17,13 @@
 - Résultat final public pour `accepted`, `rejected`, `waiting_list` et `cancelled`.
 - Notes internes, scores et avis non exposés au candidat.
 
+## Tranche: évaluation et sélection
+
+- Filtres backend ajoutés: pôle souhaité, projet d'intérêt, département, classe, genre et dates de soumission.
+- Filtres frontend ajoutés: genre, pôle souhaité, projet, département et classe.
+- Dialogue d'évaluation enrichi avec avis favorable/réservé/défavorable.
+- Les cartes candidat affichent les critères utiles au tri quand ils sont disponibles.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK

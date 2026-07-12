@@ -75,6 +75,13 @@ class RecruitmentService {
     String? campaignId,
     String? status,
     String? search,
+    String? preferredPole,
+    String? projectInterest,
+    String? department,
+    String? className,
+    String? gender,
+    DateTime? submittedFrom,
+    DateTime? submittedTo,
     bool anonymized = false,
   }) async {
     final token = await _authService.getToken();
@@ -93,6 +100,25 @@ class RecruitmentService {
     if (search != null && search.trim().isNotEmpty) {
       params['search'] = search.trim();
     }
+    if (preferredPole != null && preferredPole.trim().isNotEmpty) {
+      params['preferred_pole'] = preferredPole.trim();
+    }
+    if (projectInterest != null && projectInterest.trim().isNotEmpty) {
+      params['project_interest'] = projectInterest.trim();
+    }
+    if (department != null && department.trim().isNotEmpty) {
+      params['department'] = department.trim();
+    }
+    if (className != null && className.trim().isNotEmpty) {
+      params['class_name'] = className.trim();
+    }
+    if (gender != null && gender.trim().isNotEmpty && gender != 'all') {
+      params['gender'] = gender.trim();
+    }
+    final from = _formatDate(submittedFrom);
+    final to = _formatDate(submittedTo);
+    if (from != null) params['submitted_from'] = from;
+    if (to != null) params['submitted_to'] = to;
     if (anonymized) {
       params['anonymized'] = 'true';
     }

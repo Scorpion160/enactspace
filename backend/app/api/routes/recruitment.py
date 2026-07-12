@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -568,6 +568,13 @@ def list_applications(
     campaign_id: str | None = Query(default=None),
     status_filter: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    preferred_pole: str | None = Query(default=None),
+    project_interest: str | None = Query(default=None),
+    department: str | None = Query(default=None),
+    class_name: str | None = Query(default=None),
+    gender: str | None = Query(default=None),
+    submitted_from: date | None = Query(default=None),
+    submitted_to: date | None = Query(default=None),
     anonymized: bool = Query(default=False),
 ):
     query = db.query(Application)
@@ -594,6 +601,23 @@ def list_applications(
             (Application.email.ilike(pattern)) |
             (Application.department.ilike(pattern))
         )
+
+    text_filters = {
+        Application.preferred_pole: preferred_pole,
+        Application.project_interest: project_interest,
+        Application.department: department,
+        Application.class_name: class_name,
+        Application.gender: gender,
+    }
+    for column, value in text_filters.items():
+        if value and value.strip():
+            query = query.filter(column.ilike(f"%{value.strip()}%"))
+
+    if submitted_from:
+        query = query.filter(Application.created_at >= submitted_from)
+
+    if submitted_to:
+        query = query.filter(Application.created_at < submitted_to + timedelta(days=1))
 
     applications = query.order_by(Application.created_at.desc()).all()
     return [
