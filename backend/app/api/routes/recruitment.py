@@ -1,7 +1,10 @@
 from datetime import date, datetime, timedelta
+import csv
+from io import StringIO
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -718,6 +721,72 @@ def list_applications(
         )
         for application in applications
     ]
+
+
+@router.get("/applications/export.csv")
+def export_applications_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_recruitment_access),
+):
+    del current_user
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "Nom",
+            "Prénom",
+            "Genre",
+            "Email",
+            "Téléphone",
+            "Classe",
+            "Département",
+            "Pôle souhaité",
+            "Projet d'intérêt",
+            "Statut",
+            "Score",
+            "Avis",
+            "Date soumission",
+            "Date entretien",
+            "Décision",
+        ]
+    )
+
+    applications = db.query(Application).order_by(Application.created_at.desc()).all()
+    for application in applications:
+        latest_review = (
+            db.query(ApplicationReview)
+            .filter(ApplicationReview.application_id == application.id)
+            .order_by(ApplicationReview.updated_at.desc())
+            .first()
+        )
+        status_value = normalize_application_status(application.status)
+        writer.writerow(
+            [
+                application.last_name,
+                application.first_name,
+                application.gender,
+                application.email,
+                application.phone,
+                application.class_name,
+                application.department,
+                application.preferred_pole,
+                application.project_interest,
+                status_value,
+                application.final_score,
+                latest_review.recommendation if latest_review else "",
+                application.created_at.isoformat() if application.created_at else "",
+                application.interview_at.isoformat() if application.interview_at else "",
+                APPLICATION_FINAL_RESULTS.get(status_value, ""),
+            ]
+        )
+
+    output.seek(0)
+    headers = {"Content-Disposition": "attachment; filename=recrutement.csv"}
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
 
 
 @router.get("/applications/{application_id}", response_model=ApplicationRead)

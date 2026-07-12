@@ -144,6 +144,16 @@ class RecruitmentService {
         .toList();
   }
 
+  Future<String> exportApplicationsCsv() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    return _apiClient.getText(
+      '/recruitment/applications/export.csv',
+      token: token,
+    );
+  }
+
   Future<ApplicationModel> createApplication({
     required String campaignId,
     required String firstName,

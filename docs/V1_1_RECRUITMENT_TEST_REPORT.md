@@ -40,6 +40,13 @@
 - Protection doublon conservée via `converted_user_id` et email existant.
 - Parcours Academy Nouveau membre conservé côté frontend après conversion.
 
+## Tranche: dashboard et exports
+
+- Endpoint CSV protégé ajouté.
+- Export CSV accessible depuis l'écran recrutement.
+- Colonnes exportées alignées sur le besoin recrutement.
+- Données exportées non incluses dans la documentation.
+
 ## Vérifications à rejouer
 
 - `flutter analyze --no-pub` : OK

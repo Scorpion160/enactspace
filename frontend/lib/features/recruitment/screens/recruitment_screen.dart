@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
 import '../../poles/services/poles_service.dart';
@@ -263,6 +264,27 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
     }
   }
 
+  Future<void> _exportCsv() async {
+    try {
+      final csv = await _service.exportApplicationsCsv();
+      await Clipboard.setData(ClipboardData(text: csv));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Export CSV copié dans le presse-papiers.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
   int get _receivedCount {
     return _applications
         .where((a) => a.status == 'submitted' || a.status == 'received')
@@ -315,6 +337,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
             onRefresh: _loadRecruitment,
             onCreateCampaign: _openCreateCampaignDialog,
             onCreateApplication: _openCreateApplicationDialog,
+            onExportCsv: _exportCsv,
           ),
           const SizedBox(height: 18),
           _RecruitmentFilters(
@@ -388,6 +411,7 @@ class _RecruitmentHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCreateCampaign;
   final VoidCallback onCreateApplication;
+  final VoidCallback onExportCsv;
 
   const _RecruitmentHeader({
     required this.campaigns,
@@ -399,6 +423,7 @@ class _RecruitmentHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onCreateCampaign,
     required this.onCreateApplication,
+    required this.onExportCsv,
   });
 
   @override
@@ -413,6 +438,11 @@ class _RecruitmentHeader extends StatelessWidget {
           onPressed: onRefresh,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Actualiser'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onExportCsv,
+          icon: const Icon(Icons.table_view_rounded),
+          label: const Text('Exporter CSV'),
         ),
         ElevatedButton.icon(
           onPressed: onCreateCampaign,

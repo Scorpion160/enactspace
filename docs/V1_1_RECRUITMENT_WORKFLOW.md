@@ -44,3 +44,7 @@ Les responsables recrutement peuvent programmer un entretien depuis une carte ca
 ## Conversion en membre
 
 Une candidature acceptée peut être convertie explicitement en compte EnactSpace actif. La conversion déduit ou permet de choisir le profil `enacteur` / `enactrice`, ajoute le rôle membre, affecte le pôle cœur, les pôles support et le projet choisis, puis garde l'historique de candidature lié au compte.
+
+## Dashboard et exports
+
+L'écran recrutement affiche les cartes de pilotage globales et propose un export CSV protégé des candidatures. L'export inclut uniquement les champs nécessaires au suivi recrutement et reste réservé aux rôles autorisés.

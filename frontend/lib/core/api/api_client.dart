@@ -97,6 +97,25 @@ class ApiClient {
     return decodeResponse(response);
   }
 
+  Future<String> getText(String path, {String? token}) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl$path'),
+      headers: {
+        'Accept': 'text/csv,text/plain,*/*',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body;
+    }
+
+    throw ApiException(
+      statusCode: response.statusCode,
+      message: 'Erreur serveur ${response.statusCode}',
+    );
+  }
+
   Future<dynamic> delete(String path, {String? token}) async {
     final response = await _client.delete(
       Uri.parse('$baseUrl$path'),
