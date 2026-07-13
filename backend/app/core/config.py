@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = ""
     PUBLIC_API_BASE_URL: str | None = None
     FILE_STORAGE_PATH: str = "uploads"
+    AUTO_CREATE_TABLES: bool | None = None
 
     ENABLE_SEED: bool = True
 
@@ -183,6 +184,12 @@ class Settings(BaseSettings):
         if self.PUSH_ENABLED is not None:
             return self.PUSH_ENABLED
         return self.NOTIFICATION_PUSH_ENABLED
+
+    @property
+    def database_auto_create_tables(self) -> bool:
+        if self.AUTO_CREATE_TABLES is not None:
+            return self.AUTO_CREATE_TABLES
+        return self.APP_ENV != "production"
 
 
 settings = Settings()

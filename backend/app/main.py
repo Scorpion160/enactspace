@@ -67,7 +67,8 @@ app = FastAPI(
 
 @app.on_event("startup")
 def ensure_database_compatibility() -> None:
-    ensure_compatibility_columns()
+    if settings.database_auto_create_tables:
+        ensure_compatibility_columns()
 
 configured_storage_path = Path(settings.FILE_STORAGE_PATH)
 UPLOADS_DIR = (
