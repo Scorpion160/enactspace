@@ -2,6 +2,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/fee_model.dart';
 import '../models/financial_account_model.dart';
+import '../models/mobile_money_admin_summary_model.dart';
 import '../models/mobile_money_transaction_model.dart';
 import '../models/payment_model.dart';
 
@@ -230,6 +231,22 @@ class FinanceService {
     }
 
     throw Exception('Reponse invalide lors de la verification du paiement.');
+  }
+
+  Future<MobileMoneyAdminSummaryModel> getMobileMoneyAdminSummary() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecte.');
+
+    final response = await _apiClient.get(
+      '/finance/mobile-money/admin/summary',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MobileMoneyAdminSummaryModel.fromJson(response);
+    }
+
+    throw Exception('Reponse invalide pour le dashboard Mobile Money.');
   }
 
   List<dynamic> _extractList(dynamic response) {

@@ -6,6 +6,7 @@ import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
 import '../models/fee_model.dart';
 import '../models/financial_account_model.dart';
+import '../models/mobile_money_admin_summary_model.dart';
 import '../models/payment_model.dart';
 import '../services/finance_service.dart';
 import '../widgets/mobile_money_payment_sheet.dart';
@@ -32,6 +33,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   List<FinancialAccountModel> _accounts = [];
   List<FeeModel> _fees = [];
   List<PaymentModel> _payments = [];
+  MobileMoneyAdminSummaryModel? _mobileMoneySummary;
   UserExperience? _userExperience;
 
   bool get _canManageFinance => _userExperience?.canManageFinance == true;
@@ -61,6 +63,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       final List<FinancialAccountModel> accounts;
       final List<FeeModel> fees;
       final List<PaymentModel> payments;
+      MobileMoneyAdminSummaryModel? mobileMoneySummary;
 
       if (user.canManageFinance) {
         final results = await Future.wait([
@@ -68,11 +71,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
           _financeService.getAccounts(),
           _financeService.getFees(),
           _financeService.getPayments(),
+          _financeService.getMobileMoneyAdminSummary(),
         ]);
         members = results[0] as List<MemberModel>;
         accounts = results[1] as List<FinancialAccountModel>;
         fees = results[2] as List<FeeModel>;
         payments = results[3] as List<PaymentModel>;
+        mobileMoneySummary = results[4] as MobileMoneyAdminSummaryModel;
       } else {
         final results = await Future.wait([
           _financeService.getMyAccount(),
@@ -83,6 +88,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         accounts = [results[0] as FinancialAccountModel];
         fees = results[1] as List<FeeModel>;
         payments = results[2] as List<PaymentModel>;
+        mobileMoneySummary = null;
       }
 
       if (!mounted) return;
@@ -93,6 +99,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         _accounts = accounts;
         _fees = fees;
         _payments = payments;
+        _mobileMoneySummary = mobileMoneySummary;
       });
     } catch (e) {
       if (!mounted) return;
@@ -437,6 +444,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 totalDue: _totalDue,
               ),
               const SizedBox(height: 18),
+              if (_mobileMoneySummary != null) ...[
+                _MobileMoneyAdminCard(
+                  summary: _mobileMoneySummary!,
+                  memberName: _memberName,
+                ),
+                const SizedBox(height: 18),
+              ],
               _FinanceFiltersCard(
                 controller: _searchController,
                 paymentFilter: _paymentFilter,
@@ -847,6 +861,208 @@ class _FinanceAlertChip extends StatelessWidget {
       label: Text(label),
       backgroundColor: color.withAlpha(20),
       side: BorderSide(color: color.withAlpha(80)),
+    );
+  }
+}
+
+class _MobileMoneyAdminCard extends StatelessWidget {
+  final MobileMoneyAdminSummaryModel summary;
+  final String Function(String userId) memberName;
+
+  const _MobileMoneyAdminCard({
+    required this.summary,
+    required this.memberName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = [
+      _MobileMoneyStatTile(
+        label: 'Aujourd hui',
+        value: summary.todayCount.toString(),
+        icon: Icons.today_rounded,
+        color: AppTheme.softBlack,
+      ),
+      _MobileMoneyStatTile(
+        label: 'En attente',
+        value: summary.pendingCount.toString(),
+        icon: Icons.hourglass_top_rounded,
+        color: Colors.orange.shade800,
+      ),
+      _MobileMoneyStatTile(
+        label: 'Confirmes',
+        value: summary.successfulCount.toString(),
+        icon: Icons.verified_rounded,
+        color: Colors.green.shade700,
+      ),
+      _MobileMoneyStatTile(
+        label: 'Encaisses',
+        value: _money(summary.successfulAmount.toDouble()),
+        icon: Icons.savings_rounded,
+        color: AppTheme.softBlack,
+      ),
+    ];
+
+    return _SectionCard(
+      title: 'Mobile Money',
+      icon: Icons.phone_android_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final count = constraints.maxWidth >= 760 ? 4 : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: tiles.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: count,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: constraints.maxWidth >= 760 ? 2.2 : 1.9,
+                ),
+                itemBuilder: (context, index) => tiles[index],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusPill(
+                label: '${summary.failedCount} echec(s)',
+                color: Colors.red.shade700,
+              ),
+              _StatusPill(
+                label: '${summary.expiredCount} expiree(s)',
+                color: Colors.grey.shade700,
+              ),
+              _StatusPill(
+                label:
+                    'Jour ${_money(summary.todaySuccessfulAmount.toDouble())}',
+                color: Colors.green.shade700,
+              ),
+            ],
+          ),
+          if (summary.recentTransactions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...summary.recentTransactions.take(4).map((transaction) {
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.enactusYellow.withValues(
+                    alpha: 0.2,
+                  ),
+                  foregroundColor: AppTheme.softBlack,
+                  child: const Icon(Icons.payments_rounded),
+                ),
+                title: Text(
+                  memberName(transaction.memberId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${transaction.provider} - ${transaction.channel ?? 'checkout'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _money(transaction.amount.toDouble()),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      transaction.status,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileMoneyStatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _MobileMoneyStatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w800),
+      ),
     );
   }
 }

@@ -931,6 +931,82 @@ async def initiate_mobile_money_payment(
     return mobile_money_public_payload(transaction)
 
 
+@router.get("/mobile-money/admin/summary")
+def mobile_money_admin_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    transactions = (
+        db.query(MobileMoneyTransaction)
+        .order_by(MobileMoneyTransaction.created_at.desc())
+        .all()
+    )
+    today_transactions = [
+        transaction
+        for transaction in transactions
+        if transaction.created_at >= today
+    ]
+    successful = [
+        transaction
+        for transaction in transactions
+        if transaction.status == "successful"
+    ]
+    pending = [
+        transaction
+        for transaction in transactions
+        if transaction.status in {"created", "pending", "processing"}
+    ]
+    failed = [
+        transaction
+        for transaction in transactions
+        if transaction.status == "failed"
+    ]
+    expired = [
+        transaction
+        for transaction in transactions
+        if transaction.status == "expired"
+    ]
+    last_reconciliation = (
+        db.query(MobileMoneyTransactionEvent)
+        .filter(MobileMoneyTransactionEvent.event_type == "provider_status")
+        .order_by(MobileMoneyTransactionEvent.processed_at.desc())
+        .first()
+    )
+    return {
+        "today_count": len(today_transactions),
+        "pending_count": len(pending),
+        "successful_count": len(successful),
+        "failed_count": len(failed),
+        "expired_count": len(expired),
+        "successful_amount": sum(
+            int(transaction.amount or 0) for transaction in successful
+        ),
+        "today_successful_amount": sum(
+            int(transaction.amount or 0)
+            for transaction in today_transactions
+            if transaction.status == "successful"
+        ),
+        "last_reconciliation_at": (
+            last_reconciliation.processed_at if last_reconciliation else None
+        ),
+        "recent_transactions": [
+            {
+                "id": transaction.id,
+                "member_id": transaction.member_id,
+                "amount": transaction.amount,
+                "currency": transaction.currency,
+                "provider": transaction.provider,
+                "channel": transaction.channel,
+                "status": transaction.status,
+                "created_at": transaction.created_at,
+                "last_verified_at": transaction.last_verified_at,
+            }
+            for transaction in transactions[:10]
+        ],
+    }
+
+
 @router.post("/mobile-money/reconcile")
 async def reconcile_mobile_money_payments(
     request: Request,
