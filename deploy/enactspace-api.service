@@ -1,0 +1,25 @@
+[Unit]
+Description=EnactSpace API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=enactspace
+Group=enactspace
+WorkingDirectory=/opt/enactspace/app/backend
+EnvironmentFile=/etc/enactspace/enactspace.env
+ExecStart=/opt/enactspace/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/enactspace /var/log/enactspace
+
+[Install]
+WantedBy=multi-user.target
