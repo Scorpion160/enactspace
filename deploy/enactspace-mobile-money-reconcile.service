@@ -1,0 +1,15 @@
+[Unit]
+Description=EnactSpace Mobile Money reconciliation
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=enactspace
+Group=enactspace
+WorkingDirectory=/opt/enactspace/app/backend
+EnvironmentFile=/etc/enactspace/enactspace.env
+ExecStart=/opt/enactspace/venv/bin/python -m app.scripts.reconcile_mobile_money
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/enactspace /var/log/enactspace
