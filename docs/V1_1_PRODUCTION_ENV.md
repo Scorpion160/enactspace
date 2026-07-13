@@ -59,6 +59,24 @@ chmod 600 .env
 
 Les vraies cles PayDunya ne doivent jamais etre commitees, affichees dans Flutter ou exposees dans une reponse API.
 
+## Validation locale
+
+Avant de demarrer le VPS, valider le fichier d'environnement reel sans afficher les secrets:
+
+```bash
+cd /opt/enactspace/app/backend
+python -m app.scripts.validate_environment
+```
+
+Sur Windows local:
+
+```powershell
+cd C:\Users\DIOP\Documents\Enactus\enactspace\backend
+python -m app.scripts.validate_environment
+```
+
+Les valeurs contenant `#`, espaces, virgules ou URL doivent etre entre guillemets dans le `.env` reel. Le script affiche uniquement les erreurs de structure et les noms de variables, jamais les valeurs sensibles.
+
 ## Pointage QR
 
 - `ATTENDANCE_QR_ENABLED`: active ou desactive le pointage par QR.
