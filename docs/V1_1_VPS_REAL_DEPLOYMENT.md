@@ -44,24 +44,27 @@ avant de les consulter davantage. Ces sauvegardes restent hors Git.
 ## 2. Repertoires et compte de service
 
 ```bash
+if ! id enactspace >/dev/null 2>&1; then
+  getent passwd 10001 >/dev/null && {
+    echo "UID 10001 is already allocated; choose a dedicated runtime UID first."
+    exit 1
+  }
+  useradd --system --uid 10001 --create-home --home-dir /opt/enactspace \
+    --shell /usr/sbin/nologin enactspace
+fi
+
 install -d -m 750 -o enactspace -g enactspace /opt/enactspace/app
 install -d -m 750 -o enactspace -g enactspace /opt/enactspace/web
-install -d -m 750 -o 10001 -g 10001 /var/lib/enactspace/uploads
-install -d -m 750 -o 10001 -g 10001 /var/lib/enactspace/import
+install -d -m 750 -o enactspace -g enactspace /var/lib/enactspace/uploads
+install -d -m 750 -o enactspace -g enactspace /var/lib/enactspace/import
 install -d -m 700 -o enactspace -g enactspace /var/backups/enactspace
 install -d -m 750 -o root -g enactspace /etc/enactspace
 ```
 
-Creer d'abord le compte hote uniquement s'il n'existe pas :
-
-```bash
-id enactspace >/dev/null 2>&1 || useradd --system --create-home \
-  --home-dir /opt/enactspace --shell /usr/sbin/nologin enactspace
-```
-
-Le backend tourne non-root sous l'UID `10001` dans son conteneur; les deux
-repertoires montes sont donc volontairement attribues a cet UID. Ne pas changer
-les permissions d'autres dossiers applicatifs.
+Le backend tourne non-root sous l'UID `10001` dans son conteneur. Le compte hote
+utilise donc le meme UID, ce qui rend les repertoires montes accessibles sans
+elargir leurs permissions. Ne pas changer les permissions d'autres dossiers
+applicatifs.
 
 ## 3. Code et secrets
 
