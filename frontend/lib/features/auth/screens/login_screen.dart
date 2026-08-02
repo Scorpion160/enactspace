@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../recruitment/models/application_model.dart';
 import '../../recruitment/screens/recruitment_screen.dart';
 import '../../recruitment/services/recruitment_service.dart';
@@ -61,14 +62,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 920;
+    final isWide = MediaQuery.sizeOf(context).width >= 980;
 
     return Scaffold(
       body: Row(
         children: [
-          if (isWide) const Expanded(flex: 5, child: _BrandPanel()),
+          if (isWide) const Expanded(flex: 4, child: _BrandPanel()),
           Expanded(
-            flex: 4,
+            flex: 5,
             child: _LoginPanel(
               emailController: _emailController,
               passwordController: _passwordController,
@@ -99,8 +100,8 @@ class _BrandPanel extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxHeight < 720;
-            final padding = compact ? 34.0 : 52.0;
-            final logoSize = compact ? 126.0 : 164.0;
+            final padding = compact ? 32.0 : 42.0;
+            final logoSize = compact ? 112.0 : 142.0;
             final minPanelHeight = (constraints.maxHeight - (padding * 2))
                 .clamp(0.0, double.infinity)
                 .toDouble();
@@ -117,12 +118,12 @@ class _BrandPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _BrandMark(size: logoSize, onDark: true),
-                        SizedBox(height: compact ? 24 : 34),
+                        SizedBox(height: compact ? 20 : 28),
                         const Text(
                           'Enactus ESP',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 48,
+                            fontSize: 42,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -135,18 +136,18 @@ class _BrandPanel extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         const Text(
                           'Le QG numérique des Enacteurs: annonces, tâches, '
                           'présences, documents, finance, projets et vie de '
                           'communauté.',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 18,
+                            fontSize: 17,
                             height: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 24),
                         const Wrap(
                           spacing: 10,
                           runSpacing: 10,
@@ -169,10 +170,12 @@ class _BrandPanel extends StatelessWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 28),
+                        const _BrandGeometry(),
                       ],
                     ),
                     Padding(
-                      padding: EdgeInsets.only(top: compact ? 28 : 44),
+                      padding: EdgeInsets.only(top: compact ? 24 : 34),
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -353,139 +356,142 @@ class _LoginPanel extends StatelessWidget {
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            MediaQuery.sizeOf(context).width >= 600 ? 20 : 16,
+            20,
+            28,
+          ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width >= 600 ? 620 : 500,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (showMobileBrand) ...[
                   const _MobileBrandHeader(),
-                  const SizedBox(height: 22),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).width >= 600 ? 18 : 14,
+                  ),
                 ],
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(
-                      MediaQuery.sizeOf(context).width < 420 ? 20 : 28,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Connexion des comptes validés',
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                          ),
+                AppDataCard(
+                  padding: EdgeInsets.all(
+                    MediaQuery.sizeOf(context).width < 420 ? 16 : 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Connexion des comptes validés',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Accède à ton espace Enactus ESP avec ton compte validé.',
-                          style: TextStyle(color: Colors.black54, height: 1.4),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Accède à ton espace Enactus ESP avec ton compte validé.',
+                        style: TextStyle(color: Colors.black54, height: 1.4),
+                      ),
+                      const SizedBox(height: 10),
+                      const _ValidatedAccountHint(),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        const SizedBox(height: 12),
-                        const _ValidatedAccountHint(),
-                        const SizedBox(height: 28),
-                        TextField(
-                          controller: emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: passwordController,
-                          obscureText: obscurePassword,
-                          onSubmitted: (_) => loading ? null : onLogin(),
-                          decoration: InputDecoration(
-                            labelText: 'Mot de passe',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              onPressed: onTogglePassword,
-                              icon: Icon(
-                                obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: obscurePassword,
+                        onSubmitted: (_) => loading ? null : onLogin(),
+                        decoration: InputDecoration(
+                          labelText: 'Mot de passe',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            onPressed: onTogglePassword,
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: loading
-                                ? null
-                                : () => _showForgotPasswordDialog(context),
-                            child: const Text('Mot de passe oublié ?'),
-                          ),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: loading
+                              ? null
+                              : () => _showForgotPasswordDialog(context),
+                          child: const Text('Mot de passe oublié ?'),
                         ),
-                        const SizedBox(height: 18),
-                        if (error != null) ...[
-                          _ErrorBanner(message: error!),
-                          const SizedBox(height: 14),
-                        ],
-                        ElevatedButton.icon(
-                          onPressed: loading ? null : onLogin,
-                          icon: loading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.login_rounded),
-                          label: const Text('Se connecter'),
-                        ),
-                        const SizedBox(height: 20),
-                        const _LoginSectionLabel(
-                          'Créer un compte en attente de validation',
-                        ),
-                        const SizedBox(height: 10),
-                        _AccountRequestActions(
-                          loading: loading,
-                          onCreateMemberAccount: () =>
-                              _showJoinRequestSheet(context),
-                          onCreateAlumniAccount: () => _showJoinRequestSheet(
-                            context,
-                            profileType: 'alumni',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(height: 1),
-                        const SizedBox(height: 12),
-                        const _LoginSectionLabel('Candidature Enactus ESP'),
-                        const SizedBox(height: 8),
-                        _LoginSupportActions(
-                          onRecruitment: () => _showRecruitmentDialog(context),
-                          onTracking: () => context.go('/application-tracking'),
-                          onGuide: () => _showGuideDialog(context),
-                          onBiometric: () => _showBiometricDialog(context),
-                        ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.enactusYellow.withValues(
-                              alpha: 0.16,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Text(
-                            'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (error != null) ...[
+                        _ErrorBanner(message: error!),
+                        const SizedBox(height: 14),
                       ],
-                    ),
+                      ElevatedButton.icon(
+                        onPressed: loading ? null : onLogin,
+                        icon: loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.login_rounded),
+                        label: const Text('Se connecter'),
+                      ),
+                      const SizedBox(height: 12),
+                      const _LoginSectionLabel('Autres accès'),
+                      const SizedBox(height: 6),
+                      _AccountRequestActions(
+                        loading: loading,
+                        onCreateMemberAccount: () =>
+                            _showJoinRequestSheet(context),
+                        onCreateAlumniAccount: () => _showJoinRequestSheet(
+                          context,
+                          profileType: 'alumni',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
+                      const _LoginSectionLabel('Candidature Enactus ESP'),
+                      const SizedBox(height: 8),
+                      _LoginSupportActions(
+                        onRecruitment: () => _showRecruitmentDialog(context),
+                        onTracking: () => context.go('/application-tracking'),
+                        onGuide: () => _showGuideDialog(context),
+                        onBiometric: () => _showBiometricDialog(context),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.enactusYellow.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Text(
+                          'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1456,12 +1462,12 @@ class _MobileBrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        _BrandMark(size: 112),
-        SizedBox(height: 14),
+        _BrandMark(size: 92),
+        SizedBox(height: 10),
         Text(
           'Enactus ESP',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
         ),
         SizedBox(height: 4),
         Text(
@@ -1469,15 +1475,9 @@ class _MobileBrandHeader extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppTheme.softBlack,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'Espace interne des Enacteurs',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.black54),
         ),
       ],
     );
@@ -1561,6 +1561,44 @@ class _BrandPill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BrandGeometry extends StatelessWidget {
+  const _BrandGeometry();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 96,
+      height: 34,
+      child: Stack(
+        children: [
+          _tile(left: 0, top: 8, color: Colors.white24),
+          _tile(left: 26, top: 0, color: AppTheme.enactusYellow),
+          _tile(left: 52, top: 8, color: Colors.white24),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile({
+    required double left,
+    required double top,
+    required Color color,
+  }) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: Transform.rotate(
+        angle: 0.78,
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(border: Border.all(color: color, width: 2)),
+        ),
       ),
     );
   }

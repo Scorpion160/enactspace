@@ -9,7 +9,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pump();
 
-    expect(find.text('Connexion'), findsOneWidget);
+    expect(find.text('Connexion des comptes validés'), findsOneWidget);
     expect(find.text('Se connecter'), findsOneWidget);
   });
 

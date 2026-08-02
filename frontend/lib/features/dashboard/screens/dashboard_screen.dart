@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
-import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../models/dashboard_summary_model.dart';
 import '../services/dashboard_service.dart';
 
@@ -65,7 +65,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onRefresh: _loadDashboard,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final horizontalPadding = constraints.maxWidth < 560 ? 14.0 : 24.0;
+          final horizontalPadding = constraints.maxWidth < 560
+              ? 14.0
+              : constraints.maxWidth >= 1440
+              ? 36.0
+              : 24.0;
 
           return ListView(
             padding: EdgeInsets.fromLTRB(
@@ -77,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
+                  constraints: const BoxConstraints(maxWidth: 1480),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -123,9 +127,14 @@ class _DashboardBody extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 1060;
+        final isAdmin = summary.profile.canViewGlobal;
         final main = Column(
           children: [
-            _SummaryGrid(cards: _metricCards(summary)),
+            if (isAdmin) ...[
+              _AttentionPanel(items: _attentionItems(summary)),
+              const SizedBox(height: 18),
+            ],
+            _SummaryGrid(cards: _metricCards(summary), compactMobile: !isAdmin),
             const SizedBox(height: 18),
             _RoleCardsGrid(cards: _roleCards(summary, userExperience)),
             const SizedBox(height: 18),
@@ -137,11 +146,13 @@ class _DashboardBody extends StatelessWidget {
         );
         final side = Column(
           children: [
-            _AttentionPanel(items: _attentionItems(summary)),
+            if (!isAdmin) ...[
+              _AttentionPanel(items: _attentionItems(summary)),
+              const SizedBox(height: 18),
+            ],
+            _RoleFocusPanel(summary: summary, userExperience: userExperience),
             const SizedBox(height: 18),
             _ActivityPanel(items: summary.recentActivity),
-            const SizedBox(height: 18),
-            _RoleFocusPanel(summary: summary, userExperience: userExperience),
           ],
         );
 
@@ -149,9 +160,9 @@ class _DashboardBody extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 7, child: main),
+              Expanded(flex: 8, child: main),
               const SizedBox(width: 18),
-              Expanded(flex: 4, child: side),
+              Expanded(flex: 5, child: side),
             ],
           );
         }
@@ -180,7 +191,6 @@ class _DashboardHero extends StatelessWidget {
     final profile = summary?.profile;
     final displayName =
         profile?.displayName ?? userExperience?.displayName ?? 'Enacteur';
-    final title = userExperience?.dashboardTitle ?? _titleForProfile(profile);
     final subtitle =
         userExperience?.dashboardSubtitle ?? _subtitleForProfile(profile);
     final unread = summary?.counts.integer('notifications_unread') ?? 0;
@@ -190,194 +200,92 @@ class _DashboardHero extends StatelessWidget {
         : unread + lateTasks == 0
         ? 'Aucune alerte urgente pour le moment.'
         : '${unread + lateTasks} point(s) à suivre aujourd’hui.';
-    final isWide = MediaQuery.sizeOf(context).width >= 820;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: isWide
-          ? Row(
-              children: [
-                const _HeroMark(),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: _HeroText(
-                    title: title,
-                    displayName: displayName,
-                    subtitle: subtitle,
-                    statusText: statusText,
-                  ),
+    final isAdmin = profile?.canViewGlobal == true;
+    return AppDataCard(
+      padding: const EdgeInsets.all(18),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 620;
+          final actions = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              AppPrimaryButton(
+                label: isAdmin ? 'Voir les alertes' : 'Mes taches',
+                icon: isAdmin
+                    ? Icons.priority_high_rounded
+                    : Icons.task_alt_rounded,
+                onPressed: () =>
+                    context.go(isAdmin ? '/notifications' : '/tasks'),
+              ),
+              AppSecondaryButton(
+                label: 'Actualiser',
+                icon: Icons.refresh_rounded,
+                onPressed: onRefresh,
+              ),
+            ],
+          );
+          final heading = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppStatusBadge(
+                label: userExperience?.audienceLabel ?? 'Enactus ESP',
+                tone: AppStatusTone.info,
+              ),
+              const SizedBox(height: 8),
+              Container(width: 34, height: 3, color: AppTheme.enactusYellow),
+              const SizedBox(height: 10),
+              Text(
+                'Bonjour, $displayName',
+                style: TextStyle(
+                  fontSize: compact ? 25 : 32,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(width: 18),
-                _HeroActions(onRefresh: onRefresh),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _HeroMark(),
-                const SizedBox(height: 16),
-                _HeroText(
-                  title: title,
-                  displayName: displayName,
-                  subtitle: subtitle,
-                  statusText: statusText,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppTheme.secondaryText,
+                  height: 1.35,
                 ),
-                const SizedBox(height: 16),
-                _HeroActions(onRefresh: onRefresh),
-              ],
-            ),
-    );
-  }
-}
-
-class _HeroMark extends StatelessWidget {
-  const _HeroMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 62,
-      height: 62,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: unread + lateTasks > 0
+                      ? AppTheme.warning
+                      : AppTheme.success,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          );
+          return compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [heading, const SizedBox(height: 16), actions],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: heading),
+                    const SizedBox(width: 24),
+                    actions,
+                  ],
+                );
+        },
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Image.asset(
-          BrandAssets.icon,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(
-              Icons.dashboard_rounded,
-              color: AppTheme.softBlack,
-              size: 34,
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroText extends StatelessWidget {
-  final String title;
-  final String displayName;
-  final String subtitle;
-  final String statusText;
-
-  const _HeroText({
-    required this.title,
-    required this.displayName,
-    required this.subtitle,
-    required this.statusText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          displayName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppTheme.enactusYellow,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white70, height: 1.35),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _HeroChip(label: statusText),
-            const _HeroChip(label: 'Enactus ESP'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  final String label;
-
-  const _HeroChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final maxWidth = (MediaQuery.sizeOf(context).width - 96).clamp(
-      160.0,
-      360.0,
-    );
-
-    return Chip(
-      label: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-      backgroundColor: Colors.white.withValues(alpha: 0.10),
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
-      labelStyle: const TextStyle(color: Colors.white),
-    );
-  }
-}
-
-class _HeroActions extends StatelessWidget {
-  final VoidCallback onRefresh;
-
-  const _HeroActions({required this.onRefresh});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        OutlinedButton.icon(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () => context.go('/chat'),
-          icon: const Icon(Icons.chat_rounded),
-          label: const Text('Chat'),
-        ),
-      ],
     );
   }
 }
 
 class _SummaryGrid extends StatelessWidget {
   final List<_MetricCardData> cards;
+  final bool compactMobile;
 
-  const _SummaryGrid({required this.cards});
+  const _SummaryGrid({required this.cards, required this.compactMobile});
 
   @override
   Widget build(BuildContext context) {
@@ -387,9 +295,10 @@ class _SummaryGrid extends StatelessWidget {
             ? 4
             : constraints.maxWidth >= 700
             ? 3
-            : constraints.maxWidth >= 480
+            : constraints.maxWidth >= 480 || compactMobile
             ? 2
             : 1;
+        final compact = compactMobile && constraints.maxWidth < 480;
         const spacing = 12.0;
         final width = (constraints.maxWidth - spacing * (count - 1)) / count;
 
@@ -400,7 +309,7 @@ class _SummaryGrid extends StatelessWidget {
             for (final card in cards)
               SizedBox(
                 width: width,
-                child: _MetricCard(data: card),
+                child: _MetricCard(data: card, compact: compact),
               ),
           ],
         );
@@ -429,62 +338,21 @@ class _MetricCardData {
 
 class _MetricCard extends StatelessWidget {
   final _MetricCardData data;
+  final bool compact;
 
-  const _MetricCard({required this.data});
+  const _MetricCard({required this.data, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
-    final color = data.danger ? Colors.red.shade700 : AppTheme.softBlack;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+    return SizedBox(
+      height: compact ? 126 : 158,
+      child: AppMetric(
+        label: data.title,
+        value: data.value,
+        detail: data.subtitle,
+        icon: data.icon,
+        tone: data.danger ? AppStatusTone.warning : AppStatusTone.neutral,
         onTap: () => context.go(data.route),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: data.danger
-                        ? Colors.red.shade50
-                        : AppTheme.enactusYellow,
-                    foregroundColor: color,
-                    child: Icon(data.icon),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      data.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                data.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                data.subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black54, height: 1.25),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1672,14 +1540,6 @@ String _money(double value) {
   }
 
   return '${buffer.toString()} FCFA';
-}
-
-String _titleForProfile(DashboardProfileModel? profile) {
-  if (profile?.isAlumni == true) return 'Espace alumni';
-  if (profile?.canViewGlobal == true) return 'Tableau de bord global';
-  if (profile?.canViewFinance == true) return 'Tableau finance';
-  if (profile?.isEnacchef == true) return 'Pilotage Enacchef';
-  return 'Mon espace Enactus';
 }
 
 String _subtitleForProfile(DashboardProfileModel? profile) {

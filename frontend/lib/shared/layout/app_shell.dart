@@ -260,7 +260,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 900;
+    final isWide = MediaQuery.of(context).size.width >= 1100;
     final title = _navigationTitle(widget.currentPath);
 
     if (isWide) {
@@ -296,19 +296,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            Image.asset(
-              BrandAssets.icon,
-              width: 30,
-              height: 30,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
+        titleSpacing: 8,
+        title: Text(_mobileNavigationTitle(widget.currentPath)),
         actions: [
           _NotificationIconButton(
             unreadNotifications: _unreadNotifications,
@@ -546,7 +535,7 @@ class _SideMenu extends StatelessWidget {
     return Material(
       color: AppTheme.softBlack,
       child: SizedBox(
-        width: compact ? null : 284,
+        width: compact ? null : 232,
         child: SafeArea(
           child: Column(
             children: [
@@ -622,7 +611,7 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           SizedBox(
@@ -699,28 +688,26 @@ class _NavigationTile extends StatelessWidget {
     final mutedForeground = selected ? AppTheme.softBlack : Colors.white70;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected
-            ? AppTheme.enactusYellow
-            : Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
+        color: selected ? AppTheme.enactusYellow : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           onTap: () {
             if (compact) Navigator.of(context).pop();
             context.go(item.path);
           },
           child: Container(
-            height: 52,
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected
-                    ? AppTheme.enactusYellow
-                    : Colors.white.withValues(alpha: 0.05),
-              ),
+              borderRadius: BorderRadius.circular(12),
+              border: selected
+                  ? const Border(
+                      left: BorderSide(color: Colors.white, width: 3),
+                    )
+                  : null,
             ),
             child: Row(
               children: [
@@ -1121,4 +1108,9 @@ String _navigationTitle(String currentPath) {
         orElse: () => const MapEntry('/dashboard', 'EnactSpace'),
       )
       .value;
+}
+
+String _mobileNavigationTitle(String currentPath) {
+  if (_isSelected(currentPath, '/dashboard')) return 'Accueil';
+  return _navigationTitle(currentPath);
 }
