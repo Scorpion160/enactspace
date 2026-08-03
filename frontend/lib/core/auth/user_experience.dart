@@ -233,7 +233,9 @@ class UserExperience {
       routes.add('/finance');
     }
 
-    if (user.canManageAttendance || user.isProjectOrPoleLead) {
+    // Every active Enacteur can consult their own attendance history. The
+    // attendance screen keeps management actions restricted to their roles.
+    if (!user.isAlumni) {
       routes.add('/attendance');
     }
 
@@ -259,6 +261,32 @@ class UserExperience {
     }
 
     return routes.toList();
+  }
+
+  static bool canAccessPath(UserExperience? user, String path) {
+    if (user == null) return false;
+
+    final normalizedPath = path.split('?').first;
+    final canAccessAttendance = user.status == 'active' && !user.isAlumni;
+
+    if (normalizedPath == '/attendance' ||
+        normalizedPath == '/attendance/scan') {
+      return canAccessAttendance;
+    }
+
+    if (normalizedPath == '/attendance/nfc' ||
+        normalizedPath.startsWith('/attendance/nfc/')) {
+      return canAccessAttendance && user.canManageAttendance;
+    }
+
+    if (normalizedPath.startsWith('/attendance/')) {
+      return false;
+    }
+
+    return visibleRoutesFor(user).any(
+      (route) =>
+          normalizedPath == route || normalizedPath.startsWith('$route/'),
+    );
   }
 }
 

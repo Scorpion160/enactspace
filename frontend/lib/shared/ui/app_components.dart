@@ -352,6 +352,136 @@ class AppDataCard extends StatelessWidget {
   );
 }
 
+class AppIdentityCell extends StatelessWidget {
+  const AppIdentityCell({
+    super.key,
+    required this.name,
+    this.subtitle,
+    this.imageUrl,
+    this.trailing,
+  });
+
+  final String name;
+  final String? subtitle;
+  final String? imageUrl;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0].toUpperCase())
+        .join();
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 21,
+          backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.28),
+          foregroundColor: AppTheme.softBlack,
+          backgroundImage: imageUrl == null || imageUrl!.isEmpty
+              ? null
+              : NetworkImage(imageUrl!),
+          child: imageUrl == null || imageUrl!.isEmpty
+              ? Text(
+                  initials.isEmpty ? '?' : initials,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                )
+              : null,
+        ),
+        const SizedBox(width: AppTheme.space12),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              if (subtitle != null && subtitle!.trim().isNotEmpty)
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.secondaryText,
+                    fontSize: 13,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        ..._present(trailing),
+      ],
+    );
+  }
+}
+
+class AppProgressSummary extends StatelessWidget {
+  const AppProgressSummary({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.progress,
+    this.detail,
+  });
+
+  final String label;
+  final String value;
+  final double progress;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = progress.clamp(0.0, 1.0);
+    return AppDataCard(
+      padding: const EdgeInsets.all(AppTheme.space16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: normalized,
+              minHeight: 8,
+              color: AppTheme.enactusYellow,
+              backgroundColor: AppTheme.border,
+            ),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: AppTheme.space8),
+            Text(
+              detail!,
+              style: const TextStyle(
+                color: AppTheme.secondaryText,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
     super.key,

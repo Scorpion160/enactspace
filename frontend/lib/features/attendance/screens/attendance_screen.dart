@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../models/attendance_record_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
@@ -13,7 +14,16 @@ import '../../projects/services/projects_service.dart';
 import 'attendance_session_detail_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
+  const AttendanceScreen({
+    super.key,
+    @visibleForTesting this.testUser,
+    @visibleForTesting this.testSessions,
+    @visibleForTesting this.testRecords,
+  });
+
+  final UserExperience? testUser;
+  final List<AttendanceSessionModel>? testSessions;
+  final List<AttendanceRecordModel>? testRecords;
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -52,6 +62,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _loading = true;
       _error = null;
     });
+
+    final testUser = widget.testUser;
+    if (testUser != null) {
+      setState(() {
+        _user = testUser;
+        _sessions = widget.testSessions ?? const [];
+        _myRecords = widget.testRecords ?? const [];
+        _stats = null;
+        if (!_viewInitialized) {
+          _view = testUser.canManageAttendance ? 'management' : 'personal';
+          _viewInitialized = true;
+        }
+        _loading = false;
+      });
+      return;
+    }
 
     try {
       final results = await Future.wait([
@@ -126,7 +152,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Justifier l absence'),
+          title: const Text('Justifier l\'absence'),
           content: TextField(
             controller: controller,
             minLines: 3,
@@ -162,7 +188,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Justification envoyee.')));
+      ).showSnackBar(const SnackBar(content: Text('Justification envoyée.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -329,12 +355,12 @@ class _AttendanceStatsOverview extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _OverviewItem(
-        label: 'Seances',
+        label: 'Séances',
         value: _value('sessions_count'),
         icon: Icons.event_available_rounded,
       ),
       _OverviewItem(
-        label: 'Presents',
+        label: 'Présents',
         value: _value('present'),
         icon: Icons.check_circle_rounded,
       ),
@@ -508,13 +534,8 @@ class _PersonalAttendanceView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppTheme.softBlack,
-            borderRadius: BorderRadius.circular(24),
-          ),
+        AppDataCard(
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -541,7 +562,7 @@ class _PersonalAttendanceView extends StatelessWidget {
                         Text(
                           'Mon suivi de présence',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppTheme.darkText,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                           ),
@@ -549,7 +570,7 @@ class _PersonalAttendanceView extends StatelessWidget {
                         SizedBox(height: 4),
                         Text(
                           'Mes présences, retards et absences uniquement.',
-                          style: TextStyle(color: Colors.white70),
+                          style: TextStyle(color: AppTheme.secondaryText),
                         ),
                       ],
                     ),
@@ -557,7 +578,7 @@ class _PersonalAttendanceView extends StatelessWidget {
                   IconButton(
                     onPressed: onRefresh,
                     tooltip: 'Actualiser',
-                    color: Colors.white,
+                    color: AppTheme.softBlack,
                     icon: const Icon(Icons.refresh_rounded),
                   ),
                 ],
@@ -620,9 +641,9 @@ class _PersonalMetric extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 112),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(18),
+        color: AppTheme.enactusYellow.withAlpha(30),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: AppTheme.enactusYellow.withAlpha(90)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,12 +651,12 @@ class _PersonalMetric extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              color: AppTheme.enactusYellow,
+              color: AppTheme.softBlack,
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
-          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(label, style: const TextStyle(color: AppTheme.secondaryText)),
         ],
       ),
     );
@@ -870,12 +891,8 @@ class _AttendanceHeader extends StatelessWidget {
       ],
     );
 
-    return Container(
+    return AppDataCard(
       padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: isWide
           ? Row(
               children: [
@@ -959,7 +976,7 @@ class _HeaderText extends StatelessWidget {
         const Text(
           'Présences',
           style: TextStyle(
-            color: Colors.white,
+            color: AppTheme.darkText,
             fontSize: 28,
             fontWeight: FontWeight.w900,
           ),
@@ -967,7 +984,7 @@ class _HeaderText extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           '$total session(s) • $open ouverte(s) • $closed clôturée(s) • $scheduledSoon à venir',
-          style: const TextStyle(color: Colors.white70, height: 1.4),
+          style: const TextStyle(color: AppTheme.secondaryText, height: 1.4),
         ),
       ],
     );
@@ -993,88 +1010,101 @@ class _AttendanceFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 760;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Rechercher une session',
-                prefixIcon: Icon(Icons.search_rounded),
+    return AppFilterBar(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 760;
+          final search = TextField(
+            controller: controller,
+            onChanged: (_) => onChanged(),
+            decoration: const InputDecoration(
+              labelText: 'Rechercher une session',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          );
+          final filters = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _FilterChoice(
+                label: 'Toutes',
+                selected: statusFilter == 'all',
+                onSelected: () => onStatusChanged('all'),
               ),
-            );
-            final filters = Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _FilterChoice(
-                  label: 'Toutes',
-                  selected: statusFilter == 'all',
-                  onSelected: () => onStatusChanged('all'),
-                ),
-                _FilterChoice(
-                  label: 'Ouvertes',
-                  selected: statusFilter == 'open',
-                  onSelected: () => onStatusChanged('open'),
-                ),
-                _FilterChoice(
-                  label: 'Clôturées',
-                  selected: statusFilter == 'closed',
-                  onSelected: () => onStatusChanged('closed'),
-                ),
-                _FilterChoice(
-                  label: 'Planifiées',
-                  selected: statusFilter == 'scheduled',
-                  onSelected: () => onStatusChanged('scheduled'),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Filtrer par type',
-                  onSelected: onTypeChanged,
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'all', child: Text('Tous les types')),
-                    PopupMenuItem(
-                      value: 'general_meeting',
-                      child: Text('Réunions générales'),
-                    ),
-                    PopupMenuItem(
-                      value: 'pole_meeting',
-                      child: Text('Réunions pôle'),
-                    ),
-                    PopupMenuItem(
-                      value: 'project_meeting',
-                      child: Text('Réunions projet'),
-                    ),
-                    PopupMenuItem(value: 'training', child: Text('Formations')),
-                    PopupMenuItem(value: 'activity', child: Text('Activités')),
-                  ],
-                  child: Chip(
-                    avatar: const Icon(Icons.tune_rounded, size: 16),
-                    label: Text(_typeFilterLabel(typeFilter)),
+              _FilterChoice(
+                label: 'Ouvertes',
+                selected: statusFilter == 'open',
+                onSelected: () => onStatusChanged('open'),
+              ),
+              _FilterChoice(
+                label: 'Clôturées',
+                selected: statusFilter == 'closed',
+                onSelected: () => onStatusChanged('closed'),
+              ),
+              _FilterChoice(
+                label: 'Planifiées',
+                selected: statusFilter == 'scheduled',
+                onSelected: () => onStatusChanged('scheduled'),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Filtrer par type',
+                onSelected: onTypeChanged,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'all', child: Text('Tous les types')),
+                  PopupMenuItem(
+                    value: 'general_meeting',
+                    child: Text('Réunions générales'),
                   ),
+                  PopupMenuItem(
+                    value: 'pole_meeting',
+                    child: Text('Réunions pôle'),
+                  ),
+                  PopupMenuItem(
+                    value: 'project_meeting',
+                    child: Text('Réunions projet'),
+                  ),
+                  PopupMenuItem(value: 'training', child: Text('Formations')),
+                  PopupMenuItem(value: 'activity', child: Text('Activités')),
+                ],
+                child: Chip(
+                  avatar: const Icon(Icons.tune_rounded, size: 16),
+                  label: Text(_typeFilterLabel(typeFilter)),
                 ),
+              ),
+            ],
+          );
+
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: search),
+                const SizedBox(width: 14),
+                Flexible(child: filters),
               ],
             );
+          }
 
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, const SizedBox(height: 12), filters],
-            );
-          },
-        ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              search,
+              const SizedBox(height: 10),
+              AppDataCard(
+                padding: EdgeInsets.zero,
+                child: ExpansionTile(
+                  title: const Text('Filtres de session'),
+                  subtitle: Text(
+                    '$statusFilter • ${_typeFilterLabel(typeFilter)}',
+                  ),
+                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                  children: [
+                    Align(alignment: Alignment.centerLeft, child: filters),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1184,7 +1214,19 @@ class _SessionsList extends StatelessWidget {
                         const SizedBox(width: 14),
                         Expanded(child: content),
                         const SizedBox(width: 10),
-                        const Icon(Icons.arrow_forward_rounded),
+                        AppSecondaryButton(
+                          label: 'Ouvrir le détail',
+                          icon: Icons.arrow_forward_rounded,
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AttendanceSessionDetailScreen(
+                                  session: session,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     );
                   }
@@ -1547,7 +1589,7 @@ class _CreateAttendanceSessionDialogState
                     decoration: InputDecoration(
                       labelText: _loadingScopes
                           ? 'Chargement des poles...'
-                          : 'Pole concerne',
+                          : 'Pôle concerné',
                       prefixIcon: const Icon(Icons.hub_rounded),
                     ),
                     items: _poles

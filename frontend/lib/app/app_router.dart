@@ -65,13 +65,15 @@ class AppRouter {
 
         if (userData != null) {
           final user = UserExperience.fromJson(userData);
-          final visibleRoutes = UserExperience.visibleRoutesFor(user);
           final path = state.uri.path;
-          final allowed = visibleRoutes.any(
-            (route) => path == route || path.startsWith('$route/'),
-          );
 
-          if (!allowed) return '/dashboard';
+          if (!UserExperience.canAccessPath(user, path)) {
+            if (path == '/attendance/nfc' &&
+                UserExperience.canAccessPath(user, '/attendance')) {
+              return '/attendance';
+            }
+            return '/dashboard';
+          }
         } else if (!_authenticatedFallbackAllows(state.uri.path)) {
           return '/dashboard';
         }
@@ -182,6 +184,10 @@ class AppRouter {
   );
 
   static bool _authenticatedFallbackAllows(String path) {
+    if (path == '/attendance/nfc' || path.startsWith('/attendance/nfc/')) {
+      return false;
+    }
+
     const fallbackRoutes = {
       '/dashboard',
       '/notifications',

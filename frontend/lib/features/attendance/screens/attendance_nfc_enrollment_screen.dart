@@ -4,6 +4,7 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/src/nfc_manager_android/tags/tag.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
 import '../models/attendance_nfc_model.dart';
@@ -17,6 +18,29 @@ class AttendanceNfcEnrollmentScreen extends StatefulWidget {
       _AttendanceNfcEnrollmentScreenState();
 }
 
+String _nfcFailureMessage(Object error) {
+  final message = error.toString().replaceAll('Exception: ', '');
+  final normalized = message.toLowerCase();
+  if (normalized.contains('not supported') ||
+      normalized.contains('windows') ||
+      normalized.contains('unavailable')) {
+    return 'NFC indisponible sur cet appareil. Utilisez un téléphone Android compatible pour gérer les badges.';
+  }
+  return message;
+}
+
+enum NfcMemberLoadState { ready, empty, failed }
+
+NfcMemberLoadState nfcMemberLoadState({
+  required List<MemberModel> members,
+  String? error,
+}) {
+  if (error != null && error.trim().isNotEmpty) {
+    return NfcMemberLoadState.failed;
+  }
+  return members.isEmpty ? NfcMemberLoadState.empty : NfcMemberLoadState.ready;
+}
+
 class _AttendanceNfcEnrollmentScreenState
     extends State<AttendanceNfcEnrollmentScreen> {
   final AttendanceService _attendanceService = AttendanceService();
@@ -26,12 +50,17 @@ class _AttendanceNfcEnrollmentScreenState
   bool _loading = true;
   bool _nfcAvailable = false;
   bool _listening = false;
-  String? _error;
+  String? _nfcError;
+  String? _membersError;
+  String? _tagsError;
+  String? _operationError;
   MemberModel? _selectedMember;
   AttendanceNfcTagModel? _selectedTag;
   List<MemberModel> _members = [];
   List<AttendanceNfcTagModel> _tags = [];
   String _tagStatusFilter = 'active';
+
+  String? get _error => _operationError ?? _nfcError ?? _tagsError;
 
   @override
   void initState() {
@@ -51,34 +80,56 @@ class _AttendanceNfcEnrollmentScreenState
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _nfcError = null;
+      _membersError = null;
+      _tagsError = null;
+      _operationError = null;
     });
+
+    var nfcAvailable = false;
+    List<MemberModel> members = const [];
+    List<AttendanceNfcTagModel> tags = const [];
+    String? nfcError;
+    String? membersError;
+    String? tagsError;
 
     try {
       final availability = await NfcManager.instance.checkAvailability();
-      final results = await Future.wait([
-        _membersService.getMembers(),
-        _attendanceService.listNfcTags(status: _tagStatusFilter),
-      ]);
-      if (!mounted) return;
-      final members = results[0] as List<MemberModel>;
-      setState(() {
-        _nfcAvailable = availability == NfcAvailability.enabled;
-        _members = members
-            .where(
-              (member) => member.isActive != false && member.status == 'active',
-            )
-            .toList();
-        _tags = results[1] as List<AttendanceNfcTagModel>;
-      });
+      nfcAvailable = availability == NfcAvailability.enabled;
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      nfcError = _nfcFailureMessage(e);
+    }
+
+    try {
+      members = await _membersService.getMembers();
+    } catch (e) {
+      membersError =
+          'Impossible de charger les membres actifs. '
+          '${e.toString().replaceAll('Exception: ', '')}';
+    }
+
+    try {
+      tags = await _attendanceService.listNfcTags(status: _tagStatusFilter);
+    } catch (e) {
+      tagsError =
+          'Impossible de charger les badges NFC. '
+          '${e.toString().replaceAll('Exception: ', '')}';
     } finally {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _nfcAvailable = nfcAvailable;
+          _nfcError = nfcError;
+          _membersError = membersError;
+          _tagsError = tagsError;
+          _members = members
+              .where(
+                (member) =>
+                    member.isActive != false && member.status == 'active',
+              )
+              .toList();
+          _tags = tags;
+          _loading = false;
+        });
       }
     }
   }
@@ -87,7 +138,7 @@ class _AttendanceNfcEnrollmentScreenState
     setState(() {
       _selectedMember = member;
       _selectedTag = null;
-      _error = null;
+      _operationError = null;
     });
 
     try {
@@ -99,7 +150,7 @@ class _AttendanceNfcEnrollmentScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _operationError = _nfcFailureMessage(e);
       });
     }
   }
@@ -110,14 +161,14 @@ class _AttendanceNfcEnrollmentScreenState
 
     if (!_nfcAvailable) {
       setState(() {
-        _error = 'NFC indisponible sur cet appareil.';
+        _operationError = 'NFC indisponible sur cet appareil.';
       });
       return;
     }
 
     setState(() {
       _listening = true;
-      _error = null;
+      _operationError = null;
     });
 
     await NfcManager.instance.startSession(
@@ -145,17 +196,17 @@ class _AttendanceNfcEnrollmentScreenState
       if (!mounted) return;
       setState(() {
         _selectedTag = tag;
-        _error = null;
+        _operationError = null;
       });
       await _refreshTags();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Badge associe avec succes.')),
+        const SnackBar(content: Text('Badge associé avec succès.')),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _operationError = _nfcFailureMessage(e);
       });
     }
   }
@@ -169,7 +220,7 @@ class _AttendanceNfcEnrollmentScreenState
       if (!mounted) return;
       setState(() {
         _selectedTag = revoked;
-        _error = null;
+        _operationError = null;
       });
       await _refreshTags();
       if (!mounted) return;
@@ -179,7 +230,7 @@ class _AttendanceNfcEnrollmentScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _operationError = _nfcFailureMessage(e);
       });
     }
   }
@@ -263,6 +314,10 @@ class _AttendanceNfcEnrollmentScreenState
 
   Widget _buildMemberPicker() {
     final members = _filteredMembers;
+    final memberLoadState = nfcMemberLoadState(
+      members: _members,
+      error: _membersError,
+    );
 
     return Card(
       child: Padding(
@@ -271,7 +326,7 @@ class _AttendanceNfcEnrollmentScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Selectionner un membre',
+              'Sélectionner un membre',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
@@ -284,10 +339,17 @@ class _AttendanceNfcEnrollmentScreenState
               ),
             ),
             const SizedBox(height: 12),
-            if (members.isEmpty)
+            if (memberLoadState == NfcMemberLoadState.failed)
+              _NfcMembersLoadFailure(message: _membersError!, onRetry: _load)
+            else if (memberLoadState == NfcMemberLoadState.empty)
               const Padding(
                 padding: EdgeInsets.all(18),
-                child: Text('Aucun membre actif trouve.'),
+                child: Text('Aucun membre actif trouvé.'),
+              )
+            else if (members.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('Aucun résultat pour cette recherche.'),
               )
             else
               ...members
@@ -343,7 +405,9 @@ class _AttendanceNfcEnrollmentScreenState
               _NfcTagStatus(tag: tag),
               const SizedBox(height: 18),
               ElevatedButton.icon(
-                onPressed: _listening ? null : _startEnrollment,
+                onPressed: _nfcAvailable && !_listening
+                    ? _startEnrollment
+                    : null,
                 icon: const Icon(Icons.nfc_rounded),
                 label: Text(
                   _listening
@@ -355,7 +419,7 @@ class _AttendanceNfcEnrollmentScreenState
               OutlinedButton.icon(
                 onPressed: tag?.isActive == true ? _revokeSelectedTag : null,
                 icon: const Icon(Icons.block_rounded),
-                label: const Text('Revoquer le badge'),
+                label: const Text('Révoquer le badge'),
               ),
             ],
           ],
@@ -383,12 +447,8 @@ class _NfcHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppDataCard(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Row(
         children: [
           Container(
@@ -406,9 +466,9 @@ class _NfcHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Enrolement NFC',
+                  'Enrôlement NFC',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.darkText,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
                   ),
@@ -420,7 +480,7 @@ class _NfcHeader extends StatelessWidget {
                       : nfcAvailable
                       ? 'NFC disponible sur cet appareil.'
                       : 'NFC indisponible sur cet appareil.',
-                  style: const TextStyle(color: Colors.white70),
+                  style: const TextStyle(color: AppTheme.secondaryText),
                 ),
               ],
             ),
@@ -466,9 +526,9 @@ class _NfcTagStatus extends StatelessWidget {
                 ),
                 Text(
                   current == null
-                      ? 'Non attribue'
+                      ? 'Non attribué'
                       : 'Statut: ${current.status}'
-                            '${current.lastUsedAt == null ? '' : ' - deja utilise'}',
+                            '${current.lastUsedAt == null ? '' : ' - déjà utilisé'}',
                   style: const TextStyle(
                     color: Colors.black54,
                     fontWeight: FontWeight.w600,
@@ -530,13 +590,13 @@ class _NfcTagsList extends StatelessWidget {
                     ),
                     _StatusButton(
                       value: 'revoked',
-                      label: 'Revoques',
+                      label: 'Révoqués',
                       selected: statusFilter == 'revoked',
                       onSelected: onStatusChanged,
                     ),
                     _StatusButton(
                       value: 'replaced',
-                      label: 'Remplaces',
+                      label: 'Remplacés',
                       selected: statusFilter == 'replaced',
                       onSelected: onStatusChanged,
                     ),
@@ -580,7 +640,7 @@ class _NfcTagsList extends StatelessWidget {
                   subtitle: Text('${tag.maskedTag} - ${tag.status}'),
                   trailing: tag.isActive
                       ? IconButton(
-                          tooltip: 'Revoquer',
+                          tooltip: 'Révoquer',
                           onPressed: () => onRevoke(tag),
                           icon: const Icon(Icons.block_rounded),
                         )
@@ -634,6 +694,32 @@ class _NfcErrorCard extends StatelessWidget {
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded),
         ),
+      ),
+    );
+  }
+}
+
+class _NfcMembersLoadFailure extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _NfcMembersLoadFailure({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message, style: TextStyle(color: Colors.red.shade700)),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Réessayer'),
+          ),
+        ],
       ),
     );
   }

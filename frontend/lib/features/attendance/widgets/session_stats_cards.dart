@@ -31,7 +31,7 @@ class SessionStatsCards extends StatelessWidget {
         icon: Icons.groups_rounded,
       ),
       _AttendanceStatItem(
-        label: 'Presents',
+        label: 'Présents',
         value: present.toString(),
         icon: Icons.check_circle_rounded,
       ),
@@ -41,12 +41,12 @@ class SessionStatsCards extends StatelessWidget {
         icon: Icons.schedule_rounded,
       ),
       _AttendanceStatItem(
-        label: 'Abs. justifiees',
+        label: 'Abs. justifiées',
         value: justifiedAbsence.toString(),
         icon: Icons.verified_rounded,
       ),
       _AttendanceStatItem(
-        label: 'Abs. non justifiees',
+        label: 'Abs. non justifiées',
         value: unjustifiedAbsence.toString(),
         icon: Icons.warning_rounded,
       ),
@@ -56,7 +56,7 @@ class SessionStatsCards extends StatelessWidget {
         icon: Icons.pending_actions_rounded,
       ),
       _AttendanceStatItem(
-        label: 'Penalites',
+        label: 'Pénalités',
         value: '$totalPenaltyAmount FCFA',
         icon: Icons.payments_rounded,
       ),
@@ -65,7 +65,7 @@ class SessionStatsCards extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final crossAxisCount = width >= 1100
+        final crossAxisCount = width >= 900
             ? 4
             : width >= 760
             ? 3
@@ -79,16 +79,16 @@ class SessionStatsCards extends StatelessWidget {
           itemCount: stats.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 2.4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.55,
           ),
           itemBuilder: (context, index) {
             final stat = stats[index];
 
             return Card(
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(10),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -96,7 +96,7 @@ class SessionStatsCards extends StatelessWidget {
                       foregroundColor: AppTheme.softBlack,
                       child: Icon(stat.icon),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

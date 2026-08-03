@@ -175,7 +175,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final query = month == null ? '' : '?month=$month';
@@ -195,7 +195,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final query = month == null ? '' : '?month=$month';
@@ -286,7 +286,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -299,14 +299,14 @@ class AttendanceService {
       return AttendanceSessionModel.fromJson(response);
     }
 
-    throw Exception('RÃ©ponse invalide lors de lâ€™ouverture de la session.');
+    throw Exception('Réponse invalide lors de l’ouverture de la session.');
   }
 
   Future<AttendanceQrTokenModel> createQrToken(String sessionId) async {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -319,14 +319,14 @@ class AttendanceService {
       return AttendanceQrTokenModel.fromJson(response);
     }
 
-    throw Exception('Reponse QR invalide.');
+    throw Exception('Réponse QR invalide.');
   }
 
   Future<AttendanceQrStatusModel> getQrStatus(String sessionId) async {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.get(
@@ -345,7 +345,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -365,7 +365,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.get(
@@ -384,7 +384,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final query = status == null || status == 'all' ? '' : '?status=$status';
@@ -409,7 +409,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -427,7 +427,7 @@ class AttendanceService {
       return AttendanceNfcTagModel.fromJson(response);
     }
 
-    throw Exception('Reponse NFC invalide.');
+    throw Exception('Réponse NFC invalide.');
   }
 
   Future<AttendanceNfcTagModel> revokeNfcTag({
@@ -437,7 +437,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -460,7 +460,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -482,7 +482,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.get(
@@ -506,7 +506,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connecte.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.get(
@@ -534,7 +534,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -547,7 +547,7 @@ class AttendanceService {
       return AttendanceRecordModel.fromJson(response);
     }
 
-    throw Exception('RÃ©ponse invalide lors de la justification.');
+    throw Exception('Réponse invalide lors de la justification.');
   }
 
   Future<AttendanceRecordModel> approveJustification({
@@ -580,7 +580,7 @@ class AttendanceService {
     final token = await _authService.getToken();
 
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await _apiClient.postJson(
@@ -593,6 +593,6 @@ class AttendanceService {
       return AttendanceRecordModel.fromJson(response);
     }
 
-    throw Exception('RÃ©ponse invalide lors de la revue de justification.');
+    throw Exception('Réponse invalide lors de la revue de justification.');
   }
 }

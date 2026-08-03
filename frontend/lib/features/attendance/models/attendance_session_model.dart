@@ -74,20 +74,20 @@ class AttendanceSessionModel {
   String get typeLabel {
     switch (sessionType) {
       case 'general_meeting':
-        return 'Reunion generale';
+        return 'Réunion générale';
       case 'pole_meeting':
-        return 'Reunion pole';
+        return 'Réunion pôle';
       case 'project_meeting':
-        return 'Reunion projet';
+        return 'Réunion projet';
       case 'training':
         return 'Formation';
       case 'field_activity':
       case 'activity':
-        return 'Activite terrain';
+        return 'Activité terrain';
       case 'event':
-        return 'Evenement';
+        return 'Événement';
       case 'exceptional':
-        return 'Seance exceptionnelle';
+        return 'Séance exceptionnelle';
       default:
         return sessionType ?? 'Session';
     }
@@ -113,15 +113,16 @@ class AttendanceSessionModel {
       case 'open':
         return 'Ouverte';
       case 'closed':
-        return 'Cloturee';
+        return 'Clôturée';
       case 'draft':
         return 'Brouillon';
       case 'archived':
-        return 'Archivee';
+        return 'Archivée';
       case 'scheduled':
-        return 'Planifiee';
+      case 'planned':
+        return 'Planifiée';
       default:
-        return status ?? 'Non defini';
+        return status ?? 'Non défini';
     }
   }
 
@@ -129,7 +130,7 @@ class AttendanceSessionModel {
     final raw = scheduledAt ?? startTime;
 
     if (raw == null || raw.isEmpty) {
-      return 'Date non definie';
+      return 'Date non définie';
     }
 
     final date = DateTime.tryParse(raw)?.toLocal();
@@ -144,7 +145,7 @@ class AttendanceSessionModel {
     final hour = date.hour.toString().padLeft(2, '0');
     final minute = date.minute.toString().padLeft(2, '0');
 
-    return '$day/$month/$year a $hour:$minute';
+    return '$day/$month/$year à $hour:$minute';
   }
 }
 
