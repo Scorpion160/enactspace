@@ -1,0 +1,143 @@
+{
+  "run_id": "finance-final-local",
+  "run_started_at": "2026-08-03T16:14:20.183Z",
+  "web_origin": "http://127.0.0.1:18080",
+  "api_origin": "http://127.0.0.1:18002",
+  "runtime_response_verified": true,
+  "temporary_capture_instrumentation": true,
+  "instrumentation_removed": true,
+  "final_build_without_instrumentation": true,
+  "final_build_hash": "be1b40d34d8368a50f65aadfd12db4c69626ee3b9aaaab72d3f09721be34af47",
+  "target_payments": {
+    "decision_payment": {
+      "payment_id": "ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "reference": "AUDIT-PAY-000",
+      "proof_type": "pdf",
+      "status": "pending"
+    },
+    "image_proof_payment": {
+      "payment_id": "c5e60045-178a-5543-b5db-4cd4b4c9dd80",
+      "reference": "AUDIT-PAY-IMG-001",
+      "proof_type": "image/png",
+      "status": "pending"
+    }
+  },
+  "captures": [
+    {
+      "filename": "04_finance_payments_tablet_768x1024.png",
+      "role": "audit.finance",
+      "viewport": "768x1024",
+      "target_payment_id": null,
+      "target_reference": null,
+      "reached_semantics_label": null,
+      "expected_markers": [],
+      "reached_markers": [],
+      "dialog_opened": false,
+      "proof_preview_rendered": false,
+      "mutation_performed": false,
+      "screenshot_sha256": "97155de1f1db48215b8e2dbb1a968cfa0716a5aac7f407573f8561f103ae1003",
+      "success": true
+    },
+    {
+      "filename": "05_finance_pending_payment_desktop_1366x768.png",
+      "role": "audit.finance",
+      "viewport": "1366x768",
+      "target_payment_id": "ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "target_reference": "AUDIT-PAY-000",
+      "reached_semantics_label": "finance-payment-actions|payment_id=ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "expected_markers": [
+        "Actions du paiement"
+      ],
+      "reached_markers": [
+        "Actions du paiement"
+      ],
+      "dialog_opened": false,
+      "proof_preview_rendered": false,
+      "mutation_performed": false,
+      "screenshot_sha256": "3afdbb96864e5210073856fed10e8211a4ef4bf931077603f3145e48140bc716",
+      "success": true
+    },
+    {
+      "filename": "06_finance_payment_proof_desktop_1366x768.png",
+      "role": "audit.finance",
+      "viewport": "1366x768",
+      "target_payment_id": "c5e60045-178a-5543-b5db-4cd4b4c9dd80",
+      "target_reference": "AUDIT-PAY-IMG-001",
+      "reached_semantics_label": "finance-payment-proof|payment_id=c5e60045-178a-5543-b5db-4cd4b4c9dd80",
+      "expected_markers": [
+        "Preuve"
+      ],
+      "reached_markers": [
+        "Preuve"
+      ],
+      "dialog_opened": true,
+      "proof_preview_rendered": true,
+      "mutation_performed": false,
+      "screenshot_sha256": "31a45661e21ecefccad821dc8428d5b2ef44b56f0e2c6bfc5e9bcad14775ef80",
+      "success": true
+    },
+    {
+      "filename": "07_finance_validation_dialog_desktop_1366x768.png",
+      "role": "audit.finance",
+      "viewport": "1366x768",
+      "target_payment_id": "ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "target_reference": "AUDIT-PAY-000",
+      "reached_semantics_label": "finance-payment-validate|payment_id=ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "expected_markers": [
+        "Actions du paiement",
+        "Valider"
+      ],
+      "reached_markers": [
+        "Actions du paiement",
+        "Valider"
+      ],
+      "dialog_opened": true,
+      "proof_preview_rendered": false,
+      "mutation_performed": false,
+      "screenshot_sha256": "32bd06f4a381611980d71a986ca2dad3b36fab09d015d08460f2b6841d666b8d",
+      "success": true
+    },
+    {
+      "filename": "08_finance_rejection_dialog_desktop_1366x768.png",
+      "role": "audit.finance",
+      "viewport": "1366x768",
+      "target_payment_id": "ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "target_reference": "AUDIT-PAY-000",
+      "reached_semantics_label": "finance-payment-reject|payment_id=ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "expected_markers": [
+        "Actions du paiement",
+        "Rejeter"
+      ],
+      "reached_markers": [
+        "Actions du paiement",
+        "Rejeter"
+      ],
+      "dialog_opened": true,
+      "proof_preview_rendered": false,
+      "mutation_performed": false,
+      "screenshot_sha256": "42d1b45f89f85c1d7cc14f853943fc0c3173c2d63cacf4aa73cfc39b1f2d76f7",
+      "success": true
+    },
+    {
+      "filename": "10_finance_filters_mobile_390x844.png",
+      "role": "audit.finance",
+      "viewport": "390x844",
+      "target_payment_id": null,
+      "target_reference": null,
+      "reached_semantics_label": null,
+      "expected_markers": [
+        "Filtres et recherche",
+        "À valider"
+      ],
+      "reached_markers": [
+        "Filtres et recherche",
+        "À valider"
+      ],
+      "dialog_opened": false,
+      "proof_preview_rendered": false,
+      "mutation_performed": false,
+      "screenshot_sha256": "57646d7b9985cedffcce920c784ffda17fc375ea9222b071e99325b1b670cc6d",
+      "success": true
+    }
+  ]
+}

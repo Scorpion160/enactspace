@@ -112,6 +112,7 @@ class UserExperience {
   bool get isFinance => hasAnyRole(_financeRoles);
 
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
+  bool get isActiveMember => status == 'active' && !isAlumni;
   String get normalizedGender => gender?.trim().toLowerCase() ?? '';
   bool get isEnactrice =>
       {'femme', 'feminin', 'féminin', 'female'}.contains(normalizedGender);
@@ -142,7 +143,13 @@ class UserExperience {
   }
 
   bool get canManageMembers => isAdmin || isTeamLeader || isSecretary;
-  bool get canViewFinance => isAdmin || isTeamLeader || isFinance;
+
+  /// Active members can only reach their own Finance endpoints. Management
+  /// capabilities remain reserved for the financial leadership roles below.
+  bool get canAccessPersonalFinance => isActiveMember;
+  bool get canViewFinance =>
+      canAccessPersonalFinance ||
+      (isActiveMember && (isAdmin || isTeamLeader || isFinance));
   bool get canManageFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
       isAdmin || isTeamLeader || isSecretary || isRecruitmentLead || isEnacchef;

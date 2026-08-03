@@ -1,0 +1,25 @@
+{
+  "endpoint": "http://127.0.0.1:18002/api/finance/payments",
+  "status": 200,
+  "payment_count": 41,
+  "payments": [
+    {
+      "id": "c5e60045-178a-5543-b5db-4cd4b4c9dd80",
+      "reference": "AUDIT-PAY-IMG-001",
+      "status": "pending",
+      "proof_url": "/uploads/audit-payment-proof-image.png",
+      "can_validate": true,
+      "can_reject": true
+    },
+    {
+      "id": "ea9166eb-99d0-5d0b-be9a-c1761b5560d3",
+      "reference": "AUDIT-PAY-000",
+      "status": "pending",
+      "proof_url": "/uploads/audit-payment-proof.pdf",
+      "can_validate": true,
+      "can_reject": true
+    }
+  ],
+  "contains_AUDIT_PAY_000": true,
+  "contains_AUDIT_PAY_IMG_001": true
+}

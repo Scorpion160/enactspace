@@ -184,7 +184,10 @@ class AppRouter {
   );
 
   static bool _authenticatedFallbackAllows(String path) {
-    if (path == '/attendance/nfc' || path.startsWith('/attendance/nfc/')) {
+    if (path == '/finance' ||
+        path.startsWith('/finance/') ||
+        path == '/attendance/nfc' ||
+        path.startsWith('/attendance/nfc/')) {
       return false;
     }
 

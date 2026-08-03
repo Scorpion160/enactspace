@@ -135,7 +135,7 @@ class FinanceService {
 
   Future<PaymentModel> rejectPayment(String paymentId, String reason) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connectÃ©.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.postJson(
       '/finance/payments/$paymentId/reject',
@@ -147,7 +147,7 @@ class FinanceService {
       return PaymentModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide lors du rejet du paiement.');
+    throw Exception('Réponse invalide lors du rejet du paiement.');
   }
 
   Future<PaymentModel> cancelPayment(String paymentId) async {
@@ -173,7 +173,7 @@ class FinanceService {
     String? memberId,
   }) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final data = <String, dynamic>{
       'finance_item_ids': feeIds,
@@ -193,14 +193,14 @@ class FinanceService {
       return MobileMoneyTransactionModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide lors de l initialisation du paiement.');
+    throw Exception("Réponse invalide lors de l'initialisation du paiement.");
   }
 
   Future<MobileMoneyTransactionModel> getMobileMoneyTransaction(
     String transactionId,
   ) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.get(
       '/finance/mobile-money/$transactionId',
@@ -211,14 +211,14 @@ class FinanceService {
       return MobileMoneyTransactionModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide pour le statut du paiement.');
+    throw Exception('Réponse invalide pour le statut du paiement.');
   }
 
   Future<MobileMoneyTransactionModel> refreshMobileMoneyTransaction(
     String transactionId,
   ) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.postJson(
       '/finance/mobile-money/$transactionId/refresh',
@@ -230,12 +230,12 @@ class FinanceService {
       return MobileMoneyTransactionModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide lors de la verification du paiement.');
+    throw Exception('Réponse invalide lors de la vérification du paiement.');
   }
 
   Future<MobileMoneyAdminSummaryModel> getMobileMoneyAdminSummary() async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.get(
       '/finance/mobile-money/admin/summary',
@@ -246,7 +246,7 @@ class FinanceService {
       return MobileMoneyAdminSummaryModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide pour le dashboard Mobile Money.');
+    throw Exception('Réponse invalide pour le tableau de bord Mobile Money.');
   }
 
   List<dynamic> _extractList(dynamic response) {
