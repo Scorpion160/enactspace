@@ -23,6 +23,8 @@ import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/projects_screen.dart';
 import '../features/recruitment/screens/recruitment_screen.dart';
 import '../features/recruitment/screens/application_tracking_screen.dart';
+import '../features/recruitment/screens/public/public_application_flow_screen.dart';
+import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../shared/layout/app_shell.dart';
@@ -35,10 +37,7 @@ class AppRouter {
     errorBuilder: (context, state) => const _RouteNotFoundScreen(),
     redirect: (context, state) async {
       final loggedIn = await _authService.isLoggedIn();
-      final publicPath =
-          state.matchedLocation == '/splash' ||
-          state.matchedLocation == '/login' ||
-          state.matchedLocation == '/application-tracking';
+      final publicPath = isPublicPath(state.matchedLocation);
       final goingToLogin = state.matchedLocation == '/login';
 
       if (state.matchedLocation == '/splash') {
@@ -90,6 +89,18 @@ class AppRouter {
       GoRoute(
         path: '/application-tracking',
         builder: (context, state) => const ApplicationTrackingScreen(),
+      ),
+      GoRoute(
+        path: '/recruitment/apply',
+        builder: (context, state) => const PublicRecruitmentCampaignsScreen(),
+        routes: [
+          GoRoute(
+            path: ':campaignId',
+            builder: (context, state) => PublicApplicationFlowScreen(
+              campaignId: state.pathParameters['campaignId']!,
+            ),
+          ),
+        ],
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -182,6 +193,14 @@ class AppRouter {
       ),
     ],
   );
+
+  static bool isPublicPath(String path) {
+    return path == '/splash' ||
+        path == '/login' ||
+        path == '/application-tracking' ||
+        path == '/recruitment/apply' ||
+        path.startsWith('/recruitment/apply/');
+  }
 
   static bool _authenticatedFallbackAllows(String path) {
     if (path == '/finance' ||

@@ -5,9 +5,6 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
-import '../../recruitment/models/application_model.dart';
-import '../../recruitment/screens/recruitment_screen.dart';
-import '../../recruitment/services/recruitment_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -254,95 +251,6 @@ class _LoginPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _openRecruitmentApplication(BuildContext context) async {
-    final service = RecruitmentService();
-
-    try {
-      final campaigns = await service.getPublicCampaigns();
-      if (!context.mounted) return;
-
-      if (campaigns.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Aucune campagne active pour le moment. Envoie une demande d\'adhesion.',
-            ),
-          ),
-        );
-        _showJoinRequestSheet(context, profileType: 'enacteur');
-        return;
-      }
-
-      final application = await showDialog<ApplicationModel>(
-        context: context,
-        builder: (_) =>
-            CreateApplicationDialog(service: service, campaigns: campaigns),
-      );
-
-      if (!context.mounted || application == null) return;
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Candidature envoyée'),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Conservez ce code avec votre email pour suivre le dossier.',
-                ),
-                const SizedBox(height: 14),
-                SelectableText(
-                  application.publicTrackingCode,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.softBlack,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Fermer'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.go('/application-tracking');
-              },
-              icon: const Icon(Icons.route_rounded),
-              label: const Text('Suivre le dossier'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Campagnes indisponibles: ${e.toString().replaceAll('Exception: ', '')}',
-          ),
-        ),
-      );
-      _showJoinRequestSheet(context, profileType: 'enacteur');
-    }
-  }
-
-  void _showRecruitmentDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => _RecruitmentAccessDialog(
-        onStart: () => _openRecruitmentApplication(context),
-      ),
-    );
-  }
-
   void _showGuideDialog(BuildContext context) {
     showDialog(context: context, builder: (_) => const _BeginnerGuideDialog());
   }
@@ -470,7 +378,7 @@ class _LoginPanel extends StatelessWidget {
                       const _LoginSectionLabel('Candidature Enactus ESP'),
                       const SizedBox(height: 8),
                       _LoginSupportActions(
-                        onRecruitment: () => _showRecruitmentDialog(context),
+                        onRecruitment: () => context.go('/recruitment/apply'),
                         onTracking: () => context.go('/application-tracking'),
                         onGuide: () => _showGuideDialog(context),
                         onBiometric: () => _showBiometricDialog(context),
@@ -1244,103 +1152,6 @@ class _JoinField extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       ),
-    );
-  }
-}
-
-class _RecruitmentAccessDialog extends StatelessWidget {
-  final VoidCallback onStart;
-
-  const _RecruitmentAccessDialog({required this.onStart});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Candidature recrutement'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ce parcours permettra aux candidats de postuler sans compte quand une campagne est active.',
-                style: TextStyle(color: Colors.black54, height: 1.4),
-              ),
-              SizedBox(height: 14),
-              _RecruitmentStep(
-                icon: Icons.campaign_rounded,
-                title: 'Campagne active',
-                body: 'Le pôle Veille publie les besoins RH validés.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.assignment_ind_rounded,
-                title: 'Formulaire candidat',
-                body:
-                    'Identité, niveau, motivation, compétences et disponibilité.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.visibility_off_rounded,
-                title: 'Anonymisation possible',
-                body:
-                    'Les évaluateurs peuvent travailler avec des codes candidat.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.mark_email_read_rounded,
-                title: 'Suivi et emails',
-                body:
-                    'Statut, entretien, acceptation ou refus seront notifiés.',
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.of(context).pop();
-            onStart();
-          },
-          icon: const Icon(Icons.how_to_reg_rounded),
-          label: const Text('Démarrer'),
-        ),
-      ],
-    );
-  }
-}
-
-class _RecruitmentStep extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _RecruitmentStep({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.2),
-        foregroundColor: AppTheme.softBlack,
-        child: Icon(icon),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w900),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(body, maxLines: 3, overflow: TextOverflow.ellipsis),
     );
   }
 }

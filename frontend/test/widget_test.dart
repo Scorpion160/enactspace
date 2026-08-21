@@ -33,7 +33,10 @@ void main() {
     await tester.pump();
 
     expect(find.text('Suivre ma candidature'), findsOneWidget);
-    expect(find.text('Afficher mon suivi'), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Consulter ma candidature'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

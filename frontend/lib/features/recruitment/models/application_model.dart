@@ -1,3 +1,5 @@
+import 'application_status_presentation.dart';
+
 class ApplicationModel {
   final String id;
   final String campaignId;
@@ -130,31 +132,8 @@ class ApplicationModel {
     return name.isEmpty ? email : name;
   }
 
-  String get statusLabel {
-    switch (status) {
-      case 'submitted':
-      case 'received':
-        return 'Reçue';
-      case 'under_review':
-        return 'En étude';
-      case 'interview_scheduled':
-        return 'Entretien programmé';
-      case 'preselected':
-        return 'Présélectionnée';
-      case 'interview':
-        return 'Entretien';
-      case 'accepted':
-        return 'Acceptée';
-      case 'rejected':
-        return 'Rejetée';
-      case 'waiting_list':
-        return 'Liste d’attente';
-      case 'cancelled':
-        return 'Clôturée';
-      default:
-        return status;
-    }
-  }
+  String get statusLabel =>
+      ApplicationStatusPresentation.fromStatus(status).title;
 
   String get scoreLabel {
     if (finalScore == null) return 'Non noté';

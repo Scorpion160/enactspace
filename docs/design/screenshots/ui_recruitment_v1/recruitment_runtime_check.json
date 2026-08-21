@@ -1,0 +1,97 @@
+{
+  "environment": "ui_audit",
+  "api_origin": "http://127.0.0.1:18002",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/recruitment/campaigns/public",
+      "http_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/recruitment/campaigns",
+      "http_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/recruitment/applications",
+      "http_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/recruitment/applications/94a9bb34-7c75-5602-8cb2-3869c4851053",
+      "http_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/recruitment/applications/94a9bb34-7c75-5602-8cb2-3869c4851053/reviews",
+      "http_status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/recruitment/applications/track",
+      "http_status": 200
+    }
+  ],
+  "campaign_count": 7,
+  "public_campaign_count": 1,
+  "application_count": 37,
+  "review_count": 14,
+  "complete_application_review_count": 2,
+  "canonical_states_present": [
+    "submitted",
+    "under_review",
+    "interview_scheduled",
+    "accepted",
+    "rejected",
+    "waiting_list",
+    "cancelled"
+  ],
+  "invalid_recommendation_count": 0,
+  "example_test_application_email_count": 0,
+  "legacy_application_status_count": 0,
+  "public_open_campaign": {
+    "verified": true,
+    "reference": "AUDIT-REC-CAMPAIGN-OPEN",
+    "planned_campaign_absent": true,
+    "closed_campaign_absent": true
+  },
+  "complete_application": {
+    "reference": "AUDIT-REC-COMPLETE-001",
+    "detail_http_status": 200,
+    "full_answers_present": true,
+    "valid_review_count": 2,
+    "recommendations": [
+      "favorable",
+      "reserve"
+    ]
+  },
+  "interview_application": {
+    "reference": "AUDIT-REC-INTERVIEW-001",
+    "status": "interview_scheduled",
+    "interview_at": "2026-08-10T14:30:00",
+    "interview_location": "Salle Audit Synthétique A1"
+  },
+  "public_tracking": {
+    "verified": true,
+    "reference": "AUDIT-REC-TRACK-001",
+    "email": "audit.rec.track001@example.com",
+    "http_status": 200,
+    "status": "submitted"
+  },
+  "accepted_not_converted": {
+    "reference": "AUDIT-REC-ACCEPTED-001",
+    "converted_user_id": null,
+    "can_convert": true
+  },
+  "documents": {
+    "/uploads/audit-recruitment-cv.pdf": 200,
+    "/uploads/audit-recruitment-motivation-letter.pdf": 200,
+    "/uploads/audit-recruitment-attachment.png": 200
+  },
+  "public_campaigns_functional": true,
+  "internal_campaigns_functional": true,
+  "internal_application_list_functional": true,
+  "public_tracking_functional": true,
+  "business_mutation_performed": false
+}

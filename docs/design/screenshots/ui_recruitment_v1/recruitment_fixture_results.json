@@ -1,0 +1,162 @@
+{
+  "environment": "ui_audit",
+  "database": {
+    "driver": "postgresql+psycopg",
+    "host": "postgres",
+    "name": "enactspace_ui_audit"
+  },
+  "guards": {
+    "app_env_verified": true,
+    "postgresql_host_verified": true,
+    "database_name_verified": true,
+    "models_registry_imported": true
+  },
+  "preflight_attempt": {
+    "status": "stopped_before_database_session",
+    "database_mutation_performed": false,
+    "reason": "Missing H glyph in the local synthetic PNG generator; corrected before the completed executions."
+  },
+  "first_execution": {
+    "status": "success",
+    "created_count_reported": 13,
+    "updated_count": 0,
+    "normalized": {
+      "emails_from_example_test_to_example_com": 30,
+      "statuses_received_or_reviewing": 14,
+      "recommendations_accept": 6
+    }
+  },
+  "second_execution": {
+    "status": "success",
+    "created_count": 0,
+    "updated_count": 0,
+    "normalized_count": 0,
+    "duplicates_created": 0
+  },
+  "campaigns": [
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-OPEN",
+      "id": "b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+      "is_active": true,
+      "start_date": "2026-07-04",
+      "end_date": "2026-11-01",
+      "public": true
+    },
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-PLANNED",
+      "id": "dcd89f67-f87d-5e42-8156-a8fb4680466c",
+      "is_active": true,
+      "start_date": "2026-09-02",
+      "end_date": "2026-12-01",
+      "public": false
+    },
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-CLOSED",
+      "id": "8809df49-1eb5-5466-87ff-e9d7bcf5b729",
+      "is_active": false,
+      "start_date": "2026-04-05",
+      "end_date": "2026-07-04",
+      "public": false
+    }
+  ],
+  "applications": [
+    {
+      "reference": "AUDIT-REC-TRACK-001",
+      "id": "8fa062e8-3eab-535b-8dab-1b41050a68f5",
+      "status": "submitted",
+      "tracking_code": "AUDIT-REC-TRACK-001",
+      "email": "audit.rec.track001@example.com"
+    },
+    {
+      "reference": "AUDIT-REC-COMPLETE-001",
+      "id": "94a9bb34-7c75-5602-8cb2-3869c4851053",
+      "status": "under_review",
+      "tracking_code": "AUDIT-REC-COMPLETE-001",
+      "email": "audit.rec.complete001@example.com"
+    },
+    {
+      "reference": "AUDIT-REC-INTERVIEW-001",
+      "id": "ef287ec3-9227-50d8-acea-3e1bf34d0666",
+      "status": "interview_scheduled",
+      "tracking_code": "AUDIT-REC-INTERVIEW-001",
+      "email": "audit.rec.interview001@example.com"
+    },
+    {
+      "reference": "AUDIT-REC-ACCEPTED-001",
+      "id": "e83222d3-7c38-5a76-acd1-e586624589ef",
+      "status": "accepted",
+      "tracking_code": "AUDIT-REC-ACCEPTED-001",
+      "email": "audit.rec.accepted001@example.com",
+      "converted_user_id": null
+    },
+    {
+      "reference": "AUDIT-REC-REJECTED-001",
+      "id": "717e22ee-59e6-589e-81d2-11702c51af99",
+      "status": "rejected",
+      "tracking_code": "AUDIT-REC-REJECTED-001",
+      "email": "audit.rec.rejected001@example.com"
+    },
+    {
+      "reference": "AUDIT-REC-WAITING-001",
+      "id": "1005ac83-4b62-5c2e-b6e8-93c21039d53b",
+      "status": "waiting_list",
+      "tracking_code": "AUDIT-REC-WAITING-001",
+      "email": "audit.rec.waiting001@example.com"
+    },
+    {
+      "reference": "AUDIT-REC-CANCELLED-001",
+      "id": "4004e452-f26b-5ea2-b266-27ca1f7ee803",
+      "status": "cancelled",
+      "tracking_code": "AUDIT-REC-CANCELLED-001",
+      "email": "audit.rec.cancelled001@example.com"
+    }
+  ],
+  "reviews": [
+    {
+      "reference": "AUDIT-REC-COMPLETE-001-A",
+      "id": "2a85795e-f1e3-58d1-9dbf-3a629b8d1464",
+      "score": 17.0,
+      "recommendation": "favorable"
+    },
+    {
+      "reference": "AUDIT-REC-COMPLETE-001-B",
+      "id": "10d24d8c-a63f-5604-9abb-c2c477f0431e",
+      "score": 16.0,
+      "recommendation": "reserve"
+    }
+  ],
+  "documents": [
+    {
+      "kind": "cv",
+      "url": "/uploads/audit-recruitment-cv.pdf",
+      "notice": "DOCUMENT SYNTHÉTIQUE — AUDIT UNIQUEMENT"
+    },
+    {
+      "kind": "motivation_letter",
+      "url": "/uploads/audit-recruitment-motivation-letter.pdf",
+      "notice": "DOCUMENT SYNTHÉTIQUE — AUDIT UNIQUEMENT"
+    },
+    {
+      "kind": "attachment",
+      "url": "/uploads/audit-recruitment-attachment.png",
+      "notice": "DOCUMENT SYNTHÉTIQUE — AUDIT UNIQUEMENT"
+    }
+  ],
+  "created_elements": {
+    "campaigns": 3,
+    "applications": 7,
+    "reviews": 2,
+    "documents": 3
+  },
+  "updated_elements": {
+    "legacy_application_emails": 30,
+    "legacy_application_statuses": 14,
+    "legacy_review_recommendations": 6
+  },
+  "idempotence": {
+    "verified": true,
+    "all_target_references_unique": true,
+    "second_execution_created_nothing": true,
+    "second_execution_updated_nothing": true
+  }
+}

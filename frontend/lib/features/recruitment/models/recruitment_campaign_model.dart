@@ -39,8 +39,19 @@ class RecruitmentCampaignModel {
   }
 
   String get periodLabel {
-    final start = startDate ?? 'Non défini';
-    final end = endDate ?? 'Non défini';
-    return '$start → $end';
+    final start = _formatDate(startDate);
+    final end = _formatDate(endDate);
+    if (start == null && end == null) return 'Dates à confirmer';
+    if (start == null) return 'Jusqu’au $end';
+    if (end == null) return 'À partir du $start';
+    return 'Du $start au $end';
+  }
+
+  static String? _formatDate(String? value) {
+    final parsed = DateTime.tryParse(value ?? '');
+    if (parsed == null) return null;
+    final day = parsed.day.toString().padLeft(2, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    return '$day/$month/${parsed.year}';
   }
 }
