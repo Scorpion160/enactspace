@@ -144,6 +144,40 @@ class RecruitmentService {
         .toList();
   }
 
+  Future<ApplicationModel> getApplication(String applicationId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get(
+      '/recruitment/applications/$applicationId',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ApplicationModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du chargement du dossier.');
+  }
+
+  Future<List<ApplicationReviewModel>> getApplicationReviews(
+    String applicationId,
+  ) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get(
+      '/recruitment/applications/$applicationId/reviews',
+      token: token,
+    );
+
+    final rawList = _extractList(response);
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(ApplicationReviewModel.fromJson)
+        .toList();
+  }
+
   Future<String> exportApplicationsCsv() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

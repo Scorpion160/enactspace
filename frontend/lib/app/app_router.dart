@@ -21,7 +21,7 @@ import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
 import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/projects_screen.dart';
-import '../features/recruitment/screens/recruitment_screen.dart';
+import '../features/recruitment/screens/internal/internal_recruitment_screen.dart';
 import '../features/recruitment/screens/application_tracking_screen.dart';
 import '../features/recruitment/screens/public/public_application_flow_screen.dart';
 import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
@@ -137,7 +137,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/recruitment',
-            builder: (context, state) => const RecruitmentScreen(),
+            builder: (context, state) => const InternalRecruitmentScreen(),
           ),
           GoRoute(
             path: '/documents',
