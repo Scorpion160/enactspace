@@ -7,6 +7,7 @@ import '../../models/application_model.dart';
 import '../../models/application_review_model.dart';
 import '../../services/internal_recruitment_gateway.dart';
 import '../../widgets/internal/candidate_actions.dart';
+import '../../widgets/internal/candidate_conversion.dart';
 import '../../widgets/internal/recruitment_internal_widgets.dart';
 
 class ApplicationDetailPanel extends StatefulWidget {
@@ -99,8 +100,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       campaignTitle: widget.campaignTitle,
                       anonymized: widget.anonymized,
                       actionFeedback: _actionFeedback,
+                      gateway: widget.gateway,
                       onStatusChange: _changeStatus,
                       onInterview: _scheduleInterview,
+                      onConversionCompleted: _refreshAfterMutation,
                     ),
             ),
           ],
@@ -231,8 +234,10 @@ class _DetailBody extends StatelessWidget {
   final String campaignTitle;
   final bool anonymized;
   final String? actionFeedback;
+  final InternalRecruitmentGateway gateway;
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
+  final Future<void> Function() onConversionCompleted;
 
   const _DetailBody({
     required this.application,
@@ -240,8 +245,10 @@ class _DetailBody extends StatelessWidget {
     required this.campaignTitle,
     required this.anonymized,
     required this.actionFeedback,
+    required this.gateway,
     required this.onStatusChange,
     required this.onInterview,
+    required this.onConversionCompleted,
   });
 
   @override
@@ -377,6 +384,13 @@ class _DetailBody extends StatelessWidget {
           ),
         ],
       ),
+      if (!anonymized && application.status == 'accepted')
+        CandidateIntegrationSection(
+          application: application,
+          campaignTitle: campaignTitle,
+          gateway: gateway,
+          onCompleted: onConversionCompleted,
+        ),
     ],
   );
 }

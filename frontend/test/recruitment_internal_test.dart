@@ -6,6 +6,7 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/recruitment/models/application_model.dart';
 import 'package:frontend/features/recruitment/models/application_review_model.dart';
 import 'package:frontend/features/recruitment/models/application_status_presentation.dart';
+import 'package:frontend/features/recruitment/models/candidate_conversion_model.dart';
 import 'package:frontend/features/recruitment/models/recruitment_campaign_model.dart';
 import 'package:frontend/features/recruitment/screens/internal/internal_recruitment_screen.dart';
 import 'package:frontend/features/recruitment/services/internal_recruitment_gateway.dart';
@@ -182,6 +183,15 @@ class _FakeGateway implements InternalRecruitmentGateway {
     _current = result;
     return result;
   }
+
+  @override
+  Future<CandidateConversionCatalog> loadConversionCatalog() async =>
+      const CandidateConversionCatalog(poles: [], projects: []);
+
+  @override
+  Future<CandidateConversionResult> convertCandidate(
+    CandidateConversionRequest request,
+  ) => throw UnsupportedError('unused');
 }
 
 Widget _app(InternalRecruitmentGateway gateway) => MaterialApp(

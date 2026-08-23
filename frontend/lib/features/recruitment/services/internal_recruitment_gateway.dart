@@ -1,6 +1,9 @@
 import '../models/application_model.dart';
 import '../models/application_review_model.dart';
+import '../models/candidate_conversion_model.dart';
 import '../models/recruitment_campaign_model.dart';
+import '../../poles/services/poles_service.dart';
+import '../../projects/services/projects_service.dart';
 import 'recruitment_service.dart';
 
 abstract interface class InternalRecruitmentGateway {
@@ -44,13 +47,26 @@ abstract interface class InternalRecruitmentGateway {
     String? jury,
     String? note,
   });
+
+  Future<CandidateConversionCatalog> loadConversionCatalog();
+
+  Future<CandidateConversionResult> convertCandidate(
+    CandidateConversionRequest request,
+  );
 }
 
 class RecruitmentServiceGateway implements InternalRecruitmentGateway {
   final RecruitmentService service;
+  final PolesService polesService;
+  final ProjectsService projectsService;
 
-  RecruitmentServiceGateway({RecruitmentService? service})
-    : service = service ?? RecruitmentService();
+  RecruitmentServiceGateway({
+    RecruitmentService? service,
+    PolesService? polesService,
+    ProjectsService? projectsService,
+  }) : service = service ?? RecruitmentService(),
+       polesService = polesService ?? PolesService(),
+       projectsService = projectsService ?? ProjectsService();
 
   @override
   Future<List<RecruitmentCampaignModel>> loadCampaigns() =>
@@ -129,4 +145,31 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
     jury: jury,
     note: note,
   );
+
+  @override
+  Future<CandidateConversionCatalog> loadConversionCatalog() async {
+    final results = await Future.wait<dynamic>([
+      polesService.getPoles(),
+      projectsService.getProjects(),
+    ]);
+    return CandidateConversionCatalog(
+      poles: (results[0] as List).cast(),
+      projects: (results[1] as List).cast(),
+    );
+  }
+
+  @override
+  Future<CandidateConversionResult> convertCandidate(
+    CandidateConversionRequest request,
+  ) async {
+    final response = await service.convertToUser(
+      applicationId: request.applicationId,
+      password: request.password,
+      profileType: request.profileType,
+      corePoleId: request.corePoleId,
+      supportPoleIds: request.supportPoleIds,
+      projectId: request.projectId,
+    );
+    return CandidateConversionResult.fromResponse(response, request: request);
+  }
 }

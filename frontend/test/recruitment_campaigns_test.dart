@@ -4,6 +4,7 @@ import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/recruitment/models/application_model.dart';
 import 'package:frontend/features/recruitment/models/application_review_model.dart';
 import 'package:frontend/features/recruitment/models/campaign_state_presentation.dart';
+import 'package:frontend/features/recruitment/models/candidate_conversion_model.dart';
 import 'package:frontend/features/recruitment/models/recruitment_campaign_model.dart';
 import 'package:frontend/features/recruitment/screens/internal/campaign_management_screen.dart';
 import 'package:frontend/features/recruitment/services/internal_recruitment_gateway.dart';
@@ -178,6 +179,15 @@ class _CampaignGateway implements InternalRecruitmentGateway {
     String? jury,
     String? note,
   }) => throw UnsupportedError('unused');
+
+  @override
+  Future<CandidateConversionCatalog> loadConversionCatalog() async =>
+      const CandidateConversionCatalog(poles: [], projects: []);
+
+  @override
+  Future<CandidateConversionResult> convertCandidate(
+    CandidateConversionRequest request,
+  ) => throw UnsupportedError('unused');
 }
 
 Widget _app(_CampaignGateway gateway) => MaterialApp(
