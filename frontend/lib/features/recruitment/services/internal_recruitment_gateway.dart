@@ -6,6 +6,25 @@ import 'recruitment_service.dart';
 abstract interface class InternalRecruitmentGateway {
   Future<List<RecruitmentCampaignModel>> loadCampaigns();
 
+  Future<RecruitmentCampaignModel> createCampaign({
+    required String title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool isActive,
+  });
+
+  Future<RecruitmentCampaignModel> updateCampaign({
+    required String campaignId,
+    String? title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isActive,
+  });
+
+  Future<void> deleteCampaign(String campaignId);
+
   Future<List<ApplicationModel>> loadApplications();
 
   Future<ApplicationModel> loadApplication(String applicationId);
@@ -36,6 +55,42 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
   @override
   Future<List<RecruitmentCampaignModel>> loadCampaigns() =>
       service.getCampaigns();
+
+  @override
+  Future<RecruitmentCampaignModel> createCampaign({
+    required String title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool isActive = true,
+  }) => service.createCampaign(
+    title: title,
+    description: description,
+    startDate: startDate,
+    endDate: endDate,
+    isActive: isActive,
+  );
+
+  @override
+  Future<RecruitmentCampaignModel> updateCampaign({
+    required String campaignId,
+    String? title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isActive,
+  }) => service.updateCampaign(
+    campaignId: campaignId,
+    title: title,
+    description: description,
+    startDate: startDate,
+    endDate: endDate,
+    isActive: isActive,
+  );
+
+  @override
+  Future<void> deleteCampaign(String campaignId) =>
+      service.deleteCampaign(campaignId);
 
   @override
   Future<List<ApplicationModel>> loadApplications() =>

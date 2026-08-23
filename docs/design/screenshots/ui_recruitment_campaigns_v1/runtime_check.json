@@ -1,0 +1,56 @@
+{
+  "environment": "ui_audit",
+  "frontend_origin": "http://127.0.0.1:18081",
+  "api_origin": "http://127.0.0.1:18002",
+  "checked_at": "2026-08-23",
+  "checked_after_captures": true,
+  "campaigns_count_before": 7,
+  "campaigns_count_after": 7,
+  "applications_count_before": 37,
+  "applications_count_after": 37,
+  "campaigns_count": 7,
+  "applications_count": 37,
+  "target_campaigns": [
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-OPEN",
+      "is_active": true,
+      "start_date": "2026-07-04",
+      "end_date": "2026-11-01",
+      "calculated_state": "Ouverte",
+      "applications_count": 5
+    },
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-PLANNED",
+      "is_active": true,
+      "start_date": "2026-09-02",
+      "end_date": "2026-12-01",
+      "calculated_state": "Planifiée",
+      "applications_count": 0
+    },
+    {
+      "reference": "AUDIT-REC-CAMPAIGN-CLOSED",
+      "is_active": false,
+      "start_date": "2026-04-05",
+      "end_date": "2026-07-04",
+      "calculated_state": "Terminée",
+      "calculation_note": "La date de fin passée est prioritaire sur l’inactivité ; aucune mutation automatique n’est effectuée.",
+      "applications_count": 2
+    }
+  ],
+  "runtime_surfaces_opened": [
+    "liste des campagnes",
+    "formulaire Créer une campagne",
+    "formulaire Modifier la campagne prérempli",
+    "confirmation Fermer cette campagne ?",
+    "confirmation Supprimer définitivement cette campagne ?"
+  ],
+  "opening_confirmation": "Aucune fixture inactive non terminée n’est disponible ; le dialogue Ouvrir cette campagne ? est vérifié avec le gateway simulé.",
+  "final_confirmation_clicked": false,
+  "campaign_created": false,
+  "campaign_updated": false,
+  "campaign_toggled": false,
+  "campaign_deleted": false,
+  "application_deleted": false,
+  "mutation_request_sent": false,
+  "mutation_performed": false
+}

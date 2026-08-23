@@ -22,6 +22,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
   final int activeFilterCount;
   final VoidCallback onRefresh;
   final VoidCallback onToggleFilters;
+  final VoidCallback onManageCampaigns;
 
   const InternalRecruitmentHeader({
     super.key,
@@ -31,6 +32,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
     required this.activeFilterCount,
     required this.onRefresh,
     required this.onToggleFilters,
+    required this.onManageCampaigns,
   });
 
   @override
@@ -50,35 +52,59 @@ class InternalRecruitmentHeader extends StatelessWidget {
         Text(campaignLabel, style: const TextStyle(color: Colors.white70)),
       ],
     );
-    final actions = Wrap(
-      spacing: 8,
-      children: [
-        Semantics(
-          button: true,
-          label: 'Filtres, $activeFilterCount actifs',
-          child: OutlinedButton.icon(
-            onPressed: onToggleFilters,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white38),
-              minimumSize: const Size(44, 44),
-            ),
-            icon: const Icon(Icons.tune_rounded),
-            label: Text(
-              activeFilterCount == 0
-                  ? 'Filtres'
-                  : 'Filtres ($activeFilterCount)',
-            ),
-          ),
+    final manageCampaigns = Semantics(
+      button: true,
+      label: 'Gérer les campagnes de recrutement',
+      child: OutlinedButton.icon(
+        key: const Key('manage-campaigns'),
+        onPressed: onManageCampaigns,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: const BorderSide(color: Colors.white38),
+          minimumSize: const Size(44, 44),
         ),
-        IconButton(
-          onPressed: onRefresh,
-          tooltip: 'Actualiser la liste',
-          color: Colors.white,
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-      ],
+        icon: const Icon(Icons.campaign_outlined),
+        label: const Text('Gérer les campagnes'),
+      ),
     );
+    final filters = Semantics(
+      button: true,
+      label: 'Filtres, $activeFilterCount actifs',
+      child: OutlinedButton.icon(
+        onPressed: onToggleFilters,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: const BorderSide(color: Colors.white38),
+          minimumSize: const Size(44, 44),
+        ),
+        icon: const Icon(Icons.tune_rounded),
+        label: Text(
+          activeFilterCount == 0 ? 'Filtres' : 'Filtres ($activeFilterCount)',
+        ),
+      ),
+    );
+    final refresh = IconButton(
+      onPressed: onRefresh,
+      tooltip: 'Actualiser la liste',
+      color: Colors.white,
+      icon: const Icon(Icons.refresh_rounded),
+    );
+    final actions = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              manageCampaigns,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: filters),
+                  const SizedBox(width: 8),
+                  refresh,
+                ],
+              ),
+            ],
+          )
+        : Wrap(spacing: 8, children: [manageCampaigns, filters, refresh]);
     return Container(
       padding: EdgeInsets.all(compact ? 18 : 24),
       decoration: BoxDecoration(
@@ -91,7 +117,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
           if (compact) ...[
             heading,
             const SizedBox(height: 16),
-            actions,
+            SizedBox(width: double.infinity, child: actions),
           ] else
             Row(
               children: [

@@ -8,6 +8,7 @@ import '../../models/recruitment_campaign_model.dart';
 import '../../services/internal_recruitment_gateway.dart';
 import '../../widgets/internal/recruitment_internal_widgets.dart';
 import 'application_detail_panel.dart';
+import 'campaign_management_screen.dart';
 
 class InternalRecruitmentScreen extends StatefulWidget {
   final InternalRecruitmentGateway? gateway;
@@ -247,6 +248,15 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     });
   }
 
+  Future<void> _openCampaignManagement() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CampaignManagementScreen(gateway: _gateway),
+      ),
+    );
+    if (mounted) await _load(initial: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -272,6 +282,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onRefresh: () => _load(initial: false),
             onToggleFilters: () =>
                 setState(() => _filtersExpanded = !_filtersExpanded),
+            onManageCampaigns: _openCampaignManagement,
           ),
           const SizedBox(height: 14),
           InternalFilterBar(

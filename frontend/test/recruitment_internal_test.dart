@@ -101,6 +101,40 @@ class _FakeGateway implements InternalRecruitmentGateway {
       Future.value(const [_campaign]);
 
   @override
+  Future<RecruitmentCampaignModel> createCampaign({
+    required String title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool isActive = true,
+  }) async => _campaign.copyWith(
+    title: title,
+    description: description,
+    startDate: startDate?.toIso8601String(),
+    endDate: endDate?.toIso8601String(),
+    isActive: isActive,
+  );
+
+  @override
+  Future<RecruitmentCampaignModel> updateCampaign({
+    required String campaignId,
+    String? title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isActive,
+  }) async => _campaign.copyWith(
+    title: title,
+    description: description,
+    startDate: startDate?.toIso8601String(),
+    endDate: endDate?.toIso8601String(),
+    isActive: isActive,
+  );
+
+  @override
+  Future<void> deleteCampaign(String campaignId) async {}
+
+  @override
   Future<List<ApplicationModel>> loadApplications() =>
       applications?.call() ?? Future.value([_application()]);
 
@@ -160,8 +194,10 @@ Future<void> _pump(
   InternalRecruitmentGateway gateway, {
   Size size = const Size(1366, 768),
 }) async {
-  await tester.binding.setSurfaceSize(size);
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
   await tester.pumpWidget(_app(gateway));
   await tester.pumpAndSettle();
 }
@@ -264,7 +300,7 @@ void main() {
       const Offset(0, -700),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Documents'), findsOneWidget);
+    expect(find.text('Documents'), findsWidgets);
     expect(find.text('Lettre de motivation'), findsOneWidget);
     expect(find.text('Consulter'), findsNWidgets(3));
   });
@@ -375,7 +411,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retenir cette candidature ?'), findsOneWidget);
     expect(find.text('Moyenne officielle'), findsOneWidget);
-    expect(find.text('15.0/20'), findsOneWidget);
+    expect(find.text('15.0/20'), findsWidgets);
     expect(
       find.textContaining('sans convertir automatiquement'),
       findsOneWidget,

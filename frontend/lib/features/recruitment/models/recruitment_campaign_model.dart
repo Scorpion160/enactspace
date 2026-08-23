@@ -38,6 +38,29 @@ class RecruitmentCampaignModel {
     );
   }
 
+  DateTime? get startDateValue => DateTime.tryParse(startDate ?? '');
+
+  DateTime? get endDateValue => DateTime.tryParse(endDate ?? '');
+
+  RecruitmentCampaignModel copyWith({
+    String? title,
+    String? description,
+    String? startDate,
+    String? endDate,
+    bool? isActive,
+  }) => RecruitmentCampaignModel(
+    id: id,
+    seasonId: seasonId,
+    title: title ?? this.title,
+    description: description ?? this.description,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
+    isActive: isActive ?? this.isActive,
+    createdBy: createdBy,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+
   String get periodLabel {
     final start = _formatDate(startDate);
     final end = _formatDate(endDate);
