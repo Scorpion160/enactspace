@@ -11,6 +11,20 @@ abstract interface class InternalRecruitmentGateway {
   Future<ApplicationModel> loadApplication(String applicationId);
 
   Future<List<ApplicationReviewModel>> loadReviews(String applicationId);
+
+  Future<ApplicationModel> changeStatus({
+    required String applicationId,
+    required String status,
+  });
+
+  Future<ApplicationModel> scheduleInterview({
+    required String applicationId,
+    required DateTime interviewAt,
+    String? location,
+    String? link,
+    String? jury,
+    String? note,
+  });
 }
 
 class RecruitmentServiceGateway implements InternalRecruitmentGateway {
@@ -34,4 +48,30 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
   @override
   Future<List<ApplicationReviewModel>> loadReviews(String applicationId) =>
       service.getApplicationReviews(applicationId);
+
+  @override
+  Future<ApplicationModel> changeStatus({
+    required String applicationId,
+    required String status,
+  }) => service.changeApplicationStatus(
+    applicationId: applicationId,
+    status: status,
+  );
+
+  @override
+  Future<ApplicationModel> scheduleInterview({
+    required String applicationId,
+    required DateTime interviewAt,
+    String? location,
+    String? link,
+    String? jury,
+    String? note,
+  }) => service.scheduleInterview(
+    applicationId: applicationId,
+    interviewAt: interviewAt,
+    location: location,
+    link: link,
+    jury: jury,
+    note: note,
+  );
 }

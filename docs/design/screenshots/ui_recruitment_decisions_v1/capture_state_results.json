@@ -1,0 +1,123 @@
+{
+  "runtime_verified": true,
+  "applications_count": 37,
+  "mutation_performed": false,
+  "captures": [
+    {
+      "filename": "01_candidate_actions_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": false,
+      "expected_markers": [
+        "Complete Dossier",
+        "En cours d’étude",
+        "Actions sur la candidature",
+        "Planifier un entretien",
+        "Placer en liste d’attente",
+        "Accepter la candidature",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "reached_markers": [
+        "Complete Dossier",
+        "En cours d’étude",
+        "Actions sur la candidature",
+        "Planifier un entretien",
+        "Placer en liste d’attente",
+        "Accepter la candidature",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "screenshot_sha256": "46832b3a8858eb5a8906e622b8f69ffdd9ed9c354ac85230739204af03c1750f",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_waiting_list_dialog_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": true,
+      "expected_markers": ["Placer en liste d’attente ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Liste d’attente", "Retour", "Confirmer"],
+      "reached_markers": ["Placer en liste d’attente ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Liste d’attente", "Retour", "Confirmer"],
+      "screenshot_sha256": "499ce2322725a90223610cf0f0f32c0f24d19568c8819b2b73648bf7c396586d",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_acceptance_dialog_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": true,
+      "expected_markers": ["Retenir cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Moyenne officielle", "Évaluations", "sans convertir automatiquement", "Retour", "Retenir la candidature"],
+      "reached_markers": ["Retenir cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Moyenne officielle", "Évaluations", "sans convertir automatiquement", "Retour", "Retenir la candidature"],
+      "screenshot_sha256": "b6460957c058443529d35b981eab65d36289a1d33a1339c3131e8bb3162b934f",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_rejection_dialog_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": true,
+      "expected_markers": ["Ne pas retenir cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Cette décision est sensible", "Je confirme avoir vérifié le dossier", "Confirmer la décision"],
+      "reached_markers": ["Ne pas retenir cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "Cette décision est sensible", "Je confirme avoir vérifié le dossier", "Confirmer la décision"],
+      "confirmation_checked": false,
+      "final_action_enabled": false,
+      "screenshot_sha256": "d78a302000aaecdccd05f9bb5b0c0b1288d25dac3e681d22491dbd0f32f03d2d",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_closure_dialog_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": true,
+      "expected_markers": ["Clôturer cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "distincte d’un rejet", "Je confirme avoir vérifié le dossier", "Retour", "Confirmer la clôture"],
+      "reached_markers": ["Clôturer cette candidature ?", "AUDIT-REC-COMPLETE-001", "En cours d’étude", "distincte d’un rejet", "Je confirme avoir vérifié le dossier", "Retour", "Confirmer la clôture"],
+      "screenshot_sha256": "890c04df8b88f57b0eabb8a2d2d5a452425edb464b625e674827c5e2398ccca1",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_interview_schedule_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": true,
+      "expected_markers": ["Planifier l’entretien", "Date", "Heure", "Lieu", "Lien", "Jury", "Informations complémentaires", "Retour"],
+      "reached_markers": ["Planifier l’entretien", "Date", "Heure", "Lieu", "Lien", "Jury", "Informations complémentaires", "Retour"],
+      "screenshot_sha256": "91c5192418c64a1b9cb830991dd41630aca371018639735879c474a2d28a1e04",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_interview_edit_tablet_768x1024.png",
+      "viewport": "768x1024",
+      "target_reference": "AUDIT-REC-INTERVIEW-001",
+      "target_status": "interview_scheduled",
+      "dialog_opened": true,
+      "expected_markers": ["Modifier l’entretien", "10/08/2026", "14:30", "Salle Audit Synthétique A1", "Lien", "Jury", "Informations complémentaires", "Retour"],
+      "reached_markers": ["Modifier l’entretien", "10/08/2026", "14:30", "Salle Audit Synthétique A1", "Lien", "Jury", "Informations complémentaires", "Retour"],
+      "screenshot_sha256": "bb059fcbf89a3a3d57db16f4c36ac03f7b32cca39e1538e57b4795084648a13b",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_candidate_actions_mobile_390x844.png",
+      "viewport": "390x844",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "target_status": "under_review",
+      "dialog_opened": false,
+      "expected_markers": ["Complete Dossier", "En cours d’étude", "Actions sur la candidature", "Planifier un entretien", "Placer en liste d’attente", "Accepter la candidature", "Ne pas retenir la candidature", "Clôturer la candidature"],
+      "reached_markers": ["Complete Dossier", "En cours d’étude", "Actions sur la candidature", "Planifier un entretien", "Placer en liste d’attente", "Accepter la candidature", "Ne pas retenir la candidature", "Clôturer la candidature"],
+      "screenshot_sha256": "28c38778812a9db15920d33063117a75d097837d55b252d4ca5f0fba5f9da6a5",
+      "mutation_performed": false,
+      "success": true
+    }
+  ]
+}

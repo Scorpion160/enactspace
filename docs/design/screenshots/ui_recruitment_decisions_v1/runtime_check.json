@@ -1,0 +1,126 @@
+{
+  "environment": "ui_audit",
+  "frontend_origin": "http://127.0.0.1:18080",
+  "api_origin": "http://127.0.0.1:18002",
+  "checked_at": "2026-08-22",
+  "applications_count": 37,
+  "fixtures": [
+    {
+      "reference": "AUDIT-REC-COMPLETE-001",
+      "status_before": "under_review",
+      "status_after": "under_review",
+      "actions_available": [
+        "Planifier un entretien",
+        "Placer en liste d’attente",
+        "Accepter la candidature",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "dialogs_openable": [
+        "Planifier l’entretien",
+        "Placer en liste d’attente ?",
+        "Retenir cette candidature ?",
+        "Ne pas retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ],
+      "dialogs_opened_read_only": [
+        "Planifier l’entretien",
+        "Placer en liste d’attente ?",
+        "Retenir cette candidature ?",
+        "Ne pas retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ]
+    },
+    {
+      "reference": "AUDIT-REC-INTERVIEW-001",
+      "status_before": "interview_scheduled",
+      "status_after": "interview_scheduled",
+      "interview_at_before": "2026-08-10T14:30:00",
+      "interview_at_after": "2026-08-10T14:30:00",
+      "interview_location_before": "Salle Audit Synthétique A1",
+      "interview_location_after": "Salle Audit Synthétique A1",
+      "actions_available": [
+        "Passer en étude",
+        "Modifier l’entretien",
+        "Placer en liste d’attente",
+        "Accepter la candidature",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "dialogs_openable": [
+        "Changer le statut de la candidature ?",
+        "Modifier l’entretien",
+        "Placer en liste d’attente ?",
+        "Retenir cette candidature ?",
+        "Ne pas retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ],
+      "dialogs_opened_read_only": ["Modifier l’entretien"]
+    },
+    {
+      "reference": "AUDIT-REC-ACCEPTED-001",
+      "status_before": "accepted",
+      "status_after": "accepted",
+      "actions_available": [
+        "Passer en étude",
+        "Planifier un entretien",
+        "Placer en liste d’attente",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "dialogs_openable": [
+        "Changer le statut de la candidature ?",
+        "Planifier l’entretien",
+        "Placer en liste d’attente ?",
+        "Ne pas retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ],
+      "dialogs_opened_read_only": []
+    },
+    {
+      "reference": "AUDIT-REC-WAITING-001",
+      "status_before": "waiting_list",
+      "status_after": "waiting_list",
+      "actions_available": [
+        "Passer en étude",
+        "Planifier un entretien",
+        "Accepter la candidature",
+        "Ne pas retenir la candidature",
+        "Clôturer la candidature"
+      ],
+      "dialogs_openable": [
+        "Changer le statut de la candidature ?",
+        "Planifier l’entretien",
+        "Retenir cette candidature ?",
+        "Ne pas retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ],
+      "dialogs_opened_read_only": []
+    },
+    {
+      "reference": "AUDIT-REC-REJECTED-001",
+      "status_before": "rejected",
+      "status_after": "rejected",
+      "actions_available": [
+        "Passer en étude",
+        "Planifier un entretien",
+        "Placer en liste d’attente",
+        "Accepter la candidature",
+        "Clôturer la candidature"
+      ],
+      "dialogs_openable": [
+        "Changer le statut de la candidature ?",
+        "Planifier l’entretien",
+        "Placer en liste d’attente ?",
+        "Retenir cette candidature ?",
+        "Clôturer cette candidature ?"
+      ],
+      "dialogs_opened_read_only": []
+    }
+  ],
+  "final_confirmation_clicked": false,
+  "checked_after_captures": true,
+  "statuses_verified_after_dialogs": true,
+  "mutation_request_sent": false,
+  "mutation_performed": false
+}

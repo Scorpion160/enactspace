@@ -82,9 +82,19 @@ const _reviews = [
 
 class _FakeGateway implements InternalRecruitmentGateway {
   final Future<List<ApplicationModel>> Function()? applications;
-  final ApplicationModel? detail;
+  final Future<ApplicationModel> Function(String status)? statusMutation;
+  final Future<ApplicationModel> Function(DateTime interviewAt)?
+  interviewMutation;
+  ApplicationModel? _current;
+  int statusMutationCount = 0;
+  int interviewMutationCount = 0;
 
-  _FakeGateway({this.applications, this.detail});
+  _FakeGateway({
+    this.applications,
+    ApplicationModel? detail,
+    this.statusMutation,
+    this.interviewMutation,
+  }) : _current = detail;
 
   @override
   Future<List<RecruitmentCampaignModel>> loadCampaigns() =>
@@ -96,12 +106,48 @@ class _FakeGateway implements InternalRecruitmentGateway {
 
   @override
   Future<ApplicationModel> loadApplication(String applicationId) async =>
-      detail ?? _application();
+      _current ?? _application();
 
   @override
   Future<List<ApplicationReviewModel>> loadReviews(
     String applicationId,
   ) async => _reviews;
+
+  @override
+  Future<ApplicationModel> changeStatus({
+    required String applicationId,
+    required String status,
+  }) async {
+    statusMutationCount++;
+    final result =
+        await (statusMutation?.call(status) ??
+            Future.value(_application(status: status)));
+    _current = result;
+    return result;
+  }
+
+  @override
+  Future<ApplicationModel> scheduleInterview({
+    required String applicationId,
+    required DateTime interviewAt,
+    String? location,
+    String? link,
+    String? jury,
+    String? note,
+  }) async {
+    interviewMutationCount++;
+    final result =
+        await (interviewMutation?.call(interviewAt) ??
+            Future.value(
+              _application(
+                status: 'interview_scheduled',
+                interviewAt: interviewAt,
+                interviewLocation: location,
+              ),
+            ));
+    _current = result;
+    return result;
+  }
 }
 
 Widget _app(InternalRecruitmentGateway gateway) => MaterialApp(
@@ -118,6 +164,21 @@ Future<void> _pump(
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(_app(gateway));
   await tester.pumpAndSettle();
+}
+
+Future<void> _openActions(
+  WidgetTester tester,
+  InternalRecruitmentGateway gateway,
+) async {
+  await _pump(tester, gateway);
+  await tester.tap(find.text('Ouvrir le dossier'));
+  await tester.pumpAndSettle();
+  await tester.drag(
+    find.byKey(const Key('application-detail-scroll')),
+    const Offset(0, -3000),
+  );
+  await tester.pumpAndSettle();
+  expect(find.text('Actions sur la candidature'), findsOneWidget);
 }
 
 void main() {
@@ -278,6 +339,294 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Indice de présélection'), findsOneWidget);
     expect(find.textContaining('/100'), findsOneWidget);
+  });
+
+  testWidgets(
+    'les actions ne mutent rien à la sélection et masquent le statut actuel',
+    (tester) async {
+      final gateway = _FakeGateway();
+      await _openActions(tester, gateway);
+      expect(find.text('Passer en étude'), findsNothing);
+      expect(find.text('Planifier un entretien'), findsOneWidget);
+      expect(gateway.statusMutationCount, 0);
+      expect(gateway.interviewMutationCount, 0);
+    },
+  );
+
+  testWidgets('le dialogue standard résume le changement de statut', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Placer en liste d’attente'));
+    await tester.pumpAndSettle();
+    expect(find.text('Placer en liste d’attente ?'), findsOneWidget);
+    expect(find.text('En cours d’étude'), findsWidgets);
+    expect(find.text('Liste d’attente'), findsWidgets);
+    expect(gateway.statusMutationCount, 0);
+  });
+
+  testWidgets('acceptation dédiée confirme sans convertir en utilisateur', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Accepter la candidature'));
+    await tester.pumpAndSettle();
+    expect(find.text('Retenir cette candidature ?'), findsOneWidget);
+    expect(find.text('Moyenne officielle'), findsOneWidget);
+    expect(find.text('15.0/20'), findsOneWidget);
+    expect(
+      find.textContaining('sans convertir automatiquement'),
+      findsOneWidget,
+    );
+    expect(find.text('Retenir la candidature'), findsOneWidget);
+    expect(gateway.statusMutationCount, 0);
+  });
+
+  testWidgets('rejet exige une confirmation renforcée sans faux motif', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Ne pas retenir la candidature'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne pas retenir cette candidature ?'), findsOneWidget);
+    expect(find.textContaining('Motif'), findsNothing);
+    final submit = tester.widget<FilledButton>(
+      find.byKey(const Key('candidate-decision-submit')),
+    );
+    expect(submit.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('candidate-decision-confirmation')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('candidate-decision-submit')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('clôture reste distincte du rejet et exige confirmation', (
+    tester,
+  ) async {
+    await _openActions(tester, _FakeGateway());
+    await tester.tap(find.text('Clôturer la candidature'));
+    await tester.pumpAndSettle();
+    expect(find.text('Clôturer cette candidature ?'), findsOneWidget);
+    expect(find.textContaining('distincte d’un rejet'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('candidate-decision-submit')),
+          )
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('liste d’attente est appliquée seulement après confirmation', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Placer en liste d’attente'));
+    await tester.pumpAndSettle();
+    expect(gateway.statusMutationCount, 0);
+    await tester.tap(find.byKey(const Key('candidate-decision-submit')));
+    await tester.pumpAndSettle();
+    expect(gateway.statusMutationCount, 1);
+    expect(
+      find.textContaining('Statut mis à jour : Liste d’attente'),
+      findsOneWidget,
+    );
+    expect(find.text('Placer en liste d’attente'), findsNothing);
+  });
+
+  testWidgets('succès de décision rafraîchit un statut humanisé', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Accepter la candidature'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('candidate-decision-submit')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Candidature retenue'), findsWidgets);
+    expect(find.text('accepted'), findsNothing);
+    expect(
+      find.textContaining('conversion en utilisateur reste'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'erreur de décision garde le dialogue ouvert et permet réessayer',
+    (tester) async {
+      var attempts = 0;
+      final gateway = _FakeGateway(
+        statusMutation: (status) async {
+          attempts++;
+          if (attempts == 1) {
+            throw Exception('Service temporairement indisponible.');
+          }
+          return _application(status: status);
+        },
+      );
+      await _openActions(tester, gateway);
+      await tester.tap(find.text('Placer en liste d’attente'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('candidate-decision-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Placer en liste d’attente ?'), findsOneWidget);
+      expect(find.text('Service temporairement indisponible.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('candidate-decision-submit')));
+      await tester.pumpAndSettle();
+      expect(attempts, 2);
+      expect(find.textContaining('Liste d’attente'), findsWidgets);
+    },
+  );
+
+  testWidgets('double clic de décision est empêché pendant envoi', (
+    tester,
+  ) async {
+    final completer = Completer<ApplicationModel>();
+    final gateway = _FakeGateway(statusMutation: (_) => completer.future);
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Placer en liste d’attente'));
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const Key('candidate-decision-submit'));
+    await tester.tap(submit);
+    await tester.pump();
+    await tester.tap(submit);
+    await tester.pump();
+    expect(gateway.statusMutationCount, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    completer.complete(_application(status: 'waiting_list'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('formulaire entretien expose seulement les champs backend', (
+    tester,
+  ) async {
+    await _openActions(tester, _FakeGateway());
+    await tester.tap(find.text('Planifier un entretien'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('candidate-interview-date')), findsOneWidget);
+    expect(find.byKey(const Key('candidate-interview-time')), findsOneWidget);
+    expect(
+      find.byKey(const Key('candidate-interview-location')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('candidate-interview-link')), findsOneWidget);
+    expect(find.byKey(const Key('candidate-interview-jury')), findsOneWidget);
+    expect(find.byKey(const Key('candidate-interview-note')), findsOneWidget);
+    expect(find.textContaining('Motif'), findsNothing);
+  });
+
+  testWidgets('validation entretien bloque date et heure invalides', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Planifier un entretien'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-date')),
+      '31/02/2026',
+    );
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-time')),
+      '27:90',
+    );
+    await tester.tap(find.byKey(const Key('candidate-interview-submit')));
+    await tester.pump();
+    expect(find.text('Saisissez une date et une heure valides.'), findsWidgets);
+    expect(gateway.interviewMutationCount, 0);
+  });
+
+  testWidgets('succès entretien rafraîchit statut date et lieu', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway();
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Planifier un entretien'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-date')),
+      '10/09/2026',
+    );
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-time')),
+      '14:30',
+    );
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-location')),
+      'Salle Horizon',
+    );
+    await tester.tap(find.byKey(const Key('candidate-interview-submit')));
+    await tester.pumpAndSettle();
+    expect(gateway.interviewMutationCount, 1);
+    expect(find.textContaining('Entretien enregistré'), findsOneWidget);
+    expect(find.text('Entretien programmé'), findsWidgets);
+    expect(find.text('Salle Horizon'), findsOneWidget);
+  });
+
+  testWidgets('erreur entretien conserve le formulaire et les données', (
+    tester,
+  ) async {
+    final gateway = _FakeGateway(
+      interviewMutation: (_) async => throw Exception('Agenda indisponible.'),
+    );
+    await _openActions(tester, gateway);
+    await tester.tap(find.text('Planifier un entretien'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-date')),
+      '10/09/2026',
+    );
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-time')),
+      '14:30',
+    );
+    await tester.enterText(
+      find.byKey(const Key('candidate-interview-location')),
+      'Salle conservée',
+    );
+    await tester.tap(find.byKey(const Key('candidate-interview-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Agenda indisponible.'), findsOneWidget);
+    expect(find.text('Salle conservée'), findsOneWidget);
+    expect(find.text('Planifier l’entretien'), findsWidgets);
+  });
+
+  testWidgets('entretien existant propose une modification préremplie', (
+    tester,
+  ) async {
+    final existing = _application(
+      status: 'interview_scheduled',
+      interviewAt: DateTime(2026, 8, 10, 14, 30),
+      interviewLocation: 'Salle Audit A1',
+    );
+    await _openActions(tester, _FakeGateway(detail: existing));
+    await tester.tap(find.text('Modifier l’entretien'));
+    await tester.pumpAndSettle();
+    expect(find.text('10/08/2026'), findsOneWidget);
+    expect(find.text('14:30'), findsOneWidget);
+    expect(find.text('Salle Audit A1'), findsWidgets);
+    expect(find.text('Modifier l’entretien'), findsWidgets);
+  });
+
+  testWidgets('actions terminales déjà actives sont absentes', (tester) async {
+    await _openActions(
+      tester,
+      _FakeGateway(detail: _application(status: 'accepted')),
+    );
+    expect(find.text('Accepter la candidature'), findsNothing);
+    expect(find.text('Candidature retenue'), findsWidgets);
+    expect(find.text('accepted'), findsNothing);
   });
 }
 

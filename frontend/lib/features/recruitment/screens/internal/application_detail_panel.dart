@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../models/application_model.dart';
 import '../../models/application_review_model.dart';
 import '../../services/internal_recruitment_gateway.dart';
+import '../../widgets/internal/candidate_actions.dart';
 import '../../widgets/internal/recruitment_internal_widgets.dart';
 
 class ApplicationDetailPanel extends StatefulWidget {
@@ -13,6 +14,7 @@ class ApplicationDetailPanel extends StatefulWidget {
   final String campaignTitle;
   final bool anonymized;
   final InternalRecruitmentGateway gateway;
+  final ValueChanged<ApplicationModel>? onApplicationChanged;
   final VoidCallback onClose;
 
   const ApplicationDetailPanel({
@@ -21,6 +23,7 @@ class ApplicationDetailPanel extends StatefulWidget {
     required this.campaignTitle,
     required this.anonymized,
     required this.gateway,
+    this.onApplicationChanged,
     required this.onClose,
   });
 
@@ -32,6 +35,7 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   ApplicationModel? _application;
   List<ApplicationReviewModel> _reviews = const [];
   Object? _error;
+  String? _actionFeedback;
 
   @override
   void initState() {
@@ -65,9 +69,9 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
           children: [
             _PanelHeader(
               title: widget.anonymized
-                  ? widget.summary.anonymousCode
-                  : widget.summary.fullName,
-              status: widget.summary.status,
+                  ? (_application ?? widget.summary).anonymousCode
+                  : (_application ?? widget.summary).fullName,
+              status: (_application ?? widget.summary).status,
               onClose: widget.onClose,
             ),
             Expanded(
@@ -94,12 +98,78 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       reviews: _reviews,
                       campaignTitle: widget.campaignTitle,
                       anonymized: widget.anonymized,
+                      actionFeedback: _actionFeedback,
+                      onStatusChange: _changeStatus,
+                      onInterview: _scheduleInterview,
                     ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _changeStatus(String status) async {
+    final updated = await widget.gateway.changeStatus(
+      applicationId: widget.summary.id,
+      status: status,
+    );
+    if (!mounted) return;
+    setState(() {
+      _application = updated;
+      _actionFeedback =
+          'Statut mis à jour : ${updated.statusLabel}. Le dossier a été actualisé.';
+    });
+    widget.onApplicationChanged?.call(updated);
+    await _refreshAfterMutation();
+  }
+
+  Future<void> _scheduleInterview({
+    required DateTime interviewAt,
+    String? location,
+    String? link,
+    String? jury,
+    String? note,
+  }) async {
+    final updated = await widget.gateway.scheduleInterview(
+      applicationId: widget.summary.id,
+      interviewAt: interviewAt,
+      location: location,
+      link: link,
+      jury: jury,
+      note: note,
+    );
+    if (!mounted) return;
+    setState(() {
+      _application = updated;
+      _actionFeedback =
+          'Entretien enregistré. Le statut et les informations ont été actualisés.';
+    });
+    widget.onApplicationChanged?.call(updated);
+    await _refreshAfterMutation();
+  }
+
+  Future<void> _refreshAfterMutation() async {
+    try {
+      final results = await Future.wait<dynamic>([
+        widget.gateway.loadApplication(widget.summary.id),
+        widget.gateway.loadReviews(widget.summary.id),
+      ]);
+      if (!mounted) return;
+      final refreshed = results[0] as ApplicationModel;
+      setState(() {
+        _application = refreshed;
+        _reviews = results[1] as List<ApplicationReviewModel>;
+      });
+      widget.onApplicationChanged?.call(refreshed);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _actionFeedback =
+            '${_actionFeedback ?? 'Action enregistrée.'} '
+            'Le rafraîchissement complet pourra être relancé.';
+      });
+    }
   }
 }
 
@@ -160,12 +230,18 @@ class _DetailBody extends StatelessWidget {
   final List<ApplicationReviewModel> reviews;
   final String campaignTitle;
   final bool anonymized;
+  final String? actionFeedback;
+  final CandidateStatusCallback onStatusChange;
+  final CandidateInterviewCallback onInterview;
 
   const _DetailBody({
     required this.application,
     required this.reviews,
     required this.campaignTitle,
     required this.anonymized,
+    required this.actionFeedback,
+    required this.onStatusChange,
+    required this.onInterview,
   });
 
   @override
@@ -286,12 +362,18 @@ class _DetailBody extends StatelessWidget {
           ),
         ],
       ),
-      const _Section(
-        title: 'Actions',
-        icon: Icons.lock_outline_rounded,
+      _Section(
+        title: 'Actions sur la candidature',
+        icon: Icons.admin_panel_settings_outlined,
         children: [
-          Text(
-            'Les décisions, entretiens, conversions et changements de statut seront finalisés en 2D-B2.',
+          CandidateActionsSection(
+            application: application,
+            campaignTitle: campaignTitle,
+            reviewCount: reviews.length,
+            reviewAverage: reviews.isEmpty ? null : _average(reviews),
+            onStatusChange: onStatusChange,
+            onInterview: onInterview,
+            feedback: actionFeedback,
           ),
         ],
       ),

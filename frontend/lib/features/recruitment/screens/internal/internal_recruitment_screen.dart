@@ -199,6 +199,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             campaignTitle: _campaignTitle(application.campaignId),
             anonymized: _anonymized,
             gateway: _gateway,
+            onApplicationChanged: _applyUpdatedApplication,
             onClose: () => Navigator.of(routeContext).pop(),
           ),
         ),
@@ -221,6 +222,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             campaignTitle: _campaignTitle(application.campaignId),
             anonymized: _anonymized,
             gateway: _gateway,
+            onApplicationChanged: _applyUpdatedApplication,
             onClose: () => Navigator.of(dialogContext).pop(),
           ),
         ),
@@ -234,6 +236,15 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             child: child,
           ),
     );
+  }
+
+  void _applyUpdatedApplication(ApplicationModel updated) {
+    if (!mounted) return;
+    setState(() {
+      _applications = _applications
+          .map((item) => item.id == updated.id ? updated : item)
+          .toList();
+    });
   }
 
   @override
