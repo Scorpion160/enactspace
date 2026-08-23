@@ -20,7 +20,8 @@ import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
 import '../features/posts/screens/posts_screen.dart';
-import '../features/projects/screens/projects_screen.dart';
+import '../features/projects/screens/project_detail_screen.dart';
+import '../features/projects/screens/projects_portfolio_screen.dart';
 import '../features/recruitment/screens/internal/internal_recruitment_screen.dart';
 import '../features/recruitment/screens/application_tracking_screen.dart';
 import '../features/recruitment/screens/public/public_application_flow_screen.dart';
@@ -163,7 +164,24 @@ class AppRouter {
           ),
           GoRoute(
             path: '/projects',
-            builder: (context, state) => const ProjectsScreen(),
+            builder: (context, state) => const ProjectsPortfolioScreen(),
+            routes: [
+              GoRoute(
+                path: ':projectId',
+                builder: (context, state) {
+                  final extra = state.extra;
+                  return ProjectDetailScreen(
+                    projectId: state.pathParameters['projectId']!,
+                    gateway: extra is ProjectDetailRouteData
+                        ? extra.gateway
+                        : null,
+                    initialItem: extra is ProjectDetailRouteData
+                        ? extra.initialItem
+                        : null,
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/events',

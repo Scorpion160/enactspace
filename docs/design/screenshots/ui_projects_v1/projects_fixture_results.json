@@ -1,0 +1,135 @@
+{
+  "environment": "ui_audit",
+  "database": {
+    "host": "postgres",
+    "name": "enactspace_ui_audit",
+    "file_storage_path": "/audit/uploads"
+  },
+  "guards": {
+    "APP_ENV": true,
+    "DB_HOST": true,
+    "DB_NAME": true,
+    "FILE_STORAGE_PATH": true,
+    "DATABASE_URL_matches_host_and_name": true
+  },
+  "first_execution": {
+    "created": {
+      "projects": 1,
+      "memberships": 1,
+      "tasks": 1,
+      "task_assignees": 2,
+      "events": 1,
+      "total": 6
+    },
+    "updated": {
+      "projects": 8,
+      "memberships": 2,
+      "tasks": 31,
+      "events": 0,
+      "total": 41
+    },
+    "duplicate_rows": 0
+  },
+  "second_execution": {
+    "created": {
+      "projects": 0,
+      "memberships": 0,
+      "tasks": 0,
+      "task_assignees": 0,
+      "events": 0,
+      "total": 0
+    },
+    "updated": {
+      "projects": 0,
+      "memberships": 0,
+      "tasks": 0,
+      "events": 0,
+      "total": 0
+    },
+    "duplicate_rows": 0
+  },
+  "idempotence": true,
+  "projects_normalized": [
+    {"name": "Audit Horizon", "before": "active", "after": "idee"},
+    {"name": "Audit Rivage", "before": "active", "after": "etude"},
+    {"name": "Audit Passage", "before": "active", "after": "prototype"},
+    {"name": "Audit Mosaic", "before": "completed", "after": "test"},
+    {"name": "Audit Dense Budget", "before": "active", "after": "deploiement"},
+    {"name": "Audit Solstice", "before": "completed", "after": "termine"},
+    {"name": "Audit Canopée", "before": "suspended", "after": "suspendu"},
+    {"name": "Audit Sans Impact", "before": "suspended", "after": "suspendu"}
+  ],
+  "project_statuses_after": [
+    "idee",
+    "etude",
+    "prototype",
+    "test",
+    "deploiement",
+    "termine",
+    "suspendu"
+  ],
+  "memberships_normalized": {
+    "legacy_chef_to_chef_projet": 1,
+    "project": {
+      "id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+      "name": "Audit Horizon"
+    },
+    "lead": {
+      "membership_id": "6ace8826-1226-58a6-b4ed-a258c6d579ff",
+      "user_id": "19f62547-950e-53c9-ac33-00df468c7324",
+      "position": "chef_projet",
+      "active": true
+    },
+    "deputy": {
+      "membership_id": "60ed3458-8383-51f5-983a-d14db4fb26cd",
+      "user_id": "0981ed2c-a7a0-586f-a609-eec33b0ed43c",
+      "position": "adjoint_chef_projet",
+      "active": true
+    }
+  },
+  "tasks_normalized": {
+    "legacy_terminee_found": 12,
+    "legacy_bloquee_found": 12,
+    "legacy_values_remaining": 0,
+    "solstice": {
+      "project_id": "32857779-7cd5-544c-b1f3-7d4b6162c7eb",
+      "termine": 3,
+      "valide": 3,
+      "bloque": 0
+    },
+    "blocked_task": {
+      "id": "296a2fa6-59f9-5575-9072-8383576f94dc",
+      "project_id": "c97f7262-fe5c-5e3f-824d-63dff7f31e0e",
+      "project_name": "Audit Canopée",
+      "status": "bloque",
+      "priority": "urgente",
+      "due_date": "2026-09-15T17:00:00",
+      "assignee_id": "5754c6d8-238d-527f-a496-bb1d381f14e0"
+    }
+  },
+  "project_without_team": {
+    "id": "9e0eea52-7d05-5d73-95b9-aea188c6fa6e",
+    "name": "Audit Projet Sans Équipe",
+    "status": "idee",
+    "active_memberships": 0
+  },
+  "future_task": {
+    "id": "276ce67f-885a-5fc0-9f54-46531c4f2c51",
+    "reference": "AUDIT-PROJECT-NEXT-ACTION-001",
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "status": "a_faire",
+    "priority": "haute",
+    "due_date": "2027-03-15T17:00:00",
+    "assignee_id": "19f62547-950e-53c9-ac33-00df468c7324"
+  },
+  "future_event": {
+    "id": "c3d72fb1-a02e-5841-8c56-6200b61ce64c",
+    "reference": "AUDIT-PROJECT-EVENT-FUTURE-001",
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "start_time": "2027-03-20T10:00:00",
+    "end_time": "2027-03-20T12:00:00"
+  },
+  "audit_sans_impact_preserved": true,
+  "terrasen_fixture_created": false,
+  "contains_sensitive_data": false
+}

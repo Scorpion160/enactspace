@@ -1,0 +1,88 @@
+{
+  "environment": "ui_audit",
+  "checked_at": "2026-08-23",
+  "mode": "read_only",
+  "source_trace": "../ui_projects_v1/projects_runtime_check.json",
+  "projects": {
+    "http_status": 200,
+    "count": 9,
+    "canonical_statuses": [
+      "idee",
+      "etude",
+      "prototype",
+      "test",
+      "deploiement",
+      "termine",
+      "suspendu"
+    ],
+    "canonical_statuses_count": 7,
+    "legacy_statuses_present": false
+  },
+  "impact_projects": {
+    "http_status": 200,
+    "count": 9,
+    "progression_source_verified": true,
+    "source": "GET /api/impact/projects"
+  },
+  "targets": {
+    "audit_horizon": {
+      "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+      "lead": {
+        "user_id": "19f62547-950e-53c9-ac33-00df468c7324",
+        "position": "chef_projet",
+        "active": true
+      },
+      "deputy": {
+        "user_id": "0981ed2c-a7a0-586f-a609-eec33b0ed43c",
+        "position": "adjoint_chef_projet",
+        "active": true
+      }
+    },
+    "audit_canopee": {
+      "blocked_task_id": "296a2fa6-59f9-5575-9072-8383576f94dc",
+      "status": "bloque",
+      "priority": "urgente"
+    },
+    "project_without_team": {
+      "project_id": "9e0eea52-7d05-5d73-95b9-aea188c6fa6e",
+      "name": "Audit Projet Sans Équipe",
+      "active_memberships": 0
+    },
+    "future_next_action": {
+      "task_id": "276ce67f-885a-5fc0-9f54-46531c4f2c51",
+      "reference": "AUDIT-PROJECT-NEXT-ACTION-001",
+      "status": "a_faire",
+      "due_date": "2027-03-15T17:00:00",
+      "assignee_id": "19f62547-950e-53c9-ac33-00df468c7324"
+    },
+    "future_event": {
+      "event_id": "c3d72fb1-a02e-5841-8c56-6200b61ce64c",
+      "reference": "AUDIT-PROJECT-EVENT-FUTURE-001",
+      "start_time": "2027-03-20T10:00:00"
+    },
+    "audit_sans_impact": {
+      "incomplete_impact_preserved": true
+    },
+    "audit_solstice": {
+      "status": "termine",
+      "tasks": {
+        "termine": 3,
+        "valide": 3,
+        "bloque": 0
+      }
+    }
+  },
+  "before_after": {
+    "projects_count": {"before": 9, "after": 9, "unchanged": true},
+    "impact_aggregates_count": {"before": 9, "after": 9, "unchanged": true},
+    "horizon_lead_and_deputy_unchanged": true,
+    "canopee_blocked_task_unchanged": true,
+    "project_without_team_active_memberships": {"before": 0, "after": 0, "unchanged": true},
+    "future_task_unchanged": true,
+    "future_event_unchanged": true,
+    "solstice_status_unchanged": true,
+    "mutation_performed": false
+  },
+  "mutation_performed": false,
+  "contains_token_or_password": false
+}

@@ -1,0 +1,66 @@
+{
+  "environment": "ui_audit",
+  "checked_at": "2026-08-23",
+  "endpoints": [
+    {"method": "GET", "route": "/api/projects/", "status": 200},
+    {"method": "GET", "route": "/api/projects/{horizon_id}/members", "status": 200},
+    {"method": "GET", "route": "/api/projects/{project_without_team_id}/members", "status": 200},
+    {"method": "GET", "route": "/api/tasks/project/{project_id}", "status": 200},
+    {"method": "GET", "route": "/api/tasks/{future_task_id}/assignees", "status": 200},
+    {"method": "GET", "route": "/api/events/", "status": 200},
+    {"method": "GET", "route": "/api/impact/projects", "status": 200}
+  ],
+  "projects_count": 9,
+  "project_status_coverage": {
+    "idee": true,
+    "etude": true,
+    "prototype": true,
+    "test": true,
+    "deploiement": true,
+    "termine": true,
+    "suspendu": true
+  },
+  "legacy_project_statuses_present": false,
+  "legacy_task_statuses_present": false,
+  "lead_present": {
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "user_id": "19f62547-950e-53c9-ac33-00df468c7324",
+    "position": "chef_projet",
+    "active": true
+  },
+  "deputy_present": {
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "user_id": "0981ed2c-a7a0-586f-a609-eec33b0ed43c",
+    "position": "adjoint_chef_projet",
+    "active": true
+  },
+  "project_without_team_present": {
+    "id": "9e0eea52-7d05-5d73-95b9-aea188c6fa6e",
+    "active_memberships": 0
+  },
+  "canonical_blocked_task_present": {
+    "id": "296a2fa6-59f9-5575-9072-8383576f94dc",
+    "project_id": "c97f7262-fe5c-5e3f-824d-63dff7f31e0e",
+    "status": "bloque",
+    "priority": "urgente",
+    "due_date": "2026-09-15T17:00:00"
+  },
+  "future_task_present": {
+    "id": "276ce67f-885a-5fc0-9f54-46531c4f2c51",
+    "reference": "AUDIT-PROJECT-NEXT-ACTION-001",
+    "status": "a_faire",
+    "priority": "haute",
+    "due_date": "2027-03-15T17:00:00",
+    "known_assignee_id": "19f62547-950e-53c9-ac33-00df468c7324"
+  },
+  "future_event_present": {
+    "id": "c3d72fb1-a02e-5841-8c56-6200b61ce64c",
+    "reference": "AUDIT-PROJECT-EVENT-FUTURE-001",
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "start_time": "2027-03-20T10:00:00"
+  },
+  "impact_endpoint_available": true,
+  "impact_projects_count": 9,
+  "mutation_metier_applicative": false,
+  "contains_token_or_password": false
+}

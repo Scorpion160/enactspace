@@ -628,7 +628,7 @@ class _ProjectCard extends StatelessWidget {
               style: const TextStyle(height: 1.4),
             ),
             const SizedBox(height: 16),
-            _ProgressLine(progress: project.progress, color: statusColor),
+            _ProgressLine(progress: 0, color: statusColor),
             const SizedBox(height: 16),
             _ProjectInfoBlock(
               icon: Icons.report_problem_rounded,
@@ -1054,7 +1054,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     ),
                   ],
                   const SizedBox(height: 18),
-                  _ProgressLine(progress: project.progress, color: statusColor),
+                  _ProgressLine(progress: 0, color: statusColor),
                   const SizedBox(height: 12),
                   _ProjectStatusPanel(
                     project: project,
@@ -1198,7 +1198,7 @@ class _ProjectStatusPanel extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${project.statusLabel} · ${project.progress}% · $started · $ended',
+                '${project.statusLabel} · Progression non disponible · $started · $ended',
                 style: const TextStyle(color: Colors.black54, height: 1.35),
               ),
               if (updating) ...[
@@ -2531,7 +2531,7 @@ String _initials(String name) {
 }
 
 int _projectReadinessScore(ProjectModel project) {
-  var score = project.progress;
+  var score = 0;
 
   if ((project.problemStatement ?? '').trim().length >= 40) score += 10;
   if ((project.solution ?? '').trim().length >= 40) score += 10;
