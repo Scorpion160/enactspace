@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/user_experience.dart';
+import '../models/project_management_models.dart';
+import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
 import '../services/projects_portfolio_gateway.dart';
 import '../widgets/project_detail_widgets.dart';
+import '../widgets/project_management_widgets.dart';
 
 class ProjectDetailRouteData {
   final ProjectsPortfolioGateway gateway;
@@ -34,6 +38,8 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   late final ProjectsPortfolioGateway _gateway;
   late Future<ProjectDetailData> _loading;
+  UserExperience? _user;
+  bool _ignoreInitialItem = false;
 
   @override
   void initState() {
@@ -43,7 +49,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Future<ProjectDetailData> _load() async {
-    final initial = widget.initialItem ?? await _loadPortfolioItem();
+    final user = await _captureDetail(_gateway.loadCurrentUser());
+    _user = user.value;
+    final initial = !_ignoreInitialItem && widget.initialItem != null
+        ? widget.initialItem!
+        : await _loadPortfolioItem();
     final documentsFuture = _captureDetail(
       _gateway.loadDocuments(widget.projectId),
     );
@@ -141,7 +151,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 onRetry: () => setState(() => _loading = _load()),
               );
             }
-            return ProjectDetailView(data: snapshot.data!, onBack: _back);
+            final data = snapshot.data!;
+            final canManage = ProjectManagementPermissions.canManage(
+              _user,
+              data.item.members,
+            );
+            return ProjectDetailView(
+              data: data,
+              onBack: _back,
+              management: canManage
+                  ? ProjectManagementSection(
+                      onEdit: () => _openEdit(data),
+                      onChangeStatus: () => _openStatus(data),
+                    )
+                  : null,
+            );
           },
         ),
       ),
@@ -154,6 +178,45 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     } else {
       context.go('/projects');
     }
+  }
+
+  Future<void> _openEdit(ProjectDetailData data) async {
+    final seasons = await _captureDetail(_gateway.loadSeasons());
+    if (!mounted) return;
+    final updated = await showDialog<ProjectModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectFormDialog(
+        project: data.item.project,
+        seasons: seasons.value ?? const [],
+        onSubmit: (draft) => _gateway.updateProject(widget.projectId, draft),
+      ),
+    );
+    if (updated != null) _mutationSucceeded();
+  }
+
+  Future<void> _openStatus(ProjectDetailData data) async {
+    final updated = await showDialog<ProjectModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectStatusDialog(
+        item: data.item,
+        onSubmit: (target) =>
+            _gateway.changeProjectStatus(data.item.project, target),
+      ),
+    );
+    if (updated != null) _mutationSucceeded();
+  }
+
+  void _mutationSucceeded() {
+    if (!mounted) return;
+    _ignoreInitialItem = true;
+    setState(() {
+      _loading = _load();
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Projet mis à jour')));
   }
 }
 

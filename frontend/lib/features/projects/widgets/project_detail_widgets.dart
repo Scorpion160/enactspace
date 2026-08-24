@@ -9,11 +9,13 @@ import '../models/project_portfolio_models.dart';
 class ProjectDetailView extends StatelessWidget {
   final ProjectDetailData data;
   final VoidCallback onBack;
+  final Widget? management;
 
   const ProjectDetailView({
     super.key,
     required this.data,
     required this.onBack,
+    this.management,
   });
 
   @override
@@ -71,6 +73,7 @@ class ProjectDetailView extends StatelessWidget {
               ],
             ),
           ),
+          ?management,
           Expanded(
             child: TabBarView(
               children: [

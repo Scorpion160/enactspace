@@ -1,22 +1,35 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../documents/models/document_model.dart';
 import '../../events/models/event_model.dart';
 import '../../members/models/member_model.dart';
 import '../../tasks/models/task_assignee_model.dart';
 import '../../tasks/models/task_model.dart';
 import '../models/project_member_model.dart';
+import '../models/project_management_models.dart';
 import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
 
 abstract class ProjectsPortfolioGateway {
+  Future<UserExperience> loadCurrentUser();
   Future<List<ProjectModel>> loadProjects();
+  Future<List<ProjectSeasonOption>> loadSeasons();
   Future<Map<String, ProjectImpactSnapshot>> loadImpact();
   Future<List<ProjectMemberModel>> loadMembers(String projectId);
   Future<List<TaskModel>> loadTasks(String projectId);
   Future<List<ProjectAssignee>> loadTaskAssignees(String taskId);
   Future<List<DocumentModel>> loadDocuments(String projectId);
   Future<List<EventModel>> loadEvents();
+  Future<ProjectModel> createProject(ProjectMutationDraft draft);
+  Future<ProjectModel> updateProject(
+    String projectId,
+    ProjectMutationDraft draft,
+  );
+  Future<ProjectModel> changeProjectStatus(
+    ProjectModel project,
+    String targetStatus,
+  );
 }
 
 class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
@@ -24,6 +37,7 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
   final AuthService _authService;
   Future<String>? _token;
   Future<List<ProjectModel>>? _projects;
+  Future<List<ProjectSeasonOption>>? _seasons;
   Future<Map<String, ProjectImpactSnapshot>>? _impact;
   Future<List<EventModel>>? _events;
   Future<Map<String, MemberModel>>? _directory;
@@ -37,8 +51,16 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
       _authService = authService ?? AuthService();
 
   @override
+  Future<UserExperience> loadCurrentUser() async =>
+      UserExperience.fromJson(await _authService.getCurrentUser());
+
+  @override
   Future<List<ProjectModel>> loadProjects() =>
       _projects ??= _getList('/projects/', ProjectModel.fromJson);
+
+  @override
+  Future<List<ProjectSeasonOption>> loadSeasons() =>
+      _seasons ??= _getList('/seasons/', ProjectSeasonOption.fromJson);
 
   @override
   Future<Map<String, ProjectImpactSnapshot>> loadImpact() {
@@ -100,6 +122,69 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
   @override
   Future<List<EventModel>> loadEvents() =>
       _events ??= _getList('/events/', EventModel.fromJson);
+
+  @override
+  Future<ProjectModel> createProject(ProjectMutationDraft draft) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.postJson(
+      '/projects/',
+      token: token,
+      data: draft.toCreateJson(),
+    );
+    final project = _parseProject(response);
+    _invalidateProjectData();
+    return project;
+  }
+
+  @override
+  Future<ProjectModel> updateProject(
+    String projectId,
+    ProjectMutationDraft draft,
+  ) async {
+    return _patchProject(projectId, draft.toUpdateJson());
+  }
+
+  @override
+  Future<ProjectModel> changeProjectStatus(
+    ProjectModel project,
+    String targetStatus,
+  ) {
+    return _patchProject(
+      project.id,
+      ProjectStatusMutationPayload.build(project, targetStatus),
+    );
+  }
+
+  Future<ProjectModel> _patchProject(
+    String projectId,
+    Map<String, dynamic> data,
+  ) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.patchJson(
+      '/projects/$projectId',
+      token: token,
+      data: data,
+    );
+    final project = _parseProject(response);
+    _invalidateProjectData();
+    return project;
+  }
+
+  ProjectModel _parseProject(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      return ProjectModel.fromJson(response);
+    }
+    throw Exception('Réponse projet invalide.');
+  }
+
+  void _invalidateProjectData() {
+    _projects = null;
+    _impact = null;
+    _members.clear();
+    _tasks.clear();
+    _assignees.clear();
+    _documents.clear();
+  }
 
   Future<Map<String, MemberModel>> _loadDirectory() {
     return _directory ??= () async {

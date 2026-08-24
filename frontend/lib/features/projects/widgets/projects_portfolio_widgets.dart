@@ -5,25 +5,53 @@ import '../models/project_portfolio_models.dart';
 enum ProjectAlertFilter { all, blocked, overdue, noNextAction, incomplete }
 
 class ProjectsPortfolioHeader extends StatelessWidget {
-  const ProjectsPortfolioHeader({super.key});
+  final VoidCallback? onCreate;
+  const ProjectsPortfolioHeader({super.key, this.onCreate});
 
   @override
   Widget build(BuildContext context) => Semantics(
     header: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Portefeuille Projets',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Pilotez les priorités, les alertes et les prochaines actions.',
-        ),
-      ],
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final title = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Portefeuille Projets',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Pilotez les priorités, les alertes et les prochaines actions.',
+            ),
+          ],
+        );
+        final action = onCreate == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Nouveau projet'),
+              );
+        if (constraints.maxWidth < 560) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              title,
+              if (action != null) ...[const SizedBox(height: 12), action],
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: title),
+            if (action != null) ...[const SizedBox(width: 12), action],
+          ],
+        );
+      },
     ),
   );
 }

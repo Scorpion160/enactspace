@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/user_experience.dart';
+import '../models/project_management_models.dart';
+import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
 import '../services/projects_portfolio_gateway.dart';
+import '../widgets/project_management_widgets.dart';
 import '../widgets/projects_portfolio_widgets.dart';
 import 'project_detail_screen.dart';
 
@@ -24,6 +28,8 @@ class _ProjectsPortfolioScreenState extends State<ProjectsPortfolioScreen> {
   String _status = 'all';
   String _responsible = 'all';
   ProjectAlertFilter _alert = ProjectAlertFilter.all;
+  UserExperience? _user;
+  List<ProjectSeasonOption> _seasons = const [];
 
   @override
   void initState() {
@@ -44,6 +50,12 @@ class _ProjectsPortfolioScreenState extends State<ProjectsPortfolioScreen> {
   void _refreshFilters() => setState(() {});
 
   Future<List<ProjectPortfolioItem>> _loadPortfolio() async {
+    final user = await _capture(_gateway.loadCurrentUser());
+    _user = user.value;
+    if (ProjectManagementPermissions.canCreate(_user)) {
+      final seasons = await _capture(_gateway.loadSeasons());
+      _seasons = seasons.value ?? const [];
+    }
     final projectsFuture = _gateway.loadProjects();
     final impactFuture = _capture(_gateway.loadImpact());
     final projects = await projectsFuture;
@@ -142,7 +154,11 @@ class _ProjectsPortfolioScreenState extends State<ProjectsPortfolioScreen> {
                   desktop ? 28 : 16,
                   12,
                 ),
-                child: const ProjectsPortfolioHeader(),
+                child: ProjectsPortfolioHeader(
+                  onCreate: ProjectManagementPermissions.canCreate(_user)
+                      ? _openCreate
+                      : null,
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -241,6 +257,25 @@ class _ProjectsPortfolioScreenState extends State<ProjectsPortfolioScreen> {
       '/projects/${item.project.id}',
       extra: ProjectDetailRouteData(gateway: _gateway, initialItem: item),
     );
+  }
+
+  Future<void> _openCreate() async {
+    final created = await showDialog<ProjectModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectFormDialog(
+        project: null,
+        seasons: _seasons,
+        onSubmit: _gateway.createProject,
+      ),
+    );
+    if (created == null || !mounted) return;
+    setState(() {
+      _loading = _loadPortfolio();
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Projet mis à jour')));
   }
 
   void _retry() => setState(() => _loading = _loadPortfolio());

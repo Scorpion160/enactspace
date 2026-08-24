@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:frontend/core/auth/user_experience.dart';
 import 'package:frontend/features/documents/models/document_model.dart';
 import 'package:frontend/features/events/models/event_model.dart';
 import 'package:frontend/features/projects/models/project_member_model.dart';
+import 'package:frontend/features/projects/models/project_management_models.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
 import 'package:frontend/features/projects/models/project_portfolio_models.dart';
 import 'package:frontend/features/projects/screens/project_detail_screen.dart';
@@ -370,7 +372,9 @@ void main() {
 }
 
 class _FakeGateway implements ProjectsPortfolioGateway {
+  UserExperience user = _user('u-admin', {'administrateur'});
   List<ProjectModel> projects;
+  List<ProjectSeasonOption> seasons = const [];
   Map<String, ProjectImpactSnapshot> impact;
   final Map<String, List<ProjectMemberModel>> members;
   final Map<String, List<TaskModel>> tasks;
@@ -385,6 +389,9 @@ class _FakeGateway implements ProjectsPortfolioGateway {
   bool documentsError = false;
   Completer<List<ProjectModel>>? projectsCompleter;
   final List<String> documentRequests = [];
+
+  @override
+  Future<UserExperience> loadCurrentUser() async => user;
 
   _FakeGateway({
     required this.projects,
@@ -474,6 +481,46 @@ class _FakeGateway implements ProjectsPortfolioGateway {
     if (projectsCompleter != null) return projectsCompleter!.future;
     if (projectsError) throw Exception('projects');
     return projects;
+  }
+
+  @override
+  Future<List<ProjectSeasonOption>> loadSeasons() async => seasons;
+
+  @override
+  Future<ProjectModel> createProject(ProjectMutationDraft draft) async {
+    final created = _project('created', draft.name, draft.status);
+    projects = [created, ...projects];
+    return created;
+  }
+
+  @override
+  Future<ProjectModel> updateProject(
+    String projectId,
+    ProjectMutationDraft draft,
+  ) async {
+    final current = projects.firstWhere((item) => item.id == projectId);
+    final updated = _copyProject(
+      current,
+      name: draft.name,
+      status: current.status,
+      expectedImpact: draft.expectedImpact,
+    );
+    projects = projects
+        .map((item) => item.id == projectId ? updated : item)
+        .toList();
+    return updated;
+  }
+
+  @override
+  Future<ProjectModel> changeProjectStatus(
+    ProjectModel project,
+    String targetStatus,
+  ) async {
+    final updated = _copyProject(project, status: targetStatus);
+    projects = projects
+        .map((item) => item.id == project.id ? updated : item)
+        .toList();
+    return updated;
   }
 
   @override
@@ -576,6 +623,38 @@ ProjectModel _project(
   startedAt: DateTime(2026, 1, 10),
   endedAt: null,
   createdAt: DateTime(2026, 1, 1),
+);
+
+ProjectModel _copyProject(
+  ProjectModel project, {
+  required String status,
+  String? name,
+  String? expectedImpact,
+}) => ProjectModel(
+  id: project.id,
+  seasonId: project.seasonId,
+  name: name ?? project.name,
+  description: project.description,
+  problemStatement: project.problemStatement,
+  solution: project.solution,
+  objectives: project.objectives,
+  expectedImpact: expectedImpact ?? project.expectedImpact,
+  budgetEstimated: project.budgetEstimated,
+  status: status,
+  startedAt: project.startedAt,
+  endedAt: project.endedAt,
+  createdAt: project.createdAt,
+);
+
+UserExperience _user(String id, Set<String> roles) => UserExperience(
+  id: id,
+  email: '$id@example.com',
+  displayName: id,
+  status: 'active',
+  gender: null,
+  profileType: 'enacteur',
+  roles: roles,
+  canReviewJoinRequests: false,
 );
 
 ProjectMemberModel _member(
