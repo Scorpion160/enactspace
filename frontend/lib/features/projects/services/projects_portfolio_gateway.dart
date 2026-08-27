@@ -10,6 +10,7 @@ import '../models/project_member_model.dart';
 import '../models/project_management_models.dart';
 import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
+import '../models/project_team_management_models.dart';
 
 abstract class ProjectsPortfolioGateway {
   Future<UserExperience> loadCurrentUser();
@@ -17,6 +18,7 @@ abstract class ProjectsPortfolioGateway {
   Future<List<ProjectSeasonOption>> loadSeasons();
   Future<Map<String, ProjectImpactSnapshot>> loadImpact();
   Future<List<ProjectMemberModel>> loadMembers(String projectId);
+  Future<List<MemberModel>> loadMemberDirectory();
   Future<List<TaskModel>> loadTasks(String projectId);
   Future<List<ProjectAssignee>> loadTaskAssignees(String taskId);
   Future<List<DocumentModel>> loadDocuments(String projectId);
@@ -30,6 +32,15 @@ abstract class ProjectsPortfolioGateway {
     ProjectModel project,
     String targetStatus,
   );
+  Future<ProjectMemberMutationResult> assignProjectMember({
+    required String projectId,
+    required String userId,
+    required String position,
+  });
+  Future<ProjectMemberModel> removeProjectMember({
+    required String projectId,
+    required String userId,
+  });
 }
 
 class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
@@ -82,6 +93,10 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
           ProjectMemberModel.fromJson,
         ),
       );
+
+  @override
+  Future<List<MemberModel>> loadMemberDirectory() async =>
+      (await _loadDirectory()).values.toList();
 
   @override
   Future<List<TaskModel>> loadTasks(String projectId) => _tasks.putIfAbsent(
@@ -153,6 +168,43 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
       project.id,
       ProjectStatusMutationPayload.build(project, targetStatus),
     );
+  }
+
+  @override
+  Future<ProjectMemberMutationResult> assignProjectMember({
+    required String projectId,
+    required String userId,
+    required String position,
+  }) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.postJson(
+      '/projects/$projectId/members',
+      token: token,
+      data: {'user_id': userId, 'position': position},
+    );
+    if (response is! Map<String, dynamic>) {
+      throw Exception('Réponse membership invalide.');
+    }
+    final membership = ProjectMemberModel.fromJson(response);
+    _members.remove(projectId);
+    return ProjectMemberMutationResult(membership: membership);
+  }
+
+  @override
+  Future<ProjectMemberModel> removeProjectMember({
+    required String projectId,
+    required String userId,
+  }) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.delete(
+      '/projects/$projectId/members/$userId',
+      token: token,
+    );
+    if (response is! Map<String, dynamic>) {
+      throw Exception('Réponse membership invalide.');
+    }
+    _members.remove(projectId);
+    return ProjectMemberModel.fromJson(response);
   }
 
   Future<ProjectModel> _patchProject(

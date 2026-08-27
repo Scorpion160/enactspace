@@ -1,0 +1,235 @@
+{
+  "runtime_verified": true,
+  "projects_count": 9,
+  "audit_horizon_members_before": 7,
+  "audit_horizon_members_after": 7,
+  "empty_team_members_before": 0,
+  "empty_team_members_after": 0,
+  "post_member_requests_sent": 0,
+  "delete_member_requests_sent": 0,
+  "mutation_performed": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "captures": [
+    {
+      "filename": "01_project_team_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": null,
+      "target_position": null,
+      "dialog_opened": false,
+      "expected_markers": [
+        "Chef de projet",
+        "Adjoint chef de projet",
+        "Membres",
+        "Ajouter un membre",
+        "Changer de chef de projet",
+        "Changer d’adjoint"
+      ],
+      "reached_markers": [
+        "Chef de projet",
+        "Adjoint chef de projet",
+        "Membres",
+        "Ajouter un membre",
+        "Changer de chef de projet",
+        "Changer d’adjoint"
+      ],
+      "screenshot_sha256": "a404a882ab1f2f312b63747ceb05a32339328761eabf83aa9013a1e4de532696",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_add_project_member_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Aminata Active",
+      "target_position": "Membre du projet",
+      "dialog_opened": true,
+      "expected_markers": [
+        "Ajouter un membre",
+        "Rechercher par nom ou e-mail",
+        "Aminata Active",
+        "Fatou Active",
+        "Membre du projet",
+        "Ajouter à l’équipe"
+      ],
+      "reached_markers": [
+        "Ajouter un membre",
+        "Rechercher par nom ou e-mail",
+        "Aminata Active",
+        "Fatou Active",
+        "Membre du projet",
+        "Ajouter à l’équipe"
+      ],
+      "eligible_directory_only": true,
+      "post_request_sent": false,
+      "screenshot_sha256": "5792b747ae5d2ccb2805828d44803051e4888cb4c2727cb063cef4ac2ab01206",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_change_project_lead_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Aminata Active",
+      "target_position": "Chef de projet",
+      "dialog_opened": true,
+      "expected_markers": [
+        "Changer de chef de projet",
+        "Audit ProjectLead",
+        "Aminata Active",
+        "restera membre du projet",
+        "Nommer comme chef de projet"
+      ],
+      "reached_markers": [
+        "Changer de chef de projet",
+        "Audit ProjectLead",
+        "Aminata Active",
+        "restera membre du projet",
+        "Nommer comme chef de projet"
+      ],
+      "current_lead_visible": true,
+      "replacement_effect_visible": true,
+      "post_request_sent": false,
+      "screenshot_sha256": "078cd4b0fddb6fe96da016b6ee60a6dd01e9b5eedbb5ecdcdccebc76898de803",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_change_project_deputy_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Fatou Active",
+      "target_position": "Adjoint chef de projet",
+      "dialog_opened": true,
+      "expected_markers": [
+        "Changer d’adjoint",
+        "Audit Active03",
+        "Fatou Active",
+        "restera membre du projet",
+        "Nommer comme adjoint"
+      ],
+      "reached_markers": [
+        "Changer d’adjoint",
+        "Audit Active03",
+        "Fatou Active",
+        "restera membre du projet",
+        "Nommer comme adjoint"
+      ],
+      "current_deputy_visible": true,
+      "replacement_effect_visible": true,
+      "post_request_sent": false,
+      "screenshot_sha256": "d6a0a88a0336c13f8eeb2fb48a433929823871bad5d8b6b79861e0e6291c32f5",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_remove_project_member_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Audit MultiRole",
+      "target_position": "Membre du projet",
+      "dialog_opened": true,
+      "expected_markers": [
+        "Retirer ce membre du projet ?",
+        "Audit MultiRole",
+        "ne fera plus partie de l’équipe active",
+        "Retour",
+        "Retirer de l’équipe"
+      ],
+      "reached_markers": [
+        "Retirer ce membre du projet ?",
+        "Audit MultiRole",
+        "ne fera plus partie de l’équipe active",
+        "Retour",
+        "Retirer de l’équipe"
+      ],
+      "logical_removal_wording": true,
+      "delete_request_sent": false,
+      "screenshot_sha256": "16393908331c83fed7fb07060bf11b64a2453c78e87e8d6012bd680e8df3cfd7",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_remove_project_leader_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Audit ProjectLead",
+      "target_position": "Chef de projet",
+      "dialog_opened": true,
+      "expected_markers": [
+        "Retirer ce membre du projet ?",
+        "Audit ProjectLead",
+        "Chef de projet",
+        "restera sans chef",
+        "Retirer de l’équipe"
+      ],
+      "reached_markers": [
+        "Retirer ce membre du projet ?",
+        "Audit ProjectLead",
+        "Chef de projet",
+        "restera sans chef",
+        "Retirer de l’équipe"
+      ],
+      "leadership_warning_visible": true,
+      "automatic_replacement_promised": false,
+      "delete_request_sent": false,
+      "screenshot_sha256": "c1bf95690286c1ed936856cbc93929e0ab95043f26c4b36c48ca022ebde48d5a",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_project_empty_team_tablet_768x1024.png",
+      "viewport": "768x1024",
+      "role": "administrateur",
+      "target_project": "Audit Projet Sans Équipe",
+      "target_member": null,
+      "target_position": null,
+      "dialog_opened": false,
+      "expected_markers": [
+        "Aucune équipe affectée",
+        "Constituer l’équipe"
+      ],
+      "reached_markers": [
+        "Aucune équipe affectée",
+        "Constituer l’équipe"
+      ],
+      "empty_team_state_visible": true,
+      "screenshot_sha256": "0de1361aff06292e4ad01550a1dd57f8f9329db29a1f1382ff735d66a999a7ee",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_project_team_mobile_390x844.png",
+      "viewport": "390x844",
+      "role": "administrateur",
+      "target_project": "Audit Horizon",
+      "target_member": "Moussa Member",
+      "target_position": "Membre du projet",
+      "dialog_opened": false,
+      "expected_markers": [
+        "Chef de projet",
+        "Adjoint chef de projet",
+        "Membres",
+        "Ajouter un membre"
+      ],
+      "reached_markers": [
+        "Chef de projet",
+        "Adjoint chef de projet",
+        "Membres",
+        "Ajouter un membre"
+      ],
+      "horizontal_overflow": false,
+      "screenshot_sha256": "d9d1e715e406dc8a80cef44541c668adb0528fa56534d9433b4703a2066e8da0",
+      "mutation_performed": false,
+      "success": true
+    }
+  ]
+}

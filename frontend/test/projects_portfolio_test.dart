@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:frontend/core/auth/user_experience.dart';
 import 'package:frontend/features/documents/models/document_model.dart';
 import 'package:frontend/features/events/models/event_model.dart';
+import 'package:frontend/features/members/models/member_model.dart';
 import 'package:frontend/features/projects/models/project_member_model.dart';
 import 'package:frontend/features/projects/models/project_management_models.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
 import 'package:frontend/features/projects/models/project_portfolio_models.dart';
+import 'package:frontend/features/projects/models/project_team_management_models.dart';
 import 'package:frontend/features/projects/screens/project_detail_screen.dart';
 import 'package:frontend/features/projects/screens/projects_portfolio_screen.dart';
 import 'package:frontend/features/projects/services/projects_portfolio_gateway.dart';
@@ -534,6 +536,30 @@ class _FakeGateway implements ProjectsPortfolioGateway {
     if (memberErrors.contains(projectId)) throw Exception('members');
     return members[projectId] ?? [];
   }
+
+  @override
+  Future<List<MemberModel>> loadMemberDirectory() async => const [];
+
+  @override
+  Future<ProjectMemberMutationResult> assignProjectMember({
+    required String projectId,
+    required String userId,
+    required String position,
+  }) async => ProjectMemberMutationResult(
+    membership: _member(
+      'assigned-$userId',
+      projectId,
+      userId,
+      userId,
+      position,
+    ),
+  );
+
+  @override
+  Future<ProjectMemberModel> removeProjectMember({
+    required String projectId,
+    required String userId,
+  }) async => _member('removed-$userId', projectId, userId, userId, 'membre');
 
   @override
   Future<List<TaskModel>> loadTasks(String projectId) async {

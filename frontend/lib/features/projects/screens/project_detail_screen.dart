@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/user_experience.dart';
+import '../../members/models/member_model.dart';
 import '../models/project_management_models.dart';
+import '../models/project_member_model.dart';
 import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
+import '../models/project_team_management_models.dart';
 import '../services/projects_portfolio_gateway.dart';
 import '../widgets/project_detail_widgets.dart';
 import '../widgets/project_management_widgets.dart';
+import '../widgets/project_team_management_widgets.dart';
 
 class ProjectDetailRouteData {
   final ProjectsPortfolioGateway gateway;
@@ -156,9 +160,37 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               _user,
               data.item.members,
             );
+            final teamPermissions = ProjectTeamPermissions.resolve(
+              _user,
+              data.item.members,
+            );
             return ProjectDetailView(
               data: data,
               onBack: _back,
+              teamSection: ProjectTeamManagementSection(
+                projectName: data.item.project.name,
+                members: data.item.members,
+                unavailable: data.item.teamUnavailable,
+                permissions: teamPermissions,
+                onAddMember: teamPermissions.canManageOrdinaryMembers
+                    ? () => _openAddMember(data)
+                    : null,
+                onChangeLead: teamPermissions.canManageResponsibilities
+                    ? () => _openResponsibility(
+                        data,
+                        ProjectPositionPresentation.lead,
+                      )
+                    : null,
+                onChangeDeputy: teamPermissions.canManageResponsibilities
+                    ? () => _openResponsibility(
+                        data,
+                        ProjectPositionPresentation.deputy,
+                      )
+                    : null,
+                onRemoveMember: teamPermissions.canManageOrdinaryMembers
+                    ? (member) => _openRemoval(data, member, teamPermissions)
+                    : null,
+              ),
               management: canManage
                   ? ProjectManagementSection(
                       onEdit: () => _openEdit(data),
@@ -206,6 +238,108 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       ),
     );
     if (updated != null) _mutationSucceeded();
+  }
+
+  Future<List<MemberModel>?> _loadDirectoryForDialog() async {
+    try {
+      return await _gateway.loadMemberDirectory();
+    } catch (error) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(projectTeamErrorMessage(error))));
+      return null;
+    }
+  }
+
+  Future<void> _openAddMember(ProjectDetailData data) async {
+    final directory = await _loadDirectoryForDialog();
+    if (!mounted || directory == null) return;
+    final result = await showDialog<ProjectMemberMutationResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectMemberDialog(
+        projectName: data.item.project.name,
+        directory: directory,
+        activeMemberships: data.item.activeMembers,
+        onSubmit: (member) => _gateway.assignProjectMember(
+          projectId: widget.projectId,
+          userId: member.id,
+          position: ProjectPositionPresentation.member,
+        ),
+      ),
+    );
+    if (result == null) return;
+    _teamMutationSucceeded(
+      result.kind == ProjectMemberMutationKind.reactivated
+          ? 'Membre réintégré à l’équipe'
+          : 'Membre ajouté à l’équipe',
+    );
+  }
+
+  Future<void> _openResponsibility(
+    ProjectDetailData data,
+    String targetPosition,
+  ) async {
+    final directory = await _loadDirectoryForDialog();
+    if (!mounted || directory == null) return;
+    final current = targetPosition == ProjectPositionPresentation.lead
+        ? data.item.lead
+        : data.item.deputy;
+    final result = await showDialog<ProjectMemberMutationResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectLeadChangeDialog(
+        projectName: data.item.project.name,
+        targetPosition: targetPosition,
+        currentHolder: current,
+        directory: directory,
+        onSubmit: (member) => _gateway.assignProjectMember(
+          projectId: widget.projectId,
+          userId: member.id,
+          position: targetPosition,
+        ),
+      ),
+    );
+    if (result == null) return;
+    _teamMutationSucceeded(
+      targetPosition == ProjectPositionPresentation.lead
+          ? 'Chef de projet mis à jour'
+          : 'Adjoint du projet mis à jour',
+    );
+  }
+
+  Future<void> _openRemoval(
+    ProjectDetailData data,
+    ProjectMemberModel membership,
+    ProjectTeamPermissions permissions,
+  ) async {
+    if (!permissions.canRemove(membership)) return;
+    final removed = await showDialog<ProjectMemberModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ProjectMemberRemovalDialog(
+        projectName: data.item.project.name,
+        membership: membership,
+        isCurrentUser: membership.userId == _user?.id,
+        onSubmit: () => _gateway.removeProjectMember(
+          projectId: widget.projectId,
+          userId: membership.userId,
+        ),
+      ),
+    );
+    if (removed != null) _teamMutationSucceeded('Membre retiré de l’équipe');
+  }
+
+  void _teamMutationSucceeded(String message) {
+    if (!mounted) return;
+    _ignoreInitialItem = true;
+    setState(() {
+      _loading = _load();
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _mutationSucceeded() {

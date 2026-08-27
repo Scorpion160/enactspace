@@ -50,7 +50,7 @@ class ProjectMemberModel {
       case 'adjoint_chef_projet':
         return 'Adjoint chef de projet';
       default:
-        return 'Membre projet';
+        return 'Membre du projet';
     }
   }
 }

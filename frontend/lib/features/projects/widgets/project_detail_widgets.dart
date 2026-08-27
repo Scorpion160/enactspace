@@ -10,12 +10,14 @@ class ProjectDetailView extends StatelessWidget {
   final ProjectDetailData data;
   final VoidCallback onBack;
   final Widget? management;
+  final Widget? teamSection;
 
   const ProjectDetailView({
     super.key,
     required this.data,
     required this.onBack,
     this.management,
+    this.teamSection,
   });
 
   @override
@@ -78,7 +80,7 @@ class ProjectDetailView extends StatelessWidget {
             child: TabBarView(
               children: [
                 ProjectOverviewSection(item: data.item),
-                ProjectTeamSection(item: data.item),
+                teamSection ?? ProjectTeamSection(item: data.item),
                 ProjectWorkSection(
                   item: data.item,
                   taskAssignees: data.taskAssignees,

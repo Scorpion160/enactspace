@@ -1,0 +1,90 @@
+{
+  "environment": "ui_audit",
+  "checked_at": "2026-08-24",
+  "mode": "read_only",
+  "source_traces": [
+    "../ui_projects_portfolio_v1/runtime_check.json",
+    "../ui_projects_v1/projects_runtime_check.json"
+  ],
+  "runtime_data_verified": true,
+  "runtime_ui_dialog_verification": {
+    "attempted": true,
+    "completed": false,
+    "reason": "La politique de navigation du navigateur intégré a bloqué l’URL locale avant chargement.",
+    "fallback": "Permissions et dialogues vérifiés par gateway widget sans requête réelle."
+  },
+  "projects_count": 9,
+  "audit_horizon": {
+    "project_id": "b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+    "active_memberships_before": 7,
+    "active_memberships_after": 7,
+    "ordinary_members_present": true,
+    "lead_before": {
+      "user_id": "19f62547-950e-53c9-ac33-00df468c7324",
+      "display_name": "Audit ProjectLead",
+      "position": "chef_projet",
+      "active": true
+    },
+    "lead_after_unchanged": true,
+    "deputy_before": {
+      "user_id": "0981ed2c-a7a0-586f-a609-eec33b0ed43c",
+      "display_name": "Audit Active03",
+      "position": "adjoint_chef_projet",
+      "active": true
+    },
+    "deputy_after_unchanged": true
+  },
+  "project_without_team": {
+    "project_id": "9e0eea52-7d05-5d73-95b9-aea188c6fa6e",
+    "name": "Audit Projet Sans Équipe",
+    "active_memberships_before": 0,
+    "active_memberships_after": 0,
+    "empty_state_verified": true,
+    "global_manager_action": "Constituer l’équipe"
+  },
+  "permissions_tested": {
+    "audit_admin": {
+      "verification_surface": "widget_gateway",
+      "manage_team_visible": true,
+      "add_member_visible": true,
+      "change_lead_visible": true,
+      "change_deputy_visible": true
+    },
+    "local_lead_widget_gateway": {
+      "add_ordinary_member_visible": true,
+      "change_lead_visible": false,
+      "change_deputy_visible": false
+    },
+    "local_deputy_widget_gateway": {
+      "add_ordinary_member_visible": true,
+      "change_lead_visible": false,
+      "change_deputy_visible": false
+    },
+    "unauthorized_widget_gateway": {
+      "management_actions_visible": false
+    }
+  },
+  "directory": {
+    "endpoint": "GET /api/users/directory",
+    "contract_inspected": true,
+    "runtime_loaded": false,
+    "widget_gateway_loaded": true,
+    "active_only_in_picker": true,
+    "alumni_excluded": true,
+    "inactive_excluded": true,
+    "single_cached_read_per_gateway": true
+  },
+  "dialogs_verified_without_final_action": {
+    "verification_surface": "widget_gateway",
+    "add_member": true,
+    "change_lead": true,
+    "change_deputy": true,
+    "remove_member": true
+  },
+  "requests_sent": {
+    "post_project_members": 0,
+    "delete_project_members": 0
+  },
+  "mutation_performed": false,
+  "contains_token_or_password": false
+}
