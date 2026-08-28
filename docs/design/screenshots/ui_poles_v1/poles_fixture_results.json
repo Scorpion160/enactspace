@@ -1,0 +1,112 @@
+{
+  "environment": "ui_audit",
+  "executed_at": "2026-08-27",
+  "guards": {
+    "APP_ENV": "ui_audit",
+    "DB_HOST": "postgres",
+    "DB_NAME": "enactspace_ui_audit",
+    "FILE_STORAGE_PATH": "/audit/uploads",
+    "database_url_concordant": true
+  },
+  "docker_operation": {
+    "docker_ai_temporarily_disabled": true,
+    "docker_ai_setting_restored": true
+  },
+  "baseline_tests": {
+    "static_declarations": 210,
+    "executed": 212,
+    "passed": 212,
+    "failed": 0,
+    "skipped": 0,
+    "parametrized_case_explanation": "Une déclaration en boucle génère trois tests, soit deux exécutions supplémentaires."
+  },
+  "first_effective_execution": {
+    "created": {
+      "poles": 1,
+      "memberships": 1,
+      "tasks": 1,
+      "task_assignees": 1,
+      "events": 1,
+      "total": 5
+    },
+    "updated": {
+      "memberships": 2,
+      "total": 2
+    },
+    "duplicate_rows": 0,
+    "poles_before": 7,
+    "poles_after": 8
+  },
+  "second_effective_execution": {
+    "created_total": 0,
+    "updated_total": 0,
+    "duplicate_rows": 0,
+    "poles_before": 8,
+    "poles_after": 8
+  },
+  "idempotent": true,
+  "normalized_positions": [
+    {
+      "membership_id": "ba4b7a8e-dbcd-5981-a734-d68a3d1a028b",
+      "user_id": "855f068d-f495-5cd5-b3e8-f48501b996e4",
+      "from": "chef",
+      "to": "chef_pole"
+    },
+    {
+      "membership_id": "557bd70d-1a58-5de0-9b36-32d0845aadbf",
+      "user_id": "70141e57-c691-5123-9211-e37fa9347b8e",
+      "from": "adjoint",
+      "to": "adjoint_chef_pole"
+    }
+  ],
+  "fixtures": {
+    "technique_pole_id": "9d6dfde4-38dc-5716-aea5-63cf976d2921",
+    "empty_pole": {
+      "id": "4a6e778d-d6f6-5dee-886e-a964ba7f9388",
+      "name": "Audit Pôle Sans Équipe",
+      "type": "support",
+      "description": null,
+      "objectives": null,
+      "active_memberships": 0,
+      "project_links": 0
+    },
+    "inactive_membership": {
+      "id": "441be915-688f-5b23-b6f3-0e91d62d459d",
+      "user_id": "20b88e1d-74e3-5fa5-ba83-bd141d5bf0c7",
+      "position": "membre",
+      "is_active": false,
+      "left_at": "2026-07-01"
+    },
+    "future_task": {
+      "id": "4b32ab9b-c676-5029-9497-577f3ed68f41",
+      "reference": "AUDIT-POLE-NEXT-ACTION-001",
+      "status": "a_faire",
+      "priority": "haute",
+      "due_date": "2027-04-15T17:00:00",
+      "project_id": null,
+      "assignee_user_id": "5754c6d8-238d-527f-a496-bb1d381f14e0"
+    },
+    "canonical_blocked_task_id": "db55a34b-ffea-5789-8437-80c0518458c8",
+    "overdue_task_id": "ca0ac003-36e0-510b-a3ee-65e7ef662946",
+    "future_event": {
+      "id": "acd3068c-803e-5544-bb84-ccf4b2c99bd3",
+      "reference": "AUDIT-POLE-EVENT-FUTURE-001",
+      "start": "2027-04-20T10:00:00",
+      "end": "2027-04-20T12:00:00",
+      "location": "Salle Audit Pôle A1",
+      "project_id": null
+    }
+  },
+  "final_database_check": {
+    "poles": 8,
+    "legacy_positions": 0,
+    "inactive_fixture_rows": 1,
+    "project_poles": 8,
+    "future_task_rows": 1,
+    "future_event_rows": 1,
+    "project_poles_unchanged": true
+  },
+  "global_seed_executed": false,
+  "application_endpoint_mutation_performed": false,
+  "contains_secrets": false
+}

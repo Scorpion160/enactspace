@@ -18,6 +18,7 @@ import '../features/gamification/screens/gamification_screen.dart';
 import '../features/impact/screens/impact_dashboard_screen.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
+import '../features/poles/screens/pole_detail_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
 import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/project_detail_screen.dart';
@@ -161,6 +162,23 @@ class AppRouter {
           GoRoute(
             path: '/poles',
             builder: (context, state) => const PolesScreen(),
+            routes: [
+              GoRoute(
+                path: ':poleId',
+                builder: (context, state) {
+                  final extra = state.extra;
+                  return PoleDetailScreen(
+                    poleId: state.pathParameters['poleId']!,
+                    gateway: extra is PoleDetailRouteData
+                        ? extra.gateway
+                        : null,
+                    initialItem: extra is PoleDetailRouteData
+                        ? extra.initialItem
+                        : null,
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/projects',

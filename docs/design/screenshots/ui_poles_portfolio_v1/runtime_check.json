@@ -1,0 +1,60 @@
+{
+  "environment": "ui_audit",
+  "read_only": true,
+  "poles_count": 8,
+  "technique": {
+    "pole_id": "9d6dfde4-38dc-5716-aea5-63cf976d2921",
+    "chef": {
+      "position": "chef_pole",
+      "membership_id": "ba4b7a8e-dbcd-5981-a734-d68a3d1a028b",
+      "user_id": "855f068d-f495-5cd5-b3e8-f48501b996e4"
+    },
+    "adjoint": {
+      "position": "adjoint_chef_pole",
+      "membership_id": "557bd70d-1a58-5de0-9b36-32d0845aadbf",
+      "user_id": "70141e57-c691-5123-9211-e37fa9347b8e"
+    }
+  },
+  "legacy_positions_present": false,
+  "empty_pole": {
+    "id": "4a6e778d-d6f6-5dee-886e-a964ba7f9388",
+    "name": "Audit Pôle Sans Équipe",
+    "members": 0
+  },
+  "future_task": {
+    "id": "4b32ab9b-c676-5029-9497-577f3ed68f41",
+    "reference": "AUDIT-POLE-NEXT-ACTION-001",
+    "present": true,
+    "future": true,
+    "assignee_present": true
+  },
+  "blockage": {
+    "task_id": "db55a34b-ffea-5789-8437-80c0518458c8",
+    "status": "bloque",
+    "present": true
+  },
+  "overdue": {
+    "task_id": "ca0ac003-36e0-510b-a3ee-65e7ef662946",
+    "present": true,
+    "terminal": false
+  },
+  "future_event": {
+    "id": "acd3068c-803e-5544-bb84-ccf4b2c99bd3",
+    "reference": "AUDIT-POLE-EVENT-FUTURE-001",
+    "present": true
+  },
+  "document": {
+    "id": "5c194df1-52ac-5bf2-821e-7c0c1e9eae1b",
+    "title": "Document audit 1",
+    "present": true
+  },
+  "activity": {
+    "id": "17ab6cea-0984-5d9a-9b2e-99bfc821dd38",
+    "present": true,
+    "type": "official"
+  },
+  "project_poles_count": 8,
+  "project_poles_unchanged": true,
+  "application_mutation_performed": false,
+  "contains_credentials_or_tokens": false
+}
