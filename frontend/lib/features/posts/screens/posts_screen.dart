@@ -4,23 +4,19 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
-import '../../members/services/members_service.dart';
 import '../../poles/models/pole_model.dart';
-import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
-import '../../projects/services/projects_service.dart';
 import '../models/post_comment_model.dart';
 import '../models/post_model.dart';
 import '../models/post_stats_model.dart';
-import '../services/posts_service.dart';
+import '../models/post_update_model.dart';
+import '../services/posts_gateway.dart';
 
 class _SelectedPostMedia {
   final String fileId;
@@ -37,18 +33,16 @@ class _SelectedPostMedia {
 }
 
 class PostsScreen extends StatefulWidget {
-  const PostsScreen({super.key});
+  final PostsGateway? gateway;
+
+  const PostsScreen({super.key, this.gateway});
 
   @override
   State<PostsScreen> createState() => _PostsScreenState();
 }
 
 class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
-  final PostsService _postsService = PostsService();
-  final MembersService _membersService = MembersService();
-  final AuthService _authService = AuthService();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
+  late final PostsGateway _gateway;
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -87,6 +81,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiPostsGateway();
     WidgetsBinding.instance.addObserver(this);
     _loadPosts();
     _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
@@ -130,31 +125,25 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     }
 
     try {
-      final posts = await _postsService.getPosts(
-        search: _searchController.text,
-        postType: _postType,
-        visibility: _visibility,
-        poleId: _filterPoleId,
-        projectId: _filterProjectId,
+      final data = await _gateway.loadFeed(
+        PostsQuery(
+          search: _searchController.text,
+          postType: _postType,
+          visibility: _visibility,
+          poleId: _filterPoleId,
+          projectId: _filterProjectId,
+        ),
       );
-
-      final user = await _loadUserSafely();
-      final members = await _loadMembersSafely();
-      final poles = _poles.isEmpty ? await _loadPolesSafely() : _poles;
-      final projects = _projects.isEmpty
-          ? await _loadProjectsSafely()
-          : _projects;
-      final stats = await Future.wait(posts.map(_loadStatsSafely));
 
       if (!mounted) return;
 
       setState(() {
-        _posts = _sortPosts(_applyFeedFilter(posts, user));
-        _user = user;
-        _membersById = {for (final member in members) member.id: member};
-        _poles = poles;
-        _projects = projects;
-        _statsByPostId = {for (final stat in stats) stat.postId: stat};
+        _posts = _sortPosts(_applyFeedFilter(data.posts, data.user));
+        _user = data.user;
+        _membersById = {for (final member in data.members) member.id: member};
+        _poles = data.poles;
+        _projects = data.projects;
+        _statsByPostId = data.statsByPostId;
       });
     } catch (e) {
       if (!mounted) return;
@@ -174,50 +163,6 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<List<MemberModel>> _loadMembersSafely() async {
-    try {
-      return await _membersService.getMembers();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<UserExperience?> _loadUserSafely() async {
-    try {
-      return UserExperience.fromJson(await _authService.getCurrentUser());
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<List<PoleModel>> _loadPolesSafely() async {
-    try {
-      return await _polesService.getPoles();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<List<ProjectModel>> _loadProjectsSafely() async {
-    try {
-      return await _projectsService.getProjects();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<PostStatsModel> _loadStatsSafely(PostModel post) async {
-    try {
-      return await _postsService.getStats(post.id);
-    } catch (_) {
-      return PostStatsModel(
-        postId: post.id,
-        commentsCount: 0,
-        reactionsCount: 0,
-      );
-    }
-  }
-
   Future<void> _pickPostMedia() async {
     if (_uploadingMedia || _creating) return;
 
@@ -233,7 +178,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     setState(() => _uploadingMedia = true);
 
     try {
-      final upload = await _postsService.uploadMediaBase64(
+      final upload = await _gateway.uploadMediaBase64(
         fileName: file.name,
         dataBase64: base64Encode(bytes),
         contentType: _guessContentType(file.name),
@@ -281,6 +226,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _createPost() async {
+    if (_creating) return;
     final content = _contentController.text.trim();
 
     if (content.isEmpty && _selectedMedia == null) {
@@ -301,7 +247,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     });
 
     try {
-      await _postsService.createPost(
+      await _gateway.createPost(
         title: _titleController.text,
         content: content,
         postType: _composerPostType,
@@ -366,7 +312,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     });
 
     try {
-      final comments = await _postsService.getComments(post.id);
+      final comments = await _gateway.getComments(post.id);
 
       if (!mounted) return;
       setState(() {
@@ -390,16 +336,14 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     if (content.isEmpty) return;
 
     try {
-      await _postsService.createComment(postId: post.id, content: content);
+      await _gateway.createComment(postId: post.id, content: content);
       controller.clear();
 
       await _loadComments(post);
-      final stat = await _loadStatsSafely(post);
+      final stat = await _gateway.getStats(post.id);
 
       if (!mounted) return;
-      setState(() {
-        _statsByPostId[post.id] = stat;
-      });
+      if (stat != null) setState(() => _statsByPostId[post.id] = stat);
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
@@ -411,16 +355,14 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
 
   Future<void> _reactWith(PostModel post, String reactionType) async {
     try {
-      await _postsService.createReaction(
+      await _gateway.createReaction(
         postId: post.id,
         reactionType: reactionType,
       );
-      final stat = await _loadStatsSafely(post);
+      final stat = await _gateway.getStats(post.id);
 
       if (!mounted) return;
-      setState(() {
-        _statsByPostId[post.id] = stat;
-      });
+      if (stat != null) setState(() => _statsByPostId[post.id] = stat);
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
     }
@@ -474,12 +416,51 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
         user.isProjectOrPoleLead;
   }
 
+  bool _canEditPost(PostModel post, UserExperience? user) {
+    if (user == null) return false;
+    if (post.authorId == user.id) return true;
+    if (user.isAdmin ||
+        user.isTeamLeader ||
+        user.isSecretary ||
+        user.isFinance ||
+        user.hasRole('faculty_advisor')) {
+      return true;
+    }
+    return user.isProjectOrPoleLead &&
+        (post.poleId != null || post.projectId != null);
+  }
+
+  Future<void> _editPost(PostModel post) async {
+    final updated = await showDialog<PostModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _EditPostDialog(
+        post: post,
+        gateway: _gateway,
+        poles: _poles,
+        projects: _projects,
+        canEditOfficial: _user?.isEnacchef ?? false,
+      ),
+    );
+
+    if (!mounted || updated == null) return;
+    setState(() {
+      _posts = _sortPosts([
+        for (final current in _posts)
+          if (current.id == updated.id) updated else current,
+      ]);
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Publication modifiée.')));
+  }
+
   Future<void> _togglePostPin(PostModel post) async {
     try {
       if (post.isPinned) {
-        await _postsService.unpinPost(post.id);
+        await _gateway.unpinPost(post.id);
       } else {
-        await _postsService.pinPost(post.id);
+        await _gateway.pinPost(post.id);
       }
 
       await _loadPosts();
@@ -511,7 +492,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     if (confirmed != true) return;
 
     try {
-      await _postsService.deletePost(post.id);
+      await _gateway.deletePost(post.id);
       await _loadPosts();
     } catch (e) {
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -786,6 +767,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.only(bottom: 14),
             child: _PostCard(
               post: post,
+              gateway: _gateway,
               authorName: _authorName(post),
               authorRole: _authorRoleLabel(post),
               authorSubtitle: _authorSubtitle(post),
@@ -802,9 +784,11 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
               onReactionSelected: (reactionType) =>
                   _reactWith(post, reactionType),
               canPin: canPinPosts,
+              canEdit: _canEditPost(post, _user),
               canDelete:
                   (_user?.isEnacchef ?? false) || post.authorId == _user?.id,
               onTogglePin: () => _togglePostPin(post),
+              onEdit: () => _editPost(post),
               onDelete: () => _deletePost(post),
             ),
           ),
@@ -1430,8 +1414,345 @@ class _PostFilters extends StatelessWidget {
   }
 }
 
+class _EditPostDialog extends StatefulWidget {
+  final PostModel post;
+  final PostsGateway gateway;
+  final List<PoleModel> poles;
+  final List<ProjectModel> projects;
+  final bool canEditOfficial;
+
+  const _EditPostDialog({
+    required this.post,
+    required this.gateway,
+    required this.poles,
+    required this.projects,
+    required this.canEditOfficial,
+  });
+
+  @override
+  State<_EditPostDialog> createState() => _EditPostDialogState();
+}
+
+class _EditPostDialogState extends State<_EditPostDialog> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
+  late String _postType;
+  late String _visibility;
+  late bool _isOfficial;
+  bool _submitting = false;
+  bool _uploadingMedia = false;
+  String? _error;
+  _SelectedPostMedia? _replacementMedia;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.post.title ?? '');
+    _contentController = TextEditingController(text: widget.post.content);
+    _postType = widget.post.postType;
+    _visibility = widget.post.visibility;
+    _isOfficial = widget.post.isOfficial;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickReplacementMedia() async {
+    if (_uploadingMedia || _submitting) return;
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: false,
+      type: FileType.any,
+    );
+    final file = result?.files.single;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || bytes.isEmpty) return;
+
+    setState(() {
+      _uploadingMedia = true;
+      _error = null;
+    });
+    try {
+      final upload = await widget.gateway.uploadMediaBase64(
+        fileName: file.name,
+        dataBase64: base64Encode(bytes),
+        contentType: _contentTypeFor(file.name),
+      );
+      if (!mounted) return;
+      setState(() {
+        _replacementMedia = _SelectedPostMedia(
+          fileId: upload.fileId,
+          fileName: upload.fileName,
+          contentType: upload.contentType,
+          sizeBytes: upload.sizeBytes,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _uploadingMedia = false);
+    }
+  }
+
+  String? _contentTypeFor(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    if (_contentController.text.trim().isEmpty) {
+      setState(() => _error = 'Le contenu est obligatoire.');
+      return;
+    }
+
+    final update = PostUpdateModel.fromChanges(
+      original: widget.post,
+      title: _titleController.text,
+      content: _contentController.text,
+      postType: _postType,
+      visibility: _visibility,
+      isOfficial: widget.canEditOfficial ? _isOfficial : null,
+      replacementMediaFileId: _replacementMedia?.fileId,
+    );
+    if (update.isEmpty) {
+      setState(() => _error = 'Aucune modification à enregistrer.');
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final updated = await widget.gateway.updatePost(
+        postId: widget.post.id,
+        update: update,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(updated);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  String _poleName(String id) {
+    for (final pole in widget.poles) {
+      if (pole.id == id) return pole.name;
+    }
+    return 'Pôle associé';
+  }
+
+  String _projectName(String id) {
+    for (final project in widget.projects) {
+      if (project.id == id) return project.name;
+    }
+    return 'Projet associé';
+  }
+
+  List<DropdownMenuItem<String>> _allowedVisibilityItems() {
+    return _visibilityItems().where((item) {
+      if (item.value == 'pole_only') return widget.post.poleId != null;
+      if (item.value == 'project_only') return widget.post.projectId != null;
+      return true;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasExistingMedia =
+        widget.post.mediaFileId != null || widget.post.hasMedia;
+
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Modifier la publication'),
+      content: SizedBox(
+        width: 620,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const Key('edit-post-title'),
+                controller: _titleController,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: 'Titre optionnel'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('edit-post-content'),
+                controller: _contentController,
+                enabled: !_submitting,
+                minLines: 4,
+                maxLines: 8,
+                decoration: const InputDecoration(labelText: 'Contenu'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: const Key('edit-post-type'),
+                initialValue: _postType,
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: _postTypeItems(),
+                onChanged: _submitting
+                    ? null
+                    : (value) {
+                        if (value != null) setState(() => _postType = value);
+                      },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: const Key('edit-post-visibility'),
+                initialValue: _visibility,
+                decoration: const InputDecoration(labelText: 'Visibilité'),
+                items: _allowedVisibilityItems(),
+                onChanged: _submitting
+                    ? null
+                    : (value) {
+                        if (value != null) setState(() => _visibility = value);
+                      },
+              ),
+              if (widget.post.poleId != null) ...[
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.groups_rounded),
+                  title: const Text('Pôle conservé'),
+                  subtitle: Text(_poleName(widget.post.poleId!)),
+                ),
+              ],
+              if (widget.post.projectId != null) ...[
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.workspaces_rounded),
+                  title: const Text('Projet conservé'),
+                  subtitle: Text(_projectName(widget.post.projectId!)),
+                ),
+              ],
+              if (widget.canEditOfficial)
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Publication officielle'),
+                  value: _isOfficial,
+                  onChanged: _submitting
+                      ? null
+                      : (value) => setState(() => _isOfficial = value),
+                ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.enactusYellow.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_replacementMedia != null)
+                      Text(
+                        'Nouveau média : ${_replacementMedia!.fileName}',
+                        key: const Key('edit-post-replacement-media'),
+                      )
+                    else if (hasExistingMedia)
+                      Text(
+                        'Média actuel conservé : '
+                        '${widget.post.mediaName ?? 'Fichier joint'}',
+                      )
+                    else
+                      const Text('Aucun média joint'),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _uploadingMedia || _submitting
+                          ? null
+                          : _pickReplacementMedia,
+                      icon: _uploadingMedia
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.attach_file_rounded),
+                      label: Text(
+                        hasExistingMedia || _replacementMedia != null
+                            ? 'Remplacer le média'
+                            : 'Ajouter un média',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  key: const Key('edit-post-error'),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          key: const Key('edit-post-submit'),
+          onPressed: _submitting ? null : _submit,
+          icon: _submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.save_outlined),
+          label: const Text('Enregistrer'),
+        ),
+      ],
+    );
+  }
+}
+
 class _PostCard extends StatelessWidget {
   final PostModel post;
+  final PostsGateway gateway;
   final String authorName;
   final String authorRole;
   final String authorSubtitle;
@@ -1447,12 +1768,15 @@ class _PostCard extends StatelessWidget {
   final VoidCallback onReact;
   final ValueChanged<String> onReactionSelected;
   final bool canPin;
+  final bool canEdit;
   final bool canDelete;
   final VoidCallback onTogglePin;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _PostCard({
     required this.post,
+    required this.gateway,
     required this.authorName,
     required this.authorRole,
     required this.authorSubtitle,
@@ -1468,8 +1792,10 @@ class _PostCard extends StatelessWidget {
     required this.onReact,
     required this.onReactionSelected,
     required this.canPin,
+    required this.canEdit,
     required this.canDelete,
     required this.onTogglePin,
+    required this.onEdit,
     required this.onDelete,
   });
 
@@ -1477,8 +1803,12 @@ class _PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 560;
     final date = DateFormat('dd/MM/yyyy HH:mm').format(post.createdAt);
-    final commentsCount = stats?.commentsCount ?? 0;
-    final reactionsCount = stats?.reactionsCount ?? 0;
+    final commentsLabel = stats == null
+        ? 'Commentaires'
+        : '${stats!.commentsCount} commentaire(s)';
+    final reactionsLabel = stats == null
+        ? 'Réagir'
+        : '${stats!.reactionsCount} réaction(s)';
 
     return Card(
       color: post.isOfficial
@@ -1545,10 +1875,11 @@ class _PostCard extends StatelessWidget {
                           ),
                           if (post.isPinned)
                             const Icon(Icons.push_pin_rounded, size: 18),
-                          if (canPin || canDelete)
+                          if (canPin || canEdit || canDelete)
                             PopupMenuButton<String>(
                               onSelected: (value) {
                                 if (value == 'pin') onTogglePin();
+                                if (value == 'edit') onEdit();
                                 if (value == 'delete') onDelete();
                               },
                               itemBuilder: (context) => [
@@ -1566,6 +1897,14 @@ class _PostCard extends StatelessWidget {
                                             ? 'Désépingler'
                                             : 'Épingler',
                                       ),
+                                    ),
+                                  ),
+                                if (canEdit)
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: ListTile(
+                                      leading: Icon(Icons.edit_outlined),
+                                      title: Text('Modifier'),
                                     ),
                                   ),
                                 if (canDelete)
@@ -1614,7 +1953,7 @@ class _PostCard extends StatelessWidget {
             ),
             if (post.hasMedia) ...[
               const SizedBox(height: 12),
-              _PostMediaPreview(post: post),
+              _PostMediaPreview(post: post, gateway: gateway),
             ],
             const SizedBox(height: 14),
             Wrap(
@@ -1645,7 +1984,7 @@ class _PostCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onReact,
                   icon: const Icon(Icons.thumb_up_alt_outlined),
-                  label: Text('$reactionsCount réaction(s)'),
+                  label: Text(reactionsLabel),
                 ),
                 _ReactionPicker(onSelected: onReactionSelected),
                 TextButton.icon(
@@ -1655,7 +1994,7 @@ class _PostCard extends StatelessWidget {
                         ? Icons.mode_comment_rounded
                         : Icons.mode_comment_outlined,
                   ),
-                  label: Text('$commentsCount commentaire(s)'),
+                  label: Text(commentsLabel),
                 ),
               ],
             ),
@@ -1744,8 +2083,9 @@ class _PostCard extends StatelessWidget {
 
 class _PostMediaPreview extends StatelessWidget {
   final PostModel post;
+  final PostsGateway gateway;
 
-  const _PostMediaPreview({required this.post});
+  const _PostMediaPreview({required this.post, required this.gateway});
 
   @override
   Widget build(BuildContext context) {
@@ -1761,7 +2101,7 @@ class _PostMediaPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: AspectRatio(
           aspectRatio: 16 / 10,
-          child: _AuthenticatedPostImage(url: url),
+          child: _AuthenticatedPostImage(url: url, gateway: gateway),
         ),
       );
     }
@@ -1807,8 +2147,9 @@ class _PostMediaPreview extends StatelessWidget {
 
 class _AuthenticatedPostImage extends StatefulWidget {
   final String url;
+  final PostsGateway gateway;
 
-  const _AuthenticatedPostImage({required this.url});
+  const _AuthenticatedPostImage({required this.url, required this.gateway});
 
   @override
   State<_AuthenticatedPostImage> createState() =>
@@ -1816,7 +2157,6 @@ class _AuthenticatedPostImage extends StatefulWidget {
 }
 
 class _AuthenticatedPostImageState extends State<_AuthenticatedPostImage> {
-  final AuthService _authService = AuthService();
   Future<Uint8List>? _imageFuture;
 
   @override
@@ -1828,21 +2168,13 @@ class _AuthenticatedPostImageState extends State<_AuthenticatedPostImage> {
   @override
   void didUpdateWidget(covariant _AuthenticatedPostImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.url != widget.url || oldWidget.gateway != widget.gateway) {
       _imageFuture = _loadImage();
     }
   }
 
   Future<Uint8List> _loadImage() async {
-    final token = await _authService.getToken();
-    final response = await http.get(
-      Uri.parse(widget.url),
-      headers: {if (token != null) 'Authorization': 'Bearer $token'},
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Image indisponible');
-    }
-    return response.bodyBytes;
+    return widget.gateway.loadMediaBytes(widget.url);
   }
 
   @override
@@ -2147,14 +2479,14 @@ List<DropdownMenuItem<String>> _postTypeItems({bool includeAll = true}) {
 List<DropdownMenuItem<String>> _visibilityItems({bool includeAll = true}) {
   return [
     if (includeAll) const DropdownMenuItem(value: 'all', child: Text('Toutes')),
-    const DropdownMenuItem(value: 'internal', child: Text('Interne')),
-    const DropdownMenuItem(value: 'public_club', child: Text('Club')),
-    const DropdownMenuItem(value: 'pole_only', child: Text('Pôle uniquement')),
+    const DropdownMenuItem(value: 'internal', child: Text('Membres')),
+    const DropdownMenuItem(value: 'public_club', child: Text('Tout le club')),
+    const DropdownMenuItem(value: 'pole_only', child: Text('Pôle sélectionné')),
     const DropdownMenuItem(
       value: 'project_only',
-      child: Text('Projet uniquement'),
+      child: Text('Projet sélectionné'),
     ),
-    const DropdownMenuItem(value: 'enacchef_only', child: Text('Bureau')),
+    const DropdownMenuItem(value: 'enacchef_only', child: Text('Responsables')),
     const DropdownMenuItem(value: 'alumni_only', child: Text('Alumni')),
     const DropdownMenuItem(value: 'private', child: Text('Privé')),
   ];

@@ -172,6 +172,22 @@ class ChatThreadModel {
   bool get canManageMembers =>
       currentUserRole == 'owner' || currentUserRole == 'admin';
 
+  String get threadTypeLabel => switch (threadType) {
+    'direct' => 'Discussion directe',
+    'group' => 'Groupe',
+    'club' => 'Club Enactus',
+    'pole' => 'Pôle',
+    'project' => 'Projet',
+    'enacchef' => 'Responsables Enactus',
+    _ => 'Conversation',
+  };
+
+  String get currentUserRoleLabel => switch (currentUserRole) {
+    'owner' => 'Propriétaire',
+    'admin' => 'Administrateur',
+    _ => 'Membre',
+  };
+
   String? get absoluteAvatarUrl {
     final url = avatarUrl;
     if (url == null || url.trim().isEmpty) return null;
@@ -247,6 +263,12 @@ class ChatThreadMemberModel {
     ].where((part) => part.trim().isNotEmpty).join(' ');
     return name.isNotEmpty ? name : email;
   }
+
+  String get participantRoleLabel => switch (participantRole) {
+    'owner' => 'Propriétaire',
+    'admin' => 'Administrateur',
+    _ => 'Membre',
+  };
 }
 
 class ChatMessageModel {

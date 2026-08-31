@@ -1,0 +1,117 @@
+{
+  "capture_method": "temporary_flutter_widget_harness",
+  "integrated_browser_used": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "poppins_verified": true,
+  "icon_font_verified": true,
+  "missing_icon_glyphs_detected": false,
+  "real_post_create_requests": 0,
+  "real_post_patch_requests": 0,
+  "real_post_delete_requests": 0,
+  "real_post_reaction_requests": 0,
+  "real_post_comment_requests": 0,
+  "real_chat_thread_create_requests": 0,
+  "real_chat_message_requests": 0,
+  "real_chat_participant_requests": 0,
+  "real_chat_reaction_requests": 0,
+  "real_chat_delete_requests": 0,
+  "real_notification_read_requests": 0,
+  "real_notification_unread_requests": 0,
+  "real_notification_read_all_requests": 0,
+  "real_notification_delete_requests": 0,
+  "application_mutation_performed": false,
+  "visual_controls": {
+    "captures_verified": "8/8",
+    "poppins_rendered": true,
+    "raw_enums_detected": false,
+    "overflow_detected": false,
+    "blocked_loader_detected": false,
+    "unnecessary_technical_data_detected": false,
+    "server_data_claimed": false,
+    "dominant_material_default_palette_detected": false
+  },
+  "captures": [
+    {
+      "filename": "01_posts_feed_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "scenario": "/posts — feed éditorial desktop avec composer, publication officielle et épinglée, média et actions",
+      "expected_markers": ["Communication", "Nouvelle publication", "Épinglée", "Officielle", "Awa Ndiaye", "Général", "Membres", "Compte-rendu_atelier.pdf", "7 réaction(s)", "4 commentaire(s)"],
+      "reached_markers": ["Communication", "Nouvelle publication", "Épinglée", "Officielle", "Awa Ndiaye", "Général", "Membres", "Compte-rendu_atelier.pdf", "7 réaction(s)", "4 commentaire(s)"],
+      "screenshot_sha256": "9c00ecf3040be554a36dc3df7b7368f7d6e01102308f88ce9df3209f9ef39914",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "02_posts_feed_mobile_390x844.png",
+      "viewport": "390x844",
+      "scenario": "/posts — composer compact et feed mobile monocolonne",
+      "expected_markers": ["Communication", "Publier", "Rechercher", "Toutes", "Épinglée", "Officielle", "Compte-rendu_atelier.pdf"],
+      "reached_markers": ["Communication", "Publier", "Rechercher", "Toutes", "Épinglée", "Officielle", "Compte-rendu_atelier.pdf"],
+      "screenshot_sha256": "0022a179a82eedf9428eec0b66bcb6e0082b46850e0e1ea940dfddc9408cf2f7",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "03_edit_post_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "scenario": "/posts — dialogue Modifier prérempli, non soumis",
+      "expected_markers": ["Modifier la publication", "Titre optionnel", "Contenu", "Type", "Visibilité", "Publication officielle", "Média actuel conservé", "Annuler", "Enregistrer"],
+      "reached_markers": ["Modifier la publication", "Titre optionnel", "Contenu", "Type", "Visibilité", "Publication officielle", "Média actuel conservé", "Annuler", "Enregistrer"],
+      "screenshot_sha256": "c0f9d12c55bd5a203880cb117611ed95bde4456ce61e6454cc59f32e30387e24",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "04_chat_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "scenario": "/chat?thread=thread-project — messagerie desktop deux panneaux avec présence, typing, réactions, lecture et document",
+      "expected_markers": ["Conversations", "Rechercher une discussion", "Projet SunuTech", "Pôle Communication", "Lu", "bravo 3", "like 2", "Dossier_partenaire_SunuTech.pdf", "Moussa Fall est en train d’écrire"],
+      "reached_markers": ["Conversations", "Rechercher une discussion", "Projet SunuTech", "Pôle Communication", "Lu", "bravo 3", "like 2", "Dossier_partenaire_SunuTech.pdf", "Moussa Fall est en train d’écrire"],
+      "screenshot_sha256": "de0174e388b90f80a1eecc3c450123c041446d42cfb16d223b89d9dccebc50c1",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "05_chat_mobile_390x844.png",
+      "viewport": "390x844",
+      "scenario": "/chat?thread=thread-project — conversation mobile plein écran",
+      "expected_markers": ["Retour", "Projet SunuTech", "Lu", "Dossier_partenaire_SunuTech.pdf", "Awa Ndiaye est en train d’écrire", "Pièce jointe", "Écrire un message", "Envoyer"],
+      "reached_markers": ["Retour", "Projet SunuTech", "Lu", "Dossier_partenaire_SunuTech.pdf", "Awa Ndiaye est en train d’écrire", "Pièce jointe", "Écrire un message", "Envoyer"],
+      "screenshot_sha256": "a15e2708156d600032ba4c8d06d0716c135aab9e29d5575a859c33570425bafc",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "06_chat_thread_management_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "scenario": "/chat — informations et gestion de la conversation sans mutation",
+      "expected_markers": ["Infos", "Discussion de projet", "Projet", "Propriétaire", "Administrateur", "Membre", "Ajouter", "Désépingler", "Supprimer pour moi", "participants"],
+      "reached_markers": ["Infos", "Discussion de projet", "Projet", "Propriétaire", "Administrateur", "Membre", "Ajouter", "Désépingler", "Supprimer pour moi", "4 participant(s)"],
+      "screenshot_sha256": "3d85f9fd88286427f09bcbcc2228b4316a4c75260707fbcddb0ed441452451a7",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "07_notifications_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "scenario": "/notifications — compteur, filtres et familles Tâches, Publications et Chat",
+      "expected_markers": ["3 non lue(s)", "Toutes", "Non lues", "Tous les types", "Rechercher une notification", "Tâches", "Publications", "Chat", "Non lue"],
+      "reached_markers": ["3 non lue(s)", "Toutes", "Non lues", "Tous les types", "Rechercher une notification", "Tâches", "Publications", "Chat", "Non lue"],
+      "screenshot_sha256": "3eca244bde125166a3bbe4371a10d39488c4d7c55f86557ae0edcdf297dbd712",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "08_notifications_mobile_390x844.png",
+      "viewport": "390x844",
+      "scenario": "/notifications — liste compacte mobile, filtres et menu d’actions accessible",
+      "expected_markers": ["Notifications", "3 non lue(s)", "Toutes", "Non lues", "Tous les types", "Rechercher une notification", "Échéance aujourd’hui", "Non lue", "Options"],
+      "reached_markers": ["Notifications", "3 non lue(s)", "Toutes", "Non lues", "Tous les types", "Rechercher une notification", "Échéance aujourd’hui", "Non lue", "Options"],
+      "screenshot_sha256": "d58b2f78a869490405d9426a9022806e3678b82b7146626e46e96b065831021d",
+      "icons_rendered_correctly": true,
+      "success": true
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import '../models/post_comment_model.dart';
 import '../models/post_model.dart';
 import '../models/post_reaction_model.dart';
 import '../models/post_stats_model.dart';
+import '../models/post_update_model.dart';
 
 class PostsService {
   final ApiClient _apiClient;
@@ -83,6 +84,28 @@ class PostsService {
     }
 
     throw Exception('Réponse invalide lors de la création de publication.');
+  }
+
+  Future<PostModel> updatePost({
+    required String postId,
+    required PostUpdateModel update,
+  }) async {
+    if (update.isEmpty) {
+      throw Exception('Aucune modification à enregistrer.');
+    }
+
+    final token = await _requireToken();
+    final response = await _apiClient.patchJson(
+      '/posts/$postId',
+      token: token,
+      data: update.toJson(),
+    );
+
+    if (response is Map<String, dynamic>) {
+      return PostModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la modification de publication.');
   }
 
   Future<PostUploadedMediaModel> uploadMediaBase64({
@@ -214,7 +237,7 @@ class PostsService {
       return PostStatsModel.fromJson(response);
     }
 
-    return PostStatsModel(postId: postId, commentsCount: 0, reactionsCount: 0);
+    throw Exception('Réponse invalide lors du chargement des statistiques.');
   }
 
   Future<String> _requireToken() async {

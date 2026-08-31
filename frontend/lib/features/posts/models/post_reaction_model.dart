@@ -38,7 +38,7 @@ class PostReactionModel {
       case 'soutien':
         return 'Soutien';
       default:
-        return 'Like';
+        return 'J’aime';
     }
   }
 }
