@@ -35,6 +35,17 @@ class TasksService {
         .toList();
   }
 
+  Future<TaskModel> getTask(String taskId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get('/tasks/$taskId', token: token);
+    if (response is Map<String, dynamic>) {
+      return TaskModel.fromJson(response);
+    }
+    throw Exception('Réponse tâche invalide.');
+  }
+
   Future<TaskModel> createTask({
     required String title,
     required String description,
@@ -68,6 +79,38 @@ class TasksService {
     }
 
     throw Exception('Réponse invalide lors de la création de tâche.');
+  }
+
+  Future<TaskModel> updateTask({
+    required String taskId,
+    required String title,
+    required String description,
+    required String priority,
+    required String status,
+    required DateTime? dueDate,
+    required bool proofRequired,
+    required String? proofUrl,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.patchJson(
+      '/tasks/$taskId',
+      token: token,
+      data: {
+        'title': title.trim(),
+        'description': description.trim(),
+        'priority': priority,
+        'status': status,
+        'due_date': dueDate?.toIso8601String(),
+        'proof_required': proofRequired,
+        'proof_url': proofUrl?.trim(),
+      },
+    );
+    if (response is Map<String, dynamic>) {
+      return TaskModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la modification de tâche.');
   }
 
   Future<TaskModel> changeStatus({

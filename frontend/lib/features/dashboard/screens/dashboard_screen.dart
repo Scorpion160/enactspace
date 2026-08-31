@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
 import '../models/dashboard_summary_model.dart';
-import '../services/dashboard_service.dart';
+import '../services/dashboard_gateway.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final DashboardGateway? gateway;
+
+  const DashboardScreen({super.key, this.gateway});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final DashboardService _dashboardService = DashboardService();
-  final AuthService _authService = AuthService();
+  late final DashboardGateway _gateway;
 
   bool _loading = true;
   String? _error;
@@ -27,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiDashboardGateway();
     _loadDashboard();
   }
 
@@ -37,19 +38,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final summary = await _dashboardService.getSummary();
-      UserExperience? user;
-
-      try {
-        user = UserExperience.fromJson(await _authService.getCurrentUser());
-      } catch (_) {
-        user = null;
-      }
+      final summary = await _gateway.loadSummary();
 
       if (!mounted) return;
       setState(() {
         _summary = summary;
-        _userExperience = user;
+        _userExperience = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -345,7 +339,7 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: compact ? 126 : 158,
+      height: compact ? 180 : 166,
       child: AppMetric(
         label: data.title,
         value: data.value,
@@ -618,7 +612,7 @@ class _AttentionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return _DashboardSection(
       icon: Icons.notifications_active_rounded,
-      title: 'À suivre',
+      title: 'À suivre aujourd’hui',
       child: Column(
         children: [
           if (items.isEmpty)
@@ -966,7 +960,7 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
   final cards = <_MetricCardData>[
     _MetricCardData(
       title: 'Notifications',
-      value: counts.integer('notifications_unread').toString(),
+      value: counts.integerLabel('notifications_unread'),
       subtitle: 'non lues',
       icon: Icons.notifications_active_rounded,
       route: '/notifications',
@@ -974,15 +968,17 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
     ),
     _MetricCardData(
       title: 'Mes tâches',
-      value: counts.integer('tasks_assigned').toString(),
-      subtitle: '${counts.integer('tasks_late')} en retard',
+      value: counts.integerLabel('tasks_assigned'),
+      subtitle: counts.hasValue('tasks_late')
+          ? '${counts.integer('tasks_late')} en retard'
+          : 'retard indisponible',
       icon: Icons.task_alt_rounded,
-      route: '/tasks',
+      route: '/tasks?view=my',
       danger: counts.integer('tasks_late') > 0,
     ),
     _MetricCardData(
       title: 'Messages',
-      value: counts.integer('messages_unread').toString(),
+      value: counts.integerLabel('messages_unread'),
       subtitle: 'messages non lus',
       icon: Icons.chat_rounded,
       route: '/chat',
@@ -990,22 +986,24 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
     ),
     _MetricCardData(
       title: 'Événements',
-      value: counts.integer('events_upcoming').toString(),
+      value: counts.integerLabel('events_upcoming'),
       subtitle: 'à venir',
       icon: Icons.event_available_rounded,
       route: '/events',
     ),
     _MetricCardData(
       title: 'Documents',
-      value: counts.integer('documents_accessible').toString(),
+      value: counts.integerLabel('documents_accessible'),
       subtitle: 'accessibles',
       icon: Icons.folder_copy_rounded,
       route: '/documents',
     ),
     _MetricCardData(
       title: 'Engagement',
-      value: counts.integer('badges_points').toString(),
-      subtitle: '${counts.integer('badges_count')} badge(s)',
+      value: counts.integerLabel('badges_points'),
+      subtitle: counts.hasValue('badges_count')
+          ? '${counts.integer('badges_count')} badge(s)'
+          : 'badges indisponibles',
       icon: Icons.workspace_premium_rounded,
       route: '/gamification',
     ),
@@ -1015,8 +1013,10 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
     cards.add(
       _MetricCardData(
         title: 'Membres actifs',
-        value: counts.integer('members_active').toString(),
-        subtitle: '${counts.integer('members_inactive')} inactif(s)',
+        value: counts.integerLabel('members_active'),
+        subtitle: counts.hasValue('members_inactive')
+            ? '${counts.integer('members_inactive')} inactif(s)'
+            : 'donnée partielle',
         icon: Icons.people_alt_rounded,
         route: '/members',
       ),
@@ -1027,19 +1027,22 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
     cards.add(
       _MetricCardData(
         title: 'Projets actifs',
-        value: counts.integer('projects_active').toString(),
-        subtitle: '${counts.integer('poles')} pôle(s)',
+        value: counts.integerLabel('projects_active'),
+        subtitle: counts.hasValue('poles')
+            ? '${counts.integer('poles')} pôle(s)'
+            : 'donnée partielle',
         icon: Icons.rocket_launch_rounded,
         route: '/projects',
       ),
     );
   }
 
-  if (profile.canManageDocuments) {
+  if (profile.canManageDocuments &&
+      counts.hasValue('documents_pending_validation')) {
     cards.add(
       _MetricCardData(
         title: 'Documents à valider',
-        value: counts.integer('documents_pending_validation').toString(),
+        value: counts.integerLabel('documents_pending_validation'),
         subtitle: 'en attente',
         icon: Icons.verified_rounded,
         route: '/documents',
@@ -1050,30 +1053,32 @@ List<_MetricCardData> _metricCards(DashboardSummaryModel summary) {
 
   if (profile.canViewFinance) {
     cards.addAll([
-      _MetricCardData(
-        title: 'Paiements',
-        value: counts.integer('payments_pending').toString(),
-        subtitle: 'à valider',
-        icon: Icons.pending_actions_rounded,
-        route: '/finance',
-        danger: counts.integer('payments_pending') > 0,
-      ),
-      _MetricCardData(
-        title: 'À encaisser',
-        value: _money(counts.decimal('finance_due')),
-        subtitle: 'solde global',
-        icon: Icons.account_balance_wallet_rounded,
-        route: '/finance',
-        danger: counts.decimal('finance_due') > 0,
-      ),
+      if (counts.hasValue('payments_pending'))
+        _MetricCardData(
+          title: 'Paiements',
+          value: counts.integerLabel('payments_pending'),
+          subtitle: 'à valider',
+          icon: Icons.pending_actions_rounded,
+          route: '/finance',
+          danger: counts.integer('payments_pending') > 0,
+        ),
+      if (counts.hasValue('finance_due'))
+        _MetricCardData(
+          title: 'À encaisser',
+          value: _money(counts.decimal('finance_due')),
+          subtitle: 'solde global',
+          icon: Icons.account_balance_wallet_rounded,
+          route: '/finance',
+          danger: counts.decimal('finance_due') > 0,
+        ),
     ]);
   }
 
-  if (profile.canViewRecruitment) {
+  if (profile.canViewRecruitment && counts.hasValue('applications_pending')) {
     cards.add(
       _MetricCardData(
         title: 'Candidatures',
-        value: counts.integer('applications_pending').toString(),
+        value: counts.integerLabel('applications_pending'),
         subtitle: 'à suivre',
         icon: Icons.how_to_reg_rounded,
         route: '/recruitment',
@@ -1091,183 +1096,187 @@ List<_RoleCardData> _roleCards(
 ) {
   final profile = summary.profile;
   final counts = summary.counts;
+  final cards = <_RoleCardData>[];
+
+  void add({
+    required String key,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String route,
+    Color? color,
+  }) {
+    if (!counts.hasValue(key)) return;
+    cards.add(
+      _RoleCardData(
+        title: title,
+        value: counts.integerLabel(key),
+        subtitle: subtitle,
+        icon: icon,
+        route: route,
+        color: color,
+      ),
+    );
+  }
 
   if (profile.canViewGlobal) {
-    return [
-      _RoleCardData(
-        title: 'Vue club',
-        value: counts.integer('members_active').toString(),
-        subtitle: 'membres actifs actuellement',
-        icon: Icons.groups_rounded,
-        route: '/members',
-      ),
-      _RoleCardData(
-        title: 'Projets en mouvement',
-        value: counts.integer('projects_active').toString(),
-        subtitle: '${counts.integer('poles')} pôle(s) structurés',
-        icon: Icons.rocket_launch_rounded,
-        route: '/projects',
-      ),
-      _RoleCardData(
-        title: 'Organisation',
-        value: counts.integer('documents_pending_validation').toString(),
-        subtitle: 'document(s) à valider',
-        icon: Icons.fact_check_rounded,
-        route: '/documents',
-      ),
-    ];
+    add(
+      key: 'members_active',
+      title: 'Vue club',
+      subtitle: 'membres actifs actuellement',
+      icon: Icons.groups_rounded,
+      route: '/members',
+    );
+    add(
+      key: 'projects_active',
+      title: 'Projets en mouvement',
+      subtitle: 'projets actifs',
+      icon: Icons.rocket_launch_rounded,
+      route: '/projects',
+    );
+    add(
+      key: 'documents_pending_validation',
+      title: 'Organisation',
+      subtitle: 'document(s) à valider',
+      icon: Icons.fact_check_rounded,
+      route: '/documents',
+    );
+    return cards;
   }
 
   if (profile.canViewFinance) {
-    return [
-      _RoleCardData(
-        title: 'Paiements récents',
-        value: counts.integer('payments_pending').toString(),
-        subtitle: 'paiement(s) à valider',
-        icon: Icons.pending_actions_rounded,
-        route: '/finance',
-        color: Colors.green.shade800,
-      ),
-      _RoleCardData(
-        title: 'Cotisations',
-        value: _money(counts.decimal('finance_due')),
-        subtitle: 'reste à encaisser',
-        icon: Icons.account_balance_wallet_rounded,
-        route: '/finance',
-        color: Colors.green.shade800,
-      ),
-      _RoleCardData(
-        title: 'Encaissements',
-        value: _money(counts.decimal('finance_paid')),
-        subtitle: 'total payé enregistré',
-        icon: Icons.verified_rounded,
-        route: '/finance',
-        color: Colors.green.shade800,
-      ),
-    ];
+    add(
+      key: 'payments_pending',
+      title: 'Paiements récents',
+      subtitle: 'paiement(s) à valider',
+      icon: Icons.pending_actions_rounded,
+      route: '/finance',
+      color: Colors.green.shade800,
+    );
+    if (counts.hasValue('finance_due')) {
+      cards.add(
+        _RoleCardData(
+          title: 'Cotisations',
+          value: _money(counts.decimal('finance_due')),
+          subtitle: 'reste à encaisser',
+          icon: Icons.account_balance_wallet_rounded,
+          route: '/finance',
+          color: Colors.green.shade800,
+        ),
+      );
+    }
+    return cards;
   }
 
   if (profile.canViewGlobalMembers || profile.canManageDocuments) {
-    return [
-      _RoleCardData(
-        title: 'Présences',
-        value: counts.integer('absences_recent').toString(),
-        subtitle:
-            '${counts.integer('late_attendance_recent')} retard(s) suivis',
-        icon: Icons.event_busy_rounded,
-        route: '/attendance',
-      ),
-      _RoleCardData(
-        title: 'Documents',
-        value: counts.integer('documents_pending_validation').toString(),
-        subtitle: 'validation et classement',
-        icon: Icons.description_rounded,
-        route: '/documents',
-      ),
-      _RoleCardData(
-        title: 'Candidatures',
-        value: counts.integer('applications_pending').toString(),
-        subtitle: 'profils à suivre',
-        icon: Icons.how_to_reg_rounded,
-        route: '/recruitment',
-      ),
-    ];
+    add(
+      key: 'absences_recent',
+      title: 'Présences',
+      subtitle: 'absences récentes',
+      icon: Icons.event_busy_rounded,
+      route: '/attendance',
+    );
+    add(
+      key: 'documents_pending_validation',
+      title: 'Documents',
+      subtitle: 'validation et classement',
+      icon: Icons.description_rounded,
+      route: '/documents',
+    );
+    add(
+      key: 'applications_pending',
+      title: 'Candidatures',
+      subtitle: 'profils à suivre',
+      icon: Icons.how_to_reg_rounded,
+      route: '/recruitment',
+    );
+    return cards;
   }
 
   if (profile.isEnacchef) {
-    return [
-      _RoleCardData(
-        title: 'Mon périmètre',
-        value: counts.integer('tasks_assigned').toString(),
-        subtitle: 'tâche(s) où je suis impliqué',
-        icon: Icons.task_alt_rounded,
-        route: '/tasks',
-      ),
-      _RoleCardData(
-        title: 'Projets',
-        value: counts.integer('projects_active').toString(),
-        subtitle: 'projets actifs à coordonner',
-        icon: Icons.rocket_launch_rounded,
-        route: '/projects',
-      ),
-      _RoleCardData(
-        title: 'Communication',
-        value: counts.integer('posts_recent').toString(),
-        subtitle: 'posts récents visibles',
-        icon: Icons.campaign_rounded,
-        route: '/posts',
-      ),
-    ];
+    add(
+      key: 'tasks_assigned',
+      title: 'Mon périmètre',
+      subtitle: 'tâche(s) où je suis impliqué',
+      icon: Icons.task_alt_rounded,
+      route: '/tasks?view=my',
+    );
+    add(
+      key: 'projects_active',
+      title: 'Projets',
+      subtitle: 'projets actifs à coordonner',
+      icon: Icons.rocket_launch_rounded,
+      route: '/projects',
+    );
+    add(
+      key: 'posts_recent',
+      title: 'Communication',
+      subtitle: 'posts récents visibles',
+      icon: Icons.campaign_rounded,
+      route: '/posts',
+    );
+    return cards;
   }
 
   if (profile.isAlumni || user?.isAlumni == true) {
-    return [
-      _RoleCardData(
-        title: 'Annonces',
-        value: counts.integer('posts_recent').toString(),
-        subtitle: 'publications accessibles',
-        icon: Icons.campaign_rounded,
-        route: '/posts',
-      ),
-      _RoleCardData(
-        title: 'Événements',
-        value: counts.integer('events_upcoming').toString(),
-        subtitle: 'moments ouverts au réseau',
-        icon: Icons.event_available_rounded,
-        route: '/events',
-      ),
-      _RoleCardData(
-        title: 'Réseau',
-        value: counts.integer('messages_unread').toString(),
-        subtitle: 'message(s) non lus',
-        icon: Icons.chat_rounded,
-        route: '/chat',
-      ),
-    ];
+    add(
+      key: 'posts_recent',
+      title: 'Annonces',
+      subtitle: 'publications accessibles',
+      icon: Icons.campaign_rounded,
+      route: '/posts',
+    );
+    add(
+      key: 'events_upcoming',
+      title: 'Événements',
+      subtitle: 'moments ouverts au réseau',
+      icon: Icons.event_available_rounded,
+      route: '/events',
+    );
+    return cards;
   }
 
-  return [
-    _RoleCardData(
-      title: 'Mes tâches',
-      value: counts.integer('tasks_assigned').toString(),
-      subtitle: '${counts.integer('tasks_done')} terminée(s)',
-      icon: Icons.task_alt_rounded,
-      route: '/tasks',
-    ),
-    _RoleCardData(
-      title: 'Mes échanges',
-      value: counts.integer('messages_unread').toString(),
-      subtitle: 'message(s) à lire',
-      icon: Icons.chat_rounded,
-      route: '/chat',
-    ),
-    _RoleCardData(
-      title: 'Mon engagement',
-      value: counts.integer('badges_points').toString(),
-      subtitle: '${counts.integer('badges_count')} badge(s)',
-      icon: Icons.workspace_premium_rounded,
-      route: '/gamification',
-    ),
-  ];
+  add(
+    key: 'tasks_assigned',
+    title: 'Mes tâches',
+    subtitle: 'suivi opérationnel',
+    icon: Icons.task_alt_rounded,
+    route: '/tasks?view=my',
+  );
+  add(
+    key: 'messages_unread',
+    title: 'Mes échanges',
+    subtitle: 'message(s) à lire',
+    icon: Icons.chat_rounded,
+    route: '/chat',
+  );
+  add(
+    key: 'badges_points',
+    title: 'Mon engagement',
+    subtitle: 'points obtenus',
+    icon: Icons.workspace_premium_rounded,
+    route: '/gamification',
+  );
+  return cards;
 }
 
 List<_AttentionItem> _attentionItems(DashboardSummaryModel summary) {
   final counts = summary.counts;
   final items = <_AttentionItem>[];
 
-  if (counts.integer('tasks_late') > 0) {
+  if ((counts.nullableInteger('tasks_late') ?? 0) > 0) {
     items.add(
       _AttentionItem(
         title: 'Tâches en retard',
         message:
             '${counts.integer('tasks_late')} tâche(s) doivent être suivies.',
         icon: Icons.warning_rounded,
-        route: '/tasks',
+        route: '/tasks?view=late',
         danger: true,
       ),
     );
   }
-  if (counts.integer('notifications_unread') > 0) {
+  if ((counts.nullableInteger('notifications_unread') ?? 0) > 0) {
     items.add(
       _AttentionItem(
         title: 'Notifications',
@@ -1278,28 +1287,23 @@ List<_AttentionItem> _attentionItems(DashboardSummaryModel summary) {
       ),
     );
   }
-  if (summary.profile.canViewFinance &&
-      counts.integer('payments_pending') > 0) {
+  if ((counts.nullableInteger('messages_unread') ?? 0) > 0) {
     items.add(
       _AttentionItem(
-        title: 'Paiements à valider',
-        message:
-            '${counts.integer('payments_pending')} paiement(s) en attente.',
-        icon: Icons.payments_rounded,
-        route: '/finance',
-        danger: true,
+        title: 'Messages',
+        message: '${counts.integer('messages_unread')} message(s) non lu(s).',
+        icon: Icons.chat_rounded,
+        route: '/chat',
       ),
     );
   }
-  if (summary.profile.canManageDocuments &&
-      counts.integer('documents_pending_validation') > 0) {
+  if ((counts.nullableInteger('events_upcoming') ?? 0) > 0) {
     items.add(
       _AttentionItem(
-        title: 'Documents à valider',
-        message:
-            '${counts.integer('documents_pending_validation')} document(s) attendent.',
-        icon: Icons.description_rounded,
-        route: '/documents',
+        title: 'Prochains événements',
+        message: '${counts.integer('events_upcoming')} événement(s) à venir.',
+        icon: Icons.event_available_rounded,
+        route: '/events',
       ),
     );
   }
@@ -1347,6 +1351,12 @@ List<_QuickActionData> _quickActions(DashboardSummaryModel summary) {
       subtitle: 'Discussions',
       icon: Icons.chat_rounded,
       route: '/chat',
+    ),
+    const _QuickActionData(
+      title: 'Notifications',
+      subtitle: 'Alertes et suivi',
+      icon: Icons.notifications_rounded,
+      route: '/notifications',
     ),
     const _QuickActionData(
       title: 'Créer un post',
@@ -1408,95 +1418,60 @@ List<(String, String, IconData)> _focusItems(
   DashboardCountsModel counts,
   UserExperience? user,
 ) {
+  final items = <(String, String, IconData)>[];
+
+  void add(String key, String label, IconData icon) {
+    if (counts.hasValue(key)) {
+      items.add((label, counts.integerLabel(key), icon));
+    }
+  }
+
+  void addMoney(String key, String label, IconData icon) {
+    if (counts.hasValue(key)) {
+      items.add((label, _money(counts.decimal(key)), icon));
+    }
+  }
+
   if (profile.canViewFinance) {
-    return [
-      (
-        'Paiements à valider',
-        counts.integer('payments_pending').toString(),
-        Icons.pending_actions_rounded,
-      ),
-      (
-        'Montant à encaisser',
-        _money(counts.decimal('finance_due')),
-        Icons.payments_rounded,
-      ),
-      (
-        'Montant encaissé',
-        _money(counts.decimal('finance_paid')),
-        Icons.verified_rounded,
-      ),
-    ];
+    add(
+      'payments_pending',
+      'Paiements à valider',
+      Icons.pending_actions_rounded,
+    );
+    addMoney('finance_due', 'Montant à encaisser', Icons.payments_rounded);
+    addMoney('finance_paid', 'Montant encaissé', Icons.verified_rounded);
+    return items;
   }
   if (profile.canViewRecruitment) {
-    return [
-      (
-        'Candidatures à suivre',
-        counts.integer('applications_pending').toString(),
-        Icons.how_to_reg_rounded,
-      ),
-      (
-        'Documents à valider',
-        counts.integer('documents_pending_validation').toString(),
-        Icons.description_rounded,
-      ),
-      (
-        'Événements à venir',
-        counts.integer('events_upcoming').toString(),
-        Icons.event_rounded,
-      ),
-    ];
+    add(
+      'applications_pending',
+      'Candidatures à suivre',
+      Icons.how_to_reg_rounded,
+    );
+    add(
+      'documents_pending_validation',
+      'Documents à valider',
+      Icons.description_rounded,
+    );
+    add('events_upcoming', 'Événements à venir', Icons.event_rounded);
+    return items;
   }
   if (profile.isEnacchef) {
-    return [
-      (
-        'Projets actifs',
-        counts.integer('projects_active').toString(),
-        Icons.rocket_launch_rounded,
-      ),
-      ('Pôles suivis', counts.integer('poles').toString(), Icons.hub_rounded),
-      (
-        'Tâches en retard',
-        counts.integer('tasks_late').toString(),
-        Icons.warning_rounded,
-      ),
-    ];
+    add('projects_active', 'Projets actifs', Icons.rocket_launch_rounded);
+    add('poles', 'Pôles suivis', Icons.hub_rounded);
+    add('tasks_late', 'Tâches en retard', Icons.warning_rounded);
+    return items;
   }
   if (profile.isAlumni || user?.isAlumni == true) {
-    return [
-      (
-        'Annonces récentes',
-        counts.integer('posts_recent').toString(),
-        Icons.campaign_rounded,
-      ),
-      (
-        'Événements ouverts',
-        counts.integer('events_upcoming').toString(),
-        Icons.event_available_rounded,
-      ),
-      (
-        'Messages non lus',
-        counts.integer('messages_unread').toString(),
-        Icons.chat_rounded,
-      ),
-    ];
+    add('posts_recent', 'Annonces récentes', Icons.campaign_rounded);
+    add('events_upcoming', 'Événements ouverts', Icons.event_available_rounded);
+    add('messages_unread', 'Messages non lus', Icons.chat_rounded);
+    return items;
   }
-  return [
-    (
-      'Mes tâches',
-      counts.integer('tasks_assigned').toString(),
-      Icons.task_alt_rounded,
-    ),
-    (
-      'Mes points',
-      counts.integer('badges_points').toString(),
-      Icons.workspace_premium_rounded,
-    ),
-    (
-      'Mes messages',
-      counts.integer('messages_unread').toString(),
-      Icons.chat_rounded,
-    ),
-  ];
+  add('tasks_assigned', 'Mes tâches', Icons.task_alt_rounded);
+  add('badges_points', 'Mes points', Icons.workspace_premium_rounded);
+  add('messages_unread', 'Mes messages', Icons.chat_rounded);
+  return items;
 }
 
 IconData _activityIcon(String type) {

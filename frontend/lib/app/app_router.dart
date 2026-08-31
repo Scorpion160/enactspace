@@ -29,6 +29,9 @@ import '../features/recruitment/screens/public/public_application_flow_screen.da
 import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
+import '../features/tasks/screens/task_detail_screen.dart';
+import '../features/tasks/models/task_center_models.dart';
+import '../features/tasks/services/tasks_gateway.dart';
 import '../shared/layout/app_shell.dart';
 
 class AppRouter {
@@ -131,7 +134,22 @@ class AppRouter {
           ),
           GoRoute(
             path: '/tasks',
-            builder: (context, state) => const TasksScreen(),
+            builder: (context, state) => TasksScreen(
+              initialView: TaskCenterViewPresentation.fromQuery(
+                state.uri.queryParameters['view'],
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: ':taskId',
+                builder: (context, state) => TaskDetailScreen(
+                  taskId: state.pathParameters['taskId']!,
+                  gateway: state.extra is TasksGateway
+                      ? state.extra! as TasksGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/finance',

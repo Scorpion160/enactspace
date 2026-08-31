@@ -1,0 +1,107 @@
+{
+  "capture_method": "temporary_flutter_widget_harness",
+  "integrated_browser_used": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "icon_font_verified": true,
+  "missing_icon_glyphs_detected": false,
+  "real_task_create_requests": 0,
+  "real_task_patch_requests": 0,
+  "real_task_status_requests": 0,
+  "real_task_proof_requests": 0,
+  "real_task_validate_requests": 0,
+  "application_mutation_performed": false,
+  "visual_controls": {
+    "captures_verified": "8/8",
+    "raw_task_enums_detected": false,
+    "raw_priorities_detected": false,
+    "overflow_detected": false,
+    "blocked_loader_detected": false,
+    "horizontal_mobile_scroll_required": false,
+    "invented_history_detected": false,
+    "dominant_material_default_palette_detected": false
+  },
+  "captures": [
+    {
+      "filename": "01_dashboard_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "route/scenario": "/dashboard — desktop riche avec données et permissions présentes",
+      "expected_markers": ["À suivre aujourd’hui", "Mes tâches", "Tâches en retard", "Notifications", "Messages", "Prochains événements", "Activité récente"],
+      "reached_markers": ["À suivre aujourd’hui", "Mes tâches", "Tâches en retard", "Notifications", "Messages", "Prochains événements", "Activité récente"],
+      "screenshot_sha256": "8e91fad6c5b642abc186929e0cf8ff7c1a6b437c585052cfbaf2e884927cb45e",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "02_dashboard_mobile_390x844.png",
+      "viewport": "390x844",
+      "route/scenario": "/dashboard — mobile priorisé alertes, tâches, notifications, messages et événements",
+      "expected_markers": ["À suivre aujourd’hui", "Tâches en retard", "Notifications", "Messages", "Prochains événements"],
+      "reached_markers": ["À suivre aujourd’hui", "Tâches en retard", "Notifications", "Messages", "Prochains événements"],
+      "screenshot_sha256": "11945d3fe0f79bae647602115f5b5c78bd3b5514800609e3feb7ed2260d9bdea",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "03_tasks_center_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "route/scenario": "/tasks — Toutes visibles avec filtre de statut déployé",
+      "expected_markers": ["Toutes visibles", "Rechercher", "Statut", "Priorité", "À faire", "En cours", "Bloqué", "Terminé", "Validé", "Annulé", "En retard", "Awa Ndiaye"],
+      "reached_markers": ["Toutes visibles", "Rechercher", "Statut", "Priorité", "À faire", "En cours", "Bloqué", "Terminé", "Validé", "Annulé", "En retard", "Awa Ndiaye"],
+      "screenshot_sha256": "310b28583304cc2b7122e8884636ae0d0db28aa2b0b20cb53f2e2f56924a5f1f",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "04_tasks_filters_late_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/tasks — vue En retard avec panneau de filtres ouvert",
+      "expected_markers": ["En retard", "Rechercher", "Statut", "Priorité", "Pôle", "Projet", "Assigné", "Réinitialiser"],
+      "reached_markers": ["En retard", "Rechercher", "Statut", "Priorité", "Pôle", "Projet", "Assigné", "Réinitialiser"],
+      "screenshot_sha256": "89b4827a2971c47d997bb51d19bf2979ff748a2a6243f33cc4078e2d73054317",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "05_tasks_mobile_390x844.png",
+      "viewport": "390x844",
+      "route/scenario": "/tasks — cartes verticales mobiles et filtres accessibles",
+      "expected_markers": ["Priorité", "Pôle", "Projet", "Assigné", "Réinitialiser", "Bloqué", "Urgente", "En retard", "Ouvrir"],
+      "reached_markers": ["Priorité", "Pôle", "Projet", "Assigné", "Réinitialiser", "Bloqué", "Urgente", "En retard", "Ouvrir"],
+      "screenshot_sha256": "460affe2e3b15c9af2be60dd3ac912cf4fca6c4d2e9d5b1560ae690f0cb9bc22",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "06_task_detail_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/tasks/task-late — détail d’une tâche en retard",
+      "expected_markers": ["Préparer le forum partenaires", "Bloqué", "Urgente", "28/08/2026", "En retard", "Assignés", "Périmètre", "Preuve", "Historique technique", "Créée le 20/08/2026", "Mise à jour le 30/08/2026"],
+      "reached_markers": ["Préparer le forum partenaires", "Bloqué", "Urgente", "28/08/2026", "En retard", "Assignés", "Périmètre", "Preuve", "Historique technique", "Créée le 20/08/2026", "Mise à jour le 30/08/2026"],
+      "screenshot_sha256": "8def8d7ce45e72223a7535b9a6cb15dd144eca1431124aa216ce3bfa1fab83e3",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "07_create_task_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/tasks — formulaire Créer une tâche non soumis",
+      "expected_markers": ["Créer une tâche", "Titre", "Description (optionnelle)", "Priorité", "Sans échéance", "Preuve requise", "Pôle (optionnel)", "Projet (optionnel)", "Assignés", "Enregistrer"],
+      "reached_markers": ["Créer une tâche", "Titre", "Description (optionnelle)", "Priorité", "Sans échéance", "Preuve requise", "Pôle (optionnel)", "Projet (optionnel)", "Assignés", "Enregistrer"],
+      "screenshot_sha256": "01a471f7aed55153ae60a0f0d4c39aa5e66898fea64530168a7257bb50fbde22",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "08_task_actions_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/tasks/task-done — actions autorisées sans déclenchement",
+      "expected_markers": ["Finaliser le compte-rendu mensuel", "Terminé", "Changer le statut", "Preuve", "Modifier", "Valider", "Assignés", "Périmètre"],
+      "reached_markers": ["Finaliser le compte-rendu mensuel", "Terminé", "Changer le statut", "Preuve", "Modifier", "Valider", "Assignés", "Périmètre"],
+      "screenshot_sha256": "8c7fe85e8c6da5ed0e55e3a32a03dd1250b42c43bfe311c726125b128ef09d59",
+      "icons_rendered_correctly": true,
+      "success": true
+    }
+  ]
+}
