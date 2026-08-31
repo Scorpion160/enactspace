@@ -7,8 +7,16 @@ import '../models/pole_portfolio_models.dart';
 class PoleDetailView extends StatelessWidget {
   final PoleDetailData data;
   final VoidCallback onBack;
+  final Widget? management;
+  final Widget? teamSection;
 
-  const PoleDetailView({super.key, required this.data, required this.onBack});
+  const PoleDetailView({
+    super.key,
+    required this.data,
+    required this.onBack,
+    this.management,
+    this.teamSection,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +49,15 @@ class PoleDetailView extends StatelessWidget {
                           label: 'Résumé du pôle ${item.pole.name}',
                           child: PoleOverviewSection(item: item),
                         ),
+                        if (management != null) ...[
+                          const SizedBox(height: 10),
+                          management!,
+                        ],
                         const SizedBox(height: 14),
                         Semantics(
                           header: true,
                           label: 'Équipe du pôle',
-                          child: PoleTeamSection(item: item),
+                          child: teamSection ?? PoleTeamSection(item: item),
                         ),
                         const SizedBox(height: 14),
                         Semantics(

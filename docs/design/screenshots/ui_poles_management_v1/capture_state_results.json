@@ -1,0 +1,229 @@
+{
+  "capture_method": "temporary_flutter_widget_harness",
+  "integrated_browser_used": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "material_default_primary_dominant": false,
+  "material_default_background_dominant": false,
+  "material_default_surface_dominant": false,
+  "icon_font_verified": true,
+  "missing_icon_glyphs_detected": false,
+  "real_create_requests": 0,
+  "real_patch_requests": 0,
+  "real_member_post_requests": 0,
+  "real_member_delete_requests": 0,
+  "application_mutation_performed": false,
+  "captures": [
+    {
+      "filename": "01_create_pole_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Création d’un pôle, menu des types ouvert, sans envoi",
+      "expected_markers": [
+        "Créer un pôle",
+        "Nom",
+        "Sigle",
+        "Type",
+        "Description",
+        "Objectifs",
+        "Pôle cœur",
+        "Pôle support",
+        "Enregistrer"
+      ],
+      "reached_markers": [
+        "Créer un pôle",
+        "Nom",
+        "Sigle",
+        "Type",
+        "Description",
+        "Objectifs",
+        "Pôle cœur",
+        "Pôle support",
+        "Enregistrer"
+      ],
+      "screenshot_sha256": "54fe65a5383cd5f6840e8bd1ee2daa3167471600ec62ac9f78d75df150db590c",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_edit_pole_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Édition préremplie du pôle Technique, sans envoi",
+      "expected_markers": [
+        "Modifier le pôle",
+        "Technique",
+        "TECH",
+        "Pôle cœur",
+        "Description",
+        "Objectifs",
+        "Enregistrer"
+      ],
+      "reached_markers": [
+        "Modifier le pôle",
+        "Technique",
+        "TECH",
+        "Pôle cœur",
+        "Description",
+        "Objectifs",
+        "Enregistrer"
+      ],
+      "screenshot_sha256": "b2487f38d76b9f148c984cc171eb26787c26497910d8090b4e9b4f59356d72c8",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_add_pole_member_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Ajout ou réintégration depuis l’annuaire actif, sans envoi",
+      "expected_markers": [
+        "Ajouter ou réintégrer une personne",
+        "Rechercher par nom ou e-mail",
+        "Déjà dans l’équipe",
+        "Awa Ndiaye",
+        "Fatou Sarr",
+        "Membre du pôle"
+      ],
+      "reached_markers": [
+        "Ajouter ou réintégrer une personne",
+        "Rechercher par nom ou e-mail",
+        "Déjà dans l’équipe",
+        "Awa Ndiaye",
+        "Fatou Sarr",
+        "Membre du pôle"
+      ],
+      "screenshot_sha256": "20ad9c160e259e09bbb1c423824998e07a626fad1afe9abc3a1607ead7efb366",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_change_pole_lead_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Remplacement préparé du chef du pôle Technique, sans confirmation",
+      "expected_markers": [
+        "Changer le chef",
+        "Ancien chef",
+        "Awa Ndiaye",
+        "Nouveau chef sélectionné",
+        "Fatou Sarr",
+        "Chef de pôle",
+        "Awa Ndiaye redeviendra membre du pôle."
+      ],
+      "reached_markers": [
+        "Changer le chef",
+        "Ancien chef",
+        "Awa Ndiaye",
+        "Nouveau chef sélectionné",
+        "Fatou Sarr",
+        "Chef de pôle",
+        "Awa Ndiaye redeviendra membre du pôle."
+      ],
+      "screenshot_sha256": "5705d041cb116dd7d6f81bdef08e4f4cd61ce6a202f3af6dfabccbfccb09f068",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_change_pole_deputy_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Remplacement préparé de l’adjoint du pôle Technique, sans confirmation",
+      "expected_markers": [
+        "Changer l’adjoint",
+        "Ancien adjoint",
+        "Moussa Diop",
+        "Nouvel adjoint sélectionné",
+        "Ibrahima Fall",
+        "Adjoint du pôle",
+        "Moussa Diop redeviendra membre du pôle."
+      ],
+      "reached_markers": [
+        "Changer l’adjoint",
+        "Ancien adjoint",
+        "Moussa Diop",
+        "Nouvel adjoint sélectionné",
+        "Ibrahima Fall",
+        "Adjoint du pôle",
+        "Moussa Diop redeviendra membre du pôle."
+      ],
+      "screenshot_sha256": "c03e8306ca42af783753df1d25563be22ff5357775aad60105f525154fdd518d",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_remove_pole_member_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Confirmation de retrait d’un membre ordinaire, sans envoi",
+      "expected_markers": [
+        "Retirer Fatou Sarr du pôle Technique ?",
+        "Membre du pôle",
+        "Cette personne ne fera plus partie de l’équipe active du pôle.",
+        "Retirer du pôle"
+      ],
+      "reached_markers": [
+        "Retirer Fatou Sarr du pôle Technique ?",
+        "Membre du pôle",
+        "Cette personne ne fera plus partie de l’équipe active du pôle.",
+        "Retirer du pôle"
+      ],
+      "screenshot_sha256": "e8bfe07ef2467f88e39e34b3bfa86227de4ddf54e21fa9116a328ff48922fb03",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_remove_pole_leader_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "scenario": "Confirmation renforcée du retrait d’un chef, sans envoi",
+      "expected_markers": [
+        "Retirer Awa Ndiaye du pôle Technique ?",
+        "Chef de pôle",
+        "Aucun remplacement automatique ne sera effectué.",
+        "Je confirme le retrait du responsable"
+      ],
+      "reached_markers": [
+        "Retirer Awa Ndiaye du pôle Technique ?",
+        "Chef de pôle",
+        "Aucun remplacement automatique ne sera effectué.",
+        "Je confirme le retrait du responsable"
+      ],
+      "screenshot_sha256": "d7a1cd3f0b1764dfe345881cd5f5967af985483dd6c17accea965689871c8e07",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_pole_management_mobile_390x844.png",
+      "viewport": { "width": 390, "height": 844 },
+      "scenario": "Fiche mobile réelle d’un chef local actif avec gestion des membres ordinaires",
+      "expected_markers": [
+        "Pôles",
+        "Technique",
+        "Équipe",
+        "Ajouter ou réintégrer",
+        "Chef de pôle",
+        "Adjoint du pôle",
+        "Membres ordinaires",
+        "Travail",
+        "Activité"
+      ],
+      "reached_markers": [
+        "Pôles",
+        "Technique",
+        "Équipe",
+        "Ajouter ou réintégrer",
+        "Chef de pôle",
+        "Adjoint du pôle",
+        "Membres ordinaires",
+        "Travail",
+        "Activité"
+      ],
+      "screenshot_sha256": "4a41996b165703aab11d5c989803ea256669648b84c6de55eb8e55129672913c",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    }
+  ]
+}

@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:frontend/core/auth/user_experience.dart';
 import 'package:frontend/features/documents/models/document_model.dart';
 import 'package:frontend/features/events/models/event_model.dart';
 import 'package:frontend/features/members/models/member_model.dart';
 import 'package:frontend/features/poles/models/pole_model.dart';
+import 'package:frontend/features/poles/models/pole_management_models.dart';
 import 'package:frontend/features/poles/models/pole_portfolio_models.dart';
 import 'package:frontend/features/poles/screens/pole_detail_screen.dart';
 import 'package:frontend/features/poles/screens/poles_portfolio_screen.dart';
@@ -550,6 +552,14 @@ class _FakePolesGateway implements PolesPortfolioGateway {
   );
 
   @override
+  Future<UserExperience> loadCurrentUser() async => UserExperience.fromJson({
+    'id': 'viewer',
+    'email': 'viewer@example.test',
+    'status': 'active',
+    'roles': ['enacteur'],
+  });
+
+  @override
   Future<List<PoleModel>> loadPoles() async {
     if (polesError) throw Exception('liste indisponible');
     if (polesCompleter != null) return polesCompleter!.future;
@@ -561,6 +571,9 @@ class _FakePolesGateway implements PolesPortfolioGateway {
     if (memberErrors.contains(poleId)) throw Exception('membres indisponibles');
     return members[poleId] ?? [];
   }
+
+  @override
+  Future<List<MemberModel>> loadMemberDirectory() async => const [];
 
   @override
   Future<List<TaskModel>> loadTasks(String poleId) async {
@@ -592,6 +605,27 @@ class _FakePolesGateway implements PolesPortfolioGateway {
     if (eventsError) throw Exception('événements indisponibles');
     return events;
   }
+
+  @override
+  Future<PoleModel> createPole(PoleMutationDraft draft) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PoleModel> updatePole(String poleId, PoleMutationDraft draft) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PoleMemberMutationResult> assignPoleMember({
+    required String poleId,
+    required String userId,
+    required String position,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> removePoleMember({
+    required String poleId,
+    required String userId,
+  }) => throw UnimplementedError();
 }
 
 PoleModel _pole(

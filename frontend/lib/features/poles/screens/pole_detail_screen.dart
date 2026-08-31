@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/user_experience.dart';
+import '../../members/models/member_model.dart';
+import '../models/pole_management_models.dart';
+import '../models/pole_model.dart';
 import '../models/pole_portfolio_models.dart';
 import '../services/poles_portfolio_gateway.dart';
 import '../widgets/pole_detail_widgets.dart';
+import '../widgets/pole_management_widgets.dart';
 import 'poles_portfolio_screen.dart';
 
 class PoleDetailRouteData {
@@ -32,6 +37,8 @@ class PoleDetailScreen extends StatefulWidget {
 class _PoleDetailScreenState extends State<PoleDetailScreen> {
   late final PolesPortfolioGateway _gateway;
   late Future<PoleDetailData> _loading;
+  UserExperience? _user;
+  bool _ignoreInitialItem = false;
 
   @override
   void initState() {
@@ -41,7 +48,11 @@ class _PoleDetailScreenState extends State<PoleDetailScreen> {
   }
 
   Future<PoleDetailData> _load() async {
-    final item = widget.initialItem ?? await _loadDirectItem();
+    final user = await capturePoleSource(_gateway.loadCurrentUser());
+    _user = user.value;
+    final item = !_ignoreInitialItem && widget.initialItem != null
+        ? widget.initialItem!
+        : await _loadDirectItem();
     final documentsFuture = capturePoleSource(
       _gateway.loadDocuments(widget.poleId),
     );
@@ -98,7 +109,40 @@ class _PoleDetailScreenState extends State<PoleDetailScreen> {
               onRetry: () => setState(() => _loading = _load()),
             );
           }
-          return PoleDetailView(data: snapshot.data!, onBack: _back);
+          final data = snapshot.data!;
+          final permissions = PoleManagementPermissions.resolve(
+            _user,
+            data.item.members,
+          );
+          return PoleDetailView(
+            data: data,
+            onBack: _back,
+            management: permissions.canEditPole
+                ? PoleManagementActions(onEdit: () => _openEdit(data))
+                : null,
+            teamSection: PoleTeamManagementSection(
+              poleName: data.item.pole.name,
+              members: data.item.members,
+              unavailable: data.item.membersUnavailable,
+              permissions: permissions,
+              onAddMember: permissions.canManageOrdinaryMembers
+                  ? () => _openAddMember(data)
+                  : null,
+              onChangeLead: permissions.canManageResponsibilities
+                  ? () =>
+                        _openResponsibility(data, PolePositionPresentation.lead)
+                  : null,
+              onChangeDeputy: permissions.canManageResponsibilities
+                  ? () => _openResponsibility(
+                      data,
+                      PolePositionPresentation.deputy,
+                    )
+                  : null,
+              onRemoveMember: permissions.canManageOrdinaryMembers
+                  ? (member) => _openRemoval(data, member, permissions)
+                  : null,
+            ),
+          );
         },
       ),
     ),
@@ -110,5 +154,107 @@ class _PoleDetailScreenState extends State<PoleDetailScreen> {
     } else {
       context.go('/poles');
     }
+  }
+
+  Future<void> _openEdit(PoleDetailData data) async {
+    final updated = await showDialog<PoleModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PoleFormDialog(
+        pole: data.item.pole,
+        onSubmit: (draft) => _gateway.updatePole(widget.poleId, draft),
+      ),
+    );
+    if (updated != null) _mutationSucceeded('Pôle mis à jour');
+  }
+
+  Future<List<MemberModel>?> _loadDirectory() async {
+    try {
+      return await _gateway.loadMemberDirectory();
+    } catch (error) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(poleManagementErrorMessage(error))),
+      );
+      return null;
+    }
+  }
+
+  Future<void> _openAddMember(PoleDetailData data) async {
+    final directory = await _loadDirectory();
+    if (!mounted || directory == null) return;
+    final result = await showDialog<PoleMemberMutationResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PoleMemberDialog(
+        poleName: data.item.pole.name,
+        directory: directory,
+        activeMemberships: data.item.activeMembers,
+        onSubmit: (member) => _gateway.assignPoleMember(
+          poleId: widget.poleId,
+          userId: member.id,
+          position: PolePositionPresentation.member,
+        ),
+      ),
+    );
+    if (result == null) return;
+    _mutationSucceeded('Équipe du pôle mise à jour');
+  }
+
+  Future<void> _openResponsibility(PoleDetailData data, String position) async {
+    final directory = await _loadDirectory();
+    if (!mounted || directory == null) return;
+    final current = position == PolePositionPresentation.lead
+        ? data.item.lead
+        : data.item.deputy;
+    final result = await showDialog<PoleMemberMutationResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PoleResponsibilityDialog(
+        poleName: data.item.pole.name,
+        targetPosition: position,
+        currentHolder: current,
+        directory: directory,
+        onSubmit: (member) => _gateway.assignPoleMember(
+          poleId: widget.poleId,
+          userId: member.id,
+          position: position,
+        ),
+      ),
+    );
+    if (result == null) return;
+    _mutationSucceeded(
+      position == PolePositionPresentation.lead
+          ? 'Chef de pôle mis à jour'
+          : 'Adjoint du pôle mis à jour',
+    );
+  }
+
+  Future<void> _openRemoval(
+    PoleDetailData data,
+    MemberModel member,
+    PoleManagementPermissions permissions,
+  ) async {
+    if (!permissions.canRemove(member)) return;
+    final removed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PoleMemberRemovalDialog(
+        poleName: data.item.pole.name,
+        membership: member,
+        onSubmit: () =>
+            _gateway.removePoleMember(poleId: widget.poleId, userId: member.id),
+      ),
+    );
+    if (removed == true) _mutationSucceeded('Membre retiré de l’équipe');
+  }
+
+  void _mutationSucceeded(String message) {
+    if (!mounted) return;
+    _ignoreInitialItem = true;
+    setState(() => _loading = _load());
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

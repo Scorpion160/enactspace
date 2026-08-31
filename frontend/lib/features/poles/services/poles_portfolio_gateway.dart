@@ -1,5 +1,6 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../../documents/models/document_model.dart';
 import '../../events/models/event_model.dart';
 import '../../members/models/member_model.dart';
@@ -7,16 +8,30 @@ import '../../posts/models/post_model.dart';
 import '../../tasks/models/task_assignee_model.dart';
 import '../../tasks/models/task_model.dart';
 import '../models/pole_model.dart';
+import '../models/pole_management_models.dart';
 import '../models/pole_portfolio_models.dart';
 
 abstract class PolesPortfolioGateway {
+  Future<UserExperience> loadCurrentUser();
   Future<List<PoleModel>> loadPoles();
   Future<List<MemberModel>> loadMembers(String poleId);
+  Future<List<MemberModel>> loadMemberDirectory();
   Future<List<TaskModel>> loadTasks(String poleId);
   Future<List<PoleAssignee>> loadTaskAssignees(String taskId);
   Future<List<DocumentModel>> loadDocuments(String poleId);
   Future<List<PostModel>> loadPosts(String poleId);
   Future<List<EventModel>> loadEvents();
+  Future<PoleModel> createPole(PoleMutationDraft draft);
+  Future<PoleModel> updatePole(String poleId, PoleMutationDraft draft);
+  Future<PoleMemberMutationResult> assignPoleMember({
+    required String poleId,
+    required String userId,
+    required String position,
+  });
+  Future<void> removePoleMember({
+    required String poleId,
+    required String userId,
+  });
 }
 
 class ApiPolesPortfolioGateway implements PolesPortfolioGateway {
@@ -37,6 +52,10 @@ class ApiPolesPortfolioGateway implements PolesPortfolioGateway {
       _authService = authService ?? AuthService();
 
   @override
+  Future<UserExperience> loadCurrentUser() async =>
+      UserExperience.fromJson(await _authService.getCurrentUser());
+
+  @override
   Future<List<PoleModel>> loadPoles() =>
       _poles ??= _getList('/poles/', PoleModel.fromJson);
 
@@ -45,6 +64,10 @@ class ApiPolesPortfolioGateway implements PolesPortfolioGateway {
     poleId,
     () => _getList('/poles/$poleId/members', MemberModel.fromJson),
   );
+
+  @override
+  Future<List<MemberModel>> loadMemberDirectory() async =>
+      (await _loadDirectory()).values.toList();
 
   @override
   Future<List<TaskModel>> loadTasks(String poleId) => _tasks.putIfAbsent(
@@ -97,6 +120,82 @@ class ApiPolesPortfolioGateway implements PolesPortfolioGateway {
   @override
   Future<List<EventModel>> loadEvents() =>
       _events ??= _getList('/events/', EventModel.fromJson);
+
+  @override
+  Future<PoleModel> createPole(PoleMutationDraft draft) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.postJson(
+      '/poles/',
+      token: token,
+      data: draft.toJson(),
+    );
+    final pole = _parsePole(response);
+    _invalidatePoleData();
+    return pole;
+  }
+
+  @override
+  Future<PoleModel> updatePole(String poleId, PoleMutationDraft draft) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.patchJson(
+      '/poles/$poleId',
+      token: token,
+      data: draft.toJson(),
+    );
+    final pole = _parsePole(response);
+    _invalidatePoleData();
+    return pole;
+  }
+
+  @override
+  Future<PoleMemberMutationResult> assignPoleMember({
+    required String poleId,
+    required String userId,
+    required String position,
+  }) async {
+    final token = await (_token ??= _requireToken());
+    final response = await _apiClient.postJson(
+      '/poles/$poleId/members',
+      token: token,
+      data: {'user_id': userId, 'position': position},
+    );
+    if (response is! Map) throw Exception('Réponse membership invalide.');
+    final map = Map<String, dynamic>.from(response);
+    final membership = MemberModel.fromJson(map);
+    _members.remove(poleId);
+    final kind = map['reactivated'] == true
+        ? PoleMemberMutationKind.reactivated
+        : position == PolePositionPresentation.member
+        ? PoleMemberMutationKind.assigned
+        : PoleMemberMutationKind.responsibilityUpdated;
+    return PoleMemberMutationResult(membership: membership, kind: kind);
+  }
+
+  @override
+  Future<void> removePoleMember({
+    required String poleId,
+    required String userId,
+  }) async {
+    final token = await (_token ??= _requireToken());
+    await _apiClient.delete('/poles/$poleId/members/$userId', token: token);
+    _members.remove(poleId);
+  }
+
+  PoleModel _parsePole(dynamic response) {
+    if (response is Map) {
+      return PoleModel.fromJson(Map<String, dynamic>.from(response));
+    }
+    throw Exception('Réponse pôle invalide.');
+  }
+
+  void _invalidatePoleData() {
+    _poles = null;
+    _members.clear();
+    _tasks.clear();
+    _assignees.clear();
+    _documents.clear();
+    _posts.clear();
+  }
 
   Future<Map<String, MemberModel>> _loadDirectory() {
     return _directory ??= () async {

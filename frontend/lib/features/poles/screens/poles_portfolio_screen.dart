@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/user_experience.dart';
+import '../models/pole_management_models.dart';
+import '../models/pole_model.dart';
 import '../models/pole_portfolio_models.dart';
 import '../services/poles_portfolio_gateway.dart';
+import '../widgets/pole_management_widgets.dart';
 import '../widgets/poles_portfolio_widgets.dart';
 import 'pole_detail_screen.dart';
 
@@ -23,12 +27,13 @@ class _PolesPortfolioScreenState extends State<PolesPortfolioScreen> {
   String _type = 'all';
   String _responsible = 'all';
   PoleAlertFilter _alert = PoleAlertFilter.all;
+  UserExperience? _user;
 
   @override
   void initState() {
     super.initState();
     _gateway = widget.gateway ?? ApiPolesPortfolioGateway();
-    _loading = loadPolesPortfolio(_gateway);
+    _loading = _loadPortfolio();
     _searchController.addListener(_refreshFilters);
   }
 
@@ -41,6 +46,12 @@ class _PolesPortfolioScreenState extends State<PolesPortfolioScreen> {
   }
 
   void _refreshFilters() => setState(() {});
+
+  Future<List<PolePortfolioItem>> _loadPortfolio() async {
+    final user = await capturePoleSource(_gateway.loadCurrentUser());
+    _user = user.value;
+    return loadPolesPortfolio(_gateway);
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -81,7 +92,11 @@ class _PolesPortfolioScreenState extends State<PolesPortfolioScreen> {
                   desktop ? 28 : 16,
                   12,
                 ),
-                child: const PolesPortfolioHeader(),
+                child: PolesPortfolioHeader(
+                  onCreate: PoleManagementPermissions.canCreate(_user)
+                      ? _openCreate
+                      : null,
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -191,7 +206,20 @@ class _PolesPortfolioScreenState extends State<PolesPortfolioScreen> {
     );
   }
 
-  void _retry() => setState(() => _loading = loadPolesPortfolio(_gateway));
+  Future<void> _openCreate() async {
+    final created = await showDialog<PoleModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PoleFormDialog(onSubmit: _gateway.createPole),
+    );
+    if (created == null || !mounted) return;
+    setState(() => _loading = _loadPortfolio());
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Pôle créé')));
+  }
+
+  void _retry() => setState(() => _loading = _loadPortfolio());
 }
 
 Future<List<PolePortfolioItem>> loadPolesPortfolio(

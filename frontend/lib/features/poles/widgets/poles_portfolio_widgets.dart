@@ -3,23 +3,39 @@ import 'package:flutter/material.dart';
 import '../models/pole_portfolio_models.dart';
 
 class PolesPortfolioHeader extends StatelessWidget {
-  const PolesPortfolioHeader({super.key});
+  final VoidCallback? onCreate;
+
+  const PolesPortfolioHeader({super.key, this.onCreate});
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.spaceBetween,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 16,
+    runSpacing: 12,
     children: [
-      Text(
-        'Portefeuille des pôles',
-        style: Theme.of(
-          context,
-        ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Portefeuille des pôles',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Gouvernance, alertes et prochaines actions réelles.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ],
       ),
-      const SizedBox(height: 6),
-      Text(
-        'Gouvernance, alertes et prochaines actions réelles.',
-        style: Theme.of(context).textTheme.bodyLarge,
-      ),
+      if (onCreate != null)
+        FilledButton.icon(
+          onPressed: onCreate,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Créer un pôle'),
+        ),
     ],
   );
 }
