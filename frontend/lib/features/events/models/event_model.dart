@@ -73,6 +73,48 @@ class EventModel {
     );
   }
 
+  EventModel copyWith({
+    String? title,
+    String? description,
+    String? eventType,
+    String? location,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? poleId,
+    String? projectId,
+    double? budget,
+    int? maxParticipants,
+    bool? requiresRegistration,
+    bool? attendanceEnabled,
+    String? reportUrl,
+    int? registeredCount,
+    bool? currentUserRegistered,
+  }) {
+    return EventModel(
+      id: id,
+      seasonId: seasonId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      eventType: eventType ?? this.eventType,
+      location: location ?? this.location,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      poleId: poleId ?? this.poleId,
+      projectId: projectId ?? this.projectId,
+      budget: budget ?? this.budget,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      requiresRegistration: requiresRegistration ?? this.requiresRegistration,
+      attendanceEnabled: attendanceEnabled ?? this.attendanceEnabled,
+      reportUrl: reportUrl ?? this.reportUrl,
+      createdBy: createdBy,
+      registeredCount: registeredCount ?? this.registeredCount,
+      currentUserRegistered:
+          currentUserRegistered ?? this.currentUserRegistered,
+      canManage: canManage,
+      createdAt: createdAt,
+    );
+  }
+
   bool get isUpcoming {
     return startTime.isAfter(DateTime.now());
   }
@@ -97,12 +139,21 @@ class EventModel {
         return 'Présentation';
       case 'social':
         return 'Social';
+      case 'meeting':
+        return 'Réunion';
       case 'interclub':
         return 'Interclubs';
       case 'yendoutu':
         return 'Yendoutu';
       default:
-        return 'Réunion';
+        return eventType
+            .split('_')
+            .where((part) => part.isNotEmpty)
+            .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+            .join(' ');
     }
   }
+
+  bool get isFull =>
+      maxParticipants != null && registeredCount >= maxParticipants!;
 }

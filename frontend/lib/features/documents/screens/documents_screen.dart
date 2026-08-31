@@ -1,1534 +1,473 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../events/models/event_model.dart';
-import '../../events/services/events_service.dart';
-import '../../poles/models/pole_model.dart';
-import '../../poles/services/poles_service.dart';
-import '../../projects/models/project_model.dart';
-import '../../projects/services/projects_service.dart';
+import 'package:go_router/go_router.dart';
+
+import '../models/document_center_models.dart';
 import '../models/document_model.dart';
-import '../services/documents_service.dart';
-
-class _PickedDocumentFile {
-  final String fileId;
-  final String fileName;
-  final String? fileType;
-  final int sizeBytes;
-
-  const _PickedDocumentFile({
-    required this.fileId,
-    required this.fileName,
-    required this.fileType,
-    required this.sizeBytes,
-  });
-}
+import '../services/documents_gateway.dart';
+import '../widgets/document_form_dialog.dart';
+import '../widgets/document_widgets.dart';
 
 class DocumentsScreen extends StatefulWidget {
-  const DocumentsScreen({super.key});
-
+  final DocumentsGateway? gateway;
+  const DocumentsScreen({super.key, this.gateway});
   @override
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
 
 class _DocumentsScreenState extends State<DocumentsScreen> {
-  final DocumentsService _documentsService = DocumentsService();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
-  final EventsService _eventsService = EventsService();
-  final TextEditingController _searchController = TextEditingController();
-
-  bool _loading = true;
+  late final DocumentsGateway _gateway =
+      widget.gateway ?? ApiDocumentsGateway();
+  final _search = TextEditingController();
+  List<DocumentModel> _documents = const [];
+  DocumentReferenceData _references = const DocumentReferenceData();
+  String _category = 'all', _status = 'all', _visibility = 'all';
+  String _pole = 'all', _project = 'all', _event = 'all';
+  bool _templates = false, _officials = false, _loading = true;
   String? _error;
-
-  List<DocumentModel> _documents = [];
-  List<PoleModel> _poles = [];
-  List<ProjectModel> _projects = [];
-  List<EventModel> _events = [];
-  String _category = 'all';
-  String _visibility = 'all';
-  bool? _officialFilter;
 
   @override
   void initState() {
     super.initState();
-    _loadReferenceData();
-    _loadDocuments();
+    _initialLoad();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
-  Future<void> _loadDocuments() async {
+  Future<void> _initialLoad() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
-      final documents = await _documentsService.getDocuments(
-        search: _searchController.text,
-        category: _category,
-        visibility: _visibility,
-        isOfficial: _officialFilter,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _documents = documents;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadReferenceData() async {
-    try {
-      final results = await Future.wait([
-        _polesService.getPoles(),
-        _projectsService.getProjects(),
-        _eventsService.getEvents(),
+      final values = await Future.wait([
+        _gateway.loadDocuments(),
+        _gateway.loadReferences(),
       ]);
-
-      if (!mounted) return;
-
-      setState(() {
-        _poles = results[0] as List<PoleModel>;
-        _projects = results[1] as List<ProjectModel>;
-        _events = results[2] as List<EventModel>;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _poles = [];
-        _projects = [];
-        _events = [];
-      });
-    }
-  }
-
-  Future<void> _openCreateDocumentDialog() async {
-    final created = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return CreateDocumentDialog(
-          documentsService: _documentsService,
-          poles: _poles,
-          projects: _projects,
-          events: _events,
-        );
-      },
-    );
-
-    if (created == true) {
-      await _loadDocuments();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document créé avec succès.')),
-      );
-    }
-  }
-
-  Future<void> _validateDocument(DocumentModel document) async {
-    try {
-      await _documentsService.validateDocument(document.id);
-      await _loadDocuments();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document marqué comme officiel.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-        ),
-      );
-    }
-  }
-
-  Future<void> _rejectDocument(DocumentModel document) async {
-    final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rejeter le document'),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: 'Motif',
-            prefixIcon: Icon(Icons.report_problem_outlined),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            icon: const Icon(Icons.close_rounded),
-            label: const Text('Rejeter'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-
-    if (reason == null || reason.trim().isEmpty) return;
-
-    try {
-      await _documentsService.rejectDocument(
-        documentId: document.id,
-        reason: reason,
-      );
-      await _loadDocuments();
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Document rejeté.')));
-    } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
-    }
-  }
-
-  Future<void> _unvalidateDocument(DocumentModel document) async {
-    try {
-      await _documentsService.unvalidateDocument(document.id);
-      await _loadDocuments();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Validation retirée.')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-        ),
-      );
-    }
-  }
-
-  Future<void> _deleteDocument(DocumentModel document) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Supprimer le document'),
-          content: Text('Voulez-vous vraiment supprimer "${document.title}" ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.delete_rounded),
-              label: const Text('Supprimer'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirm != true) return;
-
-    try {
-      await _documentsService.deleteDocument(document.id);
-      await _loadDocuments();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Document supprimé.')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-        ),
-      );
-    }
-  }
-
-  int get _officialCount {
-    return _documents.where((document) => document.isOfficial).length;
-  }
-
-  int get _templateCount {
-    return _documents.where((document) => document.isTemplate).length;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadDocuments,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _DocumentsHeader(
-            total: _documents.length,
-            official: _officialCount,
-            templates: _templateCount,
-            onRefresh: _loadDocuments,
-            onCreate: _openCreateDocumentDialog,
-          ),
-          const SizedBox(height: 18),
-          _DocumentsFilters(
-            searchController: _searchController,
-            category: _category,
-            visibility: _visibility,
-            officialFilter: _officialFilter,
-            onCategoryChanged: (value) async {
-              setState(() => _category = value);
-              await _loadDocuments();
-            },
-            onVisibilityChanged: (value) async {
-              setState(() => _visibility = value);
-              await _loadDocuments();
-            },
-            onOfficialChanged: (value) async {
-              setState(() => _officialFilter = value);
-              await _loadDocuments();
-            },
-            onSearch: _loadDocuments,
-          ),
-          const SizedBox(height: 22),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_error != null)
-            _ErrorCard(message: _error!, onRetry: _loadDocuments)
-          else if (_documents.isEmpty)
-            const _EmptyDocumentsCard()
-          else
-            _DocumentsGrid(
-              documents: _documents,
-              poleNames: {for (final pole in _poles) pole.id: pole.name},
-              projectNames: {
-                for (final project in _projects) project.id: project.name,
-              },
-              eventNames: {for (final event in _events) event.id: event.title},
-              onValidate: _validateDocument,
-              onReject: _rejectDocument,
-              onUnvalidate: _unvalidateDocument,
-              onDelete: _deleteDocument,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DocumentsHeader extends StatelessWidget {
-  final int total;
-  final int official;
-  final int templates;
-  final VoidCallback onRefresh;
-  final VoidCallback onCreate;
-
-  const _DocumentsHeader({
-    required this.total,
-    required this.official,
-    required this.templates,
-    required this.onRefresh,
-    required this.onCreate,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 760;
-
-    final actions = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        OutlinedButton.icon(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
-        ),
-        ElevatedButton.icon(
-          onPressed: onCreate,
-          icon: const Icon(Icons.note_add_rounded),
-          label: const Text('Nouveau document'),
-        ),
-      ],
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: isWide
-          ? Row(
-              children: [
-                _HeaderIcon(),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: _HeaderText(
-                    total: total,
-                    official: official,
-                    templates: templates,
-                  ),
-                ),
-                actions,
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _HeaderIcon(),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: _HeaderText(
-                        total: total,
-                        official: official,
-                        templates: templates,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                actions,
-              ],
-            ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Icon(
-        Icons.folder_copy_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
-      ),
-    );
-  }
-}
-
-class _HeaderText extends StatelessWidget {
-  final int total;
-  final int official;
-  final int templates;
-
-  const _HeaderText({
-    required this.total,
-    required this.official,
-    required this.templates,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Documents',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '$total document(s) • $official officiel(s) • $templates modèle(s)',
-          style: const TextStyle(color: Colors.white70, height: 1.4),
-        ),
-      ],
-    );
-  }
-}
-
-class _DocumentsFilters extends StatelessWidget {
-  final TextEditingController searchController;
-  final String category;
-  final String visibility;
-  final bool? officialFilter;
-  final ValueChanged<String> onCategoryChanged;
-  final ValueChanged<String> onVisibilityChanged;
-  final ValueChanged<bool?> onOfficialChanged;
-  final VoidCallback onSearch;
-
-  const _DocumentsFilters({
-    required this.searchController,
-    required this.category,
-    required this.visibility,
-    required this.officialFilter,
-    required this.onCategoryChanged,
-    required this.onVisibilityChanged,
-    required this.onOfficialChanged,
-    required this.onSearch,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
-            final searchWidth = wide ? 280.0 : constraints.maxWidth;
-            final filterWidth = constraints.maxWidth >= 560
-                ? 260.0
-                : constraints.maxWidth;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: searchWidth,
-                  child: TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Rechercher',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: IconButton(
-                        onPressed: onSearch,
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                      ),
-                    ),
-                    onSubmitted: (_) => onSearch(),
-                  ),
-                ),
-                SizedBox(
-                  width: filterWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: category,
-                    decoration: const InputDecoration(labelText: 'Catégorie'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Toutes'),
-                      ),
-                      for (final option in DocumentModel.categoryOptions)
-                        DropdownMenuItem(
-                          value: option.value,
-                          child: Text(option.label),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onCategoryChanged(value);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: filterWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: visibility,
-                    decoration: const InputDecoration(labelText: 'Visibilité'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Toutes')),
-                      DropdownMenuItem(
-                        value: 'public_club',
-                        child: Text('Club'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'internal',
-                        child: Text('Interne'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'pole_only',
-                        child: Text('Pôle uniquement'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'project_only',
-                        child: Text('Projet uniquement'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'enacchef_only',
-                        child: Text('Bureau uniquement'),
-                      ),
-                      DropdownMenuItem(value: 'private', child: Text('Privé')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onVisibilityChanged(value);
-                    },
-                  ),
-                ),
-                ChoiceChip(
-                  selected: officialFilter == null,
-                  label: const Text('Tous'),
-                  onSelected: (_) => onOfficialChanged(null),
-                ),
-                ChoiceChip(
-                  selected: officialFilter == true,
-                  label: const Text('Officiels'),
-                  onSelected: (_) => onOfficialChanged(true),
-                ),
-                ChoiceChip(
-                  selected: officialFilter == false,
-                  label: const Text('Non officiels'),
-                  onSelected: (_) => onOfficialChanged(false),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _DocumentsGrid extends StatelessWidget {
-  final List<DocumentModel> documents;
-  final Map<String, String> poleNames;
-  final Map<String, String> projectNames;
-  final Map<String, String> eventNames;
-  final ValueChanged<DocumentModel> onValidate;
-  final ValueChanged<DocumentModel> onReject;
-  final ValueChanged<DocumentModel> onUnvalidate;
-  final ValueChanged<DocumentModel> onDelete;
-
-  const _DocumentsGrid({
-    required this.documents,
-    required this.poleNames,
-    required this.projectNames,
-    required this.eventNames,
-    required this.onValidate,
-    required this.onReject,
-    required this.onUnvalidate,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 1200
-            ? 3
-            : constraints.maxWidth >= 760
-            ? 2
-            : 1;
-        final spacing = 14.0;
-        final cardWidth =
-            (constraints.maxWidth - (spacing * (columns - 1))) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final document in documents)
-              SizedBox(
-                width: cardWidth,
-                child: _DocumentCard(
-                  document: document,
-                  poleNames: poleNames,
-                  projectNames: projectNames,
-                  eventNames: eventNames,
-                  onValidate: onValidate,
-                  onReject: onReject,
-                  onUnvalidate: onUnvalidate,
-                  onDelete: onDelete,
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _DocumentCard extends StatelessWidget {
-  final DocumentModel document;
-  final Map<String, String> poleNames;
-  final Map<String, String> projectNames;
-  final Map<String, String> eventNames;
-  final ValueChanged<DocumentModel> onValidate;
-  final ValueChanged<DocumentModel> onReject;
-  final ValueChanged<DocumentModel> onUnvalidate;
-  final ValueChanged<DocumentModel> onDelete;
-
-  const _DocumentCard({
-    required this.document,
-    required this.poleNames,
-    required this.projectNames,
-    required this.eventNames,
-    required this.onValidate,
-    required this.onReject,
-    required this.onUnvalidate,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scopeLabel = _scopeLabel();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: document.isOfficial
-                      ? Colors.green.shade100
-                      : AppTheme.enactusYellow,
-                  foregroundColor: AppTheme.softBlack,
-                  child: Icon(
-                    document.isOfficial
-                        ? Icons.verified_rounded
-                        : Icons.description_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    document.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              document.description ?? 'Aucune description',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text(document.categoryLabel)),
-                Chip(label: Text(document.visibilityLabel)),
-                Chip(label: Text(document.fileTypeLabel)),
-                if (scopeLabel != null)
-                  Chip(
-                    avatar: const Icon(Icons.account_tree_rounded, size: 18),
-                    label: Text(scopeLabel),
-                  ),
-                if (document.isTemplate) const Chip(label: Text('Modèle')),
-                if (document.isOfficial) const Chip(label: Text('Officiel')),
-                Chip(
-                  avatar: Icon(
-                    document.isValidated
-                        ? Icons.verified_rounded
-                        : document.isRejected
-                        ? Icons.close_rounded
-                        : Icons.hourglass_top_rounded,
-                    size: 18,
-                  ),
-                  label: Text(document.statusLabel),
-                ),
-              ],
-            ),
-            if (document.isRejected &&
-                (document.rejectionReason ?? '').isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Motif : ${document.rejectionReason}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.red.shade700,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              'Ajouté le ${document.createdAtLabel}',
-              style: const TextStyle(color: Colors.black45),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed:
-                      document.fileUrl == null || document.fileUrl!.isEmpty
-                      ? null
-                      : () async {
-                          await Clipboard.setData(
-                            ClipboardData(text: document.fileUrl!),
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Lien du document copie.'),
-                            ),
-                          );
-                        },
-                  icon: const Icon(Icons.content_copy_rounded),
-                  label: const Text('Copier le lien'),
-                ),
-                if (!document.isValidated && document.canValidate)
-                  ElevatedButton.icon(
-                    onPressed: () => onValidate(document),
-                    icon: const Icon(Icons.verified_rounded),
-                    label: const Text('Valider'),
-                  ),
-                if (!document.isValidated && document.canValidate)
-                  OutlinedButton.icon(
-                    onPressed: () => onReject(document),
-                    icon: const Icon(Icons.close_rounded),
-                    label: const Text('Rejeter'),
-                  ),
-                if (document.isValidated && document.canValidate)
-                  OutlinedButton.icon(
-                    onPressed: () => onUnvalidate(document),
-                    icon: const Icon(Icons.remove_done_rounded),
-                    label: const Text('Retirer'),
-                  ),
-                if (document.canManage)
-                  IconButton(
-                    onPressed: () => onDelete(document),
-                    icon: const Icon(Icons.delete_rounded),
-                    tooltip: 'Supprimer',
-                    color: Colors.red,
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String? _scopeLabel() {
-    if (document.poleId != null && document.poleId!.isNotEmpty) {
-      return 'Pôle : ${poleNames[document.poleId] ?? 'lié'}';
-    }
-
-    if (document.projectId != null && document.projectId!.isNotEmpty) {
-      return 'Projet : ${projectNames[document.projectId] ?? 'lié'}';
-    }
-
-    if (document.eventId != null && document.eventId!.isNotEmpty) {
-      return 'Événement : ${eventNames[document.eventId] ?? 'lié'}';
-    }
-
-    return null;
-  }
-}
-
-class _DocumentFilePickerTile extends StatelessWidget {
-  final _PickedDocumentFile? pickedFile;
-  final bool uploading;
-  final VoidCallback onPick;
-  final VoidCallback? onRemove;
-
-  const _DocumentFilePickerTile({
-    required this.pickedFile,
-    required this.uploading,
-    required this.onPick,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final file = pickedFile;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.35),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          OutlinedButton.icon(
-            onPressed: uploading ? null : onPick,
-            icon: uploading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_rounded),
-            label: Text(uploading ? 'Upload...' : 'Choisir un fichier'),
-          ),
-          if (file != null) ...[
-            const SizedBox(height: 10),
-            InputChip(
-              avatar: const Icon(Icons.description_rounded, size: 18),
-              label: Text(
-                '${file.fileName} · ${_formatDocumentBytes(file.sizeBytes)}',
-                overflow: TextOverflow.ellipsis,
-              ),
-              onDeleted: onRemove,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class CreateDocumentDialog extends StatefulWidget {
-  final DocumentsService documentsService;
-  final List<PoleModel> poles;
-  final List<ProjectModel> projects;
-  final List<EventModel> events;
-
-  const CreateDocumentDialog({
-    super.key,
-    required this.documentsService,
-    required this.poles,
-    required this.projects,
-    required this.events,
-  });
-
-  @override
-  State<CreateDocumentDialog> createState() => _CreateDocumentDialogState();
-}
-
-class _CreateDocumentDialogState extends State<CreateDocumentDialog> {
-  final _formKey = GlobalKey<FormState>();
-
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _fileUrlController = TextEditingController();
-  final _fileTypeController = TextEditingController();
-
-  String _category = 'general';
-  String _visibility = 'internal';
-  String _scopeType = 'none';
-  String? _selectedPoleId;
-  String? _selectedProjectId;
-  String? _selectedEventId;
-  bool _isTemplate = false;
-  bool _autoCategory = true;
-  _PickedDocumentFile? _pickedFile;
-
-  bool _loading = false;
-  bool _uploadingFile = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController.addListener(_refreshDocumentHints);
-    _descriptionController.addListener(_refreshDocumentHints);
-    _fileUrlController.addListener(_refreshDocumentHints);
-  }
-
-  @override
-  void dispose() {
-    _titleController.removeListener(_refreshDocumentHints);
-    _descriptionController.removeListener(_refreshDocumentHints);
-    _fileUrlController.removeListener(_refreshDocumentHints);
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _fileUrlController.dispose();
-    _fileTypeController.dispose();
-    super.dispose();
-  }
-
-  void _refreshDocumentHints() {
-    final inferredType = _inferFileType(_fileUrlController.text);
-    if (inferredType != null && inferredType != _fileTypeController.text) {
-      _fileTypeController.text = inferredType;
-    }
-
-    if (!_autoCategory) return;
-    final inferredCategory = _inferCategory(
-      title: _titleController.text,
-      description: _descriptionController.text,
-      fileUrl: _fileUrlController.text,
-      fileType: inferredType,
-    );
-    if (inferredCategory != _category && mounted) {
-      setState(() => _category = inferredCategory);
-    }
-  }
-
-  String? _inferFileType(String fileUrl) {
-    final clean = fileUrl.split('?').first.split('#').first.trim();
-    if (!clean.contains('.')) return null;
-    final extension = clean.split('.').last.toLowerCase();
-    if (extension.length > 12 || extension.contains('/')) return null;
-    return extension;
-  }
-
-  String _inferCategory({
-    required String title,
-    required String description,
-    required String fileUrl,
-    String? fileType,
-  }) {
-    final text = '$title $description $fileUrl $fileType'.toLowerCase();
-    final rules = <String, List<String>>{
-      'pv': ['pv', 'proces verbal', 'procès verbal', 'réunion', 'reunion'],
-      'budget': ['budget', 'budgetisation', 'budgétisation', 'devis', 'prix'],
-      'finance': ['finance', 'paiement', 'cotisation', 'facture'],
-      'fiche_projet': ['fiche', 'cahier des charges', 'cdc'],
-      'pitch_deck': ['pitch', 'présentation', 'presentation', 'poster'],
-      'competition': [
-        'world cup',
-        'competition',
-        'compétition',
-        'annual report',
-      ],
-      'rapport_terrain': ['terrain', 'visite', 'mission', 'bilan mensuel'],
-      'preuve_impact': ['impact', 'preuve', 'bénéficiaire', 'beneficiaire'],
-      'support_formation': ['formation', 'academy', 'guide'],
-      'partenariat': ['partenariat', 'fundraising', 'sponsor'],
-      'technique': ['technique', 'prototype', 'irrigation', 'pompe', 'esp32'],
-      'recherche': ['recherche', 'étude', 'etude', 'analyse'],
-      'administratif': ['autorisation', 'demande', 'lettre'],
-      'juridique': ['statut', 'règlement', 'reglement', 'texte'],
-      'discipline': ['renvoi', 'avertissement', 'discipline'],
-      'presence': ['présence', 'presence', 'absence', 'assiduité'],
-      'voyage': ['voyage', 'itinéraire', 'itineraire', 'bus'],
-      'communication': ['communication', 'presse', 'rfi', 'post'],
-      'rh_recrutement': ['recrutement', 'candidat', 'entretien'],
-    };
-
-    for (final entry in rules.entries) {
-      if (entry.value.any((keyword) => text.contains(keyword))) {
-        return entry.key;
-      }
-    }
-    if (['jpg', 'jpeg', 'png', 'heic'].contains(fileType)) return 'photo';
-    if (['mp4', 'mov', 'avi'].contains(fileType)) return 'video';
-    if (['ppt', 'pptx'].contains(fileType)) return 'pitch_deck';
-    if (['xlsx', 'xls', 'csv'].contains(fileType)) return 'budget';
-    return 'general';
-  }
-
-  Future<void> _pickFile() async {
-    if (_loading || _uploadingFile) return;
-
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: true,
-      type: FileType.any,
-    );
-    final file = result?.files.single;
-    final bytes = file?.bytes;
-    if (file == null || bytes == null || bytes.isEmpty) return;
-
-    setState(() {
-      _uploadingFile = true;
-      _error = null;
-    });
-
-    try {
-      final uploaded = await widget.documentsService.uploadDocumentFile(
-        fileName: file.name,
-        bytes: Uint8List.fromList(bytes),
-        visibility: _visibility,
-      );
-
       if (!mounted) return;
       setState(() {
-        _pickedFile = _PickedDocumentFile(
-          fileId: uploaded.fileId,
-          fileName: uploaded.fileName,
-          fileType: uploaded.fileType,
-          sizeBytes: uploaded.sizeBytes,
-        );
-        _fileUrlController.text = uploaded.downloadUrl;
-        if ((uploaded.fileType ?? '').isNotEmpty) {
-          _fileTypeController.text = uploaded.fileType!;
-        }
+        _documents = values[0] as List<DocumentModel>;
+        _references = values[1] as DocumentReferenceData;
+        _loading = false;
       });
-      _refreshDocumentHints();
-    } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() => _uploadingFile = false);
-      }
-    }
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    if (_scopeType == 'pole' && _selectedPoleId == null) {
-      setState(() => _error = 'Sélectionnez le pôle concerné.');
-      return;
-    }
-
-    if (_scopeType == 'project' && _selectedProjectId == null) {
-      setState(() => _error = 'Sélectionnez le projet concerné.');
-      return;
-    }
-
-    if (_scopeType == 'event' && _selectedEventId == null) {
-      setState(() => _error = 'Sélectionnez l’événement concerné.');
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      await widget.documentsService.createDocument(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        fileUrl: _fileUrlController.text,
-        fileId: _pickedFile?.fileId,
-        fileType: _fileTypeController.text.trim().isEmpty
-            ? null
-            : _fileTypeController.text,
-        category: _category,
-        visibility: _visibility,
-        poleId: _scopeType == 'pole' ? _selectedPoleId : null,
-        projectId: _scopeType == 'project' ? _selectedProjectId : null,
-        eventId: _scopeType == 'event' ? _selectedEventId : null,
-        isTemplate: _isTemplate,
-      );
-
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
-    } finally {
+    } catch (error) {
       if (mounted) {
         setState(() {
           _loading = false;
+          _error = _msg(error);
         });
       }
     }
   }
 
+  Future<void> _applyFilters() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final values = await _gateway.loadDocuments(
+        DocumentFilters(
+          search: _search.text,
+          category: _category,
+          status: _status,
+          visibility: _visibility,
+          poleId: _pole,
+          projectId: _project,
+          eventId: _event,
+          isTemplate: _templates ? true : null,
+          isOfficial: _officials ? true : null,
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _documents = values;
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = _msg(error);
+        });
+      }
+    }
+  }
+
+  Future<void> _create() async {
+    final result = await showDocumentFormDialog(
+      context,
+      gateway: _gateway,
+      references: _references,
+    );
+    if (result == null || !mounted) return;
+    try {
+      final created = await _gateway.createDocument(result.draft);
+      if (!mounted) return;
+      setState(() => _documents = [created, ..._documents]);
+      _notice('Document créé.');
+    } catch (error) {
+      if (mounted) _notice(_msg(error), true);
+    }
+  }
+
+  void _open(DocumentModel document) =>
+      context.push('/documents/${document.id}', extra: _gateway);
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Nouveau document'),
-      content: SizedBox(
-        width: _dialogWidth(context, 540),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                if (_error != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
+    final compact = MediaQuery.sizeOf(context).width < 700;
+    final filters = _Filters(
+      category: _category,
+      status: _status,
+      visibility: _visibility,
+      pole: _pole,
+      project: _project,
+      event: _event,
+      templates: _templates,
+      officials: _officials,
+      references: _references,
+      onCategory: (v) {
+        setState(() => _category = v);
+        _applyFilters();
+      },
+      onStatus: (v) {
+        setState(() => _status = v);
+        _applyFilters();
+      },
+      onVisibility: (v) {
+        setState(() => _visibility = v);
+        _applyFilters();
+      },
+      onPole: (v) {
+        setState(() => _pole = v);
+        _applyFilters();
+      },
+      onProject: (v) {
+        setState(() => _project = v);
+        _applyFilters();
+      },
+      onEvent: (v) {
+        setState(() => _event = v);
+        _applyFilters();
+      },
+      onTemplates: (v) {
+        setState(() => _templates = v);
+        _applyFilters();
+      },
+      onOfficials: (v) {
+        setState(() => _officials = v);
+        _applyFilters();
+      },
+    );
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _applyFilters,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 16 : 28,
+                  24,
+                  compact ? 16 : 28,
+                  12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Documents',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const Text(
+                                'Centralisez les fichiers, leurs périmètres et leur validation.',
+                              ),
+                            ],
+                          ),
+                        ),
+                        FilledButton.icon(
+                          key: const Key('new-document'),
+                          onPressed: _create,
+                          icon: const Icon(Icons.add_rounded),
+                          label: Text(compact ? 'Nouveau' : 'Nouveau document'),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(color: Colors.red.shade700),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: _search,
+                      onSubmitted: (_) => _applyFilters(),
+                      decoration: InputDecoration(
+                        labelText: 'Rechercher un document',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: IconButton(
+                          tooltip: 'Rechercher',
+                          onPressed: _applyFilters,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                        ),
+                      ),
                     ),
-                  ),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Titre',
-                    prefixIcon: Icon(Icons.title_rounded),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Le titre est obligatoire.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _descriptionController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    prefixIcon: Icon(Icons.description_outlined),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _DocumentFilePickerTile(
-                  pickedFile: _pickedFile,
-                  uploading: _uploadingFile,
-                  onPick: _pickFile,
-                  onRemove: _loading || _uploadingFile
-                      ? null
-                      : () {
-                          setState(() {
-                            _pickedFile = null;
-                            _fileUrlController.clear();
-                            _fileTypeController.clear();
-                          });
-                        },
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _fileUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien du fichier ou fichier uploadé',
-                    hintText: 'https://drive.google.com/...',
-                    prefixIcon: Icon(Icons.link_rounded),
-                  ),
-                  validator: (value) {
-                    if (_pickedFile == null &&
-                        (value == null || value.trim().isEmpty)) {
-                      return 'Ajoutez un fichier ou un lien.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _fileTypeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Type de fichier',
-                    hintText: 'Déduit automatiquement si possible',
-                    prefixIcon: Icon(Icons.file_present_rounded),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _category,
-                  decoration: const InputDecoration(
-                    labelText: 'Catégorie',
-                    prefixIcon: Icon(Icons.category_rounded),
-                  ),
-                  items: [
-                    for (final option in DocumentModel.categoryOptions)
-                      DropdownMenuItem(
-                        value: option.value,
-                        child: Text(option.label),
+                    const SizedBox(height: 12),
+                    if (compact)
+                      Card(
+                        child: ExpansionTile(
+                          title: const Text('Filtres'),
+                          leading: const Icon(Icons.filter_list_rounded),
+                          childrenPadding: const EdgeInsets.all(14),
+                          children: [filters],
+                        ),
+                      )
+                    else
+                      filters,
+                    if (_references.unavailableSources.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Certaines références sont temporairement indisponibles. La liste des documents reste accessible.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
                   ],
-                  onChanged: _loading
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _autoCategory = false;
-                            _category = value;
-                          });
-                        },
                 ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    DocumentModel.categoryOptions
-                        .firstWhere(
-                          (option) => option.value == _category,
-                          orElse: () => const DocumentCategoryOption(
-                            'general',
-                            'Général',
-                            'Documents transversaux',
+              ),
+            ),
+            if (_loading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: _applyFilters,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (_documents.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: Text('Aucun document ne correspond aux filtres.'),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 16 : 28,
+                  4,
+                  compact ? 16 : 28,
+                  32,
+                ),
+                sliver: compact
+                    ? SliverList.builder(
+                        itemCount: _documents.length,
+                        itemBuilder: (context, index) => SizedBox(
+                          height: 330,
+                          child: DocumentCard(
+                            document: _documents[index],
+                            references: _references,
+                            onOpen: () => _open(_documents[index]),
                           ),
-                        )
-                        .hint,
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(_visibility),
-                  initialValue: _visibility,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Visibilité',
-                    prefixIcon: Icon(Icons.visibility_rounded),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'public_club', child: Text('Club')),
-                    DropdownMenuItem(value: 'internal', child: Text('Interne')),
-                    DropdownMenuItem(
-                      value: 'pole_only',
-                      child: Text('Pôle uniquement'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'project_only',
-                      child: Text('Projet uniquement'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'enacchef_only',
-                      child: Text('Bureau uniquement'),
-                    ),
-                    DropdownMenuItem(value: 'private', child: Text('Privé')),
-                  ],
-                  onChanged: _loading
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() => _visibility = value);
-                        },
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _scopeType,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Rattachement',
-                    prefixIcon: Icon(Icons.account_tree_rounded),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'none',
-                      child: Text('Aucun rattachement'),
-                    ),
-                    DropdownMenuItem(value: 'pole', child: Text('Pôle')),
-                    DropdownMenuItem(value: 'project', child: Text('Projet')),
-                    DropdownMenuItem(value: 'event', child: Text('Événement')),
-                  ],
-                  onChanged: _loading
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() {
-                            _scopeType = value;
-                            _selectedPoleId = null;
-                            _selectedProjectId = null;
-                            _selectedEventId = null;
-                            if (value == 'pole') _visibility = 'pole_only';
-                            if (value == 'project') {
-                              _visibility = 'project_only';
-                            }
-                            if (value == 'none' || value == 'event') {
-                              _visibility = 'internal';
-                            }
-                          });
-                        },
-                ),
-                if (_scopeType == 'pole') ...[
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedPoleId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Pôle concerné',
-                      prefixIcon: Icon(Icons.hub_rounded),
-                    ),
-                    items: [
-                      for (final pole in widget.poles)
-                        DropdownMenuItem(
-                          value: pole.id,
-                          child: Text(pole.name),
                         ),
-                    ],
-                    onChanged: _loading
-                        ? null
-                        : (value) => setState(() => _selectedPoleId = value),
-                  ),
-                ],
-                if (_scopeType == 'project') ...[
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedProjectId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Projet concerne',
-                      prefixIcon: Icon(Icons.workspaces_rounded),
-                    ),
-                    items: [
-                      for (final project in widget.projects)
-                        DropdownMenuItem(
-                          value: project.id,
-                          child: Text(project.name),
+                      )
+                    : SliverGrid.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 410,
+                              mainAxisExtent: 315,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 14,
+                            ),
+                        itemCount: _documents.length,
+                        itemBuilder: (context, index) => DocumentCard(
+                          document: _documents[index],
+                          references: _references,
+                          onOpen: () => _open(_documents[index]),
                         ),
-                    ],
-                    onChanged: _loading
-                        ? null
-                        : (value) => setState(() => _selectedProjectId = value),
-                  ),
-                ],
-                if (_scopeType == 'event') ...[
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedEventId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Événement concerné',
-                      prefixIcon: Icon(Icons.event_rounded),
-                    ),
-                    items: [
-                      for (final event in widget.events)
-                        DropdownMenuItem(
-                          value: event.id,
-                          child: Text(event.title),
-                        ),
-                    ],
-                    onChanged: _loading
-                        ? null
-                        : (value) => setState(() => _selectedEventId = value),
-                  ),
-                ],
-                SwitchListTile(
-                  value: _isTemplate,
-                  title: const Text('Modèle de document'),
-                  subtitle: const Text(
-                    'Exemple : modèle PV, modèle rapport, canevas roadmap.',
-                  ),
-                  onChanged: _loading
-                      ? null
-                      : (value) {
-                          setState(() => _isTemplate = value);
-                        },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton.icon(
-          onPressed: _loading ? null : _submit,
-          icon: _loading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.save_rounded),
-          label: Text(_loading ? 'Création...' : 'Créer'),
-        ),
-      ],
-    );
-  }
-}
-
-double _dialogWidth(BuildContext context, double maxWidth) {
-  return (MediaQuery.sizeOf(context).width - 32).clamp(280.0, maxWidth);
-}
-
-String _formatDocumentBytes(int bytes) {
-  if (bytes <= 0) return '0 o';
-  if (bytes < 1024) return '$bytes o';
-  final kb = bytes / 1024;
-  if (kb < 1024) return '${kb.toStringAsFixed(kb < 10 ? 1 : 0)} Ko';
-  final mb = kb / 1024;
-  return '${mb.toStringAsFixed(mb < 10 ? 1 : 0)} Mo';
-}
-
-class _EmptyDocumentsCard extends StatelessWidget {
-  const _EmptyDocumentsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(26),
-        child: Center(
-          child: Text(
-            'Aucun document trouvé.',
-            style: TextStyle(color: Colors.black54),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorCard extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: Colors.red.shade600,
-              size: 44,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Erreur de chargement',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
-            ),
+                      ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  void _notice(String message, [bool error = false]) =>
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+        ),
+      );
 }
+
+class _Filters extends StatelessWidget {
+  final String category, status, visibility, pole, project, event;
+  final bool templates, officials;
+  final DocumentReferenceData references;
+  final ValueChanged<String> onCategory,
+      onStatus,
+      onVisibility,
+      onPole,
+      onProject,
+      onEvent;
+  final ValueChanged<bool> onTemplates, onOfficials;
+  const _Filters({
+    required this.category,
+    required this.status,
+    required this.visibility,
+    required this.pole,
+    required this.project,
+    required this.event,
+    required this.templates,
+    required this.officials,
+    required this.references,
+    required this.onCategory,
+    required this.onStatus,
+    required this.onVisibility,
+    required this.onPole,
+    required this.onProject,
+    required this.onEvent,
+    required this.onTemplates,
+    required this.onOfficials,
+  });
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: [
+      _Select(
+        label: 'Catégorie',
+        value: category,
+        items: [
+          const MapEntry('all', 'Toutes les catégories'),
+          ...DocumentModel.categoryOptions.map(
+            (item) => MapEntry(item.value, item.label),
+          ),
+        ],
+        onChanged: onCategory,
+      ),
+      _Select(
+        label: 'Statut',
+        value: status,
+        items: const [
+          MapEntry('all', 'Tous les statuts'),
+          MapEntry('draft', 'Brouillon'),
+          MapEntry('submitted', 'Soumis'),
+          MapEntry('pending_validation', 'En attente de validation'),
+          MapEntry('validated', 'Validé'),
+          MapEntry('rejected', 'Rejeté'),
+          MapEntry('archived', 'Archivé'),
+          MapEntry('expired', 'Expiré'),
+        ],
+        onChanged: onStatus,
+      ),
+      _Select(
+        label: 'Visibilité',
+        value: visibility,
+        items: const [
+          MapEntry('all', 'Toutes les visibilités'),
+          MapEntry('public_club', 'Tout le club'),
+          MapEntry('internal', 'Membres'),
+          MapEntry('pole_only', 'Pôle sélectionné'),
+          MapEntry('project_only', 'Projet sélectionné'),
+          MapEntry('enacchef_only', 'Responsables'),
+          MapEntry('private', 'Privé'),
+        ],
+        onChanged: onVisibility,
+      ),
+      _Select(
+        label: 'Pôle',
+        value: pole,
+        items: [
+          const MapEntry('all', 'Tous les pôles'),
+          ...references.poles.map((item) => MapEntry(item.id, item.name)),
+        ],
+        onChanged: onPole,
+      ),
+      _Select(
+        label: 'Projet',
+        value: project,
+        items: [
+          const MapEntry('all', 'Tous les projets'),
+          ...references.projects.map((item) => MapEntry(item.id, item.name)),
+        ],
+        onChanged: onProject,
+      ),
+      _Select(
+        label: 'Événement',
+        value: event,
+        items: [
+          const MapEntry('all', 'Tous les événements'),
+          ...references.events.map((item) => MapEntry(item.id, item.title)),
+        ],
+        onChanged: onEvent,
+      ),
+      FilterChip(
+        label: const Text('Modèles'),
+        selected: templates,
+        onSelected: onTemplates,
+      ),
+      FilterChip(
+        label: const Text('Officiels'),
+        selected: officials,
+        onSelected: onOfficials,
+      ),
+    ],
+  );
+}
+
+class _Select extends StatelessWidget {
+  final String label, value;
+  final List<MapEntry<String, String>> items;
+  final ValueChanged<String> onChanged;
+  const _Select({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 220,
+    child: DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: items
+          .map(
+            (item) => DropdownMenuItem(
+              value: item.key,
+              child: Text(item.value, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: (value) => onChanged(value!),
+    ),
+  );
+}
+
+String _msg(Object error) =>
+    error.toString().replaceFirst('Exception: ', '').trim();

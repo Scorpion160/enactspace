@@ -12,7 +12,11 @@ import '../features/auth/screens/login_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/documents/screens/documents_screen.dart';
+import '../features/documents/screens/document_detail_screen.dart';
+import '../features/documents/services/documents_gateway.dart';
 import '../features/events/screens/events_screen.dart';
+import '../features/events/screens/event_detail_screen.dart';
+import '../features/events/services/events_gateway.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/gamification/screens/gamification_screen.dart';
 import '../features/impact/screens/impact_dashboard_screen.dart';
@@ -162,6 +166,17 @@ class AppRouter {
           GoRoute(
             path: '/documents',
             builder: (context, state) => const DocumentsScreen(),
+            routes: [
+              GoRoute(
+                path: ':documentId',
+                builder: (context, state) => DocumentDetailScreen(
+                  documentId: state.pathParameters['documentId']!,
+                  gateway: state.extra is DocumentsGateway
+                      ? state.extra! as DocumentsGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/notifications',
@@ -222,6 +237,17 @@ class AppRouter {
           GoRoute(
             path: '/events',
             builder: (context, state) => const EventsScreen(),
+            routes: [
+              GoRoute(
+                path: ':eventId',
+                builder: (context, state) => EventDetailScreen(
+                  eventId: state.pathParameters['eventId']!,
+                  gateway: state.extra is EventsGateway
+                      ? state.extra! as EventsGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/alumni',

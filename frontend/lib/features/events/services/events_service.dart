@@ -20,6 +20,13 @@ class EventsService {
     ).whereType<Map<String, dynamic>>().map(EventModel.fromJson).toList();
   }
 
+  Future<EventModel> getEvent(String eventId) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get('/events/$eventId', token: token);
+    if (response is Map<String, dynamic>) return EventModel.fromJson(response);
+    throw Exception('Événement introuvable.');
+  }
+
   Future<EventModel> createEvent({
     required String title,
     required String description,
@@ -31,6 +38,9 @@ class EventsService {
     int? maxParticipants,
     required bool requiresRegistration,
     required bool attendanceEnabled,
+    String? poleId,
+    String? projectId,
+    String? seasonId,
   }) async {
     final token = await _requireToken();
     final response = await _apiClient.postJson(
@@ -47,6 +57,9 @@ class EventsService {
         'max_participants': maxParticipants,
         'requires_registration': requiresRegistration,
         'attendance_enabled': attendanceEnabled,
+        'pole_id': _nullableId(poleId),
+        'project_id': _nullableId(projectId),
+        'season_id': _nullableId(seasonId),
       },
     );
 
@@ -59,17 +72,42 @@ class EventsService {
 
   Future<EventModel> updateEvent({
     required String eventId,
+    String? title,
+    String? description,
+    String? eventType,
+    String? location,
+    DateTime? startTime,
     String? reportUrl,
     DateTime? endTime,
+    bool clearEndTime = false,
+    String? poleId,
+    String? projectId,
+    double? budget,
+    int? maxParticipants,
+    bool? requiresRegistration,
+    bool? attendanceEnabled,
   }) async {
     final token = await _requireToken();
+    final data = <String, dynamic>{
+      if (title != null) 'title': title.trim(),
+      if (description != null) 'description': _nullable(description),
+      'event_type': ?eventType,
+      if (location != null) 'location': _nullable(location),
+      if (startTime != null) 'start_time': startTime.toIso8601String(),
+      if (endTime != null) 'end_time': endTime.toIso8601String(),
+      if (clearEndTime) 'end_time': null,
+      if (poleId != null) 'pole_id': _nullableId(poleId),
+      if (projectId != null) 'project_id': _nullableId(projectId),
+      'budget': ?budget,
+      'max_participants': ?maxParticipants,
+      'requires_registration': ?requiresRegistration,
+      'attendance_enabled': ?attendanceEnabled,
+      if (reportUrl != null) 'report_url': _nullable(reportUrl),
+    };
     final response = await _apiClient.patchJson(
       '/events/$eventId',
       token: token,
-      data: {
-        if (reportUrl != null) 'report_url': _nullable(reportUrl),
-        if (endTime != null) 'end_time': endTime.toIso8601String(),
-      },
+      data: data,
     );
 
     if (response is Map<String, dynamic>) {
@@ -130,6 +168,11 @@ class EventsService {
   String? _nullable(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  String? _nullableId(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty || trimmed == 'all' ? null : trimmed;
   }
 
   List<dynamic> _extractList(dynamic response) {
