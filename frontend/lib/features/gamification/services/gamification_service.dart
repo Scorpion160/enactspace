@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/gamification_models.dart';
@@ -33,8 +35,11 @@ class GamificationService {
 
   Future<EngagementPointModel> createPoint({
     required String userId,
+    String? seasonId,
     String? poleId,
+    String? projectId,
     required String sourceType,
+    String? sourceId,
     required int points,
     String? reason,
   }) async {
@@ -44,8 +49,11 @@ class GamificationService {
       token: token,
       data: {
         'user_id': userId,
+        'season_id': _nullable(seasonId),
         'pole_id': _nullable(poleId),
+        'project_id': _nullable(projectId),
         'source_type': sourceType,
+        'source_id': _nullable(sourceId),
         'points': points,
         'reason': _nullable(reason),
       },
@@ -144,6 +152,80 @@ class GamificationService {
     return _extractList(
       response,
     ).whereType<Map<String, dynamic>>().map(BadgeModel.fromJson).toList();
+  }
+
+  Future<BadgeModel> createBadge({
+    required String name,
+    required String label,
+    String? description,
+    String? iconUrl,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/gamification/badges',
+      token: await _requireToken(),
+      data: {
+        'name': name.trim(),
+        'label': label.trim(),
+        'description': _nullable(description),
+        'icon_url': _nullable(iconUrl),
+      },
+    );
+    if (response is Map<String, dynamic>) return BadgeModel.fromJson(response);
+    throw Exception('Réponse invalide lors de la création du badge.');
+  }
+
+  Future<BadgeModel> updateBadge(
+    String badgeId, {
+    String? name,
+    String? label,
+    String? description,
+    String? iconUrl,
+  }) async {
+    final response = await _apiClient.patchJson(
+      '/gamification/badges/$badgeId',
+      token: await _requireToken(),
+      data: {
+        if (name != null) 'name': name.trim(),
+        if (label != null) 'label': label.trim(),
+        if (description != null) 'description': _nullable(description),
+        if (iconUrl != null) 'icon_url': _nullable(iconUrl),
+      },
+    );
+    if (response is Map<String, dynamic>) return BadgeModel.fromJson(response);
+    throw Exception('Réponse invalide lors de la modification du badge.');
+  }
+
+  Future<void> deleteBadge(String badgeId) async {
+    await _apiClient.delete(
+      '/gamification/badges/$badgeId',
+      token: await _requireToken(),
+    );
+  }
+
+  Future<UserBadgeModel> awardBadge({
+    required String userId,
+    required String badgeId,
+    String? seasonId,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/gamification/user-badges',
+      token: await _requireToken(),
+      data: {
+        'user_id': userId,
+        'badge_id': badgeId,
+        'season_id': _nullable(seasonId),
+      },
+    );
+    if (response is Map<String, dynamic>)
+      return UserBadgeModel.fromJson(response);
+    throw Exception('Réponse invalide lors de l’attribution du badge.');
+  }
+
+  Future<void> removeUserBadge(String userBadgeId) async {
+    await _apiClient.delete(
+      '/gamification/user-badges/$userBadgeId',
+      token: await _requireToken(),
+    );
   }
 
   Future<List<UserBadgeModel>> getUserBadges({String? userId}) async {

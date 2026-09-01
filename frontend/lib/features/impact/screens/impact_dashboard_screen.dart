@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/impact_models.dart';
-import '../services/impact_service.dart';
+import '../services/impact_gateway.dart';
 
 class ImpactDashboardScreen extends StatefulWidget {
-  const ImpactDashboardScreen({super.key});
+  final ImpactGateway? gateway;
+  const ImpactDashboardScreen({super.key, this.gateway});
 
   @override
   State<ImpactDashboardScreen> createState() => _ImpactDashboardScreenState();
 }
 
 class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
-  final ImpactService _service = ImpactService();
+  late final ImpactGateway _gateway;
 
   bool _loading = true;
   String? _error;
@@ -21,6 +23,7 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiImpactGateway();
     _loadImpact();
   }
 
@@ -31,7 +34,7 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
     });
 
     try {
-      final data = await _service.getDashboard();
+      final data = await _gateway.loadDashboard();
       if (!mounted) return;
       setState(() => _data = data);
     } catch (e) {
@@ -50,6 +53,15 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const _ImpactHeader(),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => context.go('/impact/records', extra: _gateway),
+              icon: const Icon(Icons.fact_check_rounded),
+              label: const Text('Gérer les fiches Impact'),
+            ),
+          ),
           const SizedBox(height: 18),
           if (_loading)
             const Center(
@@ -207,10 +219,6 @@ class _ImpactContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (data.usesDemoData) ...[
-          const _DemoDataNotice(),
-          const SizedBox(height: 16),
-        ],
         _OrganizationScoreCard(organization: organization),
         const SizedBox(height: 16),
         _HistoricalImpactSection(impact: data.historicalImpact),
@@ -309,36 +317,6 @@ class _ImpactContent extends StatelessWidget {
         const SizedBox(height: 22),
         const _ScoreFrameworkCard(),
       ],
-    );
-  }
-}
-
-class _DemoDataNotice extends StatelessWidget {
-  const _DemoDataNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.42),
-        ),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: AppTheme.softBlack),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Données de démonstration affichées. Le module basculera automatiquement sur les données backend dès qu’elles seront disponibles.',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: use_null_aware_elements
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/alumni_profile_model.dart';
@@ -40,6 +42,28 @@ class AlumniService {
         .toList();
   }
 
+  Future<AlumniProfileModel> getProfile(String profileId) async {
+    final response = await _apiClient.get(
+      '/alumni/profiles/$profileId',
+      token: await _requireToken(),
+    );
+    if (response is Map<String, dynamic>) {
+      return AlumniProfileModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide pour le profil alumni.');
+  }
+
+  Future<AlumniProfileModel> getProfileForUser(String userId) async {
+    final response = await _apiClient.get(
+      '/alumni/profiles/user/$userId',
+      token: await _requireToken(),
+    );
+    if (response is Map<String, dynamic>) {
+      return AlumniProfileModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide pour le profil alumni.');
+  }
+
   Future<AlumniProfileModel> createProfile({
     required String userId,
     int? graduationYear,
@@ -77,6 +101,52 @@ class AlumniService {
     }
 
     throw Exception('Réponse invalide lors de la création du profil alumni.');
+  }
+
+  Future<AlumniProfileModel> updateProfile(
+    String profileId, {
+    int? graduationYear,
+    String? currentCompany,
+    String? currentPosition,
+    String? domain,
+    String? skills,
+    String? experienceSummary,
+    bool? availableForMentoring,
+    String? linkedinUrl,
+    String? portfolioUrl,
+    String? visibility,
+  }) async {
+    final data = <String, dynamic>{
+      if (graduationYear != null) 'graduation_year': graduationYear,
+      if (currentCompany != null) 'current_company': _nullable(currentCompany),
+      if (currentPosition != null)
+        'current_position': _nullable(currentPosition),
+      if (domain != null) 'domain': _nullable(domain),
+      if (skills != null) 'skills': _nullable(skills),
+      if (experienceSummary != null)
+        'experience_summary': _nullable(experienceSummary),
+      if (availableForMentoring != null)
+        'available_for_mentoring': availableForMentoring,
+      if (linkedinUrl != null) 'linkedin_url': _nullable(linkedinUrl),
+      if (portfolioUrl != null) 'portfolio_url': _nullable(portfolioUrl),
+      if (visibility != null) 'visibility': visibility,
+    };
+    final response = await _apiClient.patchJson(
+      '/alumni/profiles/$profileId',
+      token: await _requireToken(),
+      data: data,
+    );
+    if (response is Map<String, dynamic>) {
+      return AlumniProfileModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la modification du profil.');
+  }
+
+  Future<void> deleteProfile(String profileId) async {
+    await _apiClient.delete(
+      '/alumni/profiles/$profileId',
+      token: await _requireToken(),
+    );
   }
 
   Future<List<MentorshipModel>> getMentorships({String? status}) async {
@@ -124,6 +194,65 @@ class AlumniService {
     }
 
     throw Exception('Réponse invalide lors de la création du mentorat.');
+  }
+
+  Future<MentorshipModel> getMentorship(String mentorshipId) async {
+    final response = await _apiClient.get(
+      '/alumni/mentorships/$mentorshipId',
+      token: await _requireToken(),
+    );
+    if (response is Map<String, dynamic>) {
+      return MentorshipModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide pour le mentorat.');
+  }
+
+  Future<MentorshipModel> updateMentorship(
+    String mentorshipId, {
+    String? projectId,
+    String? poleId,
+    String? title,
+    String? objective,
+    String? status,
+    DateTime? startedAt,
+    DateTime? endedAt,
+  }) async {
+    final response = await _apiClient.patchJson(
+      '/alumni/mentorships/$mentorshipId',
+      token: await _requireToken(),
+      data: {
+        if (projectId != null) 'project_id': projectId,
+        if (poleId != null) 'pole_id': poleId,
+        if (title != null) 'title': _nullable(title),
+        if (objective != null) 'objective': _nullable(objective),
+        if (status != null) 'status': status,
+        if (startedAt != null) 'started_at': startedAt.toIso8601String(),
+        if (endedAt != null) 'ended_at': endedAt.toIso8601String(),
+      },
+    );
+    if (response is Map<String, dynamic>) {
+      return MentorshipModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la modification du mentorat.');
+  }
+
+  Future<MentorshipModel> completeMentorship(String mentorshipId) async {
+    final response = await _apiClient.postJson(
+      '/alumni/mentorships/$mentorshipId/complete',
+      token: await _requireToken(),
+      data: {},
+    );
+    if (response is Map<String, dynamic>) {
+      return MentorshipModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la clôture du mentorat.');
+  }
+
+  Future<void> deleteMentorship(String mentorshipId) async {
+    await _apiClient.delete(
+      '/alumni/mentorships/$mentorshipId',
+      token: await _requireToken(),
+    );
   }
 
   Future<String> _requireToken() async {

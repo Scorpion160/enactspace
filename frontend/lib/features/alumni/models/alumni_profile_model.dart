@@ -62,14 +62,16 @@ class AlumniProfileModel {
 
   String get visibilityLabel {
     switch (visibility) {
+      case 'internal':
+        return 'Membres';
       case 'alumni_only':
         return 'Alumni';
       case 'enacchef_only':
-        return 'Bureau';
+        return 'Responsables';
       case 'private':
         return 'Privé';
       default:
-        return 'Interne';
+        return 'Membres';
     }
   }
 }

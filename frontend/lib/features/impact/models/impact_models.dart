@@ -312,7 +312,6 @@ class ImpactDashboardData {
   final List<ProjectImpactMetricModel> projects;
   final List<EnacteurPerformanceModel> enacteurs;
   final List<PolePerformanceModel> poles;
-  final bool usesDemoData;
 
   const ImpactDashboardData({
     required this.organization,
@@ -320,6 +319,5 @@ class ImpactDashboardData {
     required this.projects,
     required this.enacteurs,
     required this.poles,
-    this.usesDemoData = false,
   });
 }

@@ -3,7 +3,11 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
 import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
+import '../features/academy/screens/academy_course_screen.dart';
+import '../features/academy/services/academy_gateway.dart';
 import '../features/alumni/screens/alumni_screen.dart';
+import '../features/alumni/screens/alumni_profile_detail_screen.dart';
+import '../features/alumni/services/alumni_gateway.dart';
 import '../features/archives/screens/archives_screen.dart';
 import '../features/attendance/screens/attendance_nfc_enrollment_screen.dart';
 import '../features/attendance/screens/attendance_qr_scanner_screen.dart';
@@ -20,6 +24,8 @@ import '../features/events/services/events_gateway.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/gamification/screens/gamification_screen.dart';
 import '../features/impact/screens/impact_dashboard_screen.dart';
+import '../features/impact/screens/impact_records_screen.dart';
+import '../features/impact/services/impact_gateway.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/pole_detail_screen.dart';
@@ -252,6 +258,17 @@ class AppRouter {
           GoRoute(
             path: '/alumni',
             builder: (context, state) => const AlumniScreen(),
+            routes: [
+              GoRoute(
+                path: ':profileId',
+                builder: (context, state) => AlumniProfileDetailScreen(
+                  profileId: state.pathParameters['profileId']!,
+                  gateway: state.extra is AlumniGateway
+                      ? state.extra! as AlumniGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/gamification',
@@ -260,6 +277,25 @@ class AppRouter {
           GoRoute(
             path: '/academy',
             builder: (context, state) => const AcademyHomeScreen(),
+            routes: [
+              GoRoute(
+                path: 'courses/:courseId',
+                builder: (context, state) => AcademyCourseScreen(
+                  courseId: state.pathParameters['courseId']!,
+                  gateway: state.extra is AcademyGateway
+                      ? state.extra! as AcademyGateway
+                      : null,
+                ),
+              ),
+              GoRoute(
+                path: 'admin',
+                builder: (context, state) => AcademyAdminScreen(
+                  gateway: state.extra is AcademyGateway
+                      ? state.extra! as AcademyGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/archives',
@@ -268,6 +304,27 @@ class AppRouter {
           GoRoute(
             path: '/impact',
             builder: (context, state) => const ImpactDashboardScreen(),
+            routes: [
+              GoRoute(
+                path: 'records',
+                builder: (context, state) => ImpactRecordsScreen(
+                  gateway: state.extra is ImpactGateway
+                      ? state.extra! as ImpactGateway
+                      : null,
+                ),
+                routes: [
+                  GoRoute(
+                    path: ':impactRecordId',
+                    builder: (context, state) => ImpactRecordDetailScreen(
+                      recordId: state.pathParameters['impactRecordId']!,
+                      gateway: state.extra is ImpactGateway
+                          ? state.extra! as ImpactGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
