@@ -8,7 +8,9 @@ import '../features/academy/services/academy_gateway.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/alumni/screens/alumni_profile_detail_screen.dart';
 import '../features/alumni/services/alumni_gateway.dart';
-import '../features/archives/screens/archives_screen.dart';
+import '../features/archives/screens/archive_detail_screens.dart';
+import '../features/archives/screens/archives_center_screen.dart';
+import '../features/archives/services/archives_gateway.dart';
 import '../features/attendance/screens/attendance_nfc_enrollment_screen.dart';
 import '../features/attendance/screens/attendance_qr_scanner_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
@@ -299,7 +301,40 @@ class AppRouter {
           ),
           GoRoute(
             path: '/archives',
-            builder: (context, state) => const ArchivesScreen(),
+            builder: (context, state) => ArchivesScreen(
+              gateway: state.extra is ArchivesGateway
+                  ? state.extra! as ArchivesGateway
+                  : null,
+            ),
+            routes: [
+              GoRoute(
+                path: 'items/:archiveId',
+                builder: (context, state) => ArchiveItemDetailScreen(
+                  archiveId: state.pathParameters['archiveId']!,
+                  gateway: state.extra is ArchivesGateway
+                      ? state.extra! as ArchivesGateway
+                      : null,
+                ),
+              ),
+              GoRoute(
+                path: 'projects/:projectId',
+                builder: (context, state) => HistoricalProjectDetailScreen(
+                  projectId: state.pathParameters['projectId']!,
+                  gateway: state.extra is ArchivesGateway
+                      ? state.extra! as ArchivesGateway
+                      : null,
+                ),
+              ),
+              GoRoute(
+                path: 'hall-of-fame/:entryId',
+                builder: (context, state) => HallOfFameDetailScreen(
+                  entryId: state.pathParameters['entryId']!,
+                  gateway: state.extra is ArchivesGateway
+                      ? state.extra! as ArchivesGateway
+                      : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/impact',
