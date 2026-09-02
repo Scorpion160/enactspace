@@ -514,7 +514,6 @@ def run_v1_demo_seed(db: Session, password: str) -> dict:
         "badges_created": badges_created,
         "test_users_created": users_created,
         "role_links_created": role_links_created,
-        "test_password": password,
     }
 
 

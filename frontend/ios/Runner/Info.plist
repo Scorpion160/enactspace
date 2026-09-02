@@ -44,6 +44,12 @@
 		<true/>
 	</dict>
 
+	<key>NSCameraUsageDescription</key>
+	<string>EnactSpace utilise l’appareil photo pour scanner les QR codes de présence.</string>
+
+	<key>NFCReaderUsageDescription</key>
+	<string>EnactSpace utilise le NFC pour enregistrer les badges et permettre l’émargement aux activités compatibles.</string>
+
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

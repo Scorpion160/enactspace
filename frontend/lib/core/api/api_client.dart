@@ -10,18 +10,48 @@ class ApiClient {
   );
 
   static String get serverUrl {
-    if (_configuredServerUrl.trim().isNotEmpty) {
-      return _normalizeServerUrl(_configuredServerUrl);
-    }
-
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
-    }
-
-    return 'http://127.0.0.1:8000';
+    return resolveServerUrl(
+      configuredUrl: _configuredServerUrl,
+      releaseMode: kReleaseMode,
+      isWeb: kIsWeb,
+      platform: defaultTargetPlatform,
+    );
   }
 
   static String get baseUrl => '$serverUrl/api';
+
+  @visibleForTesting
+  static String resolveServerUrl({
+    required String configuredUrl,
+    required bool releaseMode,
+    required bool isWeb,
+    required TargetPlatform platform,
+  }) {
+    if (configuredUrl.trim().isEmpty) {
+      if (releaseMode) {
+        throw StateError(
+          'ENACTSPACE_API_URL est obligatoire pour une version release.',
+        );
+      }
+      if (!isWeb && platform == TargetPlatform.android) {
+        return 'http://10.0.2.2:8000';
+      }
+      return 'http://127.0.0.1:8000';
+    }
+
+    final normalized = _normalizeServerUrl(configuredUrl);
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      throw StateError('ENACTSPACE_API_URL doit être une URL absolue valide.');
+    }
+    if (releaseMode && uri.scheme.toLowerCase() != 'https') {
+      throw StateError('ENACTSPACE_API_URL doit utiliser HTTPS en release.');
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      throw StateError('ENACTSPACE_API_URL doit utiliser HTTP ou HTTPS.');
+    }
+    return normalized;
+  }
 
   static String _normalizeServerUrl(String value) {
     final withoutTrailingSlash = value.trim().replaceFirst(RegExp(r'/+$'), '');

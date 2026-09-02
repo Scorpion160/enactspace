@@ -18,6 +18,7 @@ import 'package:frontend/features/events/services/events_service.dart';
 import 'package:frontend/features/poles/models/pole_model.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -25,11 +26,10 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(
-    () => SharedPreferences.setMockInitialValues({
-      'enactspace_token': 'test-token',
-    }),
-  );
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'enactspace_token': 'test-token'});
+  });
 
   group('Événements', () {
     testWidgets('liste, périodes, recherche et enums humanisés', (

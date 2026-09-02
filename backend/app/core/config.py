@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     FILE_STORAGE_PATH: str = "uploads"
     AUTO_CREATE_TABLES: bool | None = None
 
-    ENABLE_SEED: bool = True
+    ENABLE_SEED: bool = False
 
     EMAIL_ENABLED: bool | None = None
     NOTIFICATION_EMAIL_ENABLED: bool = False
@@ -190,6 +190,13 @@ class Settings(BaseSettings):
         if self.AUTO_CREATE_TABLES is not None:
             return self.AUTO_CREATE_TABLES
         return self.APP_ENV != "production"
+
+    @property
+    def seed_routes_enabled(self) -> bool:
+        return self.ENABLE_SEED and self.APP_ENV.lower() in {
+            "development",
+            "test",
+        }
 
 
 settings = Settings()

@@ -1,0 +1,5 @@
+# Copy to android/key.properties and keep the real values outside Git.
+storeFile=C:/secure/location/enactspace-upload.jks
+storePassword=REPLACE_WITH_EXTERNAL_SECRET
+keyAlias=enactspace-upload
+keyPassword=REPLACE_WITH_EXTERNAL_SECRET
