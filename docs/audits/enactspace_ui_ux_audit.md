@@ -1,7 +1,7 @@
 # Audit UI/UX exhaustif - EnactSpace
 
-Date d'audit : 2026-07-22  
-Portee : frontend Flutter de `Scorpion160/enactspace`, commit `7f0a9fd`.  
+Date d'audit : 2026-07-22
+Portee : frontend Flutter de `Scorpion160/enactspace`, commit `7f0a9fd`.
 Nature : analyse uniquement. Aucun fichier applicatif, asset, backend ou configuration n'a ete modifie. Aucun commit n'est cree par cet audit.
 
 ## 1. Resume executif
@@ -219,41 +219,41 @@ La dette visuelle est donc aussi une dette de performance percue : plus le layou
 
 ### A. Institutionnelle et premium
 
-**Personnalite.** Sereine, precise, credible, orientee resultats et gouvernance.  
-**Principes.** Peu de surfaces, hierarchie typographique forte, jaune reserve aux actions et decisions, noir reserve aux reperes majeurs.  
-**Formes.** Grille rigoureuse, angles legerement adoucis, tableaux et timelines lisibles.  
-**Couleurs.** Noir Enactus, jaune Enactus, ivoire tres leger, gris neutres et couleurs semantiques contenues.  
-**Typographie.** Sans serif humaniste pour les donnees, Poppins reserve a la marque et aux titres courts.  
-**Illustrations/icones.** Pictogrammes sobres et proprietaires, photos documentaires authentiques des projets.  
-**Animations.** Courtes, fonctionnelles, sobrement echelonnees.  
-**Meilleurs ecrans.** Finance, presence, recrutement, membres, impact, projets.  
-**Avantages.** Confiance, lisibilite, durabilite.  
+**Personnalite.** Sereine, precise, credible, orientee resultats et gouvernance.
+**Principes.** Peu de surfaces, hierarchie typographique forte, jaune reserve aux actions et decisions, noir reserve aux reperes majeurs.
+**Formes.** Grille rigoureuse, angles legerement adoucis, tableaux et timelines lisibles.
+**Couleurs.** Noir Enactus, jaune Enactus, ivoire tres leger, gris neutres et couleurs semantiques contenues.
+**Typographie.** Sans serif humaniste pour les donnees, Poppins reserve a la marque et aux titres courts.
+**Illustrations/icones.** Pictogrammes sobres et proprietaires, photos documentaires authentiques des projets.
+**Animations.** Courtes, fonctionnelles, sobrement echelonnees.
+**Meilleurs ecrans.** Finance, presence, recrutement, membres, impact, projets.
+**Avantages.** Confiance, lisibilite, durabilite.
 **Risques.** Peut devenir trop institutionnelle et perdre l'energie etudiante.
 
 ### B. Communautaire, humaine et energique
 
-**Personnalite.** Accueillante, collective, active au quotidien.  
-**Principes.** Priorite aux personnes, aux equipes, aux conversations et aux petites victoires visibles.  
-**Formes.** Modules souples, piliers de contenu, avatars, timeliness, accents jaunes ponctuels, images de terrain.  
-**Couleurs.** Noir/jaune Enactus avec vert de progression et bleu de confiance, en accents limites.  
-**Typographie.** Poppins conservee pour l'energie, echelle plus claire entre conversation, information et action.  
-**Illustrations/icones.** Icones arrondies coherentement dessinees, badges de contribution, photos de membres/projets.  
-**Animations.** Feedback de reaction, passage d'etape, lecture et presence, jamais decoratifs.  
-**Meilleurs ecrans.** Dashboard membre, chat, posts, Academy, gamification, alumni.  
-**Avantages.** Forte adoption quotidienne et sentiment d'appartenance.  
+**Personnalite.** Accueillante, collective, active au quotidien.
+**Principes.** Priorite aux personnes, aux equipes, aux conversations et aux petites victoires visibles.
+**Formes.** Modules souples, piliers de contenu, avatars, timeliness, accents jaunes ponctuels, images de terrain.
+**Couleurs.** Noir/jaune Enactus avec vert de progression et bleu de confiance, en accents limites.
+**Typographie.** Poppins conservee pour l'energie, echelle plus claire entre conversation, information et action.
+**Illustrations/icones.** Icones arrondies coherentement dessinees, badges de contribution, photos de membres/projets.
+**Animations.** Feedback de reaction, passage d'etape, lecture et presence, jamais decoratifs.
+**Meilleurs ecrans.** Dashboard membre, chat, posts, Academy, gamification, alumni.
+**Avantages.** Forte adoption quotidienne et sentiment d'appartenance.
 **Risques.** Surcharge ou gamification artificielle si les donnees reelles ne portent pas le recit.
 
 ### C. Senegalaise contemporaine et technologique, sans folklore superficiel
 
-**Personnalite.** Locale, ambitieuse, urbaine, creative et tournee vers l'impact.  
-**Principes.** S'inspirer des rythmes, de la composition editoriale et de la pluralite des savoir-faire, pas plaquer des motifs decoratifs.  
-**Formes.** Trames geometriques discretes, blocs editoriaux, rythme vertical, photos de terrain et artefacts de projet.  
-**Couleurs.** Jaune Enactus comme ancrage, noir bleute, blancs chauds et deux accents seulement issus d'un travail de contenu valide par l'equipe.  
-**Typographie.** Une sans serif tres lisible, titres affirmes, possibilite d'une seconde fonte d'accent testee pour les campagnes uniquement.  
-**Illustrations/icones.** Photographie Enactus ESP, cartes d'impact, representations des projets et des prix reels.  
-**Animations.** Transitions inspirees du rythme editorial, sans effets “ethniques” decoratifs.  
-**Meilleurs ecrans.** Connexion, recrutement public, Archives, Hall of Fame, Impact, projets.  
-**Avantages.** Memorisation forte et sentiment d'appartenance authentique.  
+**Personnalite.** Locale, ambitieuse, urbaine, creative et tournee vers l'impact.
+**Principes.** S'inspirer des rythmes, de la composition editoriale et de la pluralite des savoir-faire, pas plaquer des motifs decoratifs.
+**Formes.** Trames geometriques discretes, blocs editoriaux, rythme vertical, photos de terrain et artefacts de projet.
+**Couleurs.** Jaune Enactus comme ancrage, noir bleute, blancs chauds et deux accents seulement issus d'un travail de contenu valide par l'equipe.
+**Typographie.** Une sans serif tres lisible, titres affirmes, possibilite d'une seconde fonte d'accent testee pour les campagnes uniquement.
+**Illustrations/icones.** Photographie Enactus ESP, cartes d'impact, representations des projets et des prix reels.
+**Animations.** Transitions inspirees du rythme editorial, sans effets “ethniques” decoratifs.
+**Meilleurs ecrans.** Connexion, recrutement public, Archives, Hall of Fame, Impact, projets.
+**Avantages.** Memorisation forte et sentiment d'appartenance authentique.
 **Risques.** Appropriation superficielle si les choix ne sont pas co-concus avec les membres et appuyes sur du contenu reel.
 
 ## 16. Questions a soumettre a l'equipe avant toute refonte

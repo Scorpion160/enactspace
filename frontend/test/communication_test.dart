@@ -22,8 +22,14 @@ import 'package:frontend/features/posts/models/post_update_model.dart';
 import 'package:frontend/features/posts/screens/posts_screen.dart';
 import 'package:frontend/features/posts/services/posts_gateway.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 void main() {
+  setUpAll(() async {
+    await initializeDateFormatting('fr_FR');
+  });
+
   group('présentation Communication', () {
     test('humanise les types, audiences et réactions des publications', () {
       final post = _post(postType: 'announcement', visibility: 'public_club');
@@ -337,6 +343,10 @@ void main() {
       await _pump(tester, ChatScreen(gateway: gateway), const Size(1200, 800));
       expect(find.text('Conversations'), findsWidgets);
       expect(find.text('Équipe projet'), findsOneWidget);
+      expect(
+        DateFormat('EEE', 'fr_FR').format(DateTime.utc(2026, 8, 31)),
+        'lun.',
+      );
       expect(find.text('3'), findsWidgets);
       expect(find.textContaining('Choisis une conversation'), findsOneWidget);
     });
