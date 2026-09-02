@@ -213,7 +213,7 @@ class MembersService {
   Future<String> downloadImportTemplate() async {
     final token = await _authService.getToken();
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final response = await http.get(
@@ -225,7 +225,7 @@ class MembersService {
       return response.body;
     }
 
-    throw Exception('Impossible de charger le modÃ¨le CSV.');
+    throw Exception('Impossible de charger le modèle CSV.');
   }
 
   Future<MemberImportReport> previewImport({
@@ -262,7 +262,7 @@ class MembersService {
   }) async {
     final token = await _authService.getToken();
     if (token == null) {
-      throw Exception('Utilisateur non connectÃ©.');
+      throw Exception('Utilisateur non connecté.');
     }
 
     final request = http.MultipartRequest(
@@ -284,6 +284,6 @@ class MembersService {
       return MemberImportReport.fromJson(decoded);
     }
 
-    throw Exception('RÃ©ponse invalide lors de lâ€™import des membres.');
+    throw Exception('Réponse invalide lors de l’import des membres.');
   }
 }

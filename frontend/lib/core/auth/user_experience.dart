@@ -159,6 +159,7 @@ class UserExperience {
       isAdmin || isTeamLeader || isSecretary || isProjectOrPoleLead;
   bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
   bool get canManageGamification => isAdmin || isTeamLeader || isSecretary;
+  bool get canManageAcademy => isAdmin;
   bool get canViewMembersDirectory => canManageMembers || isProjectOrPoleLead;
   bool get canViewOperations => !isAlumni;
 
@@ -275,6 +276,11 @@ class UserExperience {
 
     final normalizedPath = path.split('?').first;
     final canAccessAttendance = user.status == 'active' && !user.isAlumni;
+
+    if (normalizedPath == '/academy/admin' ||
+        normalizedPath.startsWith('/academy/admin/')) {
+      return user.canManageAcademy;
+    }
 
     if (normalizedPath == '/attendance' ||
         normalizedPath == '/attendance/scan') {

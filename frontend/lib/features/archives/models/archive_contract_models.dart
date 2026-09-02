@@ -30,7 +30,8 @@ String archiveStatusLabel(String value) => switch (value.toLowerCase()) {
   'rejected' => 'Rejeté',
   'archived' => 'Archivé',
   'hidden' => 'Masqué',
-  _ => value,
+  'under_review' => 'En vérification',
+  _ => archiveTechnicalValueLabel(value),
 };
 
 String archiveVisibilityLabel(String value) => switch (value.toLowerCase()) {
@@ -39,7 +40,7 @@ String archiveVisibilityLabel(String value) => switch (value.toLowerCase()) {
   'alumni' => 'Alumni',
   'public' => 'Public',
   'privé' => 'Privé',
-  _ => value,
+  _ => archiveTechnicalValueLabel(value),
 };
 
 String historicalProjectStatusLabel(String value) =>
@@ -48,7 +49,7 @@ String historicalProjectStatusLabel(String value) =>
       'archive' || 'archivé' => 'Archivé',
       'continue' || 'continué' => 'Continué',
       'developpement' || 'développement' => 'En développement',
-      _ => value,
+      _ => archiveTechnicalValueLabel(value),
     };
 
 String historicalMediaTypeLabel(String value) => switch (value.toLowerCase()) {
@@ -59,8 +60,37 @@ String historicalMediaTypeLabel(String value) => switch (value.toLowerCase()) {
   'rapport' => 'Rapport',
   'presentation' => 'Présentation',
   'document' => 'Document',
-  _ => value,
+  _ => archiveTechnicalValueLabel(value),
 };
+
+String historicalDocumentTypeLabel(String value) =>
+    switch (value.trim().toLowerCase()) {
+      'official_document' || 'document_officiel' => 'Document officiel',
+      'annual_report' || 'rapport_annuel' => 'Rapport annuel',
+      'presentation' => 'Présentation',
+      'minutes' || 'meeting_minutes' || 'proces_verbal' => 'Procès-verbal',
+      'press_article' || 'article_presse' => 'Article de presse',
+      'report' || 'rapport' => 'Rapport',
+      _ => archiveTechnicalValueLabel(value),
+    };
+
+String hallOfFameEntryTypeLabel(String value) =>
+    switch (value.trim().toLowerCase()) {
+      'transmission' => 'Transmission',
+      'distinction' || 'award' => 'Distinction',
+      'competition' || 'competition_win' => 'Compétition',
+      'milestone' => 'Moment clé',
+      _ => archiveTechnicalValueLabel(value),
+    };
+
+String archiveTechnicalValueLabel(String value) {
+  final words = value
+      .trim()
+      .replaceAll(RegExp(r'[_-]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ');
+  if (words.isEmpty) return 'Non renseigné';
+  return '${words[0].toUpperCase()}${words.substring(1)}';
+}
 
 bool isPersistedArchiveRecord(String id) => RegExp(
   r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
@@ -452,6 +482,7 @@ class ArchiveDocumentModel {
       );
 
   bool get isPersisted => isPersistedArchiveRecord(id);
+  String get documentTypeLabel => historicalDocumentTypeLabel(documentType);
 }
 
 class HallOfFameEntryModel {
@@ -508,6 +539,7 @@ class HallOfFameEntryModel {
       );
 
   bool get isPersisted => isPersistedArchiveRecord(id);
+  String get entryTypeLabel => hallOfFameEntryTypeLabel(entryType);
 }
 
 class HistoricalStatisticModel {

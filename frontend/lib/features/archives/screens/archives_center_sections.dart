@@ -510,6 +510,7 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
               label: 'Type',
               value: _type,
               values: types,
+              itemLabel: hallOfFameEntryTypeLabel,
               onChanged: (value) => setState(() => _type = value),
             ),
             FilterChip(
@@ -545,7 +546,7 @@ class HallOfFameCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RecordCard(
     title: item.title,
-    eyebrow: '${item.year ?? 'Année non renseignée'} · ${item.entryType}',
+    eyebrow: '${item.year ?? 'Année non renseignée'} · ${item.entryTypeLabel}',
     description: item.subtitle ?? item.description,
     featured: item.isFeatured,
     memoryOnly: !item.isPersisted,
@@ -880,7 +881,7 @@ class ArchiveDocumentCard extends StatelessWidget {
   Widget build(BuildContext context) => RecordCard(
     title: item.title,
     eyebrow:
-        '${item.year ?? ''} · ${item.documentType} · ${archiveVisibilityLabel(item.visibility)}',
+        '${item.year ?? ''} · ${item.documentTypeLabel} · ${archiveVisibilityLabel(item.visibility)}',
     description: item.description ?? item.sourceLabel,
     featured: item.isFeatured,
     memoryOnly: !item.isPersisted,

@@ -290,6 +290,7 @@ class AppMetric extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final accent = switch (tone) {
       AppStatusTone.error => AppTheme.error,
       AppStatusTone.warning => AppTheme.warning,
@@ -300,10 +301,11 @@ class AppMetric extends StatelessWidget {
     return AppDataCard(
       onTap: onTap,
       child: Column(
+        mainAxisSize: largeText ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (icon != null) Icon(icon, color: accent, size: 22),
-          const Spacer(),
+          if (largeText) const SizedBox(height: 12) else const Spacer(),
           Text(
             value,
             style: TextStyle(

@@ -166,23 +166,23 @@ class ApplicationModel {
         level.contains('1ere') ||
         level.contains('1ère') ||
         level.contains('premi')) {
-      return 'StabilitÃ© forte';
+      return 'Stabilité forte';
     }
 
     if (level.contains('dic2') ||
         level.contains('l2') ||
         level.contains('deux')) {
-      return 'Bonne stabilitÃ©';
+      return 'Bonne stabilité';
     }
 
     if (level.contains('dic3') ||
         level.contains('m2') ||
         level.contains('fin') ||
         level.contains('5')) {
-      return 'DÃ©part proche';
+      return 'Départ proche';
     }
 
-    return 'StabilitÃ© Ã  qualifier';
+    return 'Stabilité à qualifier';
   }
 
   int get screeningScore {

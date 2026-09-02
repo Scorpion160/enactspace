@@ -419,7 +419,7 @@ class RecruitmentService {
     required String userId,
   }) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connectÃ©.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     try {
       await _apiClient.postJson(

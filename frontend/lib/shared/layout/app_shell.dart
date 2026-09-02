@@ -310,7 +310,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ),
         ],
       ),
-      bottomNavigationBar: _MobileBottomNavigation(
+      bottomNavigationBar: MobileBottomNavigation(
         currentPath: widget.currentPath,
         userExperience: _userExperience,
         unreadNotifications: _unreadNotifications,
@@ -817,14 +817,15 @@ class _NotificationIconButton extends StatelessWidget {
   }
 }
 
-class _MobileBottomNavigation extends StatelessWidget {
+class MobileBottomNavigation extends StatelessWidget {
   final String currentPath;
   final UserExperience? userExperience;
   final int? unreadNotifications;
   final int? unreadChatMessages;
   final int? lateTasks;
 
-  const _MobileBottomNavigation({
+  const MobileBottomNavigation({
+    super.key,
     required this.currentPath,
     required this.userExperience,
     required this.unreadNotifications,
@@ -906,6 +907,48 @@ class _MobileBottomNavigation extends StatelessWidget {
         icon: Icons.history_edu_outlined,
         selectedIcon: Icons.history_edu_rounded,
         path: '/archives',
+      ),
+      _MobileDestination(
+        label: 'Présences',
+        icon: Icons.fact_check_outlined,
+        selectedIcon: Icons.fact_check_rounded,
+        path: '/attendance',
+      ),
+      _MobileDestination(
+        label: 'Pôles',
+        icon: Icons.hub_outlined,
+        selectedIcon: Icons.hub_rounded,
+        path: '/poles',
+      ),
+      _MobileDestination(
+        label: 'Projets',
+        icon: Icons.rocket_launch_outlined,
+        selectedIcon: Icons.rocket_launch_rounded,
+        path: '/projects',
+      ),
+      _MobileDestination(
+        label: 'Événements',
+        icon: Icons.event_outlined,
+        selectedIcon: Icons.event_rounded,
+        path: '/events',
+      ),
+      _MobileDestination(
+        label: 'Finance',
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments_rounded,
+        path: '/finance',
+      ),
+      _MobileDestination(
+        label: 'Alumni',
+        icon: Icons.school_outlined,
+        selectedIcon: Icons.school_rounded,
+        path: '/alumni',
+      ),
+      _MobileDestination(
+        label: 'Recrutement',
+        icon: Icons.how_to_reg_outlined,
+        selectedIcon: Icons.how_to_reg_rounded,
+        path: '/recruitment',
       ),
     ];
     final allowedDestinations = preferred

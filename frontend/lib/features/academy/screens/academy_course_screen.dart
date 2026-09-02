@@ -3,13 +3,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/user_experience.dart';
 import '../models/academy_models.dart';
 import '../services/academy_gateway.dart';
 
 class AcademyCourseScreen extends StatefulWidget {
   final String courseId;
   final AcademyGateway? gateway;
-  const AcademyCourseScreen({super.key, required this.courseId, this.gateway});
+  final UserExperience? currentUser;
+  const AcademyCourseScreen({
+    super.key,
+    required this.courseId,
+    this.gateway,
+    this.currentUser,
+  });
   @override
   State<AcademyCourseScreen> createState() => _AcademyCourseScreenState();
 }
@@ -17,6 +25,7 @@ class AcademyCourseScreen extends StatefulWidget {
 class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
   late final AcademyGateway gateway;
   AcademyCourseModel? course;
+  UserExperience? currentUser;
   String? error;
   bool loading = true;
   String? busy;
@@ -24,7 +33,20 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
   void initState() {
     super.initState();
     gateway = widget.gateway ?? ApiAcademyGateway();
+    currentUser = widget.currentUser;
+    if (currentUser == null) _loadCachedUser();
     load();
+  }
+
+  Future<void> _loadCachedUser() async {
+    try {
+      final cached = await AuthService.readCachedCurrentUser();
+      if (cached != null && mounted) {
+        setState(() => currentUser = UserExperience.fromJson(cached));
+      }
+    } catch (_) {
+      // Le contenu du cours reste accessible sans permission d’administration.
+    }
   }
 
   Future<void> load() async {
@@ -119,36 +141,9 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        Chip(label: Text(c.levelLabel)),
-                        Chip(label: Text(c.category)),
-                        if (c.isRequired)
-                          const Chip(label: Text('Obligatoire')),
-                      ],
-                    ),
-                    Text(
-                      c.title,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w900),
-                    ),
-                    Text(c.description),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => context.go('/academy/admin'),
-                icon: const Icon(Icons.admin_panel_settings_rounded),
-                label: const Text('Gestion Academy'),
-              ),
-            ],
+          _CourseHeader(
+            course: c,
+            canManage: currentUser?.canManageAcademy == true,
           ),
           const SizedBox(height: 16),
           Card(
@@ -161,12 +156,9 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
                   _D('Durée', '${c.durationMinutes} min'),
                   _D('Points', '${c.points}'),
                   _D('Progression', '${(c.progress * 100).round()} %'),
-                  _D(
-                    'Rôles cibles',
-                    c.targetRoles.isEmpty ? 'Tous' : c.targetRoles.join(', '),
-                  ),
-                  _D('Pôle', c.poleId ?? 'Tous'),
-                  _D('Projet', c.projectId ?? 'Tous'),
+                  _D('Rôles cibles', c.targetRolesLabel),
+                  _D('Pôle', c.poleId == null ? 'Tous' : 'Pôle associé'),
+                  _D('Projet', c.projectId == null ? 'Tous' : 'Projet associé'),
                 ],
               ),
             ),
@@ -219,6 +211,67 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CourseHeader extends StatelessWidget {
+  final AcademyCourseModel course;
+  final bool canManage;
+
+  const _CourseHeader({required this.course, required this.canManage});
+
+  @override
+  Widget build(BuildContext context) {
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Chip(label: Text(course.levelLabel)),
+            Chip(label: Text(course.categoryLabel)),
+            if (course.isRequired) const Chip(label: Text('Obligatoire')),
+          ],
+        ),
+        Text(
+          course.title,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        Text(course.description),
+      ],
+    );
+    final action = OutlinedButton.icon(
+      onPressed: () => context.go('/academy/admin'),
+      icon: const Icon(Icons.admin_panel_settings_rounded),
+      label: const Text('Gestion Academy'),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stack =
+            constraints.maxWidth < 700 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              details,
+              if (canManage) ...[const SizedBox(height: 12), action],
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: details),
+            if (canManage) ...[const SizedBox(width: 16), action],
+          ],
+        );
+      },
     );
   }
 }
@@ -363,7 +416,7 @@ class _AcademyAdminScreenState extends State<AcademyAdminScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text(
-                  '${c.levelLabel} · ${c.category} · ${c.isPublished ? 'Publié' : 'Non publié'}',
+                  '${c.levelLabel} · ${c.categoryLabel} · ${c.isPublished ? 'Publié' : 'Non publié'}',
                 ),
                 trailing: PopupMenuButton<String>(
                   onSelected: (v) => action(c, v),

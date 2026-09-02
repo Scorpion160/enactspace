@@ -2595,6 +2595,7 @@ class _MessageComposer extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: onClearReply,
+                    tooltip: 'Annuler la réponse',
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
@@ -3291,6 +3292,7 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
                   onPressed: _loadContacts,
+                  tooltip: 'Rechercher des membres',
                   icon: const Icon(Icons.arrow_forward_rounded),
                 ),
               ),
@@ -4076,6 +4078,7 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: IconButton(
                     onPressed: _loadContacts,
+                    tooltip: 'Rechercher des membres',
                     icon: const Icon(Icons.arrow_forward_rounded),
                   ),
                 ),

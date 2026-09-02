@@ -128,7 +128,7 @@ class PostsService {
       return PostUploadedMediaModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide lors de l upload du media.');
+    throw Exception('Réponse invalide lors de l’upload du média.');
   }
 
   Future<List<PostCommentModel>> getComments(String postId) async {

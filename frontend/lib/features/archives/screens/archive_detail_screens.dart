@@ -488,7 +488,7 @@ class _HallOfFameDetailScreenState extends State<HallOfFameDetailScreen> {
       padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 30),
       children: [
         Text(
-          '${entry.year ?? 'Année non renseignée'} · ${entry.entryType}',
+          '${entry.year ?? 'Année non renseignée'} · ${entry.entryTypeLabel}',
           style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: 8),

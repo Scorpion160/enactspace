@@ -285,7 +285,10 @@ class _SummaryGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = constraints.maxWidth >= 1040
+        final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        final count = largeText
+            ? 1
+            : constraints.maxWidth >= 1040
             ? 4
             : constraints.maxWidth >= 700
             ? 3
@@ -338,6 +341,17 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    if (largeText) {
+      return AppMetric(
+        label: data.title,
+        value: data.value,
+        detail: data.subtitle,
+        icon: data.icon,
+        tone: data.danger ? AppStatusTone.warning : AppStatusTone.neutral,
+        onTap: () => context.go(data.route),
+      );
+    }
     return SizedBox(
       height: compact ? 180 : 166,
       child: AppMetric(
@@ -497,7 +511,10 @@ class _QuickActionsPanel extends StatelessWidget {
       title: 'Actions rapides',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final count = constraints.maxWidth >= 820
+          final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+          final count = largeText
+              ? 1
+              : constraints.maxWidth >= 820
               ? 4
               : constraints.maxWidth >= 560
               ? 2
@@ -510,7 +527,7 @@ class _QuickActionsPanel extends StatelessWidget {
               crossAxisCount: count,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              mainAxisExtent: 84,
+              mainAxisExtent: largeText ? 136 : 84,
             ),
             itemBuilder: (context, index) {
               return _QuickActionTile(action: actions[index]);

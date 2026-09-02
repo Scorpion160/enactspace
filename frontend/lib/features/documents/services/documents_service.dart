@@ -222,7 +222,7 @@ class DocumentsService {
     required String visibility,
   }) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final request = http.MultipartRequest(
       'POST',
@@ -251,7 +251,7 @@ class DocumentsService {
       if (body is Map<String, dynamic>) {
         return DocumentUploadedFileModel.fromJson(body);
       }
-      throw Exception('Reponse invalide lors de l upload du fichier.');
+      throw Exception('Réponse invalide lors de l’upload du fichier.');
     }
 
     if (body is Map<String, dynamic> && body['detail'] != null) {
@@ -302,7 +302,7 @@ class DocumentsService {
       throw ArgumentError('Le motif du rejet est obligatoire.');
     }
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecte.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.postJson(
       '/documents/$documentId/reject',
@@ -314,7 +314,7 @@ class DocumentsService {
       return DocumentModel.fromJson(response);
     }
 
-    throw Exception('Reponse invalide lors du rejet du document.');
+    throw Exception('Réponse invalide lors du rejet du document.');
   }
 
   Future<DocumentModel> _postAction(String documentId, String action) async {

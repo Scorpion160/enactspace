@@ -323,6 +323,9 @@ class _LoginPanel extends StatelessWidget {
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: onTogglePassword,
+                            tooltip: obscurePassword
+                                ? 'Afficher le mot de passe'
+                                : 'Masquer le mot de passe',
                             icon: Icon(
                               obscurePassword
                                   ? Icons.visibility_outlined
@@ -689,6 +692,9 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
+                      tooltip: _obscurePassword
+                          ? 'Afficher le mot de passe'
+                          : 'Masquer le mot de passe',
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_outlined
@@ -1046,6 +1052,9 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                               () => _obscurePassword = !_obscurePassword,
                             );
                           },
+                          tooltip: _obscurePassword
+                              ? 'Afficher le mot de passe'
+                              : 'Masquer le mot de passe',
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_outlined

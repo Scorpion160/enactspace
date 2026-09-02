@@ -1,3 +1,25 @@
+String academyCategoryLabel(String value) => switch (value.toLowerCase()) {
+  'culture_enactus' => 'Culture Enactus',
+  'impact' => 'Impact',
+  'business_principles' => 'Principes entrepreneuriaux',
+  'competition' => 'Compétition',
+  'leadership' => 'Leadership',
+  _ => value.replaceAll('_', ' '),
+};
+
+String academyRoleLabel(String value) => switch (value.toLowerCase()) {
+  'admin' || 'administrateur' => 'Administrateur',
+  'team_leader' => 'Team Leader',
+  'secretaire_generale' || 'secretaire_general' => 'Secrétariat général',
+  'chef_pole' || 'chef_de_pole' => 'Chef de pôle',
+  'adjoint_chef_pole' || 'adjoint_chef_de_pole' => 'Adjoint chef de pôle',
+  'chef_projet' || 'chef_de_projet' => 'Chef de projet',
+  'adjoint_chef_projet' || 'adjoint_chef_de_projet' => 'Adjoint chef de projet',
+  'enacteur' => 'Enacteur/Enactrice',
+  'alumni' => 'Alumni',
+  _ => value.replaceAll('_', ' '),
+};
+
 class AcademyCourseModel {
   final String id;
   final String title;
@@ -49,6 +71,11 @@ class AcademyCourseModel {
     'responsable' => 'Responsable',
     _ => level,
   };
+
+  String get categoryLabel => academyCategoryLabel(category);
+  String get targetRolesLabel => targetRoles.isEmpty
+      ? 'Tous'
+      : targetRoles.map(academyRoleLabel).join(', ');
 }
 
 class AcademyLessonModel {
