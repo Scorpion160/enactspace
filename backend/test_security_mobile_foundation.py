@@ -21,6 +21,7 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
         APP_DEBUG=False,
         DATABASE_URL="sqlite:///security-foundation-test.db",
         SECRET_KEY="unit-test-secret-not-for-production",
+        REFRESH_TOKEN_HMAC_KEY="unit-test-refresh-hmac-key-distinct",
         ENABLE_SEED=enable_seed,
         ATTENDANCE_QR_ENABLED=False,
         ATTENDANCE_NFC_ENABLED=False,
@@ -28,6 +29,24 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
 
 
 class SeedRouteSecurityTests(unittest.TestCase):
+    def test_production_requires_dedicated_refresh_hmac_key(self):
+        common = {
+            "_env_file": None,
+            "APP_ENV": "production",
+            "APP_DEBUG": False,
+            "DATABASE_URL": "sqlite:///security-foundation-test.db",
+            "SECRET_KEY": "unit-test-secret-not-for-production",
+            "ATTENDANCE_QR_ENABLED": False,
+            "ATTENDANCE_NFC_ENABLED": False,
+        }
+        with self.assertRaises(ValueError):
+            Settings(**common)
+        with self.assertRaises(ValueError):
+            Settings(
+                **common,
+                REFRESH_TOKEN_HMAC_KEY=common["SECRET_KEY"],
+            )
+
     def test_production_never_registers_seed_routes(self):
         app = FastAPI()
         registered = register_seed_routes(

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Iterable
 
 from fastapi import Depends, HTTPException, status
@@ -6,7 +7,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token_payload
+from app.models.account import AuthSession
 from app.core.roles import (
     ENACCHEF_ROLES,
     FINANCE_MANAGEMENT_ROLES,
@@ -28,7 +30,8 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    user_id = decode_access_token(token)
+    payload = decode_access_token_payload(token)
+    user_id = payload.get("sub") if payload else None
 
     if not user_id:
         raise HTTPException(
@@ -49,6 +52,22 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Compte désactivé",
         )
+
+    session_id = payload.get("sid") if payload else None
+    if session_id:
+        auth_session = db.query(AuthSession).filter(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user.id,
+        ).first()
+        if (
+            auth_session is None
+            or auth_session.revoked_at is not None
+            or auth_session.expires_at <= datetime.utcnow()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session révoquée ou expirée",
+            )
 
     return user
 

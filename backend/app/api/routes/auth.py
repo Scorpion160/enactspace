@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,8 @@ from app.models.user import User, PasswordResetOtp
 from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
+    RefreshTokenRequest,
+    AuthSessionRead,
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordResetRequestRead,
@@ -20,7 +22,14 @@ from app.schemas.auth import (
 from app.core.security import (
     verify_password,
     hash_password,
-    create_access_token,
+)
+from app.api.deps import get_current_active_validated_user
+from app.models.account import AuthSession
+from app.services.audit_service import create_audit_log
+from app.services.session_service import (
+    create_session_tokens,
+    revoke_user_sessions,
+    rotate_refresh_token,
 )
 
 
@@ -118,16 +127,26 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = authenticate_user(
         email=payload.email,
         password=payload.password,
         db=db,
     )
 
-    token = create_access_token(str(user.id))
-
-    return TokenResponse(access_token=token)
+    _, access_token, refresh_token = create_session_tokens(
+        db,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        platform=payload.platform,
+    )
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
 
 
 @router.post("/join-requests", response_model=JoinRequestRead)
@@ -276,6 +295,16 @@ def confirm_password_reset(
         )
 
     user.password_hash = hash_password(new_password)
+    revoked_count = revoke_user_sessions(db, user.id)
+    if revoked_count:
+        create_audit_log(
+            db,
+            action="session_revoked",
+            user_id=user.id,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={"reason": "password_reset", "count": revoked_count},
+        )
     db.delete(reset_otp)
     user.updated_at = datetime.utcnow()
     db.commit()
@@ -285,6 +314,7 @@ def confirm_password_reset(
 
 @router.post("/token", response_model=TokenResponse)
 def login_for_swagger(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -294,6 +324,75 @@ def login_for_swagger(
         db=db,
     )
 
-    token = create_access_token(str(user.id))
+    _, access_token, refresh_token = create_session_tokens(
+        db,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        platform="api",
+    )
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
 
-    return TokenResponse(access_token=token)
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+    _, access_token, refresh_token = rotate_refresh_token(db, payload.refresh_token)
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
+
+
+@router.get("/sessions", response_model=list[AuthSessionRead])
+def list_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    return db.query(AuthSession).filter(
+        AuthSession.user_id == current_user.id,
+        AuthSession.revoked_at.is_(None),
+    ).order_by(AuthSession.created_at.desc()).all()
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def revoke_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    auth_session = db.query(AuthSession).filter(
+        AuthSession.id == session_id,
+        AuthSession.user_id == current_user.id,
+    ).first()
+    if auth_session is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    if auth_session.revoked_at is None:
+        auth_session.revoked_at = datetime.utcnow()
+        create_audit_log(
+            db, "session_revoked", current_user.id,
+            "auth_session", auth_session.id,
+        )
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/logout-all")
+def logout_all(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    revoked_count = revoke_user_sessions(db, current_user.id)
+    create_audit_log(
+        db, "logout_all", current_user.id, "user", current_user.id,
+        new_value={"revoked_sessions": revoked_count},
+    )
+    db.commit()
+    return {"ok": True, "revoked_sessions": revoked_count}

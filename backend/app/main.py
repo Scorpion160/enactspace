@@ -35,6 +35,8 @@ from app.api.routes import (
     seed,
     system,
     realtime,
+    account,
+    legal,
 )
 
 
@@ -110,6 +112,9 @@ def health():
 
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(account.router, prefix="/api")
+app.include_router(account.admin_router, prefix="/api")
+app.include_router(legal.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(poles.router, prefix="/api")

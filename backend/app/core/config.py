@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     JWT_SECRET_KEY: str | None = None
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_TOKEN_HMAC_KEY: str | None = None
 
     CORS_ORIGINS: str = ""
     PUBLIC_API_BASE_URL: str | None = None
@@ -88,6 +90,13 @@ class Settings(BaseSettings):
             raise ValueError("PAYMENT_TRANSACTION_TTL_MINUTES must be positive")
         if self.PAYDUNYA_TIMEOUT_SECONDS < 1:
             raise ValueError("PAYDUNYA_TIMEOUT_SECONDS must be positive")
+        if self.REFRESH_TOKEN_EXPIRE_DAYS < 1:
+            raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS must be positive")
+        if self.APP_ENV == "production":
+            if not self.REFRESH_TOKEN_HMAC_KEY:
+                raise ValueError("REFRESH_TOKEN_HMAC_KEY is required in production")
+            if self.REFRESH_TOKEN_HMAC_KEY == self.signing_secret:
+                raise ValueError("REFRESH_TOKEN_HMAC_KEY must differ from JWT secret")
         if self.PAYDUNYA_MODE not in {"test", "live"}:
             raise ValueError("PAYDUNYA_MODE must be test or live")
         if self.MOBILE_MONEY_PROVIDER not in {
@@ -154,6 +163,10 @@ class Settings(BaseSettings):
     @property
     def signing_secret(self) -> str:
         return self.JWT_SECRET_KEY or self.SECRET_KEY
+
+    @property
+    def refresh_token_hmac_key(self) -> str:
+        return self.REFRESH_TOKEN_HMAC_KEY or self.signing_secret
 
     @property
     def attendance_qr_secret(self) -> str:
