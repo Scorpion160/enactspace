@@ -40,3 +40,15 @@ build/
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
+
+# Enactus knowledge - generated/local analysis artifacts
+# Normalized document contents may reproduce internal source material and
+# must remain local unless explicitly reviewed and approved.
+docs/enactus_knowledge/normalized/by_sha/
+
+# Generated normalization / privacy review reports
+docs/enactus_knowledge/catalog/duplicates_exact.csv
+docs/enactus_knowledge/catalog/extraction_failures.csv
+docs/enactus_knowledge/catalog/normalization_report.csv
+docs/enactus_knowledge/catalog/privacy_review_candidates.csv
+docs/enactus_knowledge/catalog/source_to_normalized.csv
