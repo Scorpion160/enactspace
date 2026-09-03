@@ -28,8 +28,11 @@ from app.models.account import AuthSession
 from app.services.audit_service import create_audit_log
 from app.services.session_service import (
     create_session_tokens,
+    revoke_current_session,
     revoke_user_sessions,
     rotate_refresh_token,
+    session_seconds_remaining,
+    utc_now,
 )
 
 
@@ -64,7 +67,13 @@ def normalize_login_email(email: str) -> str:
 
 def authenticate_user(email: str, password: str, db: Session) -> User:
     normalized_email = normalize_login_email(email)
-    user = db.query(User).filter(User.email == normalized_email).first()
+    user = (
+        db.query(User)
+        .filter(User.email == normalized_email)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if not user:
         raise HTTPException(
@@ -341,14 +350,28 @@ def login_for_swagger(
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
-    _, access_token, refresh_token = rotate_refresh_token(db, payload.refresh_token)
+    auth_session, access_token, refresh_token = rotate_refresh_token(db, payload.refresh_token)
+    remaining = session_seconds_remaining(auth_session)
     db.commit()
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        refresh_expires_in=remaining,
     )
+
+
+@router.post("/logout", status_code=204)
+def logout(payload: RefreshTokenRequest, request: Request, db: Session = Depends(get_db)):
+    authorization = request.headers.get("authorization", "")
+    access_token = authorization[7:] if authorization.lower().startswith("bearer ") else None
+    auth_session = revoke_current_session(db, payload.refresh_token, access_token=access_token)
+    if auth_session is not None:
+        create_audit_log(
+            db, "session_revoked", auth_session.user_id, "auth_session", auth_session.id,
+        )
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/sessions", response_model=list[AuthSessionRead])
@@ -359,6 +382,7 @@ def list_sessions(
     return db.query(AuthSession).filter(
         AuthSession.user_id == current_user.id,
         AuthSession.revoked_at.is_(None),
+        AuthSession.expires_at > utc_now(),
     ).order_by(AuthSession.created_at.desc()).all()
 
 
@@ -368,14 +392,16 @@ def revoke_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    # Match rotation's lock order before touching the session or its audit FK.
+    db.query(User.id).filter(User.id == current_user.id).with_for_update().first()
     auth_session = db.query(AuthSession).filter(
         AuthSession.id == session_id,
         AuthSession.user_id == current_user.id,
-    ).first()
+    ).populate_existing().with_for_update().first()
     if auth_session is None:
         raise HTTPException(status_code=404, detail="Session introuvable")
     if auth_session.revoked_at is None:
-        auth_session.revoked_at = datetime.utcnow()
+        auth_session.revoked_at = utc_now()
         create_audit_log(
             db, "session_revoked", current_user.id,
             "auth_session", auth_session.id,

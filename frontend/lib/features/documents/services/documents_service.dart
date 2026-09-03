@@ -1,7 +1,4 @@
-import 'dart:convert';
 import 'dart:typed_data';
-
-import 'package:http/http.dart' as http;
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
@@ -224,40 +221,21 @@ class DocumentsService {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
 
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiClient.baseUrl}/files/upload'),
+    final body = await _apiClient.postMultipart(
+      '/files/upload',
+      token: token,
+      bytes: bytes,
+      fileName: fileName,
+      fields: {
+        'storage_scope': 'document',
+        'visibility': visibility,
+        'is_temporary': 'true',
+      },
     );
-    request.headers.addAll({
-      'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
-    });
-    request.fields.addAll({
-      'storage_scope': 'document',
-      'visibility': visibility,
-      'is_temporary': 'true',
-    });
-    request.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
-    );
-
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-    final dynamic body = response.body.isNotEmpty
-        ? jsonDecode(response.body)
-        : {};
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (body is Map<String, dynamic>) {
-        return DocumentUploadedFileModel.fromJson(body);
-      }
-      throw Exception('Réponse invalide lors de l’upload du fichier.');
+    if (body is Map<String, dynamic>) {
+      return DocumentUploadedFileModel.fromJson(body);
     }
-
-    if (body is Map<String, dynamic> && body['detail'] != null) {
-      throw Exception(body['detail'].toString());
-    }
-    throw Exception('Erreur serveur ${response.statusCode}');
+    throw Exception('Réponse invalide lors de l’upload du fichier.');
   }
 
   Future<DocumentModel> validateDocument(String documentId) async {

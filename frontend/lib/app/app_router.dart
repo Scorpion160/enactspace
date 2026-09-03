@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
+import '../core/auth/auth_storage.dart';
 import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
 import '../features/academy/screens/academy_course_screen.dart';
@@ -51,6 +52,7 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    refreshListenable: AuthStorage.instance.sessionChanges,
     errorBuilder: (context, state) => const _RouteNotFoundScreen(),
     redirect: (context, state) async {
       final loggedIn = await _authService.isLoggedIn();

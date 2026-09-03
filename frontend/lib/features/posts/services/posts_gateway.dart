@@ -203,14 +203,10 @@ class ApiPostsGateway implements PostsGateway {
     final absoluteUrl = url.startsWith('http://') || url.startsWith('https://')
         ? url
         : '${ApiClient.serverUrl}$url';
-    final response = await _httpClient.get(
-      Uri.parse(absoluteUrl),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Média indisponible (${response.statusCode}).');
-    }
-    return response.bodyBytes;
+    final bytes = await ApiClient(
+      client: _httpClient,
+    ).getBytes(absoluteUrl, token: token);
+    return Uint8List.fromList(bytes);
   }
 
   @override

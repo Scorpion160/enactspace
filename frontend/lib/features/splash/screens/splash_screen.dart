@@ -16,6 +16,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   final AuthService _authService = AuthService();
+  bool _retry = false;
 
   @override
   void initState() {
@@ -24,10 +25,17 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _continue() async {
-    await Future<void>.delayed(const Duration(milliseconds: 850));
-    final loggedIn = await _authService.isLoggedIn();
     if (!mounted) return;
-    context.go(loggedIn ? '/dashboard' : '/login');
+    setState(() => _retry = false);
+    await Future<void>.delayed(const Duration(milliseconds: 850));
+    if (!mounted) return;
+    try {
+      final loggedIn = await _authService.restoreSession();
+      if (!mounted) return;
+      context.go(loggedIn ? '/dashboard' : '/login');
+    } catch (_) {
+      if (mounted) setState(() => _retry = true);
+    }
   }
 
   @override
@@ -64,11 +72,21 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const SizedBox(
-                    width: 34,
-                    height: 34,
-                    child: CircularProgressIndicator(strokeWidth: 3),
-                  ),
+                  if (_retry) ...[
+                    const Text(
+                      'Connexion temporairement indisponible. Votre session est conservée.',
+                      textAlign: TextAlign.center,
+                    ),
+                    TextButton(
+                      onPressed: _continue,
+                      child: const Text('Réessayer'),
+                    ),
+                  ] else
+                    const SizedBox(
+                      width: 34,
+                      height: 34,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
                 ],
               ),
             ),

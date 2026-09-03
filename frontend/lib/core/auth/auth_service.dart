@@ -4,19 +4,21 @@ import '../api/api_client.dart';
 import 'auth_storage.dart';
 
 class AuthService {
-  static final AuthStorage _defaultStorage = AuthStorage();
+  static final AuthStorage _defaultStorage = AuthStorage.instance;
 
   final ApiClient _apiClient;
   final AuthStorage _authStorage;
 
   AuthService({ApiClient? apiClient, AuthStorage? authStorage})
-    : _apiClient = apiClient ?? ApiClient(),
-      _authStorage = authStorage ?? _defaultStorage;
+    : _apiClient =
+          apiClient ?? ApiClient(authStorage: authStorage ?? _defaultStorage),
+      _authStorage = authStorage ?? apiClient?.authStorage ?? _defaultStorage;
 
   Future<String> login({
     required String email,
     required String password,
   }) async {
+    final generation = _authStorage.generation;
     final data = await _apiClient.postForm(
       '/auth/token',
       data: {'username': email, 'password': password},
@@ -28,10 +30,18 @@ class AuthService {
       throw Exception('Token non reçu depuis le serveur.');
     }
 
-    await _authStorage.writeAccessToken(token.toString());
+    await _authStorage.writeTokenPair(
+      AuthTokens(
+        accessToken: token.toString(),
+        refreshToken: data['refresh_token'] as String?,
+      ),
+      expectedGeneration: generation,
+    );
 
     try {
       await getCurrentUser();
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
     } catch (_) {
       // The token is enough to enter the app; navigation can refresh the
       // profile again once the shell is mounted.
@@ -118,24 +128,44 @@ class AuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    final token = await getToken();
-    return token != null && token.isNotEmpty;
+    final pair = await _authStorage.readTokenPair();
+    return pair != null &&
+        (pair.accessToken.isNotEmpty ||
+            (pair.refreshToken?.isNotEmpty ?? false));
+  }
+
+  Future<bool> restoreSession() async {
+    if (!await isLoggedIn()) return false;
+    try {
+      await getCurrentUser();
+      return true;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) return false;
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getCurrentUser() async {
-    final token = await getToken();
-
-    if (token == null) {
-      throw Exception('Utilisateur non connecté.');
-    }
-
+    final generation = _authStorage.generation;
     try {
+      final token =
+          await getToken() ??
+          await _apiClient.refreshSession(expectedGeneration: generation);
       final user = await _apiClient.get('/users/me', token: token);
-      await _authStorage.writeCurrentUser(jsonEncode(user));
+      if (generation != _authStorage.generation) {
+        throw ApiException(
+          statusCode: 401,
+          message: 'Session expirée. Reconnectez-vous.',
+        );
+      }
+      await _authStorage.writeCurrentUser(
+        jsonEncode(user),
+        expectedGeneration: generation,
+      );
       return user;
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 403) {
-        await logout();
+        await _authStorage.clearAuthSecrets(expectedGeneration: generation);
       }
       rethrow;
     }
@@ -169,5 +199,7 @@ class AuthService {
     }
   }
 
-  Future<void> logout() => _authStorage.clearAuthSecrets();
+  Future<void> logout() => _apiClient.logoutSession();
+
+  Future<void> logoutAll() => _apiClient.logoutSession(all: true);
 }

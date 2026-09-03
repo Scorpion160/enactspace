@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -31,6 +32,7 @@ def create_access_token(
     payload = {
         "sub": subject,
         "exp": expire,
+        "jti": secrets.token_urlsafe(16),
     }
     if session_id:
         payload["sid"] = session_id

@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/attendance_nfc_model.dart';
@@ -199,16 +195,7 @@ class AttendanceService {
     }
 
     final query = month == null ? '' : '?month=$month';
-    final response = await http.get(
-      Uri.parse('${ApiClient.baseUrl}/attendance/monthly-export$query'),
-      headers: {'Accept': 'text/csv', 'Authorization': 'Bearer $token'},
-    );
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return utf8.decode(response.bodyBytes);
-    }
-
-    throw Exception('Export impossible (${response.statusCode}).');
+    return _apiClient.getText('/attendance/monthly-export$query', token: token);
   }
 
   Future<void> addExpectedMember({

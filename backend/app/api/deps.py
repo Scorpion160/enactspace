@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Iterable
 
 from fastapi import Depends, HTTPException, status
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.security import decode_access_token_payload
 from app.models.account import AuthSession
+from app.services.session_service import session_seconds_remaining
 from app.core.roles import (
     ENACCHEF_ROLES,
     FINANCE_MANAGEMENT_ROLES,
@@ -62,7 +62,7 @@ def get_current_user(
         if (
             auth_session is None
             or auth_session.revoked_at is not None
-            or auth_session.expires_at <= datetime.utcnow()
+            or session_seconds_remaining(auth_session) <= 0
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

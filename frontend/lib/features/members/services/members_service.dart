@@ -1,5 +1,3 @@
-import 'package:http/http.dart' as http;
-
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/member_import_model.dart';
@@ -216,16 +214,7 @@ class MembersService {
       throw Exception('Utilisateur non connecté.');
     }
 
-    final response = await http.get(
-      Uri.parse('${ApiClient.baseUrl}/members/import/template'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return response.body;
-    }
-
-    throw Exception('Impossible de charger le modèle CSV.');
+    return _apiClient.getText('/members/import/template', token: token);
   }
 
   Future<MemberImportReport> previewImport({
@@ -265,21 +254,12 @@ class MembersService {
       throw Exception('Utilisateur non connecté.');
     }
 
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse(
-        '${ApiClient.baseUrl}/members/import/$action'
-        '?update_existing=$updateExisting',
-      ),
+    final decoded = await _apiClient.postMultipart(
+      '/members/import/$action?update_existing=$updateExisting',
+      token: token,
+      bytes: bytes,
+      fileName: fileName,
     );
-    request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
-    );
-
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    final decoded = _apiClient.decodeResponse(response);
     if (decoded is Map<String, dynamic>) {
       return MemberImportReport.fromJson(decoded);
     }

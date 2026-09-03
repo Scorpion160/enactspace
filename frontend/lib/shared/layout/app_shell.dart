@@ -247,7 +247,46 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _logout(BuildContext context) async {
-    await _authService.logout();
+    final all = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Déconnecter cet appareil ou tous vos appareils ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cet appareil'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tous les appareils'),
+          ),
+        ],
+      ),
+    );
+    if (all == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (all) {
+        await _authService.logoutAll();
+      } else {
+        await _authService.logout();
+      }
+    } catch (_) {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Déconnexion serveur non confirmée. Vérifiez votre connexion avant de réessayer.',
+            ),
+          ),
+        );
+      }
+    }
 
     if (!context.mounted) return;
     context.go('/login');
