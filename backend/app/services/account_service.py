@@ -172,9 +172,9 @@ def build_user_data_export(db: Session, user: User, app_version: str) -> dict:
                 "badges": _rows(db.query(UserBadge).filter(UserBadge.user_id == user_id).all(), ("id", "badge_id", "season_id", "awarded_at")),
             },
             "impact_created": {
-                "projects": _rows(impact_projects, ("id", "project_id", "season_id", "title", "summary", "status", "created_at", "updated_at")),
-                "metrics": _rows(impact_metrics, ("id", "impact_project_id", "title", "category", "unit", "value", "source", "status", "created_at", "updated_at")),
-                "evidence": _rows(impact_evidence, ("id", "impact_project_id", "metric_id", "title", "description", "category", "status", "created_at", "updated_at")),
+                "projects": _rows(impact_projects, ("id", "project_id", "season_id", "title", "summary", "validation_status", "status", "created_at", "updated_at")),
+                "metrics": _rows(impact_metrics, ("id", "impact_project_id", "semantic_key", "title", "category", "unit", "value", "claim_type", "validation_status", "period_start", "period_end", "population_scope", "source", "source_reference", "methodology_note", "notes_limitations", "status", "created_at", "updated_at")),
+                "evidence": _rows(impact_evidence, ("id", "impact_project_id", "metric_id", "title", "description", "category", "validation_status", "status", "created_at", "updated_at")),
             },
             "recruitment_applications": _rows(
                 db.query(Application).filter(Application.email == user.email).all(),

@@ -313,7 +313,7 @@ class HistoricalImpactStatistic(Base):
     )
     metric_key: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     label: Mapped[str] = mapped_column(String(220), nullable=False)
-    value: Mapped[float] = mapped_column(Numeric(18, 2), default=0)
+    value: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     unit: Mapped[str | None] = mapped_column(String(80), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_label: Mapped[str | None] = mapped_column(String(180), nullable=True)
@@ -322,7 +322,7 @@ class HistoricalImpactStatistic(Base):
         ForeignKey("stored_files.id"),
         nullable=True,
     )
-    status: Mapped[str] = mapped_column(String(50), default="validated")
+    status: Mapped[str] = mapped_column(String(50), default="draft")
     is_featured: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),

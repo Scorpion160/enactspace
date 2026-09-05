@@ -106,31 +106,6 @@ VALID_ARCHIVE_CATEGORIES = {
 }
 
 
-DEFAULT_HISTORICAL_IMPACT_SUMMARY = {
-    "created_projects": 5,
-    "developing_projects": 4,
-    "developed_products": 14,
-    "touched_sdgs": 11,
-    "created_jobs": 227,
-    "saved_lives": 206,
-    "planted_trees": 1425,
-    "cumulative_fcfa_gains": 27468761.10,
-    "impacted_lives": 15900,
-}
-
-HISTORICAL_STAT_LABELS = {
-    "created_projects": ("Projets créés", "projets"),
-    "developing_projects": ("Projets en développement", "projets"),
-    "developed_products": ("Produits développés", "produits"),
-    "touched_sdgs": ("ODD touchés", "ODD"),
-    "created_jobs": ("Emplois créés", "emplois"),
-    "saved_lives": ("Vies sauvées", "vies"),
-    "planted_trees": ("Arbres plantés", "arbres"),
-    "cumulative_fcfa_gains": ("Gains cumulés", "FCFA"),
-    "impacted_lives": ("Vies impactées", "vies"),
-}
-
-
 INITIAL_HISTORICAL_PROJECTS = [
     {
         "id": "sukhalii-gokh",
@@ -597,8 +572,24 @@ def _hall_of_fame_payload(db: Session, entry: HallOfFameEntry) -> dict:
     return data
 
 
+def _historical_statistic_has_provenance(
+    statistic: HistoricalImpactStatistic,
+) -> bool:
+    return bool(
+        statistic.source_file_id is not None
+        or (statistic.source_label or "").strip()
+    )
+
+
 def _historical_statistic_payload(statistic: HistoricalImpactStatistic) -> dict:
-    return HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
+    data = HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
+    provenance_ready = _historical_statistic_has_provenance(statistic)
+    data["provenance_ready"] = provenance_ready
+    if data["status"] == "validated" and not provenance_ready:
+        data["status"] = "submitted"
+        data["validated_by_id"] = None
+        data["validated_at"] = None
+    return data
 
 
 def _archive_item_payload(item: ArchiveItem) -> dict:
@@ -1772,14 +1763,19 @@ def get_historical_impact_summary(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
-    summary = dict(DEFAULT_HISTORICAL_IMPACT_SUMMARY)
+    summary = {}
     statistics = (
         db.query(HistoricalImpactStatistic)
         .filter(HistoricalImpactStatistic.status == "validated")
         .all()
     )
+    statistics = [
+        statistic
+        for statistic in statistics
+        if _historical_statistic_has_provenance(statistic)
+    ]
     for statistic in statistics:
-        summary[statistic.metric_key] = float(statistic.value or 0)
+        summary[statistic.metric_key] = float(statistic.value)
     summary["statistics"] = [
         _historical_statistic_payload(statistic) for statistic in statistics
     ]
@@ -1801,28 +1797,9 @@ def list_historical_impact_statistics(
         )
         .all()
     }
-    if include_defaults:
-        for key, value in DEFAULT_HISTORICAL_IMPACT_SUMMARY.items():
-            if key in db_statistics:
-                continue
-            label, unit = HISTORICAL_STAT_LABELS.get(key, (key, None))
-            db_statistics[key] = {
-                "id": key,
-                "metric_key": key,
-                "label": label,
-                "value": value,
-                "unit": unit,
-                "description": "Chiffre historique à confirmer avec les sources disponibles.",
-                "source_label": "Présentation Enactus ESP",
-                "source_file_id": None,
-                "status": "validated",
-                "is_featured": True,
-                "updated_by_id": None,
-                "validated_by_id": None,
-                "validated_at": None,
-                "created_at": None,
-                "updated_at": None,
-            }
+    # Kept as a compatible query parameter; anonymous default figures are no
+    # longer emitted. Historical statistics must be explicitly persisted.
+    _ = include_defaults
     return {"statistics": list(db_statistics.values())}
 
 
@@ -1836,6 +1813,13 @@ def create_historical_impact_statistic(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut de statistique historique invalide",
+        )
+    if payload.status == "validated" and not (
+        payload.source_file_id is not None or (payload.source_label or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une source est requise pour valider une statistique historique",
         )
     existing = (
         db.query(HistoricalImpactStatistic)
@@ -1892,6 +1876,20 @@ def update_historical_impact_statistic(
         )
     if "source_file_id" in data:
         _mark_file_as_archive(db, data["source_file_id"])
+    resulting_status = data.get("status", statistic.status)
+    resulting_source_file_id = data.get(
+        "source_file_id",
+        statistic.source_file_id,
+    )
+    resulting_source_label = data.get("source_label", statistic.source_label)
+    if resulting_status == "validated" and not (
+        resulting_source_file_id is not None
+        or (resulting_source_label or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une source est requise pour valider une statistique historique",
+        )
     for field, value in data.items():
         setattr(statistic, field, value)
     statistic.updated_by_id = current_user.id

@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ImpactProjectBase(BaseModel):
@@ -13,22 +13,23 @@ class ImpactProjectBase(BaseModel):
     problem_statement: Optional[str] = None
     solution_summary: Optional[str] = None
     target_population: Optional[str] = None
-    direct_beneficiaries: int = 0
-    indirect_beneficiaries: int = 0
-    reach: int = 0
-    jobs_created: int = 0
-    revenue_generated: float = 0
-    profit_or_surplus: float = 0
-    cost_savings: float = 0
-    lives_impacted: int = 0
-    trees_planted: int = 0
-    waste_reduced: float = 0
-    water_saved: float = 0
-    co2_reduced: float = 0
+    direct_beneficiaries: Optional[int] = None
+    indirect_beneficiaries: Optional[int] = None
+    reach: Optional[int] = None
+    jobs_created: Optional[int] = None
+    revenue_generated: Optional[float] = None
+    profit_or_surplus: Optional[float] = None
+    cost_savings: Optional[float] = None
+    lives_impacted: Optional[int] = None
+    trees_planted: Optional[int] = None
+    waste_reduced: Optional[float] = None
+    water_saved: Optional[float] = None
+    co2_reduced: Optional[float] = None
     sdgs: list[str] = Field(default_factory=list)
     evidence_notes: Optional[str] = None
     methodology: Optional[str] = None
     projection_next_12_months: Optional[str] = None
+    validation_status: str = "DRAFT"
     status: str = "draft"
 
 
@@ -60,6 +61,7 @@ class ImpactProjectUpdate(BaseModel):
     methodology: Optional[str] = None
     projection_next_12_months: Optional[str] = None
     status: Optional[str] = None
+    validation_status: Optional[str] = None
 
 
 class ImpactProjectRead(ImpactProjectBase):
@@ -76,14 +78,29 @@ class ImpactProjectRead(ImpactProjectBase):
 
 
 class ImpactMetricCreate(BaseModel):
+    semantic_key: str = Field(min_length=1, max_length=100)
     title: str
     category: str = "social"
     unit: str = "personnes"
-    value: float = 0
+    value: Optional[float] = None
+    claim_type: str = "HISTORICAL_CLAIM"
+    validation_status: str = "DRAFT"
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    population_scope: Optional[str] = None
     source: Optional[str] = None
+    source_reference: Optional[str] = None
     methodology_note: Optional[str] = None
+    notes_limitations: Optional[str] = None
     evidence_file_id: Optional[UUID] = None
+    supersedes_metric_id: Optional[UUID] = None
     status: str = "draft"
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            raise ValueError("period_end must be on or after period_start")
+        return self
 
 
 class ImpactMetricRead(ImpactMetricCreate):
@@ -106,6 +123,7 @@ class ImpactEvidenceCreate(BaseModel):
     category: str = "proof"
     metric_id: Optional[UUID] = None
     file_id: Optional[UUID] = None
+    validation_status: str = "EVIDENCE_ATTACHED"
     status: str = "submitted"
 
 

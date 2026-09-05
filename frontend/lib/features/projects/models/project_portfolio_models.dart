@@ -31,15 +31,15 @@ class ProjectTaskPresentation {
 class ProjectImpactSnapshot {
   final String projectId;
   final double? progress;
-  final int directBeneficiaries;
-  final int indirectBeneficiaries;
-  final int reach;
-  final int jobsCreated;
-  final int livesImpacted;
-  final int treesPlanted;
-  final double wasteReduced;
-  final double waterSaved;
-  final double co2Reduced;
+  final int? directBeneficiaries;
+  final int? indirectBeneficiaries;
+  final int? reach;
+  final int? jobsCreated;
+  final int? livesImpacted;
+  final int? treesPlanted;
+  final double? wasteReduced;
+  final double? waterSaved;
+  final double? co2Reduced;
   final List<String> sdgs;
   final String? methodology;
 
@@ -60,19 +60,19 @@ class ProjectImpactSnapshot {
   });
 
   factory ProjectImpactSnapshot.fromJson(Map<String, dynamic> json) {
-    double number(dynamic value) =>
-        double.tryParse(value?.toString() ?? '') ?? 0;
+    double? number(dynamic value) =>
+        value == null ? null : double.tryParse(value.toString());
     final rawProgress = double.tryParse(json['progress']?.toString() ?? '');
     final rawSdgs = json['sdgs'];
     return ProjectImpactSnapshot(
       projectId: json['id']?.toString() ?? '',
       progress: rawProgress?.clamp(0, 100),
-      directBeneficiaries: number(json['direct_impact']).round(),
-      indirectBeneficiaries: number(json['indirect_impact']).round(),
-      reach: number(json['reach']).round(),
-      jobsCreated: number(json['jobs_created']).round(),
-      livesImpacted: number(json['lives_impacted']).round(),
-      treesPlanted: number(json['trees_planted']).round(),
+      directBeneficiaries: number(json['direct_impact'])?.round(),
+      indirectBeneficiaries: number(json['indirect_impact'])?.round(),
+      reach: number(json['reach'])?.round(),
+      jobsCreated: number(json['jobs_created'])?.round(),
+      livesImpacted: number(json['lives_impacted'])?.round(),
+      treesPlanted: number(json['trees_planted'])?.round(),
       wasteReduced: number(json['waste_reduced']),
       waterSaved: number(json['water_saved']),
       co2Reduced: number(json['co2_reduced']),
@@ -85,15 +85,15 @@ class ProjectImpactSnapshot {
 
   bool get hasContractualData =>
       progress != null ||
-      directBeneficiaries > 0 ||
-      indirectBeneficiaries > 0 ||
-      reach > 0 ||
-      jobsCreated > 0 ||
-      livesImpacted > 0 ||
-      treesPlanted > 0 ||
-      wasteReduced > 0 ||
-      waterSaved > 0 ||
-      co2Reduced > 0 ||
+      directBeneficiaries != null ||
+      indirectBeneficiaries != null ||
+      reach != null ||
+      jobsCreated != null ||
+      livesImpacted != null ||
+      treesPlanted != null ||
+      wasteReduced != null ||
+      waterSaved != null ||
+      co2Reduced != null ||
       sdgs.isNotEmpty;
 }
 

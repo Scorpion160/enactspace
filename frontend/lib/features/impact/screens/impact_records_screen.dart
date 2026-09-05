@@ -139,10 +139,14 @@ class _ImpactRecordsScreenState extends State<ImpactRecordsScreen> {
                                 children: [
                                   Chip(
                                     label: Text(
-                                      '${r.directBeneficiaries} directs',
+                                      '${impactValueLabel(r.directBeneficiaries)} directs',
                                     ),
                                   ),
-                                  Chip(label: Text('${r.reach} portée')),
+                                  Chip(
+                                    label: Text(
+                                      '${impactValueLabel(r.reach)} portée',
+                                    ),
+                                  ),
                                   Chip(label: Text('${r.sdgs.length} ODD')),
                                 ],
                               ),
@@ -351,24 +355,39 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
           ),
           const SizedBox(height: 12),
           _Section(
-            'People · Planet · Prosperity',
+            'Données historiques / compatibilité — non vérifiées',
             Icons.insights_rounded,
             Wrap(
               spacing: 24,
               runSpacing: 16,
               children: [
-                _Datum('Bénéficiaires directs', '${r.directBeneficiaries}'),
-                _Datum('Bénéficiaires indirects', '${r.indirectBeneficiaries}'),
-                _Datum('Portée', '${r.reach}'),
-                _Datum('Vies impactées', '${r.livesImpacted}'),
-                _Datum('Emplois créés', '${r.jobsCreated}'),
-                _Datum('Revenus', '${r.revenueGenerated} FCFA'),
-                _Datum('Profit / surplus', '${r.profitOrSurplus} FCFA'),
-                _Datum('Économies', '${r.costSavings} FCFA'),
-                _Datum('Arbres', '${r.treesPlanted}'),
-                _Datum('Déchets réduits', '${r.wasteReduced} kg'),
-                _Datum('Eau économisée', '${r.waterSaved} litres'),
-                _Datum('CO₂ réduit', '${r.co2Reduced} kg'),
+                _Datum(
+                  'Bénéficiaires directs',
+                  impactValueLabel(r.directBeneficiaries),
+                ),
+                _Datum(
+                  'Bénéficiaires indirects',
+                  impactValueLabel(r.indirectBeneficiaries),
+                ),
+                _Datum('Portée', impactValueLabel(r.reach)),
+                _Datum('Vies impactées', impactValueLabel(r.livesImpacted)),
+                _Datum('Emplois créés', impactValueLabel(r.jobsCreated)),
+                _Datum('Revenus', _numberWithUnit(r.revenueGenerated, 'FCFA')),
+                _Datum(
+                  'Profit / surplus',
+                  _numberWithUnit(r.profitOrSurplus, 'FCFA'),
+                ),
+                _Datum('Économies', _numberWithUnit(r.costSavings, 'FCFA')),
+                _Datum('Arbres', impactValueLabel(r.treesPlanted)),
+                _Datum(
+                  'Déchets réduits',
+                  _numberWithUnit(r.wasteReduced, 'kg'),
+                ),
+                _Datum(
+                  'Eau économisée',
+                  _numberWithUnit(r.waterSaved, 'litres'),
+                ),
+                _Datum('CO₂ réduit', _numberWithUnit(r.co2Reduced, 'kg')),
               ],
             ),
           ),
@@ -421,7 +440,9 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(m.title),
                           subtitle: Text(
-                            '${m.categoryLabel} · ${m.value} ${m.unitLabel} · ${m.statusLabel}${m.rejectionReason == null ? '' : ' · ${m.rejectionReason}'}',
+                            '${m.categoryLabel} · ${impactValueLabel(m.value)} ${m.unitLabel} · '
+                            '${m.claimTypeLabel} · ${m.statusLabel}'
+                            '${m.rejectionReason == null ? '' : ' · ${m.rejectionReason}'}',
                           ),
                           trailing: r.canValidate
                               ? PopupMenuButton<String>(
@@ -552,18 +573,6 @@ class _RecordFormDialogState extends State<_RecordFormDialog> {
         'problem_statement',
         'solution_summary',
         'target_population',
-        'direct_beneficiaries',
-        'indirect_beneficiaries',
-        'reach',
-        'jobs_created',
-        'revenue_generated',
-        'profit_or_surplus',
-        'cost_savings',
-        'lives_impacted',
-        'trees_planted',
-        'waste_reduced',
-        'water_saved',
-        'co2_reduced',
         'sdgs',
         'evidence_notes',
         'methodology',
@@ -675,12 +684,18 @@ class _MetricDialog extends StatefulWidget {
 }
 
 class _MetricDialogState extends State<_MetricDialog> {
-  final title = TextEditingController(),
+  final semanticKey = TextEditingController(),
+      title = TextEditingController(),
       value = TextEditingController(),
       source = TextEditingController(),
+      sourceReference = TextEditingController(),
+      periodStart = TextEditingController(),
+      periodEnd = TextEditingController(),
+      populationScope = TextEditingController(),
       method = TextEditingController(),
+      limitations = TextEditingController(),
       file = TextEditingController();
-  String category = 'social', unit = 'personnes';
+  String category = 'social', unit = 'personnes', claimType = 'MEASURED';
   bool busy = false;
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -690,6 +705,13 @@ class _MetricDialogState extends State<_MetricDialog> {
       child: SingleChildScrollView(
         child: Column(
           children: [
+            TextField(
+              controller: semanticKey,
+              decoration: const InputDecoration(
+                labelText: 'Clé sémantique stable',
+                hintText: 'direct_beneficiaries',
+              ),
+            ),
             TextField(
               controller: title,
               decoration: const InputDecoration(labelText: 'Titre'),
@@ -738,6 +760,27 @@ class _MetricDialogState extends State<_MetricDialog> {
                       .toList(),
               onChanged: (v) => unit = v!,
             ),
+            DropdownButtonFormField(
+              initialValue: claimType,
+              decoration: const InputDecoration(
+                labelText: 'Type de déclaration',
+              ),
+              items:
+                  const [
+                        'MEASURED',
+                        'ESTIMATE',
+                        'PROJECTION',
+                        'HISTORICAL_CLAIM',
+                      ]
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(impactClaimTypeLabel(v)),
+                        ),
+                      )
+                      .toList(),
+              onChanged: (v) => claimType = v!,
+            ),
             TextField(
               controller: value,
               decoration: const InputDecoration(labelText: 'Valeur'),
@@ -747,10 +790,34 @@ class _MetricDialogState extends State<_MetricDialog> {
               decoration: const InputDecoration(labelText: 'Source'),
             ),
             TextField(
+              controller: sourceReference,
+              decoration: const InputDecoration(labelText: 'Référence source'),
+            ),
+            TextField(
+              controller: periodStart,
+              decoration: const InputDecoration(
+                labelText: 'Début (AAAA-MM-JJ)',
+              ),
+            ),
+            TextField(
+              controller: periodEnd,
+              decoration: const InputDecoration(labelText: 'Fin (AAAA-MM-JJ)'),
+            ),
+            TextField(
+              controller: populationScope,
+              decoration: const InputDecoration(
+                labelText: 'Site / population concernée',
+              ),
+            ),
+            TextField(
               controller: method,
               decoration: const InputDecoration(
                 labelText: 'Note méthodologique',
               ),
+            ),
+            TextField(
+              controller: limitations,
+              decoration: const InputDecoration(labelText: 'Notes / limites'),
             ),
             TextField(
               controller: file,
@@ -773,12 +840,22 @@ class _MetricDialogState extends State<_MetricDialog> {
             : () async {
                 setState(() => busy = true);
                 await widget.gateway.createMetric(widget.recordId, {
+                  'semantic_key': semanticKey.text.trim(),
                   'title': title.text,
                   'category': category,
                   'unit': unit,
-                  'value': double.tryParse(value.text) ?? 0,
-                  'source': source.text,
-                  'methodology_note': method.text,
+                  'value': value.text.trim().isEmpty
+                      ? null
+                      : double.tryParse(value.text),
+                  'claim_type': claimType,
+                  'validation_status': 'DRAFT',
+                  'source': _emptyToNull(source.text),
+                  'source_reference': _emptyToNull(sourceReference.text),
+                  'period_start': _emptyToNull(periodStart.text),
+                  'period_end': _emptyToNull(periodEnd.text),
+                  'population_scope': _emptyToNull(populationScope.text),
+                  'methodology_note': _emptyToNull(method.text),
+                  'notes_limitations': _emptyToNull(limitations.text),
                   'evidence_file_id': file.text.isEmpty ? null : file.text,
                 });
                 if (context.mounted) Navigator.pop(context, true);
@@ -904,11 +981,13 @@ class _Section extends StatelessWidget {
             children: [
               Icon(icon),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
               ),
             ],
           ),
@@ -1045,18 +1124,6 @@ String _recordValue(ImpactRecordModel? r, String k) {
     'problem_statement' => r.problemStatement ?? '',
     'solution_summary' => r.solutionSummary ?? '',
     'target_population' => r.targetPopulation ?? '',
-    'direct_beneficiaries' => '${r.directBeneficiaries}',
-    'indirect_beneficiaries' => '${r.indirectBeneficiaries}',
-    'reach' => '${r.reach}',
-    'jobs_created' => '${r.jobsCreated}',
-    'revenue_generated' => '${r.revenueGenerated}',
-    'profit_or_surplus' => '${r.profitOrSurplus}',
-    'cost_savings' => '${r.costSavings}',
-    'lives_impacted' => '${r.livesImpacted}',
-    'trees_planted' => '${r.treesPlanted}',
-    'waste_reduced' => '${r.wasteReduced}',
-    'water_saved' => '${r.waterSaved}',
-    'co2_reduced' => '${r.co2Reduced}',
     'sdgs' => r.sdgs.join(', '),
     'evidence_notes' => r.evidenceNotes ?? '',
     'methodology' => r.methodology ?? '',
@@ -1066,24 +1133,6 @@ String _recordValue(ImpactRecordModel? r, String k) {
 }
 
 dynamic _fieldValue(String k, String v) {
-  if (const [
-    'direct_beneficiaries',
-    'indirect_beneficiaries',
-    'reach',
-    'jobs_created',
-    'lives_impacted',
-    'trees_planted',
-  ].contains(k))
-    return int.tryParse(v) ?? 0;
-  if (const [
-    'revenue_generated',
-    'profit_or_surplus',
-    'cost_savings',
-    'waste_reduced',
-    'water_saved',
-    'co2_reduced',
-  ].contains(k))
-    return double.tryParse(v) ?? 0;
   if (k == 'sdgs')
     return v
         .split(',')
@@ -1100,5 +1149,9 @@ String _fieldLabel(String k) => k
     .join(' ');
 String _value(String? v) =>
     v == null || v.trim().isEmpty ? 'À documenter' : v.trim();
+String? _emptyToNull(String value) =>
+    value.trim().isEmpty ? null : value.trim();
+String _numberWithUnit(num? value, String unit) =>
+    value == null ? 'Non renseigné' : '$value $unit';
 String _msg(Object e) => e.toString().replaceFirst('Exception: ', '');
 const _label = TextStyle(fontWeight: FontWeight.w900);

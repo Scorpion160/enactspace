@@ -69,7 +69,7 @@ void main() {
         value: 12,
         status: 'validated',
       );
-      expect(statistic.confidenceLabel, 'Validé');
+      expect(statistic.confidenceLabel, 'Historique validé');
       expect(statistic.isPersisted, isTrue);
     });
 
@@ -144,7 +144,7 @@ void main() {
       await _pumpCenter(tester, _MemoryArchivesGateway());
       expect(find.text('Archives & mémoire collective'), findsOneWidget);
       expect(find.text('Historique à confirmer'), findsOneWidget);
-      expect(find.text('Validé'), findsOneWidget);
+      expect(find.text('Historique validé'), findsOneWidget);
       expect(find.text('Initiative source'), findsOneWidget);
     });
 

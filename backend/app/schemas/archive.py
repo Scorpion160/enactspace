@@ -293,12 +293,12 @@ class HallOfFameEntryRead(HallOfFameEntryCreate):
 class HistoricalImpactStatisticCreate(BaseModel):
     metric_key: str
     label: str
-    value: float = 0
+    value: float
     unit: Optional[str] = None
     description: Optional[str] = None
     source_label: Optional[str] = None
     source_file_id: Optional[UUID] = None
-    status: str = "validated"
+    status: str = "draft"
     is_featured: bool = True
 
 

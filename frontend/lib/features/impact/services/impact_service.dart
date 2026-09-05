@@ -29,11 +29,11 @@ class ImpactService {
 
     final projects = projectsResponse
         .whereType<Map<String, dynamic>>()
-        .map(_projectFromJson)
+        .map(projectFromJson)
         .toList();
 
     return ImpactDashboardData(
-      organization: _organizationFromJson(summary['organization'], projects),
+      organization: organizationFromJson(summary['organization'], projects),
       historicalImpact: _historicalFromJson(summary['historical_impact']),
       projects: projects,
       enacteurs: _enacteursFromJson(summary['enacteurs']),
@@ -41,7 +41,7 @@ class ImpactService {
     );
   }
 
-  ProjectImpactMetricModel _projectFromJson(Map<String, dynamic> json) {
+  ProjectImpactMetricModel projectFromJson(Map<String, dynamic> json) {
     return ProjectImpactMetricModel(
       id: _string(json['id'], fallback: 'project'),
       projectName: _string(json['project_name'], fallback: 'Projet'),
@@ -56,104 +56,75 @@ class ImpactService {
         json['target_beneficiaries'],
         fallback: 'Bénéficiaires à préciser',
       ),
-      directImpact: _int(json['direct_impact']),
-      indirectImpact: _int(json['indirect_impact']),
-      reach: _int(json['reach']),
-      revenue: _double(json['revenue']),
-      surplus: _double(json['surplus']),
-      jobsCreated: _int(json['jobs_created']),
-      livesImpacted: _int(json['lives_impacted']),
-      treesPlanted: _int(json['trees_planted']),
-      wasteReduced: _double(json['waste_reduced']),
-      waterSaved: _double(json['water_saved']),
-      co2Reduced: _double(json['co2_reduced']),
-      planetImpact: _double(json['planet_impact']),
+      directImpact: _nullableInt(json['direct_impact']),
+      indirectImpact: _nullableInt(json['indirect_impact']),
+      reach: _nullableInt(json['reach']),
+      revenue: _nullableDouble(json['revenue']),
+      surplus: _nullableDouble(json['surplus']),
+      jobsCreated: _nullableInt(json['jobs_created']),
+      livesImpacted: _nullableInt(json['lives_impacted']),
+      treesPlanted: _nullableInt(json['trees_planted']),
+      wasteReduced: _nullableDouble(json['waste_reduced']),
+      waterSaved: _nullableDouble(json['water_saved']),
+      co2Reduced: _nullableDouble(json['co2_reduced']),
+      planetImpact: _nullableDouble(json['planet_impact']),
       evidenceCount: _int(json['evidence_count']),
-      methodology: _string(json['methodology'], fallback: 'Méthode à préciser'),
-      assumptions: _string(
-        json['assumptions'],
-        fallback: 'Hypothèses à préciser',
-      ),
+      verifiedEvidenceCount: _int(json['verified_evidence_count']),
+      methodology: _nullableString(json['methodology']),
+      assumptions: _nullableString(json['assumptions']),
       budgetUsed: _double(json['budget_used']),
       progress: _double(json['progress']),
       completedTasks: _int(json['completed_tasks']),
       lateTasks: _int(json['late_tasks']),
       documentsCount: _int(json['documents_count']),
-      innovationScore: _double(json['innovation_score']),
-      businessViabilityScore: _double(json['business_viability_score']),
-      scalabilityScore: _double(json['scalability_score']),
-      competitionReadinessScore: _double(json['competition_readiness_score']),
+      innovationScore: _nullableDouble(json['innovation_score']),
+      businessViabilityScore: _nullableDouble(json['business_viability_score']),
+      scalabilityScore: _nullableDouble(json['scalability_score']),
+      competitionReadinessScore: _nullableDouble(
+        json['competition_readiness_score'],
+      ),
+      claims: _claimsFromJson(json['claims']),
     );
   }
 
-  OrganizationPerformanceModel _organizationFromJson(
+  OrganizationPerformanceModel organizationFromJson(
     dynamic value,
     List<ProjectImpactMetricModel> projects,
   ) {
     final json = value is Map<String, dynamic> ? value : <String, dynamic>{};
     return OrganizationPerformanceModel(
       activeMembers: _int(json['active_members']),
-      attendanceRate: _double(json['attendance_rate']),
-      retentionRate: _double(json['retention_rate']),
+      attendanceRate: _nullableDouble(json['attendance_rate']),
+      retentionRate: _nullableDouble(json['retention_rate']),
       completedTasks: _int(json['completed_tasks']),
       lateTasks: _int(json['late_tasks']),
       activeProjects: _int(json['active_projects'], fallback: projects.length),
-      directImpactTotal: _int(
-        json['direct_impact_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.directImpact),
-      ),
-      indirectImpactTotal: _int(
-        json['indirect_impact_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.indirectImpact),
-      ),
-      reachTotal: _int(
-        json['reach_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.reach),
-      ),
-      jobsCreatedTotal: _int(
-        json['jobs_created_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.jobsCreated),
-      ),
-      livesImpactedTotal: _int(
-        json['lives_impacted_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.livesImpacted),
-      ),
-      treesPlantedTotal: _int(
-        json['trees_planted_total'],
-        fallback: projects.fold(0, (sum, item) => sum + item.treesPlanted),
-      ),
-      validatedEvidenceCount: _int(
-        json['validated_evidence_count'],
-        fallback: projects.fold(0, (sum, item) => sum + item.evidenceCount),
-      ),
-      touchedSdgs: _int(
-        json['touched_sdgs'],
-        fallback: {
-          for (final project in projects)
-            for (final sdg in project.sdgs) sdg,
-        }.length,
-      ),
-      revenueTotal: _double(
-        json['revenue_total'],
-        fallback: projects.fold<double>(0, (sum, item) => sum + item.revenue),
-      ),
-      surplusTotal: _double(
-        json['surplus_total'],
-        fallback: projects.fold<double>(0, (sum, item) => sum + item.surplus),
-      ),
+      directImpactTotal: _nullableInt(json['direct_impact_total']),
+      indirectImpactTotal: _nullableInt(json['indirect_impact_total']),
+      reachTotal: _nullableInt(json['reach_total']),
+      jobsCreatedTotal: _nullableInt(json['jobs_created_total']),
+      livesImpactedTotal: _nullableInt(json['lives_impacted_total']),
+      treesPlantedTotal: _nullableInt(json['trees_planted_total']),
+      validatedEvidenceCount: _int(json['validated_evidence_count']),
+      touchedSdgs: _nullableInt(json['touched_sdgs']),
+      revenueTotal: _nullableDouble(json['revenue_total']),
+      surplusTotal: _nullableDouble(json['surplus_total']),
       officialDocuments: _int(
         json['official_documents'],
         fallback: projects.fold(0, (sum, item) => sum + item.documentsCount),
       ),
-      competitionReadiness: _double(json['competition_readiness']),
-      academyParticipation: _double(json['academy_participation']),
-      communicationEngagement: _double(json['communication_engagement']),
-      financialHealth: _double(json['financial_health']),
+      competitionReadiness: _nullableDouble(json['competition_readiness']),
+      academyParticipation: _nullableDouble(json['academy_participation']),
+      communicationEngagement: _nullableDouble(
+        json['communication_engagement'],
+      ),
+      financialHealth: _nullableDouble(json['financial_health']),
     );
   }
 
-  HistoricalImpactModel _historicalFromJson(dynamic value) {
-    final json = value is Map<String, dynamic> ? value : <String, dynamic>{};
+  HistoricalImpactModel? _historicalFromJson(dynamic value) {
+    if (value is! Map<String, dynamic>) return null;
+    final json = value;
     return HistoricalImpactModel(
       createdProjects: _int(json['created_projects']),
       developingProjects: _int(json['developing_projects']),
@@ -168,6 +139,29 @@ class ImpactService {
       emblematicProjects: _stringList(json['emblematic_projects']),
       distinctions: _stringList(json['distinctions']),
     );
+  }
+
+  List<ImpactClaimModel> _claimsFromJson(dynamic value) {
+    if (value is! List) return const [];
+    return value.whereType<Map<String, dynamic>>().map((json) {
+      return ImpactClaimModel(
+        id: _string(json['id'], fallback: ''),
+        semanticKey: _string(json['semantic_key'], fallback: ''),
+        title: _string(json['title'], fallback: 'Indicateur'),
+        value: _nullableDouble(json['value']),
+        unit: _string(json['unit'], fallback: ''),
+        claimType: _string(json['claim_type'], fallback: 'HISTORICAL_CLAIM'),
+        validationStatus: _string(json['validation_status'], fallback: 'DRAFT'),
+        periodStart: _nullableString(json['period_start']),
+        periodEnd: _nullableString(json['period_end']),
+        populationScope: _nullableString(json['population_scope']),
+        source: _nullableString(json['source']),
+        sourceReference: _nullableString(json['source_reference']),
+        methodology: _nullableString(json['methodology']),
+        notesLimitations: _nullableString(json['notes_limitations']),
+        evidenceCount: _int(json['evidence_count']),
+      );
+    }).toList();
   }
 
   List<EnacteurPerformanceModel> _enacteursFromJson(dynamic value) {
@@ -225,8 +219,23 @@ class ImpactService {
     return int.tryParse(value?.toString() ?? '') ?? fallback;
   }
 
+  int? _nullableInt(dynamic value) {
+    if (value == null) return null;
+    return num.tryParse(value.toString())?.round();
+  }
+
   double _double(dynamic value, {double fallback = 0}) {
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  double? _nullableDouble(dynamic value) {
+    if (value == null) return null;
+    return double.tryParse(value.toString());
+  }
+
+  String? _nullableString(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
   }
 
   List<String> _stringList(dynamic value, {List<String> fallback = const []}) {

@@ -401,22 +401,23 @@ class ProjectImpactSection extends StatelessWidget {
           'Progression opérationnelle',
           '${impact.progress!.toStringAsFixed(0)} %',
         ),
-      if (impact.directBeneficiaries > 0)
+      if (impact.directBeneficiaries != null)
         MapEntry('Bénéficiaires directs', '${impact.directBeneficiaries}'),
-      if (impact.indirectBeneficiaries > 0)
+      if (impact.indirectBeneficiaries != null)
         MapEntry('Bénéficiaires indirects', '${impact.indirectBeneficiaries}'),
-      if (impact.reach > 0) MapEntry('Portée', '${impact.reach}'),
-      if (impact.jobsCreated > 0)
+      if (impact.reach != null) MapEntry('Portée', '${impact.reach}'),
+      if (impact.jobsCreated != null)
         MapEntry('Emplois créés', '${impact.jobsCreated}'),
-      if (impact.livesImpacted > 0)
+      if (impact.livesImpacted != null)
         MapEntry('Vies impactées', '${impact.livesImpacted}'),
-      if (impact.treesPlanted > 0)
+      if (impact.treesPlanted != null)
         MapEntry('Arbres plantés', '${impact.treesPlanted}'),
-      if (impact.wasteReduced > 0)
+      if (impact.wasteReduced != null)
         MapEntry('Déchets réduits', '${impact.wasteReduced}'),
-      if (impact.waterSaved > 0)
+      if (impact.waterSaved != null)
         MapEntry('Eau économisée', '${impact.waterSaved}'),
-      if (impact.co2Reduced > 0) MapEntry('CO₂ réduit', '${impact.co2Reduced}'),
+      if (impact.co2Reduced != null)
+        MapEntry('CO₂ réduit', '${impact.co2Reduced}'),
     ];
     return _SectionPage(
       semanticsLabel: 'Section Impact du projet',

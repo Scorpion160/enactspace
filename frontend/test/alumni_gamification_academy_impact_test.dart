@@ -101,7 +101,7 @@ void main() {
 
   test('Impact humanise statuts, catégories et unités', () {
     expect(impactStatusLabel('under_review'), 'En vérification');
-    expect(impactStatusLabel('validated'), 'Validé');
+    expect(impactStatusLabel('validated'), 'Vérifié');
     expect(impactCategoryLabel('environmental'), 'Environnemental');
     expect(impactCategoryLabel('economique'), 'Économique');
     expect(impactUnitLabel('personnes'), 'Personnes');

@@ -727,19 +727,19 @@ TaskModel _task(
   currentUserAssigned: false,
 );
 
-ProjectImpactSnapshot _impact(String id, {double? progress, int direct = 0}) =>
+ProjectImpactSnapshot _impact(String id, {double? progress, int? direct}) =>
     ProjectImpactSnapshot(
       projectId: id,
       progress: progress,
       directBeneficiaries: direct,
-      indirectBeneficiaries: 0,
-      reach: 0,
-      jobsCreated: 0,
-      livesImpacted: 0,
-      treesPlanted: 0,
-      wasteReduced: 0,
-      waterSaved: 0,
-      co2Reduced: 0,
+      indirectBeneficiaries: null,
+      reach: null,
+      jobsCreated: null,
+      livesImpacted: null,
+      treesPlanted: null,
+      wasteReduced: null,
+      waterSaved: null,
+      co2Reduced: null,
       sdgs: const [],
       methodology: null,
     );

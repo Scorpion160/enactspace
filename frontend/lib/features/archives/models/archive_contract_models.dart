@@ -546,7 +546,7 @@ class HistoricalStatisticModel {
   final String id;
   final String metricKey;
   final String label;
-  final num value;
+  final num? value;
   final String? unit;
   final String? description;
   final String? sourceLabel;
@@ -573,7 +573,7 @@ class HistoricalStatisticModel {
     label: archiveString(json['label'], fallback: 'Indicateur historique'),
     value: json['value'] is num
         ? json['value'] as num
-        : num.tryParse('${json['value'] ?? ''}') ?? 0,
+        : num.tryParse('${json['value'] ?? ''}'),
     unit: archiveNullableString(json['unit']),
     description: archiveNullableString(json['description']),
     sourceLabel: archiveNullableString(json['source_label'] ?? json['source']),
@@ -585,7 +585,7 @@ class HistoricalStatisticModel {
   bool get isValidated => status.toLowerCase() == 'validated';
   String get statusLabel => archiveStatusLabel(status);
   String get confidenceLabel =>
-      isValidated ? 'Validé' : 'Historique à confirmer';
+      isValidated ? 'Historique validé' : 'Historique à confirmer';
 }
 
 class ArchiveImpactSummaryModel {

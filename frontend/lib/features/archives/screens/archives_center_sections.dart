@@ -1116,7 +1116,9 @@ class HistoricalStatisticsWrap extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${item.value} ${item.unit ?? ''}'.trim(),
+                            item.value == null
+                                ? 'Non renseigné'
+                                : '${item.value} ${item.unit ?? ''}'.trim(),
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
