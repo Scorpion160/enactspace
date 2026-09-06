@@ -31,19 +31,24 @@ import 'package:frontend/shared/layout/app_shell.dart';
 
 void main() {
   group('matrice routes', () {
-    test('le router déclare les 38 routes finales attendues', () {
+    test('le router déclare les 43 routes finales attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
         r"path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
-      expect(declared, hasLength(38));
+      expect(declared, hasLength(43));
       for (final path in const [
         '/splash',
         '/login',
+        '/legal/privacy',
+        '/legal/terms',
+        '/about',
         '/application-tracking',
         '/recruitment/apply',
         ':campaignId',
+        '/settings',
+        '/help',
         '/dashboard',
         '/members',
         '/attendance',
@@ -89,6 +94,9 @@ void main() {
         '/application-tracking',
         '/recruitment/apply',
         '/recruitment/apply/campagne-2026',
+        '/legal/privacy',
+        '/legal/terms',
+        '/about',
       ]) {
         expect(AppRouter.isPublicPath(path), isTrue, reason: path);
       }
@@ -97,6 +105,8 @@ void main() {
         '/tasks/task-1',
         '/archives/hall-of-fame/entry-1',
         '/recruitment',
+        '/settings',
+        '/help',
       ]) {
         expect(AppRouter.isPublicPath(path), isFalse, reason: path);
       }

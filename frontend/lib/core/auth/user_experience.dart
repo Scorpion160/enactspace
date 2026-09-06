@@ -54,6 +54,8 @@ const Set<String> _recruitmentRoles = {
 };
 
 class UserExperience {
+  static const Set<String> authenticatedUtilityRoutes = {'/settings', '/help'};
+
   final String id;
   final String email;
   final String displayName;
@@ -275,6 +277,12 @@ class UserExperience {
     if (user == null) return false;
 
     final normalizedPath = path.split('?').first;
+    if (authenticatedUtilityRoutes.any(
+      (route) =>
+          normalizedPath == route || normalizedPath.startsWith('$route/'),
+    )) {
+      return true;
+    }
     final canAccessAttendance = user.status == 'active' && !user.isAlumni;
 
     if (normalizedPath == '/academy/admin' ||

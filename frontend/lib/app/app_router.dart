@@ -6,6 +6,7 @@ import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
 import '../features/academy/screens/academy_course_screen.dart';
 import '../features/academy/services/academy_gateway.dart';
+import '../features/about/screens/about_screen.dart';
 import '../features/alumni/screens/alumni_screen.dart';
 import '../features/alumni/screens/alumni_profile_detail_screen.dart';
 import '../features/alumni/services/alumni_gateway.dart';
@@ -26,9 +27,12 @@ import '../features/events/screens/event_detail_screen.dart';
 import '../features/events/services/events_gateway.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/gamification/screens/gamification_screen.dart';
+import '../features/help/screens/help_screen.dart';
 import '../features/impact/screens/impact_dashboard_screen.dart';
 import '../features/impact/screens/impact_records_screen.dart';
 import '../features/impact/services/impact_gateway.dart';
+import '../features/legal/screens/public_legal_screen.dart';
+import '../features/legal/widgets/legal_acceptance_gate.dart';
 import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/pole_detail_screen.dart';
@@ -41,6 +45,7 @@ import '../features/recruitment/screens/application_tracking_screen.dart';
 import '../features/recruitment/screens/public/public_application_flow_screen.dart';
 import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
+import '../features/settings/screens/settings_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../features/tasks/screens/task_detail_screen.dart';
 import '../features/tasks/models/task_center_models.dart';
@@ -70,6 +75,8 @@ class AppRouter {
       if (loggedIn && goingToLogin) {
         return '/dashboard';
       }
+
+      if (publicPath) return null;
 
       if (loggedIn) {
         var userData = await _authService.getCachedCurrentUser();
@@ -106,6 +113,17 @@ class AppRouter {
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
+        path: '/legal/privacy',
+        builder: (context, state) =>
+            const PublicLegalScreen(documentType: 'privacy_policy'),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        builder: (context, state) =>
+            const PublicLegalScreen(documentType: 'terms_of_use'),
+      ),
+      GoRoute(path: '/about', builder: (context, state) => AboutScreen()),
+      GoRoute(
         path: '/application-tracking',
         builder: (context, state) => const ApplicationTrackingScreen(),
       ),
@@ -123,9 +141,19 @@ class AppRouter {
       ),
       ShellRoute(
         builder: (context, state, child) {
-          return AppShell(currentPath: state.uri.path, child: child);
+          return LegalAcceptanceGate(
+            child: AppShell(currentPath: state.uri.path, child: child),
+          );
         },
         routes: [
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/help',
+            builder: (context, state) => const HelpScreen(),
+          ),
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const DashboardScreen(),
@@ -371,6 +399,9 @@ class AppRouter {
   static bool isPublicPath(String path) {
     return path == '/splash' ||
         path == '/login' ||
+        path == '/legal/privacy' ||
+        path == '/legal/terms' ||
+        path == '/about' ||
         path == '/application-tracking' ||
         path == '/recruitment/apply' ||
         path.startsWith('/recruitment/apply/');
@@ -403,6 +434,8 @@ class AppRouter {
       '/recruitment',
       '/impact',
       '/alumni',
+      '/settings',
+      '/help',
     };
 
     return fallbackRoutes.any(

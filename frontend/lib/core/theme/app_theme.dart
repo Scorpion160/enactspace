@@ -102,4 +102,86 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get darkTheme {
+    const darkBackground = Color(0xFF101418);
+    const darkSurface = Color(0xFF191F24);
+    const darkBorder = Color(0xFF343B42);
+    const darkForeground = Color(0xFFF4F1E8);
+    final base = ThemeData(
+      brightness: Brightness.dark,
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: enactusYellow,
+        brightness: Brightness.dark,
+        primary: enactusYellow,
+        onPrimary: softBlack,
+        secondary: enactusYellow,
+        surface: darkSurface,
+        error: const Color(0xFFFFB4AB),
+      ),
+    );
+
+    return base.copyWith(
+      scaffoldBackgroundColor: darkBackground,
+      focusColor: enactusYellow.withValues(alpha: 0.25),
+      hoverColor: Colors.white.withValues(alpha: 0.06),
+      textTheme: GoogleFonts.poppinsTextTheme(
+        base.textTheme,
+      ).apply(bodyColor: darkForeground, displayColor: darkForeground),
+      appBarTheme: AppBarTheme(
+        backgroundColor: softBlack,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.poppins(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkSurface,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusMedium),
+          side: const BorderSide(color: darkBorder),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkSurface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusSmall),
+          borderSide: const BorderSide(color: enactusYellow, width: 2),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: enactusYellow,
+          foregroundColor: softBlack,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          minimumSize: const Size(44, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSmall),
+          ),
+          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+        ),
+      ),
+      dividerColor: darkBorder,
+    );
+  }
 }

@@ -343,6 +343,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             onPressed: () => context.go('/notifications'),
           ),
           IconButton(
+            onPressed: () => context.go('/settings'),
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings_rounded),
+          ),
+          IconButton(
             onPressed: () => _logout(context),
             tooltip: 'Déconnexion',
             icon: const Icon(Icons.logout_rounded),
@@ -391,9 +396,11 @@ class _TopBar extends StatelessWidget {
     return Container(
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE8E8E8))),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
       ),
       child: Row(
         children: [
@@ -412,6 +419,11 @@ class _TopBar extends StatelessWidget {
           _NotificationIconButton(
             unreadNotifications: unreadNotifications,
             onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            onPressed: () => context.go('/settings'),
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings_rounded),
           ),
           IconButton(
             onPressed: onLogout,
@@ -601,7 +613,20 @@ class _SideMenu extends StatelessWidget {
               const Divider(color: Colors.white12, height: 1),
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: _LogoutTile(onLogout: onLogout),
+                child: Column(
+                  children: [
+                    _NavigationTile(
+                      item: const _MenuItem(
+                        label: 'Réglages',
+                        icon: Icons.settings_rounded,
+                        path: '/settings',
+                      ),
+                      selected: _isSelected(currentPath, '/settings'),
+                      compact: compact,
+                    ),
+                    _LogoutTile(onLogout: onLogout),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1182,6 +1207,8 @@ String _navigationTitle(String currentPath) {
     '/gamification': 'Gamification',
     '/academy': 'EnactSpace Academy',
     '/impact': 'Impact & Performance',
+    '/settings': 'Réglages',
+    '/help': 'Centre d’aide',
   };
 
   return sections.entries
