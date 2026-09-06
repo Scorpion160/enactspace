@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.core.config import settings
@@ -16,6 +16,16 @@ engine = create_engine(
     settings.DATABASE_URL,
     connect_args=connect_args,
 )
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+if settings.DATABASE_URL.startswith("sqlite"):
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
 
 
 SessionLocal = sessionmaker(

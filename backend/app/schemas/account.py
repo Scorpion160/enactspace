@@ -44,6 +44,7 @@ class UserPreferenceRead(BaseModel):
     theme: ThemePreference
     notification_in_app_enabled: bool
     notification_email_enabled: bool
+    notification_push_enabled: bool
     created_at: datetime
     updated_at: datetime
 
@@ -53,6 +54,7 @@ class UserPreferenceUpdate(BaseModel):
     theme: ThemePreference | None = None
     notification_in_app_enabled: bool | None = None
     notification_email_enabled: bool | None = None
+    notification_push_enabled: bool | None = None
 
 
 class LegalDocumentCreate(BaseModel):

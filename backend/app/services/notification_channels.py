@@ -1,6 +1,7 @@
 import logging
 
 from app.core.config import settings
+from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.user import User
 
@@ -11,16 +12,23 @@ logger = logging.getLogger("enactspace.notifications")
 def dispatch_notification_channels(
     notification: Notification,
     recipient: User | None,
+    preference: UserPreference | None = None,
 ) -> dict[str, bool]:
     """Prepare external delivery without making network calls by default."""
     return {
-        "email": _dispatch_email(notification, recipient),
-        "push": _dispatch_push(notification, recipient),
+        "email": _dispatch_email(notification, recipient, preference),
+        "push": _dispatch_push(notification, recipient, preference),
     }
 
 
-def _dispatch_email(notification: Notification, recipient: User | None) -> bool:
-    if not settings.email_enabled:
+def _dispatch_email(
+    notification: Notification,
+    recipient: User | None,
+    preference: UserPreference | None = None,
+) -> bool:
+    if not settings.email_enabled or (
+        preference is not None and not preference.notification_email_enabled
+    ):
         return False
 
     if not recipient or not recipient.email:
@@ -39,8 +47,16 @@ def _dispatch_email(notification: Notification, recipient: User | None) -> bool:
     return True
 
 
-def _dispatch_push(notification: Notification, recipient: User | None) -> bool:
-    if not settings.push_enabled:
+def _dispatch_push(
+    notification: Notification,
+    recipient: User | None,
+    preference: UserPreference | None = None,
+) -> bool:
+    if (
+        not settings.push_enabled
+        or preference is None
+        or not preference.notification_push_enabled
+    ):
         return False
 
     if not recipient:

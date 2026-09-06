@@ -29,6 +29,7 @@ class Notification(Base):
     type: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    in_app_suppressed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     related_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     related_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)

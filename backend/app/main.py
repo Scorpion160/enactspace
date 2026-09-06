@@ -38,6 +38,7 @@ from app.api.routes import (
     realtime,
     account,
     legal,
+    product_services,
 )
 
 
@@ -116,6 +117,13 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(account.router, prefix="/api")
 app.include_router(account.admin_router, prefix="/api")
 app.include_router(legal.router, prefix="/api")
+app.include_router(product_services.installation_router, prefix="/api")
+app.include_router(product_services.support_router, prefix="/api")
+app.include_router(product_services.support_admin_router, prefix="/api")
+app.include_router(product_services.feedback_router, prefix="/api")
+app.include_router(product_services.feedback_admin_router, prefix="/api")
+app.include_router(product_services.product_router, prefix="/api")
+app.include_router(product_services.product_admin_router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(poles.router, prefix="/api")

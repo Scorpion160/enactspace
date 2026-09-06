@@ -14,6 +14,12 @@ from app.models.gamification import EngagementPoint, UserBadge
 from app.models.impact import ImpactEvidence, ImpactMetric, ImpactProject
 from app.models.mobile_money import MobileMoneyTransaction
 from app.models.notification import Notification
+from app.models.product_services import (
+    AppInstallation,
+    ProductFeedback,
+    SupportTicket,
+    SupportTicketMessage,
+)
 from app.models.pole import PoleMember
 from app.models.post import Post, PostComment, PostReaction
 from app.models.project import ProjectMember
@@ -23,7 +29,7 @@ from app.models.task import Task, TaskAssignee, TaskComment
 from app.models.user import User
 
 
-EXPORT_SCHEMA_VERSION = "1.0"
+EXPORT_SCHEMA_VERSION = "1.1"
 
 
 def _value(value):
@@ -96,8 +102,31 @@ def build_user_data_export(db: Session, user: User, app_version: str) -> dict:
             },
             "preferences": _rows([preference] if preference else [], (
                 "locale", "theme", "notification_in_app_enabled",
-                "notification_email_enabled", "created_at", "updated_at",
+                "notification_email_enabled", "notification_push_enabled",
+                "created_at", "updated_at",
             )),
+            "app_installations": _rows(
+                db.query(AppInstallation).filter(AppInstallation.user_id == user_id).all(),
+                ("id", "installation_key", "platform", "app_version", "build_number",
+                 "os_version", "device_model", "locale", "last_seen_at", "revoked_at",
+                 "created_at", "updated_at"),
+            ),
+            "support_tickets": _rows(
+                db.query(SupportTicket).filter(SupportTicket.user_id == user_id).all(),
+                ("id", "subject", "category", "status", "priority", "assigned_to_id",
+                 "created_at", "updated_at", "resolved_at", "closed_at"),
+            ),
+            "support_messages_authored": _rows(
+                db.query(SupportTicketMessage).filter(
+                    SupportTicketMessage.author_id == user_id
+                ).all(),
+                ("id", "ticket_id", "message", "created_at"),
+            ),
+            "product_feedback": _rows(
+                db.query(ProductFeedback).filter(ProductFeedback.user_id == user_id).all(),
+                ("id", "category", "message", "rating", "platform", "app_version",
+                 "build_number", "status", "created_at", "updated_at"),
+            ),
             "roles": [row[0] for row in roles],
             "pole_memberships": _rows(
                 db.query(PoleMember).filter(PoleMember.user_id == user_id).all(),

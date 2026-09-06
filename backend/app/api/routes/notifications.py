@@ -181,7 +181,8 @@ def list_my_notifications(
     type_filter: str | None = Query(default=None),
 ):
     query = db.query(Notification).filter(
-        Notification.user_id == current_user.id
+        Notification.user_id == current_user.id,
+        Notification.in_app_suppressed.is_(False),
     )
 
     if unread_only is True:

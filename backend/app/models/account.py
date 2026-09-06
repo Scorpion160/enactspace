@@ -18,6 +18,7 @@ class UserPreference(Base):
     theme: Mapped[str] = mapped_column(String(10), default="system", nullable=False)
     notification_in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notification_email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notification_push_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

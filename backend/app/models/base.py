@@ -87,3 +87,11 @@ from app.models.institutional_memory import (
     ProjectYear,
     Territory,
 )
+from app.models.product_services import (
+    AppInstallation,
+    AppRelease,
+    AppVersionPolicy,
+    ProductFeedback,
+    SupportTicket,
+    SupportTicketMessage,
+)
