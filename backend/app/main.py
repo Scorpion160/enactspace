@@ -31,6 +31,7 @@ from app.api.routes import (
     dashboard,
     academy,
     archives,
+    institutional_memory,
     audit,
     seed,
     system,
@@ -138,6 +139,7 @@ app.include_router(members_import.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(academy.router, prefix="/api")
 app.include_router(archives.router, prefix="/api")
+app.include_router(institutional_memory.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 seed.register_seed_routes(app)
 app.include_router(system.router, prefix="/api")

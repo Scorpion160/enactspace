@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -141,6 +151,36 @@ class Award(Base):
         ForeignKey("archived_projects.id"),
         nullable=True,
     )
+    competition_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "archive_competition_records.id",
+            ondelete="SET NULL",
+            name="fk_archive_award_competition",
+        ),
+        nullable=True,
+    )
+    canonical_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "institutional_canonical_projects.id",
+            ondelete="SET NULL",
+            name="fk_archive_award_project",
+        ),
+        nullable=True,
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "institutional_sources.id",
+            ondelete="RESTRICT",
+            name="fk_archive_award_source",
+        ),
+        nullable=True,
+    )
+    validation_status: Mapped[str] = mapped_column(
+        String(32), default="HISTORICAL_REPORTED"
+    )
     file_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("stored_files.id"),
@@ -148,11 +188,31 @@ class Award(Base):
     )
     media_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_archive_award_created_by"),
+        nullable=True,
+    )
+    validated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_archive_award_validated_by"),
+        nullable=True,
+    )
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "validation_status IN ('HISTORICAL_REPORTED', 'EVIDENCE_PENDING', "
+            "'EVIDENCE_ATTACHED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', "
+            "'SUPERSEDED')",
+            name="ck_archive_award_memory_validation",
+        ),
     )
 
 
@@ -174,6 +234,27 @@ class CompetitionRecord(Base):
     stage: Mapped[str | None] = mapped_column(String(140), nullable=True)
     result: Mapped[str | None] = mapped_column(String(180), nullable=True)
     location: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    territory_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "institutional_territories.id",
+            ondelete="SET NULL",
+            name="fk_archive_competition_territory",
+        ),
+        nullable=True,
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "institutional_sources.id",
+            ondelete="RESTRICT",
+            name="fk_archive_competition_source",
+        ),
+        nullable=True,
+    )
+    validation_status: Mapped[str] = mapped_column(
+        String(32), default="HISTORICAL_REPORTED"
+    )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     project_ids: Mapped[list] = mapped_column(JSON, default=list)
     award_ids: Mapped[list] = mapped_column(JSON, default=list)
@@ -183,11 +264,35 @@ class CompetitionRecord(Base):
         nullable=True,
     )
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "users.id", ondelete="SET NULL", name="fk_archive_competition_created_by"
+        ),
+        nullable=True,
+    )
+    validated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey(
+            "users.id", ondelete="SET NULL", name="fk_archive_competition_validated_by"
+        ),
+        nullable=True,
+    )
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "validation_status IN ('HISTORICAL_REPORTED', 'EVIDENCE_PENDING', "
+            "'EVIDENCE_ATTACHED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED', "
+            "'SUPERSEDED')",
+            name="ck_archive_competition_memory_validation",
+        ),
     )
 
 

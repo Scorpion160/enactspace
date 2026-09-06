@@ -74,3 +74,16 @@ from app.models.archive import (
     HallOfFameEntry,
     HistoricalImpactStatistic,
 )
+from app.models.institutional_memory import (
+    CanonicalProject,
+    CompetitionParticipation,
+    InstitutionalEvent,
+    InstitutionalFramework,
+    InstitutionalGeneration,
+    InstitutionalSource,
+    LeadershipTerm,
+    ProjectAlias,
+    ProjectRelationship,
+    ProjectYear,
+    Territory,
+)
