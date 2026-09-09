@@ -20,6 +20,8 @@ from app.schemas.account import (
 )
 from app.services.account_service import build_user_data_export
 from app.services.audit_service import create_audit_log
+from app.services.push_lifecycle import disable_user_push
+from app.services.push_locking import lock_push_preference
 
 
 router = APIRouter(prefix="/users/me", tags=["Compte et confidentialité"])
@@ -55,12 +57,16 @@ def update_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    preference = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
+    preference = lock_push_preference(db, current_user.id)
     if preference is None:
         preference = UserPreference(user_id=current_user.id)
         db.add(preference)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(preference, field, value.value if hasattr(value, "value") else value)
+    if changes.get("notification_push_enabled") is False:
+        db.flush()
+        disable_user_push(db, current_user.id)
     preference.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(preference)

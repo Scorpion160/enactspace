@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     PUSH_ENABLED: bool | None = None
     NOTIFICATION_PUSH_ENABLED: bool = False
     FCM_SERVER_KEY: str | None = None
+    FIREBASE_PROJECT_ID: str | None = None
+    PUSH_TOKEN_ENCRYPTION_KEY: str | None = None
 
     PAYMENT_PROVIDER_ENABLED: bool = False
     PAYMENT_PROVIDER: str = "manual_proof"
@@ -97,6 +99,18 @@ class Settings(BaseSettings):
                 raise ValueError("REFRESH_TOKEN_HMAC_KEY is required in production")
             if self.REFRESH_TOKEN_HMAC_KEY == self.signing_secret:
                 raise ValueError("REFRESH_TOKEN_HMAC_KEY must differ from JWT secret")
+            if self.push_enabled:
+                if not self.FIREBASE_PROJECT_ID:
+                    raise ValueError("FIREBASE_PROJECT_ID is required when push is enabled")
+                if not self.PUSH_TOKEN_ENCRYPTION_KEY:
+                    raise ValueError("PUSH_TOKEN_ENCRYPTION_KEY is required when push is enabled")
+                auth_secrets = {
+                    self.SECRET_KEY,
+                    self.JWT_SECRET_KEY,
+                    self.REFRESH_TOKEN_HMAC_KEY,
+                }
+                if self.PUSH_TOKEN_ENCRYPTION_KEY in auth_secrets:
+                    raise ValueError("PUSH_TOKEN_ENCRYPTION_KEY must differ from auth secrets")
         if self.PAYDUNYA_MODE not in {"test", "live"}:
             raise ValueError("PAYDUNYA_MODE must be test or live")
         if self.MOBILE_MONEY_PROVIDER not in {

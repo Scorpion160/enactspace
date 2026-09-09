@@ -4,11 +4,13 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app/app_router.dart';
 import 'core/theme/appearance_controller.dart';
 import 'core/theme/app_theme.dart';
+import 'core/push/push_lifecycle_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR');
   await AppearanceController.instance.loadCached();
+  await PushLifecycleController.instance.initialize();
   runApp(EnactSpaceApp());
 }
 

@@ -62,6 +62,27 @@ class InstallationRead(BaseModel):
     revoked_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    push_registered: bool
+
+
+class PushTokenUpdate(BaseModel):
+    provider: str = Field(default="fcm", pattern="^fcm$")
+    token: str = Field(min_length=1, max_length=4096)
+    enable_account_push: bool = False
+
+    @field_validator("token")
+    @classmethod
+    def token_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("token must not be blank")
+        return value
+
+
+class PushTokenRead(BaseModel):
+    installation_id: UUID
+    provider: str | None
+    registered: bool
+    updated_at: datetime | None
 
 
 class SupportCategory(str, Enum):

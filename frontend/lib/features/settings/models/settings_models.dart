@@ -22,6 +22,14 @@ class UserPreferences {
       pushNotifications: json['notification_push_enabled'] == true,
     );
   }
+
+  UserPreferences copyWith({bool? pushNotifications}) => UserPreferences(
+    locale: locale,
+    theme: theme,
+    inAppNotifications: inAppNotifications,
+    emailNotifications: emailNotifications,
+    pushNotifications: pushNotifications ?? this.pushNotifications,
+  );
 }
 
 class AccountDataExport {

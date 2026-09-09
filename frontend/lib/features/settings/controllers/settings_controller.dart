@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/theme/appearance_controller.dart';
+import '../../../core/push/push_lifecycle_controller.dart';
 import '../models/settings_models.dart';
 import '../services/settings_gateway.dart';
 
 class SettingsController extends ChangeNotifier {
   final SettingsGateway gateway;
   final AppearanceController appearance;
+  final PushLifecycleController push;
 
   UserPreferences? preferences;
   AccountDeletionRequest? deletionRequest;
@@ -14,7 +16,11 @@ class SettingsController extends ChangeNotifier {
   bool saving = false;
   String? error;
 
-  SettingsController({required this.gateway, required this.appearance});
+  SettingsController({
+    required this.gateway,
+    required this.appearance,
+    PushLifecycleController? pushController,
+  }) : push = pushController ?? PushLifecycleController.instance;
 
   Future<void> load() async {
     loading = true;
@@ -28,6 +34,7 @@ class SettingsController extends ChangeNotifier {
       preferences = results[0] as UserPreferences;
       deletionRequest = results[1] as AccountDeletionRequest?;
       await appearance.synchronizeServer(preferences!.theme);
+      push.synchronizeServerPreference(preferences!.pushNotifications);
     } catch (_) {
       error = 'Impossible de charger vos réglages. Réessayez dans un instant.';
     } finally {
@@ -46,6 +53,26 @@ class SettingsController extends ChangeNotifier {
 
   Future<bool> setEmailNotifications(bool value) =>
       _patch({'notification_email_enabled': value}, appliedLocally: false);
+
+  Future<bool> setPushNotifications(bool value) async {
+    saving = true;
+    error = null;
+    notifyListeners();
+    try {
+      final success = value
+          ? await push.enableFromUserAction()
+          : await push.disableFromUserAction();
+      if (success && preferences != null) {
+        preferences = preferences!.copyWith(pushNotifications: value);
+      } else if (!success) {
+        error = push.error;
+      }
+      return success;
+    } finally {
+      saving = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> _patch(
     Map<String, dynamic> changes, {

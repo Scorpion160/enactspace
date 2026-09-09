@@ -74,7 +74,7 @@ def create_notification(
     )
     db.add(notification)
     recipient_user = db.query(User).filter(User.id == recipient).first()
-    dispatch_notification_channels(notification, recipient_user, preference)
+    dispatch_notification_channels(db, notification, recipient_user, preference)
     return notification
 
 

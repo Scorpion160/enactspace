@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/api/api_client.dart';
 import '../../core/auth/user_experience.dart';
 import '../../core/brand/brand_assets.dart';
 import '../../core/realtime/realtime_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/push/push_lifecycle_controller.dart';
+import '../../core/push/push_navigation_resolver.dart';
+import '../../core/push/push_platform.dart';
 import '../../features/chat/services/chat_service.dart';
 import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/services/notifications_service.dart';
@@ -38,10 +42,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Timer? _metricsTimer;
   Timer? _notificationTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
+  StreamSubscription<PushIncomingMessage>? _foregroundPushSubscription;
+  StreamSubscription<PushIncomingMessage>? _openedPushSubscription;
   bool _metricsLoading = false;
   bool _notificationLoading = false;
   bool _chatMetricLoading = false;
   String? _lastPresentedNotificationId;
+  final PushOpenReadinessGate _pushOpenGate = PushOpenReadinessGate();
 
   @override
   void initState() {
@@ -68,7 +75,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     });
     unawaited(_realtimeService.start());
-    _loadNavigationMetrics();
+    unawaited(_startPushLifecycle());
     _metricsTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _loadNavigationMetrics();
     });
@@ -81,9 +88,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pushOpenGate.discard();
     _metricsTimer?.cancel();
     _notificationTimer?.cancel();
     unawaited(_realtimeSubscription?.cancel());
+    unawaited(_foregroundPushSubscription?.cancel());
+    unawaited(_openedPushSubscription?.cancel());
     unawaited(_realtimeService.dispose());
     super.dispose();
   }
@@ -92,7 +102,81 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadNavigationMetrics();
+      unawaited(PushLifecycleController.instance.reconcileOnResume());
     }
+  }
+
+  Future<void> _startPushLifecycle() async {
+    final push = PushLifecycleController.instance;
+    _foregroundPushSubscription = push.foregroundMessages.listen(
+      _presentForegroundPush,
+    );
+    _openedPushSubscription = push.openedMessages.listen(_receivePushOpen);
+    final initial = await push.platform.initialMessage();
+    if (initial != null) _receivePushOpen(initial);
+    await push.activateForAuthenticatedUser();
+
+    bool? authenticated;
+    try {
+      await _authService.getCurrentUser();
+      authenticated = true;
+    } on ApiException catch (exception) {
+      if (exception.statusCode == 401 || exception.statusCode == 403) {
+        authenticated = false;
+      }
+    } catch (_) {
+      authenticated = false;
+    }
+    if (!mounted) return;
+    if (authenticated != null) _resolvePushSession(authenticated);
+    _loadNavigationMetrics();
+  }
+
+  void _resolvePushSession(bool authenticated) {
+    if (!mounted) return;
+    setState(() => _hasSession = authenticated);
+    final pending = _pushOpenGate.resolve(authenticated: authenticated);
+    if (pending != null) unawaited(_openAuthenticatedPush(pending));
+  }
+
+  void _receivePushOpen(PushIncomingMessage message) {
+    final ready = _pushOpenGate.receive(message);
+    if (ready != null) unawaited(_openAuthenticatedPush(ready));
+  }
+
+  void _presentForegroundPush(PushIncomingMessage message) {
+    if (!mounted || !_hasSession) return;
+    final title = message.title?.trim();
+    final body = message.body?.trim();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+          content: Text(
+            [
+              if (title?.isNotEmpty == true) title!,
+              if (body?.isNotEmpty == true) body!,
+            ].join('\n'),
+          ),
+          action: SnackBarAction(
+            label: 'Ouvrir',
+            onPressed: () => _openAuthenticatedPush(message),
+          ),
+        ),
+      );
+    _loadNotificationMetric();
+  }
+
+  Future<void> _openAuthenticatedPush(PushIncomingMessage message) async {
+    if (!mounted || !_hasSession) return;
+    await PushLifecycleController.instance.markReadBestEffort(
+      message.data['notification_id'],
+    );
+    if (!mounted) return;
+    context.go(PushNavigationResolver.fromData(message.data));
+    _loadNotificationMetric();
   }
 
   @override
@@ -141,6 +225,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       try {
         final user = await _authService.getCurrentUser();
         userExperience = UserExperience.fromJson(user);
+        _resolvePushSession(true);
+      } on ApiException catch (exception) {
+        if (exception.statusCode == 401 || exception.statusCode == 403) {
+          _resolvePushSession(false);
+        }
+        userExperience = null;
       } catch (_) {
         userExperience = null;
       }
@@ -271,11 +361,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (all == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
-      if (all) {
-        await _authService.logoutAll();
-      } else {
-        await _authService.logout();
-      }
+      await runLogoutWithPushCleanup(
+        cleanup: () =>
+            PushLifecycleController.instance.cleanupForLogout(allDevices: all),
+        logout: all ? _authService.logoutAll : _authService.logout,
+      );
     } catch (_) {
       if (messenger.mounted) {
         messenger.showSnackBar(
@@ -287,6 +377,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         );
       }
     }
+
+    _pushOpenGate.discard();
 
     if (!context.mounted) return;
     context.go('/login');

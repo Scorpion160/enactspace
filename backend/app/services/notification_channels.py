@@ -1,15 +1,19 @@
 import logging
 
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.user import User
+from app.services.push_lifecycle import enqueue_push_deliveries
 
 
 logger = logging.getLogger("enactspace.notifications")
 
 
 def dispatch_notification_channels(
+    db: Session,
     notification: Notification,
     recipient: User | None,
     preference: UserPreference | None = None,
@@ -17,7 +21,10 @@ def dispatch_notification_channels(
     """Prepare external delivery without making network calls by default."""
     return {
         "email": _dispatch_email(notification, recipient, preference),
-        "push": _dispatch_push(notification, recipient, preference),
+        "push": bool(
+            recipient is not None
+            and enqueue_push_deliveries(db, notification, preference)
+        ),
     }
 
 
@@ -52,24 +59,10 @@ def _dispatch_push(
     recipient: User | None,
     preference: UserPreference | None = None,
 ) -> bool:
-    if (
-        not settings.push_enabled
-        or preference is None
-        or not preference.notification_push_enabled
-    ):
-        return False
-
-    if not recipient:
-        logger.info("Notification push skipped: recipient missing")
-        return False
-
-    if not settings.FCM_SERVER_KEY:
-        logger.warning("Notification push enabled but FCM_SERVER_KEY is not set")
-        return False
-
-    logger.info(
-        "Notification push queued for user %s: %s",
-        recipient.id,
-        notification.title,
+    """Compatibility eligibility helper; delivery is handled only by the outbox."""
+    return bool(
+        settings.push_enabled
+        and recipient is not None
+        and preference is not None
+        and preference.notification_push_enabled
     )
-    return True

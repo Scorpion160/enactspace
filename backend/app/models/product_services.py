@@ -35,6 +35,10 @@ class AppInstallation(Base):
     os_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
     device_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    push_provider: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    push_token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    push_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    push_token_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
@@ -55,10 +59,74 @@ class AppInstallation(Base):
             "build_number IS NULL OR build_number > 0",
             name="ck_app_installation_build_positive",
         ),
+        CheckConstraint(
+            "push_provider IS NULL OR push_provider = 'fcm'",
+            name="ck_app_installation_push_provider",
+        ),
+        CheckConstraint(
+            "((push_provider IS NULL AND push_token_ciphertext IS NULL AND "
+            "push_token_hash IS NULL AND push_token_updated_at IS NULL) OR "
+            "(push_provider = 'fcm' AND push_token_ciphertext IS NOT NULL AND "
+            "push_token_hash IS NOT NULL AND push_token_updated_at IS NOT NULL))",
+            name="ck_app_installation_push_material",
+        ),
         UniqueConstraint(
             "installation_key", name="uq_app_installations_installation_key"
         ),
+        UniqueConstraint("push_token_hash", name="uq_app_installations_push_token_hash"),
         Index("ix_app_installation_user_last_seen", "user_id", "last_seen_at"),
+    )
+
+    @property
+    def push_registered(self) -> bool:
+        return self.push_token_hash is not None and self.revoked_at is None
+
+
+class PushDelivery(Base):
+    __tablename__ = "push_deliveries"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    notification_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("notifications.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    installation_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("app_installations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash_snapshot: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'processing', 'sent', 'retry', 'cancelled', 'dead')",
+            name="ck_push_delivery_status",
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_push_delivery_attempt_count"),
+        CheckConstraint(
+            "((status = 'processing' AND processing_started_at IS NOT NULL) OR "
+            "(status != 'processing' AND processing_started_at IS NULL))",
+            name="ck_push_delivery_processing_lease",
+        ),
+        UniqueConstraint(
+            "notification_id", "installation_id", "token_hash_snapshot",
+            name="uq_push_delivery_notification_installation_token",
+        ),
+        Index(
+            "ix_push_delivery_claim",
+            "status",
+            "next_attempt_at",
+            "processing_started_at",
+            "created_at",
+        ),
     )
 
 

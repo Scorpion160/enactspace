@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/push/push_lifecycle_controller.dart';
 import '../../legal/models/legal_models.dart';
 import '../../legal/services/legal_gateway.dart';
 
@@ -113,11 +114,12 @@ class _LegalAcceptanceGateState extends State<LegalAcceptanceGate> {
 
   Future<void> _logout() async {
     try {
-      if (widget.onLogout != null) {
-        await widget.onLogout!();
-      } else {
-        await AuthService().logout();
-      }
+      await runLogoutWithPushCleanup(
+        cleanup: () => PushLifecycleController.instance.cleanupForLogout(
+          allDevices: false,
+        ),
+        logout: widget.onLogout ?? AuthService().logout,
+      );
     } finally {
       if (mounted) context.go('/login');
     }

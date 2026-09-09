@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/appearance_controller.dart';
+import '../../../core/push/push_lifecycle_controller.dart';
+import '../../../core/push/push_platform.dart';
 import '../controllers/settings_controller.dart';
 import '../models/settings_models.dart';
 import '../services/settings_gateway.dart';
@@ -200,11 +202,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (confirmed != true) return;
     try {
-      if (all) {
-        await _authService.logoutAll();
-      } else {
-        await _authService.logout();
-      }
+      await runLogoutWithPushCleanup(
+        cleanup: () =>
+            PushLifecycleController.instance.cleanupForLogout(allDevices: all),
+        logout: all ? _authService.logoutAll : _authService.logout,
+      );
     } catch (_) {
       // Existing AuthService guarantees local logout completion.
     }
@@ -316,6 +318,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ? null
                                   : _controller.setEmailNotifications,
                             ),
+                            if (_controller.push.platform.supported &&
+                                !_controller.push.available)
+                              const ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('Notifications push'),
+                                subtitle: Text(
+                                  'Indisponibles sur cette version.',
+                                ),
+                              ),
+                            if (_controller.push.available)
+                              SwitchListTile(
+                                key: const Key('push-notifications-toggle'),
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Notifications push'),
+                                subtitle: Text(
+                                  (preferences?.pushNotifications ?? false)
+                                      ? 'Activées pour votre compte.'
+                                      : 'Désactivées pour votre compte.',
+                                ),
+                                value: preferences?.pushNotifications ?? false,
+                                onChanged: _controller.saving
+                                    ? null
+                                    : (value) async {
+                                        final success = await _controller
+                                            .setPushNotifications(value);
+                                        if (mounted &&
+                                            !success &&
+                                            _controller.error != null) {
+                                          _message(_controller.error!);
+                                        }
+                                      },
+                              ),
+                            if (_controller.push.available &&
+                                (preferences?.pushNotifications ?? false))
+                              ListTile(
+                                key: const Key('push-current-device-state'),
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Cet appareil'),
+                                subtitle: Text(
+                                  _controller.push.authorization ==
+                                          PushAuthorization.notDetermined
+                                      ? 'Cet appareil n’est pas encore autorisé.'
+                                      : _controller.push.authorization ==
+                                            PushAuthorization.denied
+                                      ? 'Bloquées dans les réglages de l’appareil.'
+                                      : _controller.push.deviceSynchronized
+                                      ? 'Autorisées et synchronisées sur cet appareil.'
+                                      : 'Autorisation accordée, synchronisation en attente.',
+                                ),
+                                trailing:
+                                    _controller.push.authorization ==
+                                        PushAuthorization.notDetermined
+                                    ? FilledButton(
+                                        key: const Key('authorize-push-device'),
+                                        onPressed: _controller.saving
+                                            ? null
+                                            : () async {
+                                                final success =
+                                                    await _controller
+                                                        .setPushNotifications(
+                                                          true,
+                                                        );
+                                                if (mounted &&
+                                                    !success &&
+                                                    _controller.error != null) {
+                                                  _message(_controller.error!);
+                                                }
+                                              },
+                                        child: const Text(
+                                          'Autoriser sur cet appareil',
+                                        ),
+                                      )
+                                    : null,
+                              ),
                           ],
                         ),
                       ),

@@ -6,9 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_current_active_validated_user,
+    oauth2_scheme,
     require_admin_or_team_leader,
 )
+from app.core.security import decode_access_token_payload
 from app.db.database import get_db
+from app.models.account import AuthSession, UserPreference
 from app.models.product_services import (
     AppInstallation,
     AppRelease,
@@ -18,6 +21,7 @@ from app.models.product_services import (
     SupportTicketMessage,
 )
 from app.models.user import User
+from app.services.session_service import session_seconds_remaining
 from app.schemas.product_services import (
     AppReleaseCreate,
     AppReleaseRead,
@@ -26,6 +30,8 @@ from app.schemas.product_services import (
     AppVersionPolicyUpdate,
     InstallationRead,
     InstallationUpsert,
+    PushTokenRead,
+    PushTokenUpdate,
     ProductBootstrapRead,
     ProductFeedbackAdminRead,
     ProductFeedbackCreate,
@@ -41,6 +47,9 @@ from app.schemas.product_services import (
     VERSION_PATTERN,
 )
 from app.services.audit_service import create_audit_log
+from app.services.push_lifecycle import cancel_unsent_deliveries, clear_installation_push
+from app.services.push_locking import lock_push_preference, lock_user_installation
+from app.services.push_tokens import encrypt_push_token, push_token_hash
 
 
 installation_router = APIRouter(
@@ -152,11 +161,24 @@ def register_installation(
     payload: InstallationUpsert,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
+    access_token: str = Depends(oauth2_scheme),
 ):
-    installation = db.query(AppInstallation).filter(
+    lock_push_preference(db, current_user.id)
+    _lock_active_request_session(db, current_user.id, access_token)
+    installation = (
+        db.query(AppInstallation)
+        .filter(
+            AppInstallation.installation_key == payload.installation_key,
+            AppInstallation.user_id == current_user.id,
+        )
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    conflicting = None if installation is not None else db.query(AppInstallation).filter(
         AppInstallation.installation_key == payload.installation_key
     ).first()
-    if installation is not None and installation.user_id != current_user.id:
+    if conflicting is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cette installation appartient deja a un autre compte",
@@ -176,14 +198,25 @@ def register_installation(
     installation.platform = payload.platform.value
     installation.last_seen_at = now
     installation.updated_at = now
+    if installation.revoked_at is not None:
+        clear_installation_push(db, installation)
     installation.revoked_at = None
     try:
         db.commit()
     except IntegrityError as error:
         db.rollback()
-        existing = db.query(AppInstallation).filter(
-            AppInstallation.installation_key == payload.installation_key
-        ).first()
+        lock_push_preference(db, current_user.id)
+        _lock_active_request_session(db, current_user.id, access_token)
+        existing = (
+            db.query(AppInstallation)
+            .filter(
+                AppInstallation.installation_key == payload.installation_key,
+                AppInstallation.user_id == current_user.id,
+            )
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         if existing is not None and existing.user_id == current_user.id:
             return existing
         raise HTTPException(
@@ -194,24 +227,125 @@ def register_installation(
     return installation
 
 
+def _lock_active_request_session(db: Session, user_id, access_token) -> None:
+    """Revalidate a session-bearing request after the stable user lock.
+
+    This fences an already-authenticated installation POST that was waiting
+    while logout-all revoked its session. Legacy access tokens without a
+    session ID retain their existing compatibility behavior.
+    """
+    if not isinstance(access_token, str):
+        return
+    payload = decode_access_token_payload(access_token)
+    session_id = payload.get("sid") if payload else None
+    if not session_id:
+        return
+    auth_session = (
+        db.query(AuthSession)
+        .filter(AuthSession.id == session_id, AuthSession.user_id == user_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if (
+        auth_session is None
+        or auth_session.revoked_at is not None
+        or session_seconds_remaining(auth_session) <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session révoquée ou expirée",
+        )
+
+
 @installation_router.post("/{installation_id}/revoke", response_model=InstallationRead)
 def revoke_installation(
     installation_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    installation = db.query(AppInstallation).filter(
-        AppInstallation.id == installation_id,
-        AppInstallation.user_id == current_user.id,
-    ).first()
+    installation = lock_user_installation(db, current_user.id, installation_id)
     if installation is None:
         raise HTTPException(status_code=404, detail="Installation introuvable")
     if installation.revoked_at is None:
         installation.revoked_at = datetime.utcnow()
         installation.updated_at = installation.revoked_at
-        db.commit()
-        db.refresh(installation)
+    clear_installation_push(db, installation)
+    db.commit()
+    db.refresh(installation)
     return installation
+
+
+def _own_installation_or_404(db: Session, installation_id: str, user_id) -> AppInstallation:
+    installation = lock_user_installation(db, user_id, installation_id)
+    if installation is None:
+        raise HTTPException(status_code=404, detail="Installation introuvable")
+    return installation
+
+
+@installation_router.put("/{installation_id}/push-token", response_model=PushTokenRead)
+def register_push_token(
+    installation_id: str,
+    payload: PushTokenUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    installation = _own_installation_or_404(db, installation_id, current_user.id)
+    if installation.revoked_at is not None:
+        raise HTTPException(status_code=409, detail="Installation révoquée")
+    preference = db.query(UserPreference).filter(
+        UserPreference.user_id == current_user.id
+    ).populate_existing().first()
+    if preference is None:
+        if not payload.enable_account_push:
+            raise HTTPException(status_code=409, detail="Notifications push désactivées")
+        preference = UserPreference(
+            user_id=current_user.id,
+            notification_push_enabled=True,
+        )
+        db.add(preference)
+    elif not preference.notification_push_enabled:
+        if not payload.enable_account_push:
+            raise HTTPException(status_code=409, detail="Notifications push désactivées")
+        preference.notification_push_enabled = True
+        preference.updated_at = datetime.utcnow()
+    normalized_hash = push_token_hash(payload.token)
+    encrypted = encrypt_push_token(payload.token)
+    if installation.push_token_hash and installation.push_token_hash != normalized_hash:
+        cancel_unsent_deliveries(
+            db, installation_id=installation.id,
+            token_hash=installation.push_token_hash,
+        )
+    now = datetime.utcnow()
+    installation.push_provider = "fcm"
+    installation.push_token_ciphertext = encrypted
+    installation.push_token_hash = normalized_hash
+    installation.push_token_updated_at = now
+    installation.updated_at = now
+    _commit(db, "Ce jeton push est déjà associé à une autre installation")
+    return PushTokenRead(
+        installation_id=installation.id,
+        provider=installation.push_provider,
+        registered=True,
+        updated_at=installation.push_token_updated_at,
+    )
+
+
+@installation_router.delete("/{installation_id}/push-token", response_model=PushTokenRead)
+def delete_push_token(
+    installation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    installation = _own_installation_or_404(db, installation_id, current_user.id)
+    clear_installation_push(db, installation)
+    db.commit()
+    return PushTokenRead(
+        installation_id=installation.id,
+        provider=None,
+        registered=False,
+        updated_at=None,
+    )
 
 
 @support_router.post("", response_model=SupportTicketRead, status_code=201)

@@ -1,4 +1,5 @@
 import 'notification_presentation.dart';
+import '../../../core/push/push_navigation_resolver.dart';
 
 class NotificationModel {
   final String id;
@@ -60,37 +61,11 @@ class NotificationModel {
   }
 
   String? get routePath {
-    final source =
-        (relatedType == null || relatedType!.isEmpty ? type : relatedType!)
-            .toLowerCase();
-
-    if (type == 'chat_message' && relatedId != null && relatedId!.isNotEmpty) {
-      return '/chat?thread=${Uri.encodeComponent(relatedId!)}';
-    }
-    if (source.contains('task')) return '/tasks';
-    if (source.contains('attendance') || source.contains('presence')) {
-      return '/attendance';
-    }
-    if (source.contains('absence')) return '/attendance';
-    if (source.contains('payment') ||
-        source.contains('finance') ||
-        source.contains('fee')) {
-      return '/finance';
-    }
-    if (source.contains('document')) return '/documents';
-    if (source.contains('recruitment') || source.contains('application')) {
-      return '/recruitment';
-    }
-    if (source.contains('post') || source.contains('communication')) {
-      return '/posts';
-    }
-    if (source.contains('announcement')) return '/posts';
-    if (source.contains('chat') || source.contains('message')) return '/chat';
-    if (source.contains('event')) return '/events';
-    if (source.contains('project')) return '/projects';
-    if (source.contains('pole')) return '/poles';
-
-    return null;
+    return PushNavigationResolver.resolve(
+      type: type,
+      relatedType: relatedType,
+      relatedId: relatedId,
+    );
   }
 
   String get typeLabel {

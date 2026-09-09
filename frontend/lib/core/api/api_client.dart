@@ -415,6 +415,28 @@ class ApiClient {
     return decodeResponse(response);
   }
 
+  Future<dynamic> putJson(
+    String path, {
+    required Map<String, dynamic> data,
+    String? token,
+  }) async {
+    final body = jsonEncode(data);
+    final response = await sendAuthenticated(
+      path,
+      token: token,
+      send: (token) => _client.put(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: body,
+      ),
+    );
+    return decodeResponse(response);
+  }
+
   Future<dynamic> get(String path, {String? token}) async {
     final response = await sendAuthenticated(
       path,

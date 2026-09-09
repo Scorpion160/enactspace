@@ -89,6 +89,7 @@ from app.models.institutional_memory import (
 )
 from app.models.product_services import (
     AppInstallation,
+    PushDelivery,
     AppRelease,
     AppVersionPolicy,
     ProductFeedback,

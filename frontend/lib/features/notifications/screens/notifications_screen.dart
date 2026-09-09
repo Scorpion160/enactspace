@@ -294,7 +294,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     if (!mounted) return;
 
     final route = notification.routePath;
-    if (route == null) {
+    if (route == null || route == '/notifications') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Aucune page liée pour cette notification.'),

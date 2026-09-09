@@ -415,10 +415,24 @@ def logout_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    from app.services.push_lifecycle import disable_user_push
+
     revoked_count = revoke_user_sessions(db, current_user.id)
+    revoked_installations, cancelled_push = disable_user_push(
+        db, current_user.id, revoke=True
+    )
     create_audit_log(
         db, "logout_all", current_user.id, "user", current_user.id,
-        new_value={"revoked_sessions": revoked_count},
+        new_value={
+            "revoked_sessions": revoked_count,
+            "revoked_installations": revoked_installations,
+            "cancelled_push_deliveries": cancelled_push,
+        },
     )
     db.commit()
-    return {"ok": True, "revoked_sessions": revoked_count}
+    return {
+        "ok": True,
+        "revoked_sessions": revoked_count,
+        "revoked_installations": revoked_installations,
+        "cancelled_push_deliveries": cancelled_push,
+    }

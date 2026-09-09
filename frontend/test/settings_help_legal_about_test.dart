@@ -189,7 +189,7 @@ void main() {
   });
 
   group('écran réglages', () {
-    testWidgets('dark/narrow reste lisible, sans push et avec français', (
+    testWidgets('dark/narrow reste lisible, push indisponible et français', (
       tester,
     ) async {
       _narrow(tester);
@@ -210,7 +210,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Réglages'), findsWidgets);
       expect(find.text('Français'), findsOneWidget);
-      expect(find.textContaining('push', findRichText: true), findsNothing);
+      expect(find.text('Notifications push'), findsOneWidget);
+      expect(find.text('Indisponibles sur cette version.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
