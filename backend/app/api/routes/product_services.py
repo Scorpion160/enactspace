@@ -45,6 +45,7 @@ from app.schemas.product_services import (
     SupportTicketMessageRead,
     SupportTicketRead,
     VERSION_PATTERN,
+    validate_store_url_for_platform,
 )
 from app.services.audit_service import create_audit_log
 from app.services.push_lifecycle import cancel_unsent_deliveries, clear_installation_push
@@ -644,12 +645,18 @@ def create_app_release(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
+    try:
+        store_url = validate_store_url_for_platform(
+            payload.store_url, payload.platform
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     release = AppRelease(
         platform=payload.platform.value,
         version=payload.version,
         build_number=payload.build_number,
         release_notes=_clean_optional(payload.release_notes),
-        store_url=_clean_optional(payload.store_url),
+        store_url=store_url,
         created_by_id=current_user.id,
     )
     db.add(release)
@@ -685,6 +692,11 @@ def update_app_release(
         for field in ("version", "build_number")
     ):
         raise HTTPException(status_code=400, detail="Version applicative invalide")
+    if "store_url" in payload.model_fields_set:
+        try:
+            validate_store_url_for_platform(payload.store_url, release.platform)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(release, field, _clean_optional(value) if isinstance(value, str) or value is None else value)
     release.updated_at = datetime.utcnow()
@@ -824,6 +836,31 @@ def update_app_version_policy(
             status_code=400,
             detail="La version minimale ne peut pas depasser la version courante",
         )
+    force_to_current = (
+        payload.force_update_to_current
+        if "force_update_to_current" in fields
+        else policy.force_update_to_current
+    )
+    force_capable = minimum_id is not None or force_to_current is True
+    if force_capable:
+        if current is None:
+            raise HTTPException(
+                status_code=400, detail="Une version courante est requise"
+            )
+        try:
+            store_url = validate_store_url_for_platform(
+                current.store_url, platform_value
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="La version courante doit avoir une URL de mise a jour valide",
+            ) from exc
+        if store_url is None:
+            raise HTTPException(
+                status_code=400,
+                detail="La version courante doit avoir une URL de mise a jour valide",
+            )
     starts = (
         _naive_utc(payload.maintenance_starts_at)
         if "maintenance_starts_at" in fields else policy.maintenance_starts_at

@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import Enum
 import ipaddress
-from urllib.parse import urlparse
+import re
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -17,17 +18,73 @@ def _validate_public_https_url(value: str | None) -> str | None:
     if not normalized:
         return None
     parsed = urlparse(normalized)
-    if parsed.scheme != "https" or not parsed.hostname:
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.fragment
+    ):
         raise ValueError("store_url must be a public HTTPS URL")
     hostname = parsed.hostname.lower()
-    if hostname == "localhost" or hostname.endswith(".localhost"):
+    if (
+        hostname == "localhost"
+        or hostname.endswith(".localhost")
+        or hostname.endswith(".")
+    ):
         raise ValueError("store_url must be a public HTTPS URL")
     try:
-        address = ipaddress.ip_address(hostname)
+        ipaddress.ip_address(hostname)
     except ValueError:
-        address = None
-    if address is not None and not address.is_global:
+        labels = hostname.rstrip(".").split(".")
+        if len(labels) < 2 or any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+            for label in labels
+        ):
+            raise ValueError("store_url must be a public HTTPS URL")
+    else:
         raise ValueError("store_url must be a public HTTPS URL")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("store_url must be a public HTTPS URL") from exc
+    if port not in (None, 443):
+        raise ValueError("store_url must be a public HTTPS URL")
+    return normalized
+
+
+def validate_store_url_for_platform(
+    value: str | None,
+    platform: "ProductPlatform | str",
+) -> str | None:
+    normalized = _validate_public_https_url(value)
+    if normalized is None:
+        return None
+    platform_value = (
+        platform.value if isinstance(platform, ProductPlatform) else platform
+    )
+    parsed = urlparse(normalized)
+    hostname = parsed.hostname.lower() if parsed.hostname else ""
+
+    if platform_value == ProductPlatform.android.value:
+        query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True)
+        if (
+            hostname != "play.google.com"
+            or parsed.path not in {"/store/apps/details", "/store/apps/details/"}
+            or query.get("id") != ["sn.enactusesp.enactspace"]
+            or not set(query).issubset({"id", "hl", "gl"})
+        ):
+            raise ValueError("store_url must be the EnactSpace Google Play URL")
+    elif platform_value == ProductPlatform.ios.value:
+        segments = [segment for segment in parsed.path.split("/") if segment]
+        if (
+            hostname != "apps.apple.com"
+            or "app" not in segments
+            or not segments
+            or re.fullmatch(r"id\d+", segments[-1]) is None
+        ):
+            raise ValueError("store_url must be an Apple App Store application URL")
+
     return normalized
 
 

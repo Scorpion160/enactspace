@@ -40,6 +40,7 @@ from app.models.user import User
 from app.schemas.account import UserPreferenceUpdate
 from app.schemas.product_services import (
     AppReleaseCreate,
+    AppReleaseUpdate,
     AppVersionPolicyUpdate,
     FeedbackCategory,
     ProductFeedbackAdminRead,
@@ -101,12 +102,20 @@ class ProductServicesTests(unittest.TestCase):
         return user
 
     def _release(self, version, build, platform="android"):
+        store_url = {
+            "android": (
+                "https://play.google.com/store/apps/details"
+                "?id=sn.enactusesp.enactspace"
+            ),
+            "ios": "https://apps.apple.com/sn/app/enactspace/id1234567890",
+            "web": "https://www.enactspace.example/releases",
+        }[platform]
         return product.create_app_release(
             AppReleaseCreate(
                 platform=platform,
                 version=version,
                 build_number=build,
-                store_url="https://store.example.test/enactspace",
+                store_url=store_url,
             ),
             db=self.db,
             current_user=self.admin,
@@ -484,6 +493,146 @@ class ProductServicesTests(unittest.TestCase):
             ProductPlatform.android, "1.5.0", 150, db=self.db
         )["force_update"])
         self.assertGreaterEqual(self.db.query(AuditLog).count(), 5)
+
+    def test_platform_store_urls_are_strict_and_updates_use_existing_platform(self):
+        android = self._release("6.0.0", 600)
+        self.assertEqual(
+            android.store_url,
+            "https://play.google.com/store/apps/details"
+            "?id=sn.enactusesp.enactspace",
+        )
+        ios = self._release("6.0.0", 600, platform="ios")
+        self.assertEqual(
+            ios.store_url,
+            "https://apps.apple.com/sn/app/enactspace/id1234567890",
+        )
+        web = self._release("6.0.0", 600, platform="web")
+        self.assertEqual(web.store_url, "https://www.enactspace.example/releases")
+
+        rejected = [
+            (
+                "android",
+                "https://example.com/store/apps/details"
+                "?id=sn.enactusesp.enactspace",
+            ),
+            (
+                "android",
+                "https://play.google.com/store/apps/details?id=wrong.package",
+            ),
+            (
+                "android",
+                "https://user@play.google.com/store/apps/details"
+                "?id=sn.enactusesp.enactspace",
+            ),
+            (
+                "android",
+                "https://play.google.com/store/apps/details"
+                "?id=sn.enactusesp.enactspace#fragment",
+            ),
+            ("ios", "https://example.com/sn/app/enactspace/id1234567890"),
+            ("ios", "https://apps.apple.com/sn/app/enactspace/not-an-id"),
+        ]
+        for index, (platform, store_url) in enumerate(rejected, start=1):
+            with self.subTest(platform=platform, store_url=store_url):
+                with self.assertRaises((ValidationError, HTTPException)):
+                    product.create_app_release(
+                        AppReleaseCreate(
+                            platform=platform,
+                            version=f"7.0.{index}",
+                            build_number=700 + index,
+                            store_url=store_url,
+                        ),
+                        db=self.db,
+                        current_user=self.admin,
+                    )
+
+        with self.assertRaises(ValidationError):
+            AppReleaseCreate(
+                platform="web",
+                version="7.1.0",
+                build_number=710,
+                store_url="https://internal/releases",
+            )
+        with self.assertRaises(HTTPException):
+            product.update_app_release(
+                str(android.id),
+                AppReleaseUpdate(
+                    store_url="https://apps.apple.com/sn/app/enactspace/id1234567890"
+                ),
+                db=self.db,
+                current_user=self.admin,
+            )
+
+    def test_force_capable_policies_require_current_store_destination(self):
+        with self.assertRaises(HTTPException) as no_current:
+            product.update_app_version_policy(
+                ProductPlatform.ios,
+                AppVersionPolicyUpdate(force_update_to_current=True),
+                db=self.db,
+                current_user=self.admin,
+            )
+        self.assertEqual(no_current.exception.status_code, 400)
+
+        current_without_url = product.create_app_release(
+            AppReleaseCreate(
+                platform="android", version="8.0.0", build_number=800
+            ),
+            db=self.db,
+            current_user=self.admin,
+        )
+        self._publish(current_without_url)
+        non_force = product.update_app_version_policy(
+            ProductPlatform.android,
+            AppVersionPolicyUpdate(current_release_id=current_without_url.id),
+            db=self.db,
+            current_user=self.admin,
+        )
+        self.assertFalse(non_force.force_update_to_current)
+
+        with self.assertRaises(HTTPException) as no_force_url:
+            product.update_app_version_policy(
+                ProductPlatform.android,
+                AppVersionPolicyUpdate(force_update_to_current=True),
+                db=self.db,
+                current_user=self.admin,
+            )
+        self.assertEqual(no_force_url.exception.status_code, 400)
+
+        minimum = self._publish(self._release("7.0.0", 700))
+        with self.assertRaises(HTTPException) as no_minimum_url:
+            product.update_app_version_policy(
+                ProductPlatform.android,
+                AppVersionPolicyUpdate(
+                    minimum_supported_release_id=minimum.id,
+                ),
+                db=self.db,
+                current_user=self.admin,
+            )
+        self.assertEqual(no_minimum_url.exception.status_code, 400)
+
+        valid_current = self._publish(self._release("9.0.0", 900))
+        policy = product.update_app_version_policy(
+            ProductPlatform.android,
+            AppVersionPolicyUpdate(
+                current_release_id=valid_current.id,
+                minimum_supported_release_id=minimum.id,
+                force_update_to_current=True,
+            ),
+            db=self.db,
+            current_user=self.admin,
+        )
+        self.assertTrue(policy.force_update_to_current)
+
+        valid_current.store_url = None
+        self.db.flush()
+        with self.assertRaises(HTTPException) as idempotent_revalidation:
+            product.update_app_version_policy(
+                ProductPlatform.android,
+                AppVersionPolicyUpdate(),
+                db=self.db,
+                current_user=self.admin,
+            )
+        self.assertEqual(idempotent_revalidation.exception.status_code, 400)
 
     def test_maintenance_windows_unconfigured_bootstrap_and_public_endpoint(self):
         with self.assertRaises(HTTPException) as invalid_window:

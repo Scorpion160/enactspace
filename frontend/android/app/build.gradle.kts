@@ -72,7 +72,14 @@ flutter {
 }
 
 tasks.configureEach {
-    if (name in setOf("assembleRelease", "bundleRelease", "packageRelease")) {
+    if (
+        name in setOf(
+            "preReleaseBuild",
+            "assembleRelease",
+            "bundleRelease",
+            "packageRelease",
+        )
+    ) {
         doFirst {
             if (!releaseSigningConfigured) {
                 throw GradleException(

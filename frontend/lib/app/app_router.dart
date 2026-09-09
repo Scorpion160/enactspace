@@ -37,6 +37,7 @@ import '../features/members/screens/members_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/pole_detail_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
+import '../features/product_readiness/product_readiness_gate.dart';
 import '../features/posts/screens/posts_screen.dart';
 import '../features/projects/screens/project_detail_screen.dart';
 import '../features/projects/screens/projects_portfolio_screen.dart';
@@ -108,11 +109,6 @@ class AppRouter {
     },
     routes: [
       GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
         path: '/legal/privacy',
         builder: (context, state) =>
             const PublicLegalScreen(documentType: 'privacy_policy'),
@@ -122,270 +118,285 @@ class AppRouter {
         builder: (context, state) =>
             const PublicLegalScreen(documentType: 'terms_of_use'),
       ),
-      GoRoute(path: '/about', builder: (context, state) => AboutScreen()),
-      GoRoute(
-        path: '/application-tracking',
-        builder: (context, state) => const ApplicationTrackingScreen(),
-      ),
-      GoRoute(
-        path: '/recruitment/apply',
-        builder: (context, state) => const PublicRecruitmentCampaignsScreen(),
-        routes: [
-          GoRoute(
-            path: ':campaignId',
-            builder: (context, state) => PublicApplicationFlowScreen(
-              campaignId: state.pathParameters['campaignId']!,
-            ),
-          ),
-        ],
-      ),
       ShellRoute(
-        builder: (context, state, child) {
-          return LegalAcceptanceGate(
-            child: AppShell(currentPath: state.uri.path, child: child),
-          );
-        },
+        builder: (context, state, child) => ProductReadinessGate(child: child),
         routes: [
           GoRoute(
-            path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            path: '/splash',
+            builder: (context, state) => const SplashScreen(),
           ),
           GoRoute(
-            path: '/help',
-            builder: (context, state) => const HelpScreen(),
+            path: '/login',
+            builder: (context, state) => const LoginScreen(),
+          ),
+          GoRoute(path: '/about', builder: (context, state) => AboutScreen()),
+          GoRoute(
+            path: '/application-tracking',
+            builder: (context, state) => const ApplicationTrackingScreen(),
           ),
           GoRoute(
-            path: '/dashboard',
-            builder: (context, state) => const DashboardScreen(),
-          ),
-          GoRoute(
-            path: '/members',
-            builder: (context, state) => const MembersScreen(),
-          ),
-          GoRoute(
-            path: '/attendance',
-            builder: (context, state) => const AttendanceScreen(),
-          ),
-          GoRoute(
-            path: '/attendance/scan',
-            builder: (context, state) => const AttendanceQrScannerScreen(),
-          ),
-          GoRoute(
-            path: '/attendance/nfc',
-            builder: (context, state) => const AttendanceNfcEnrollmentScreen(),
-          ),
-          GoRoute(
-            path: '/tasks',
-            builder: (context, state) => TasksScreen(
-              initialView: TaskCenterViewPresentation.fromQuery(
-                state.uri.queryParameters['view'],
-              ),
-            ),
+            path: '/recruitment/apply',
+            builder: (context, state) =>
+                const PublicRecruitmentCampaignsScreen(),
             routes: [
               GoRoute(
-                path: ':taskId',
-                builder: (context, state) => TaskDetailScreen(
-                  taskId: state.pathParameters['taskId']!,
-                  gateway: state.extra is TasksGateway
-                      ? state.extra! as TasksGateway
-                      : null,
+                path: ':campaignId',
+                builder: (context, state) => PublicApplicationFlowScreen(
+                  campaignId: state.pathParameters['campaignId']!,
                 ),
               ),
             ],
           ),
-          GoRoute(
-            path: '/finance',
-            builder: (context, state) => const FinanceScreen(),
-          ),
-          GoRoute(
-            path: '/recruitment',
-            builder: (context, state) => const InternalRecruitmentScreen(),
-          ),
-          GoRoute(
-            path: '/documents',
-            builder: (context, state) => const DocumentsScreen(),
+          ShellRoute(
+            builder: (context, state, child) {
+              return LegalAcceptanceGate(
+                child: AppShell(currentPath: state.uri.path, child: child),
+              );
+            },
             routes: [
               GoRoute(
-                path: ':documentId',
-                builder: (context, state) => DocumentDetailScreen(
-                  documentId: state.pathParameters['documentId']!,
-                  gateway: state.extra is DocumentsGateway
-                      ? state.extra! as DocumentsGateway
-                      : null,
+                path: '/settings',
+                builder: (context, state) => const SettingsScreen(),
+              ),
+              GoRoute(
+                path: '/help',
+                builder: (context, state) => const HelpScreen(),
+              ),
+              GoRoute(
+                path: '/dashboard',
+                builder: (context, state) => const DashboardScreen(),
+              ),
+              GoRoute(
+                path: '/members',
+                builder: (context, state) => const MembersScreen(),
+              ),
+              GoRoute(
+                path: '/attendance',
+                builder: (context, state) => const AttendanceScreen(),
+              ),
+              GoRoute(
+                path: '/attendance/scan',
+                builder: (context, state) => const AttendanceQrScannerScreen(),
+              ),
+              GoRoute(
+                path: '/attendance/nfc',
+                builder: (context, state) =>
+                    const AttendanceNfcEnrollmentScreen(),
+              ),
+              GoRoute(
+                path: '/tasks',
+                builder: (context, state) => TasksScreen(
+                  initialView: TaskCenterViewPresentation.fromQuery(
+                    state.uri.queryParameters['view'],
+                  ),
                 ),
+                routes: [
+                  GoRoute(
+                    path: ':taskId',
+                    builder: (context, state) => TaskDetailScreen(
+                      taskId: state.pathParameters['taskId']!,
+                      gateway: state.extra is TasksGateway
+                          ? state.extra! as TasksGateway
+                          : null,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/notifications',
-            builder: (context, state) => const NotificationsScreen(),
-          ),
-          GoRoute(
-            path: '/posts',
-            builder: (context, state) => const PostsScreen(),
-          ),
-          GoRoute(
-            path: '/chat',
-            builder: (context, state) => ChatScreen(
-              initialThreadId: state.uri.queryParameters['thread'],
-            ),
-          ),
-          GoRoute(
-            path: '/poles',
-            builder: (context, state) => const PolesScreen(),
-            routes: [
               GoRoute(
-                path: ':poleId',
-                builder: (context, state) {
-                  final extra = state.extra;
-                  return PoleDetailScreen(
-                    poleId: state.pathParameters['poleId']!,
-                    gateway: extra is PoleDetailRouteData
-                        ? extra.gateway
-                        : null,
-                    initialItem: extra is PoleDetailRouteData
-                        ? extra.initialItem
-                        : null,
-                  );
-                },
+                path: '/finance',
+                builder: (context, state) => const FinanceScreen(),
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/projects',
-            builder: (context, state) => const ProjectsPortfolioScreen(),
-            routes: [
               GoRoute(
-                path: ':projectId',
-                builder: (context, state) {
-                  final extra = state.extra;
-                  return ProjectDetailScreen(
-                    projectId: state.pathParameters['projectId']!,
-                    gateway: extra is ProjectDetailRouteData
-                        ? extra.gateway
-                        : null,
-                    initialItem: extra is ProjectDetailRouteData
-                        ? extra.initialItem
-                        : null,
-                  );
-                },
+                path: '/recruitment',
+                builder: (context, state) => const InternalRecruitmentScreen(),
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/events',
-            builder: (context, state) => const EventsScreen(),
-            routes: [
               GoRoute(
-                path: ':eventId',
-                builder: (context, state) => EventDetailScreen(
-                  eventId: state.pathParameters['eventId']!,
-                  gateway: state.extra is EventsGateway
-                      ? state.extra! as EventsGateway
-                      : null,
-                ),
+                path: '/documents',
+                builder: (context, state) => const DocumentsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':documentId',
+                    builder: (context, state) => DocumentDetailScreen(
+                      documentId: state.pathParameters['documentId']!,
+                      gateway: state.extra is DocumentsGateway
+                          ? state.extra! as DocumentsGateway
+                          : null,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/alumni',
-            builder: (context, state) => const AlumniScreen(),
-            routes: [
               GoRoute(
-                path: ':profileId',
-                builder: (context, state) => AlumniProfileDetailScreen(
-                  profileId: state.pathParameters['profileId']!,
-                  gateway: state.extra is AlumniGateway
-                      ? state.extra! as AlumniGateway
-                      : null,
-                ),
+                path: '/notifications',
+                builder: (context, state) => const NotificationsScreen(),
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/gamification',
-            builder: (context, state) => const GamificationScreen(),
-          ),
-          GoRoute(
-            path: '/academy',
-            builder: (context, state) => const AcademyHomeScreen(),
-            routes: [
               GoRoute(
-                path: 'courses/:courseId',
-                builder: (context, state) => AcademyCourseScreen(
-                  courseId: state.pathParameters['courseId']!,
-                  gateway: state.extra is AcademyGateway
-                      ? state.extra! as AcademyGateway
-                      : null,
+                path: '/posts',
+                builder: (context, state) => const PostsScreen(),
+              ),
+              GoRoute(
+                path: '/chat',
+                builder: (context, state) => ChatScreen(
+                  initialThreadId: state.uri.queryParameters['thread'],
                 ),
               ),
               GoRoute(
-                path: 'admin',
-                builder: (context, state) => AcademyAdminScreen(
-                  gateway: state.extra is AcademyGateway
-                      ? state.extra! as AcademyGateway
-                      : null,
-                ),
+                path: '/poles',
+                builder: (context, state) => const PolesScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':poleId',
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      return PoleDetailScreen(
+                        poleId: state.pathParameters['poleId']!,
+                        gateway: extra is PoleDetailRouteData
+                            ? extra.gateway
+                            : null,
+                        initialItem: extra is PoleDetailRouteData
+                            ? extra.initialItem
+                            : null,
+                      );
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
-          GoRoute(
-            path: '/archives',
-            builder: (context, state) => ArchivesScreen(
-              gateway: state.extra is ArchivesGateway
-                  ? state.extra! as ArchivesGateway
-                  : null,
-            ),
-            routes: [
               GoRoute(
-                path: 'items/:archiveId',
-                builder: (context, state) => ArchiveItemDetailScreen(
-                  archiveId: state.pathParameters['archiveId']!,
+                path: '/projects',
+                builder: (context, state) => const ProjectsPortfolioScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':projectId',
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      return ProjectDetailScreen(
+                        projectId: state.pathParameters['projectId']!,
+                        gateway: extra is ProjectDetailRouteData
+                            ? extra.gateway
+                            : null,
+                        initialItem: extra is ProjectDetailRouteData
+                            ? extra.initialItem
+                            : null,
+                      );
+                    },
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/events',
+                builder: (context, state) => const EventsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':eventId',
+                    builder: (context, state) => EventDetailScreen(
+                      eventId: state.pathParameters['eventId']!,
+                      gateway: state.extra is EventsGateway
+                          ? state.extra! as EventsGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/alumni',
+                builder: (context, state) => const AlumniScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':profileId',
+                    builder: (context, state) => AlumniProfileDetailScreen(
+                      profileId: state.pathParameters['profileId']!,
+                      gateway: state.extra is AlumniGateway
+                          ? state.extra! as AlumniGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/gamification',
+                builder: (context, state) => const GamificationScreen(),
+              ),
+              GoRoute(
+                path: '/academy',
+                builder: (context, state) => const AcademyHomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'courses/:courseId',
+                    builder: (context, state) => AcademyCourseScreen(
+                      courseId: state.pathParameters['courseId']!,
+                      gateway: state.extra is AcademyGateway
+                          ? state.extra! as AcademyGateway
+                          : null,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'admin',
+                    builder: (context, state) => AcademyAdminScreen(
+                      gateway: state.extra is AcademyGateway
+                          ? state.extra! as AcademyGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/archives',
+                builder: (context, state) => ArchivesScreen(
                   gateway: state.extra is ArchivesGateway
                       ? state.extra! as ArchivesGateway
-                      : null,
-                ),
-              ),
-              GoRoute(
-                path: 'projects/:projectId',
-                builder: (context, state) => HistoricalProjectDetailScreen(
-                  projectId: state.pathParameters['projectId']!,
-                  gateway: state.extra is ArchivesGateway
-                      ? state.extra! as ArchivesGateway
-                      : null,
-                ),
-              ),
-              GoRoute(
-                path: 'hall-of-fame/:entryId',
-                builder: (context, state) => HallOfFameDetailScreen(
-                  entryId: state.pathParameters['entryId']!,
-                  gateway: state.extra is ArchivesGateway
-                      ? state.extra! as ArchivesGateway
-                      : null,
-                ),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: '/impact',
-            builder: (context, state) => const ImpactDashboardScreen(),
-            routes: [
-              GoRoute(
-                path: 'records',
-                builder: (context, state) => ImpactRecordsScreen(
-                  gateway: state.extra is ImpactGateway
-                      ? state.extra! as ImpactGateway
                       : null,
                 ),
                 routes: [
                   GoRoute(
-                    path: ':impactRecordId',
-                    builder: (context, state) => ImpactRecordDetailScreen(
-                      recordId: state.pathParameters['impactRecordId']!,
+                    path: 'items/:archiveId',
+                    builder: (context, state) => ArchiveItemDetailScreen(
+                      archiveId: state.pathParameters['archiveId']!,
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'projects/:projectId',
+                    builder: (context, state) => HistoricalProjectDetailScreen(
+                      projectId: state.pathParameters['projectId']!,
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'hall-of-fame/:entryId',
+                    builder: (context, state) => HallOfFameDetailScreen(
+                      entryId: state.pathParameters['entryId']!,
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/impact',
+                builder: (context, state) => const ImpactDashboardScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'records',
+                    builder: (context, state) => ImpactRecordsScreen(
                       gateway: state.extra is ImpactGateway
                           ? state.extra! as ImpactGateway
                           : null,
                     ),
+                    routes: [
+                      GoRoute(
+                        path: ':impactRecordId',
+                        builder: (context, state) => ImpactRecordDetailScreen(
+                          recordId: state.pathParameters['impactRecordId']!,
+                          gateway: state.extra is ImpactGateway
+                              ? state.extra! as ImpactGateway
+                              : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -405,6 +416,10 @@ class AppRouter {
         path == '/application-tracking' ||
         path == '/recruitment/apply' ||
         path.startsWith('/recruitment/apply/');
+  }
+
+  static bool isProductReadinessExemptPath(String path) {
+    return path == '/legal/privacy' || path == '/legal/terms';
   }
 
   static bool _authenticatedFallbackAllows(String path) {
