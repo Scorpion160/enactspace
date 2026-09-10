@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -69,7 +71,7 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
     normalized_email = normalize_login_email(email)
     user = (
         db.query(User)
-        .filter(User.email == normalized_email)
+        .filter(func.lower(User.email) == normalized_email)
         .populate_existing()
         .with_for_update()
         .first()
@@ -190,7 +192,8 @@ def create_join_request(
             detail="Complétez au moins identité, email et filière",
         )
 
-    existing = db.query(User).filter(User.email == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    existing = db.query(User).filter(func.lower(User.email) == normalized_email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -200,7 +203,7 @@ def create_join_request(
     user = User(
         first_name=first_name,
         last_name=last_name,
-        email=payload.email,
+        email=normalized_email,
         phone=optional_text(payload.phone),
         gender=gender,
         profile_type=profile_type,
@@ -219,7 +222,14 @@ def create_join_request(
     )
 
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte existe déjà avec cet email",
+        ) from exc
     db.refresh(user)
 
     return JoinRequestRead(
@@ -236,7 +246,9 @@ def request_password_reset(
     payload: PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(
+        func.lower(User.email) == payload.email.strip().lower()
+    ).first()
     otp = f"{secrets.randbelow(1_000_000):06d}"
 
     if user and user.is_active:
@@ -269,7 +281,9 @@ def confirm_password_reset(
     payload: PasswordResetConfirm,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(
+        func.lower(User.email) == payload.email.strip().lower()
+    ).first()
     reset_otp = None
     if user:
         reset_otp = db.query(PasswordResetOtp).filter(

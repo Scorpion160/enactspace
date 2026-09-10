@@ -51,7 +51,10 @@ FINANCE_MANAGEMENT_ROLES = {
     FINANCE_ROLE,
 }
 
-RECRUITMENT_ACCESS_ROLES = ENACCHEF_ROLES | {
+RECRUITMENT_ACCESS_ROLES = {
+    ADMIN_ROLE,
+    TEAM_LEADER_ROLE,
+    SECRETARY_ROLE,
     "pole_veille",
     "veille",
     "chef_pole_veille",

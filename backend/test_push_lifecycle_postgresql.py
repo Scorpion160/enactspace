@@ -251,7 +251,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
             version = connection.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-        self.assertEqual(version, "20260906_0006")
+        self.assertEqual(version, "20260909_0007")
         user_id, installation_id = self._identity(token="unique-token")
         db = self.Session()
         second = AppInstallation(

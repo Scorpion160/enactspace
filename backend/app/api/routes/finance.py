@@ -1,4 +1,5 @@
 import csv
+import hashlib
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from io import StringIO
@@ -16,7 +17,9 @@ from app.services.payments import (
     get_payment_provider,
 )
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db.database import get_db
 from app.models.finance import (
@@ -56,6 +59,7 @@ from app.api.deps import (
     require_finance_or_admin,
     user_has_any_role,
 )
+from app.services.operational_integrity import lock_row
 
 router = APIRouter(prefix="/finance", tags=["Finances"])
 
@@ -145,7 +149,7 @@ def finance_manager_ids(db: Session) -> list:
 def ensure_financial_account(db: Session, user_id):
     account = db.query(FinancialAccount).filter(
         FinancialAccount.user_id == user_id
-    ).first()
+    ).populate_existing().with_for_update().first()
 
     if not account:
         account = FinancialAccount(
@@ -184,7 +188,7 @@ def allocate_payment_to_unpaid_fees(
     fees = db.query(Fee).filter(
         Fee.user_id == payment.user_id,
         Fee.status.in_(["unpaid", "partial"]),
-    ).order_by(Fee.created_at.asc()).all()
+    ).order_by(Fee.id.asc()).with_for_update().all()
 
     allocations = []
 
@@ -548,7 +552,6 @@ def create_fee_record(
                 Fee.user_id == user_id,
                 Fee.source_type == source_type,
                 Fee.source_id == source_id,
-                Fee.status != "cancelled",
             )
             .first()
         )
@@ -796,6 +799,24 @@ async def initiate_mobile_money_payment(
     if existing:
         return mobile_money_public_payload(existing)
 
+    window = int(datetime.utcnow().timestamp()) // 300
+    semantic_material = (
+        f"{target_member_id}|{','.join(sorted(fee_ids_as_text))}|"
+        f"{amount}|{payload.channel or ''}|{window}"
+    )
+    semantic_base = "mm:" + hashlib.sha256(semantic_material.encode("utf-8")).hexdigest()
+    prior_attempts = db.query(func.count(MobileMoneyTransaction.id)).filter(
+        or_(
+            MobileMoneyTransaction.idempotency_key == semantic_base,
+            MobileMoneyTransaction.idempotency_key.like(f"{semantic_base}:%"),
+        )
+    ).scalar()
+    semantic_key = (
+        semantic_base
+        if not prior_attempts
+        else f"{semantic_base}:{prior_attempts}"
+    )
+
     member = db.query(User).filter(User.id == target_member_id).first()
     if member is None:
         raise HTTPException(
@@ -807,7 +828,7 @@ async def initiate_mobile_money_payment(
         member_id=target_member_id,
         finance_item_id=fees[0].id if len(fees) == 1 else None,
         provider=settings.MOBILE_MONEY_PROVIDER,
-        idempotency_key=str(uuid.uuid4()),
+        idempotency_key=semantic_key,
         amount=amount,
         currency=settings.PAYMENT_CURRENCY,
         channel=payload.channel,
@@ -820,7 +841,19 @@ async def initiate_mobile_money_payment(
         },
     )
     db.add(transaction)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        concurrent = db.query(MobileMoneyTransaction).filter(
+            MobileMoneyTransaction.idempotency_key == semantic_key
+        ).first()
+        if concurrent is not None:
+            return mobile_money_public_payload(concurrent)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une initiation Mobile Money identique est déjà en cours",
+        ) from exc
     mobile_money_event(
         db,
         transaction,
@@ -1386,7 +1419,9 @@ def validate_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    payment = get_payment_or_404(db, payment_id)
+    payment = lock_row(db, Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
     if not can_review_payment(db, current_user, payment):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1398,13 +1433,13 @@ def validate_payment(
 
     if payment.status == "rejected":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Impossible de valider un paiement rejete",
         )
 
     if payment.status == "cancelled":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Impossible de valider un paiement annulé",
         )
 
@@ -1477,7 +1512,9 @@ def reject_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    payment = get_payment_or_404(db, payment_id)
+    payment = lock_row(db, Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
     if not can_review_payment(db, current_user, payment):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1489,7 +1526,7 @@ def reject_payment(
 
     if payment.status in {"validated", "cancelled"}:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Impossible de rejeter ce paiement",
         )
 
@@ -1544,7 +1581,9 @@ def cancel_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    payment = get_payment_or_404(db, payment_id)
+    payment = lock_row(db, Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
     if not (
         is_finance_manager(db, current_user)
         or payment.user_id == current_user.id
@@ -1561,7 +1600,7 @@ def cancel_payment(
 
     if payment.status == "validated":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Impossible d'annuler directement un paiement déjà validé",
         )
 

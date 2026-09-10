@@ -1,10 +1,12 @@
 import csv
 from io import StringIO
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -24,6 +26,7 @@ from app.models.attendance import (
     AttendanceSession,
     AttendanceSetting,
 )
+from app.models.event import Event
 from app.models.finance import Fee, FinancialAccount
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
@@ -56,6 +59,11 @@ from app.services.attendance_qr_service import (
     validate_attendance_qr_token,
 )
 from app.services.notification_service import notify_user, notify_users
+from app.services.operational_integrity import (
+    assert_active_operational_member,
+    lock_row,
+    to_naive_utc,
+)
 
 router = APIRouter(prefix="/attendance", tags=["Presences"])
 
@@ -154,14 +162,20 @@ def _sanctions_started(db: Session) -> bool:
     if not raw:
         return True
     try:
-        started_at = datetime.fromisoformat(raw)
+        started_at = to_naive_utc(datetime.fromisoformat(raw))
     except ValueError:
         return True
     return datetime.utcnow() >= started_at
 
 
 def _ensure_financial_account(db: Session, user_id) -> FinancialAccount:
-    account = db.query(FinancialAccount).filter(FinancialAccount.user_id == user_id).first()
+    account = (
+        db.query(FinancialAccount)
+        .filter(FinancialAccount.user_id == user_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if not account:
         account = FinancialAccount(user_id=user_id, balance_due=0, total_paid=0)
         db.add(account)
@@ -170,14 +184,30 @@ def _ensure_financial_account(db: Session, user_id) -> FinancialAccount:
 
 
 def _remove_attendance_penalty(db: Session, record: AttendanceRecord) -> None:
-    fee = db.query(Fee).filter(Fee.related_attendance_id == record.id).first()
-    if fee and fee.status == "unpaid":
+    fee = (
+        db.query(Fee)
+        .filter(Fee.related_attendance_id == record.id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if fee and fee.status != "cancelled":
         account = _ensure_financial_account(db, record.user_id)
-        account.balance_due = max(0, float(account.balance_due or 0) - float(fee.amount or 0))
+        remaining = max(
+            Decimal("0"),
+            Decimal(str(fee.amount or 0)) - Decimal(str(fee.amount_paid or 0)),
+        )
+        account.balance_due = max(
+            Decimal("0"),
+            Decimal(str(account.balance_due or 0)) - remaining,
+        )
         account.updated_at = datetime.utcnow()
-        db.delete(fee)
+        fee.status = "cancelled"
+        fee.cancelled_at = datetime.utcnow()
+        fee.updated_at = datetime.utcnow()
     record.penalty_amount = 0
-    record.penalty_fee_id = None
+    if fee:
+        record.penalty_fee_id = fee.id
 
 
 def _attendance_penalty_amount(db: Session, record: AttendanceRecord) -> float:
@@ -199,8 +229,14 @@ def _sync_attendance_penalty(
     record: AttendanceRecord,
     current_user: User,
 ) -> None:
-    amount = _attendance_penalty_amount(db, record)
-    existing_fee = db.query(Fee).filter(Fee.related_attendance_id == record.id).first()
+    amount = Decimal(str(_attendance_penalty_amount(db, record)))
+    existing_fee = (
+        db.query(Fee)
+        .filter(Fee.related_attendance_id == record.id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if amount <= 0:
         _remove_attendance_penalty(db, record)
@@ -214,17 +250,31 @@ def _sync_attendance_penalty(
     fee_type = "penalite_retard" if record.status == "late" else "penalite_absence"
 
     if existing_fee:
-        previous_amount = float(existing_fee.amount or 0)
-        existing_fee.amount = amount
+        was_cancelled = existing_fee.status == "cancelled"
+        paid = Decimal(str(existing_fee.amount_paid or 0))
+        previous_total = Decimal(str(existing_fee.amount or 0))
+        previous_remaining = (
+            Decimal("0")
+            if was_cancelled
+            else max(
+                Decimal("0"),
+                previous_total - paid,
+            )
+        )
+        existing_fee.amount = max(amount, paid)
         existing_fee.label = label
         existing_fee.type = fee_type
+        total = Decimal(str(existing_fee.amount or 0))
+        existing_fee.status = "paid" if paid >= total else ("partial" if paid > 0 else "unpaid")
+        existing_fee.cancelled_at = None
         existing_fee.updated_at = datetime.utcnow()
-        record.penalty_amount = amount
+        record.penalty_amount = existing_fee.amount
         record.penalty_fee_id = existing_fee.id
         account = _ensure_financial_account(db, record.user_id)
+        remaining = max(Decimal("0"), total - paid)
         account.balance_due = max(
-            0,
-            float(account.balance_due or 0) - previous_amount + amount,
+            Decimal("0"),
+            Decimal(str(account.balance_due or 0)) - previous_remaining + remaining,
         )
         account.updated_at = datetime.utcnow()
         return
@@ -244,7 +294,7 @@ def _sync_attendance_penalty(
     db.flush()
 
     account = _ensure_financial_account(db, record.user_id)
-    account.balance_due = float(account.balance_due or 0) + amount
+    account.balance_due = Decimal(str(account.balance_due or 0)) + amount
     account.updated_at = datetime.utcnow()
 
     record.penalty_amount = amount
@@ -415,9 +465,12 @@ def _calculate_delay_minutes(
         return max(0, explicit_delay)
     if attendance_status != "late":
         return None
+    arrival_time = to_naive_utc(arrival_time)
     if not arrival_time:
         return session.late_after_minutes
-    reference_time = session.checkin_start or session.scheduled_at or session.created_at
+    reference_time = to_naive_utc(
+        session.checkin_start or session.scheduled_at or session.created_at
+    )
     delay = int((arrival_time - reference_time).total_seconds() // 60)
     return max(0, delay)
 
@@ -454,7 +507,7 @@ def _attendance_session_payload(
     current_user: User,
     session: AttendanceSession,
 ) -> dict:
-    if session.is_closed and session.status != "closed":
+    if session.is_closed and session.status not in {"closed", "archived"}:
         session.status = "closed"
 
     data = AttendanceSessionRead.model_validate(session).model_dump()
@@ -502,6 +555,33 @@ def _validate_session_payload_permissions(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Permission insuffisante pour creer cette seance",
+    )
+
+
+def _validate_event_reference_permissions(
+    db: Session,
+    current_user: User,
+    event_id,
+) -> None:
+    if event_id is None:
+        return
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Evenement introuvable",
+        )
+    if _is_global_attendance_manager(db, current_user):
+        return
+    if event.created_by == current_user.id:
+        return
+    if event.pole_id and event.pole_id in _managed_pole_ids(db, current_user):
+        return
+    if event.project_id and event.project_id in _managed_project_ids(db, current_user):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission insuffisante pour cet evenement",
     )
 
 
@@ -603,7 +683,7 @@ def _upsert_record(
         normalized_status,
     )
     now = datetime.utcnow()
-    arrival = arrival_time if arrival_time is not None else now
+    arrival = to_naive_utc(arrival_time) if arrival_time is not None else now
     if normalized_status in {"absent", "justified_absence", "excused", "not_recorded"}:
         arrival = None
 
@@ -704,7 +784,10 @@ def _notify_justification_reviewers(
 
 
 def _compute_checkin_status(session: AttendanceSession, now: datetime) -> str:
-    reference_time = session.checkin_start or session.scheduled_at or session.created_at
+    now = to_naive_utc(now)
+    reference_time = to_naive_utc(
+        session.checkin_start or session.scheduled_at or session.created_at
+    )
     late_limit = reference_time + timedelta(minutes=session.late_after_minutes)
     return "late" if now > late_limit else "present"
 
@@ -1167,6 +1250,11 @@ def create_attendance_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    if _normalize_session_status(payload.status) != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une séance doit être créée à l'état brouillon",
+        )
     scope_type = _normalize_scope_type(payload.scope_type, payload)
     _validate_session_payload_permissions(
         db,
@@ -1175,6 +1263,7 @@ def create_attendance_session(
         payload.pole_id,
         payload.project_id,
     )
+    _validate_event_reference_permissions(db, current_user, payload.event_id)
 
     session = AttendanceSession(
         title=payload.title.strip(),
@@ -1187,12 +1276,12 @@ def create_attendance_session(
         project_id=payload.project_id,
         created_by=current_user.id,
         qr_token=payload.qr_token,
-        scheduled_at=payload.scheduled_at,
-        checkin_start=payload.checkin_start,
-        checkin_end=payload.checkin_end,
+        scheduled_at=to_naive_utc(payload.scheduled_at),
+        checkin_start=to_naive_utc(payload.checkin_start),
+        checkin_end=to_naive_utc(payload.checkin_end),
         late_after_minutes=payload.late_after_minutes,
-        status=_normalize_session_status(payload.status),
-        is_closed=payload.status == "closed",
+        status="draft",
+        is_closed=False,
         notes=payload.notes,
     )
     db.add(session)
@@ -1223,7 +1312,9 @@ def get_attendance_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, session_id)
+    session = lock_row(db, AttendanceSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     visible = _session_query_for_user(db, current_user).filter(
         AttendanceSession.id == session.id
     ).first()
@@ -1248,16 +1339,32 @@ def update_attendance_session(
 
     old_value = _attendance_session_payload(db, current_user, session)
     updates = payload.model_dump(exclude_unset=True)
+    if {"status", "is_closed"}.intersection(updates):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Utilisez les actions ouvrir, clôturer ou archiver",
+        )
     if "session_type" in updates:
         updates["session_type"] = _normalize_session_type(updates["session_type"])
     if "scope_type" in updates:
         updates["scope_type"] = _normalize_scope_type(updates["scope_type"], payload)
-    if "status" in updates:
-        updates["status"] = _normalize_session_status(
-            updates["status"],
-            is_closed=updates["status"] == "closed",
+    for time_field in ("scheduled_at", "checkin_start", "checkin_end"):
+        if time_field in updates:
+            updates[time_field] = to_naive_utc(updates[time_field])
+
+    next_scope_type = updates.get("scope_type", session.scope_type)
+    next_pole_id = updates.get("pole_id", session.pole_id)
+    next_project_id = updates.get("project_id", session.project_id)
+    next_event_id = updates.get("event_id", session.event_id)
+    if {"scope_type", "pole_id", "project_id", "event_id"}.intersection(updates):
+        _validate_session_payload_permissions(
+            db,
+            current_user,
+            next_scope_type,
+            next_pole_id,
+            next_project_id,
         )
-        updates["is_closed"] = updates["status"] == "closed"
+        _validate_event_reference_permissions(db, current_user, next_event_id)
 
     for field, value in updates.items():
         setattr(session, field, value)
@@ -1286,12 +1393,16 @@ def open_attendance_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, session_id)
+    session = lock_row(db, AttendanceSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     _require_can_manage_session(db, current_user, session)
-    if session.is_closed:
+    if session.status == "open":
+        return _attendance_session_payload(db, current_user, session)
+    if session.status != "draft" or session.is_closed:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette seance est deja cloturee",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Transition de séance interdite : {session.status} -> open",
         )
 
     session.status = "open"
@@ -1336,11 +1447,18 @@ def close_attendance_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, session_id)
+    session = lock_row(db, AttendanceSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     _require_can_manage_session(db, current_user, session)
 
-    if session.is_closed:
+    if session.status in {"closed", "archived"}:
         return {"ok": True, "message": "La seance etait deja cloturee"}
+    if session.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Transition de séance interdite : {session.status} -> closed",
+        )
 
     _ensure_expected_members(db, session)
     expected_members = (
@@ -1391,6 +1509,42 @@ def close_attendance_session(
         "message": "Seance de presence cloturee",
         "absences_generated": created_absences,
     }
+
+
+@router.post("/sessions/{session_id}/archive", response_model=AttendanceSessionRead)
+def archive_attendance_session(
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    session = lock_row(db, AttendanceSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
+    _require_can_manage_session(db, current_user, session)
+    if session.status == "archived":
+        return _attendance_session_payload(db, current_user, session)
+    if session.status != "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Transition de séance interdite : {session.status} -> archived",
+        )
+    session.status = "archived"
+    session.is_closed = True
+    session.updated_at = datetime.utcnow()
+    create_audit_log(
+        db=db,
+        action="archivage_seance_presence",
+        user_id=current_user.id,
+        entity_type="attendance_session",
+        entity_id=session.id,
+        old_value={"status": "closed"},
+        new_value={"status": "archived"},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(session)
+    return _attendance_session_payload(db, current_user, session)
 
 
 @router.post("/sessions/{session_id}/qr-token", response_model=AttendanceQrTokenRead)
@@ -1498,11 +1652,7 @@ def scan_attendance_qr(
         db.commit()
         return _qr_scan_result("invalid_token")
 
-    session = (
-        db.query(AttendanceSession)
-        .filter(AttendanceSession.id == qr_payload.session_id)
-        .first()
-    )
+    session = lock_row(db, AttendanceSession, qr_payload.session_id)
     if not session:
         _audit_qr_scan(
             db,
@@ -1629,15 +1779,18 @@ def list_session_attendance_records(
 def create_session_attendance_record(
     session_id: str,
     payload: AttendanceRecordCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, session_id)
+    session = lock_row(db, AttendanceSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     _require_can_manage_session(db, current_user, session)
-    if session.is_closed:
+    if session.status != "open" or session.is_closed:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette seance est deja cloturee",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La séance doit être ouverte",
         )
 
     record = _upsert_record(
@@ -1656,6 +1809,15 @@ def create_session_attendance_record(
         note=payload.note,
     )
     _notify_record_change(db, record, session)
+    create_audit_log(
+        db=db,
+        action="creation_presence_admin",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        new_value={"status": record.status, "user_id": str(record.user_id)},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(record)
     return record
@@ -1665,6 +1827,7 @@ def create_session_attendance_record(
 def update_attendance_record(
     record_id: str,
     payload: AttendanceRecordUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -1674,8 +1837,24 @@ def update_attendance_record(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ligne de presence introuvable",
         )
-    session = _get_session_or_404(db, str(record.session_id))
+    session = lock_row(db, AttendanceSession, record.session_id)
+    record = lock_row(db, AttendanceRecord, record.id)
+    if session is None or record is None:
+        raise HTTPException(status_code=404, detail="Ligne de presence introuvable")
     _require_can_manage_session(db, current_user, session)
+    protected_fields = {
+        "justification_status",
+        "is_justified",
+        "penalty_amount",
+        "penalty_fee_id",
+    }.intersection(payload.model_fields_set)
+    if protected_fields:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Utilisez le workflow de justification pour modifier cet état",
+        )
+
+    old_status = record.status
 
     record = _upsert_record(
         db,
@@ -1690,9 +1869,7 @@ def update_attendance_record(
         justification=payload.justification
         if payload.justification is not None
         else record.justification,
-        justification_status=payload.justification_status
-        if payload.justification_status is not None
-        else record.justification_status,
+        justification_status=record.justification_status,
         justification_reason=payload.justification_reason
         if payload.justification_reason is not None
         else record.justification_reason,
@@ -1705,6 +1882,16 @@ def update_attendance_record(
         note=payload.note if payload.note is not None else record.note,
     )
     _notify_record_change(db, record, session)
+    create_audit_log(
+        db=db,
+        action="modification_presence_admin",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        old_value={"status": old_status},
+        new_value={"status": record.status},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(record)
     return record
@@ -1714,10 +1901,15 @@ def update_attendance_record(
 def submit_absence_justification(
     record_id: str,
     payload: AttendanceJustificationSubmit,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    record = _get_record_or_404(db, record_id)
+    unlocked_record = _get_record_or_404(db, record_id)
+    session = lock_row(db, AttendanceSession, unlocked_record.session_id)
+    record = lock_row(db, AttendanceRecord, record_id)
+    if session is None or record is None:
+        raise HTTPException(status_code=404, detail="Ligne de presence introuvable")
     if record.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1728,6 +1920,11 @@ def submit_absence_justification(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Seule une absence peut etre justifiee",
         )
+    if record.justification_status not in {"not_submitted", "rejected"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette justification ne peut plus être soumise",
+        )
     reason = payload.reason.strip()
     if not reason:
         raise HTTPException(
@@ -1735,7 +1932,6 @@ def submit_absence_justification(
             detail="Le motif de justification est obligatoire",
         )
 
-    session = _get_session_or_404(db, str(record.session_id))
     record.justification = reason
     record.justification_reason = reason
     record.justification_status = "pending"
@@ -1745,6 +1941,16 @@ def submit_absence_justification(
     record.updated_at = datetime.utcnow()
     _sync_attendance_penalty(db, record, current_user)
     _notify_justification_reviewers(db, record, session)
+    create_audit_log(
+        db=db,
+        action="soumission_justification_presence",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        old_value={"justification_status": "not_submitted_or_rejected"},
+        new_value={"justification_status": "pending"},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(record)
     return record
@@ -1757,12 +1963,20 @@ def submit_absence_justification(
 def approve_absence_justification(
     record_id: str,
     payload: AttendanceJustificationReview,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    record = _get_record_or_404(db, record_id)
-    session = _get_session_or_404(db, str(record.session_id))
+    unlocked_record = _get_record_or_404(db, record_id)
+    session = lock_row(db, AttendanceSession, unlocked_record.session_id)
+    record = lock_row(db, AttendanceRecord, record_id)
+    if session is None or record is None:
+        raise HTTPException(status_code=404, detail="Ligne de presence introuvable")
     _require_can_manage_session(db, current_user, session)
+    if record.justification_status != "pending":
+        raise HTTPException(status_code=409, detail="Seule une justification en attente peut être approuvée")
+
+    linked_fee = db.query(Fee).filter(Fee.related_attendance_id == record.id).with_for_update().first()
 
     record.status = "justified_absence"
     record.justification_status = "approved"
@@ -1771,6 +1985,27 @@ def approve_absence_justification(
         record.note = payload.reason.strip()
     record.updated_at = datetime.utcnow()
     _sync_attendance_penalty(db, record, current_user)
+    if linked_fee and float(linked_fee.amount_paid or 0) > 0:
+        create_audit_log(
+            db=db,
+            action="attendance_penalty_financial_review_required",
+            user_id=current_user.id,
+            entity_type="fee",
+            entity_id=linked_fee.id,
+            old_value={"amount_paid": str(linked_fee.amount_paid)},
+            new_value={"status": "cancelled", "automatic_refund": False},
+            ip_address=get_client_ip(request),
+        )
+    create_audit_log(
+        db=db,
+        action="approbation_justification_presence",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        old_value={"justification_status": "pending"},
+        new_value={"justification_status": "approved"},
+        ip_address=get_client_ip(request),
+    )
     notify_user(
         db,
         user_id=record.user_id,
@@ -1793,12 +2028,18 @@ def approve_absence_justification(
 def reject_absence_justification(
     record_id: str,
     payload: AttendanceJustificationReview,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    record = _get_record_or_404(db, record_id)
-    session = _get_session_or_404(db, str(record.session_id))
+    unlocked_record = _get_record_or_404(db, record_id)
+    session = lock_row(db, AttendanceSession, unlocked_record.session_id)
+    record = lock_row(db, AttendanceRecord, record_id)
+    if session is None or record is None:
+        raise HTTPException(status_code=404, detail="Ligne de presence introuvable")
     _require_can_manage_session(db, current_user, session)
+    if record.justification_status != "pending":
+        raise HTTPException(status_code=409, detail="Seule une justification en attente peut être rejetée")
 
     reason = (payload.reason or "").strip()
     if not reason:
@@ -1813,6 +2054,16 @@ def reject_absence_justification(
     record.note = reason
     record.updated_at = datetime.utcnow()
     _sync_attendance_penalty(db, record, current_user)
+    create_audit_log(
+        db=db,
+        action="rejet_justification_presence",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        old_value={"justification_status": "pending"},
+        new_value={"justification_status": "rejected"},
+        ip_address=get_client_ip(request),
+    )
     notify_user(
         db,
         user_id=record.user_id,
@@ -1834,7 +2085,9 @@ def add_expected_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, str(payload.session_id))
+    session = lock_row(db, AttendanceSession, payload.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     _require_can_manage_session(db, current_user, session)
 
     user = db.query(User).filter(User.id == payload.user_id).first()
@@ -1843,6 +2096,9 @@ def add_expected_member(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Utilisateur introuvable",
         )
+    assert_active_operational_member(user)
+    if session.status in {"closed", "archived"}:
+        raise HTTPException(status_code=409, detail="Cette séance est clôturée")
 
     expected_member = (
         db.query(AttendanceExpectedMember)
@@ -1861,7 +2117,11 @@ def add_expected_member(
         is_required=payload.is_required,
     )
     db.add(expected_member)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ce membre est déjà attendu") from exc
     db.refresh(expected_member)
     return expected_member
 
@@ -1891,78 +2151,33 @@ def qr_check_in(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    now = datetime.utcnow()
-    session = (
-        db.query(AttendanceSession)
-        .filter(
-            AttendanceSession.id == payload.session_id,
-            AttendanceSession.qr_token == payload.qr_token,
-        )
-        .first()
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Ce pointage QR historique est désactivé; utilisez /attendance/scan-qr",
     )
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="QR code invalide ou seance introuvable",
-        )
-    if session.is_closed or session.status == "closed":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette seance est deja cloturee",
-        )
-    if session.checkin_start and now < session.checkin_start:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le pointage n'est pas encore ouvert",
-        )
-    if session.checkin_end and now > session.checkin_end:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le pointage est termine",
-        )
-
-    expected = (
-        db.query(AttendanceExpectedMember.id)
-        .filter(
-            AttendanceExpectedMember.session_id == session.id,
-            AttendanceExpectedMember.user_id == current_user.id,
-        )
-        .first()
-    )
-    if not expected:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous n'etes pas attendu pour cette seance",
-        )
-
-    record = _upsert_record(
-        db,
-        session,
-        current_user,
-        user_id=current_user.id,
-        attendance_status=_compute_checkin_status(session, now),
-        arrival_time=now,
-        source="qr",
-    )
-    _notify_record_change(db, record, session)
-    db.commit()
-    db.refresh(record)
-    return record
 
 
 @router.post("/manual", response_model=AttendanceRecordRead)
 def create_manual_attendance(
     payload: AttendanceManualCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = _get_session_or_404(db, str(payload.session_id))
+    session = lock_row(db, AttendanceSession, payload.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Seance de presence introuvable")
     _require_can_manage_session(db, current_user, session)
-    if session.is_closed:
+    if session.status != "open" or session.is_closed:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette seance est deja cloturee",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La séance doit être ouverte",
         )
+
+    target_user = db.query(User).filter(User.id == payload.user_id).first()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    assert_active_operational_member(target_user)
 
     record = _upsert_record(
         db,
@@ -1980,6 +2195,15 @@ def create_manual_attendance(
         note=payload.note,
     )
     _notify_record_change(db, record, session)
+    create_audit_log(
+        db=db,
+        action="pointage_manuel",
+        user_id=current_user.id,
+        entity_type="attendance_record",
+        entity_id=record.id,
+        new_value={"status": record.status, "user_id": str(record.user_id)},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(record)
     return record

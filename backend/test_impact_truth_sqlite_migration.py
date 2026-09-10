@@ -24,7 +24,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
             heads = ScriptDirectory.from_config(config).get_heads()
-            self.assertEqual(heads, ["20260906_0006"])
+            self.assertEqual(heads, ["20260909_0007"])
 
             def migrate(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -248,7 +248,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
                 regenerated_ids,
                 {str(user_claim_id), str(generated_claim_id)},
             )
-            self.assertEqual(final_revision, "20260906_0006")
+            self.assertEqual(final_revision, "20260909_0007")
             self.assertEqual(final_active_index_count, 1)
             engine.dispose()
 

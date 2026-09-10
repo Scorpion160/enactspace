@@ -57,8 +57,8 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
         cls.addClassCleanup(cls.engine.dispose)
         cls.config = Config("alembic.ini")
         cls.heads = ScriptDirectory.from_config(cls.config).get_heads()
-        if cls.heads != ["20260906_0006"]:
-            raise AssertionError(f"Expected PR-2D Alembic head, got {cls.heads}")
+        if cls.heads != ["20260909_0007"]:
+            raise AssertionError(f"Expected current Alembic head, got {cls.heads}")
 
     @classmethod
     def _upgrade(cls, revision):
@@ -92,7 +92,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
                 connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one(),
-                "20260906_0006",
+                "20260909_0007",
             )
 
         self._downgrade("20260903_0003")

@@ -9,6 +9,7 @@ from sqlalchemy import (
     Numeric,
     Integer,
     Boolean,
+    CheckConstraint,
     UniqueConstraint,
 )
 from app.db.types import GUID
@@ -70,6 +71,15 @@ class Event(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint("end_time IS NULL OR end_time > start_time", name="ck_events_time_order"),
+        CheckConstraint("budget >= 0", name="ck_events_budget_nonnegative"),
+        CheckConstraint(
+            "max_participants IS NULL OR max_participants > 0",
+            name="ck_events_capacity_positive",
+        ),
+    )
 
 
 class EventParticipant(Base):

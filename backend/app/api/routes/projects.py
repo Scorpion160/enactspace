@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db.database import get_db
 from app.models.project import Project, ProjectMember
@@ -21,6 +22,7 @@ from app.models.role import Role, UserRole
 from app.models.user import User
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
+from app.services.operational_integrity import assert_active_operational_member, lock_row
 
 
 router = APIRouter(prefix="/projects", tags=["Projets"])
@@ -32,6 +34,15 @@ VALID_PROJECT_STATUSES = {
     "deploiement",
     "termine",
     "suspendu",
+}
+PROJECT_STATUS_TRANSITIONS = {
+    "idee": {"etude", "suspendu"},
+    "etude": {"idee", "prototype", "suspendu"},
+    "prototype": {"etude", "test", "suspendu"},
+    "test": {"prototype", "deploiement", "suspendu"},
+    "deploiement": {"test", "termine", "suspendu"},
+    "suspendu": {"idee", "etude", "prototype", "test", "deploiement"},
+    "termine": set(),
 }
 VALID_PROJECT_POSITIONS = {"membre", "chef_projet", "adjoint_chef_projet"}
 GLOBAL_PROJECT_MANAGERS = {
@@ -141,12 +152,35 @@ def sync_project_responsibility_role(
         db.delete(assignment)
 
 
+def apply_project_status(project: Project, next_status: str) -> bool:
+    if next_status not in VALID_PROJECT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut projet invalide",
+        )
+    if next_status == project.status:
+        return False
+    if next_status not in PROJECT_STATUS_TRANSITIONS.get(project.status, set()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Transition projet interdite : {project.status} -> {next_status}",
+        )
+    project.status = next_status
+    return True
+
+
 @router.post("/", response_model=ProjectRead)
 def create_project(
     payload: ProjectCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
+    if payload.status not in VALID_PROJECT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Statut projet invalide",
+        )
     project = Project(
         season_id=payload.season_id,
         name=payload.name,
@@ -162,6 +196,16 @@ def create_project(
     )
 
     db.add(project)
+    db.flush()
+    create_audit_log(
+        db=db,
+        action="creation_projet",
+        user_id=current_user.id,
+        entity_type="project",
+        entity_id=project.id,
+        new_value={"name": project.name, "status": project.status},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(project)
 
@@ -180,23 +224,39 @@ def list_projects(
 def update_project(
     project_id: str,
     payload: ProjectUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    project = get_project_or_404(db, project_id)
+    project = lock_row(db, Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
     require_project_manager(db, current_user, project_id)
     data = payload.model_dump(exclude_unset=True)
 
-    if data.get("status") is not None and data["status"] not in VALID_PROJECT_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Statut projet invalide",
-        )
-
+    old_value = {key: getattr(project, key) for key in data}
+    next_status = data.pop("status", None)
+    status_changed = False
+    if next_status is not None:
+        status_changed = apply_project_status(project, next_status)
     for field, value in data.items():
         setattr(project, field, value)
 
     project.updated_at = datetime.utcnow()
+    new_value = {key: getattr(project, key) for key in old_value}
+    if next_status is not None:
+        old_value["status"] = old_value.get("status", project.status if not status_changed else None)
+        new_value["status"] = project.status
+    create_audit_log(
+        db=db,
+        action="changement_statut_projet" if status_changed else "modification_projet",
+        user_id=current_user.id,
+        entity_type="project",
+        entity_id=project.id,
+        old_value={key: str(value) if value is not None else None for key, value in old_value.items()},
+        new_value={key: str(value) if value is not None else None for key, value in new_value.items()},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(project)
 
@@ -231,8 +291,12 @@ def assign_project_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    project = get_project_or_404(db, project_id)
-    user = get_user_or_404(db, str(payload.user_id))
+    project = lock_row(db, Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    user = lock_row(db, User, payload.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     is_global_manager = require_project_manager(db, current_user, project_id)
 
     if payload.position not in VALID_PROJECT_POSITIONS:
@@ -248,11 +312,7 @@ def assign_project_member(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls Admin, Team Leader ou SG nomment les responsables",
         )
-    if user.status != "active" or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le membre sélectionné n'est pas actif",
-        )
+    assert_active_operational_member(user)
 
     membership = (
         db.query(ProjectMember)
@@ -260,6 +320,7 @@ def assign_project_member(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == payload.user_id,
         )
+        .with_for_update()
         .first()
     )
 
@@ -297,9 +358,12 @@ def assign_project_member(
                 ProjectMember.position == payload.position,
                 ProjectMember.is_active.is_(True),
             )
+            .order_by(ProjectMember.id.asc())
+            .with_for_update()
             .all()
         )
         for existing_leader in existing_leaders:
+            previous_leader_position = existing_leader.position
             existing_leader.position = "membre"
             sync_project_responsibility_role(
                 db,
@@ -314,6 +378,24 @@ def assign_project_member(
                 notification_type="role_assigned",
                 related_type="project",
                 related_id=project.id,
+            )
+            create_audit_log(
+                db=db,
+                action="remplacement_responsable_projet",
+                user_id=current_user.id,
+                entity_type="user",
+                entity_id=existing_leader.user_id,
+                old_value={
+                    "project_id": str(project.id),
+                    "project_name": project.name,
+                    "position": previous_leader_position,
+                },
+                new_value={
+                    "project_id": str(project.id),
+                    "project_name": project.name,
+                    "position": "membre",
+                },
+                ip_address=get_client_ip(request),
             )
 
     if previous_position in PROJECT_LEADERSHIP_POSITIONS:
@@ -347,7 +429,14 @@ def assign_project_member(
         ip_address=get_client_ip(request),
     )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette responsabilité de projet vient d'être attribuée",
+        ) from exc
     db.refresh(membership)
 
     return project_member_payload(membership, user)

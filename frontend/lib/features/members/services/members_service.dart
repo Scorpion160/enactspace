@@ -175,9 +175,7 @@ class MembersService {
 
   Future<MemberModel> updateMemberAdmin({
     required String userId,
-    String? status,
     bool? emailVerified,
-    bool? isActive,
     String? department,
     String? studyLevel,
   }) async {
@@ -189,9 +187,7 @@ class MembersService {
 
     final Map<String, dynamic> data = {};
 
-    if (status != null) data['status'] = status;
     if (emailVerified != null) data['email_verified'] = emailVerified;
-    if (isActive != null) data['is_active'] = isActive;
     if (department != null) data['department'] = department;
     if (studyLevel != null) data['study_level'] = studyLevel;
 

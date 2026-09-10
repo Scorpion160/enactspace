@@ -7,6 +7,16 @@ import '../models/task_model.dart';
 import '../services/tasks_gateway.dart';
 import '../widgets/task_form_dialog.dart';
 
+String _taskStatusLabel(String value) => switch (value) {
+  'a_faire' => 'À faire',
+  'en_cours' => 'En cours',
+  'bloque' => 'Bloqué',
+  'termine' => 'Terminé',
+  'valide' => 'Validé',
+  'annule' => 'Annulé',
+  _ => value,
+};
+
 class TaskDetailScreen extends StatefulWidget {
   final String taskId;
   final TasksGateway? gateway;
@@ -58,6 +68,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ).showSnackBar(SnackBar(content: Text(success)));
       }
     } catch (error) {
+      await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,7 +83,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _changeStatus(TaskModel task) async {
-    var selected = task.status;
+    final permitted = task.allowedStatusTransitions;
+    if (permitted.isEmpty) return;
+    var selected = permitted.first;
     final status = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -80,14 +93,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           title: const Text('Changer le statut'),
           content: DropdownButtonFormField<String>(
             initialValue: selected,
-            items: const [
-              DropdownMenuItem(value: 'a_faire', child: Text('À faire')),
-              DropdownMenuItem(value: 'en_cours', child: Text('En cours')),
-              DropdownMenuItem(value: 'bloque', child: Text('Bloqué')),
-              DropdownMenuItem(value: 'termine', child: Text('Terminé')),
-              DropdownMenuItem(value: 'valide', child: Text('Validé')),
-              DropdownMenuItem(value: 'annule', child: Text('Annulé')),
-            ],
+            items: permitted
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(_taskStatusLabel(value)),
+                  ),
+                )
+                .toList(),
             onChanged: (value) =>
                 setDialogState(() => selected = value ?? selected),
           ),
@@ -290,16 +303,18 @@ class _TaskDetailBody extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: submitting ? null : () => onStatus(task),
-                        icon: const Icon(Icons.swap_horiz_rounded),
-                        label: const Text('Changer le statut'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: submitting ? null : () => onProof(task),
-                        icon: const Icon(Icons.link_rounded),
-                        label: const Text('Preuve'),
-                      ),
+                      if (task.allowedStatusTransitions.isNotEmpty)
+                        OutlinedButton.icon(
+                          onPressed: submitting ? null : () => onStatus(task),
+                          icon: const Icon(Icons.swap_horiz_rounded),
+                          label: const Text('Changer le statut'),
+                        ),
+                      if (!const {'valide', 'annule'}.contains(task.status))
+                        OutlinedButton.icon(
+                          onPressed: submitting ? null : () => onProof(task),
+                          icon: const Icon(Icons.link_rounded),
+                          label: const Text('Preuve'),
+                        ),
                       if (task.canManage)
                         OutlinedButton.icon(
                           onPressed: submitting ? null : () => onEdit(task),

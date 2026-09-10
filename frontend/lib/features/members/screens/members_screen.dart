@@ -2681,8 +2681,6 @@ class EditMemberDialog extends StatefulWidget {
 }
 
 class _EditMemberDialogState extends State<EditMemberDialog> {
-  late String _status;
-  late bool _isActive;
   late bool _emailVerified;
   final _departmentController = TextEditingController();
   final _studyLevelController = TextEditingController();
@@ -2692,8 +2690,6 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
   @override
   void initState() {
     super.initState();
-    _status = widget.member.status ?? 'active';
-    _isActive = widget.member.isActive ?? _status == 'active';
     _emailVerified = widget.member.emailVerified ?? false;
     _departmentController.text = widget.member.department ?? '';
     _studyLevelController.text = widget.member.studyLevel ?? '';
@@ -2714,8 +2710,6 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
     try {
       await widget.membersService.updateMemberAdmin(
         userId: widget.member.id,
-        status: _status,
-        isActive: _isActive,
         emailVerified: _emailVerified,
         department: _departmentController.text.trim(),
         studyLevel: _studyLevelController.text.trim(),
@@ -2751,18 +2745,9 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                 AppStatusBadge(label: _error!, tone: AppStatusTone.error),
                 const SizedBox(height: 12),
               ],
-              DropdownButtonFormField<String>(
-                initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Statut'),
-                items: const [
-                  DropdownMenuItem(value: 'active', child: Text('Actif')),
-                  DropdownMenuItem(value: 'inactive', child: Text('Inactif')),
-                  DropdownMenuItem(value: 'suspended', child: Text('Suspendu')),
-                  DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
-                ],
-                onChanged: _loading
-                    ? null
-                    : (value) => setState(() => _status = value ?? _status),
+              const Text(
+                'Le statut du membre se gère avec les actions dédiées '
+                'Approuver, Suspendre, Réactiver ou Passer Alumni.',
               ),
               const SizedBox(height: 12),
               TextField(
@@ -2783,15 +2768,6 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Compte actif'),
-                subtitle: const Text('Le membre peut accéder à son espace.'),
-                value: _isActive,
-                onChanged: _loading
-                    ? null
-                    : (value) => setState(() => _isActive = value),
-              ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Email vérifié'),

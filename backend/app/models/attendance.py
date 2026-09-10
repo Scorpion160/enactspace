@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -88,6 +90,18 @@ class AttendanceSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'open', 'closed', 'archived')",
+            name="ck_attendance_sessions_status",
+        ),
+        CheckConstraint(
+            "((status IN ('draft', 'open') AND is_closed = false) OR "
+            "(status IN ('closed', 'archived') AND is_closed = true))",
+            name="ck_attendance_sessions_closed_state",
+        ),
+    )
+
 
 class AttendanceExpectedMember(Base):
     __tablename__ = "attendance_expected_members"
@@ -113,6 +127,12 @@ class AttendanceExpectedMember(Base):
     is_required: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "user_id", name="uq_attendance_expected_session_user"
+        ),
+    )
 
 
 class AttendanceRecord(Base):
@@ -176,6 +196,12 @@ class AttendanceRecord(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "user_id", name="uq_attendance_record_session_user"
+        ),
+    )
 
     @property
     def member_id(self):

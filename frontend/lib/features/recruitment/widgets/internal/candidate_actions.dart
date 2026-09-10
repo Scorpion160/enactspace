@@ -35,8 +35,9 @@ class CandidateActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final allowed = _allowedTransitions(application);
     final actions = <Widget>[
-      if (application.status != 'under_review')
+      if (allowed.contains('under_review'))
         _ActionButton(
           key: const Key('candidate-action-under-review'),
           icon: Icons.manage_search_rounded,
@@ -47,7 +48,9 @@ class CandidateActionsSection extends StatelessWidget {
             kind: CandidateDecisionKind.standard,
           ),
         ),
-      _ActionButton(
+      if (allowed.contains('interview_scheduled') ||
+          application.status == 'interview_scheduled')
+        _ActionButton(
         key: const Key('candidate-action-interview'),
         icon: Icons.event_available_rounded,
         label: application.status == 'interview_scheduled'
@@ -62,7 +65,7 @@ class CandidateActionsSection extends StatelessWidget {
           ),
         ),
       ),
-      if (application.status != 'waiting_list')
+      if (allowed.contains('waiting_list'))
         _ActionButton(
           key: const Key('candidate-action-waiting-list'),
           icon: Icons.hourglass_top_rounded,
@@ -73,7 +76,7 @@ class CandidateActionsSection extends StatelessWidget {
             kind: CandidateDecisionKind.standard,
           ),
         ),
-      if (application.status != 'accepted')
+      if (allowed.contains('accepted'))
         _ActionButton(
           key: const Key('candidate-action-accept'),
           icon: Icons.check_circle_outline_rounded,
@@ -84,7 +87,7 @@ class CandidateActionsSection extends StatelessWidget {
             kind: CandidateDecisionKind.acceptance,
           ),
         ),
-      if (application.status != 'rejected')
+      if (allowed.contains('rejected'))
         _ActionButton(
           key: const Key('candidate-action-reject'),
           icon: Icons.person_off_outlined,
@@ -95,7 +98,7 @@ class CandidateActionsSection extends StatelessWidget {
             kind: CandidateDecisionKind.rejection,
           ),
         ),
-      if (application.status != 'cancelled')
+      if (allowed.contains('cancelled'))
         _ActionButton(
           key: const Key('candidate-action-close'),
           icon: Icons.archive_outlined,
@@ -128,6 +131,23 @@ class CandidateActionsSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  static Set<String> _allowedTransitions(ApplicationModel application) {
+    if (application.convertedUserId != null) return const {};
+    return switch (application.status) {
+      'submitted' => const {'under_review', 'cancelled'},
+      'under_review' => const {
+        'interview_scheduled', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+      },
+      'interview_scheduled' => const {
+        'under_review', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+      },
+      'waiting_list' => const {
+        'interview_scheduled', 'accepted', 'rejected', 'cancelled',
+      },
+      _ => const {},
+    };
   }
 
   Future<void> _showStatusDialog(

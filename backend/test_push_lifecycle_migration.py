@@ -17,7 +17,7 @@ class PushLifecycleMigrationTests(unittest.TestCase):
     def test_0005_upgrade_downgrade_reupgrade_and_fresh_head(self):
         self.assertEqual(
             ScriptDirectory.from_config(Config("alembic.ini")).get_heads(),
-            ["20260906_0006"],
+            ["20260909_0007"],
         )
         for start_at_0005 in (True, False):
             with self.subTest(start_at_0005=start_at_0005), tempfile.TemporaryDirectory(prefix="pr5_sqlite_") as directory:
@@ -42,7 +42,7 @@ class PushLifecycleMigrationTests(unittest.TestCase):
                 with engine.connect() as connection:
                     self.assertEqual(
                         connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                        "20260906_0006",
+                        "20260909_0007",
                     )
                 if start_at_0005:
                     engine.dispose()

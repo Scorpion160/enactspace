@@ -116,6 +116,22 @@ class TaskModel {
 
   bool get isTerminal => const {'termine', 'valide', 'annule'}.contains(status);
 
+  List<String> get allowedStatusTransitions {
+    final base = <String, List<String>>{
+      'a_faire': ['en_cours', 'bloque'],
+      'en_cours': ['bloque', 'termine'],
+      'bloque': ['en_cours', 'termine'],
+      'termine': canManage ? ['en_cours', 'valide'] : const [],
+      'valide': const [],
+      'annule': const [],
+    };
+    final values = [...?base[status]];
+    if (canManage && const {'a_faire', 'en_cours', 'bloque'}.contains(status)) {
+      values.add('annule');
+    }
+    return values;
+  }
+
   bool isLateAt(DateTime now) {
     final due = dueAt;
     return due != null && due.isBefore(now) && !isTerminal;

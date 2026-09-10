@@ -101,6 +101,11 @@ class MobileMoneyTransactionEvent(Base):
     __table_args__ = (
         Index("ix_mobile_money_event_transaction", "transaction_id"),
         Index("ix_mobile_money_event_received_at", "received_at"),
+        UniqueConstraint(
+            "transaction_id",
+            "provider_event_id",
+            name="uq_mobile_money_event_provider_id",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

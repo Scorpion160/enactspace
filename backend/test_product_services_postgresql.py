@@ -59,8 +59,8 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
         cls.addClassCleanup(cls.engine.dispose)
         cls.config = Config("alembic.ini")
         cls.heads = ScriptDirectory.from_config(cls.config).get_heads()
-        if cls.heads != ["20260906_0006"]:
-            raise AssertionError(f"Expected PR-3 Alembic head, got {cls.heads}")
+        if cls.heads != ["20260909_0007"]:
+            raise AssertionError(f"Expected current Alembic head, got {cls.heads}")
 
     @classmethod
     def _upgrade(cls, revision):
@@ -114,7 +114,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
             )
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                "20260906_0006",
+                "20260909_0007",
             )
             self.assertEqual(
                 connection.execute(text("SELECT count(*) FROM app_releases")).scalar_one(),

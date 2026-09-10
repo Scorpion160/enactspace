@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, DateTime, Date, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Index, String, Text, DateTime, Date, ForeignKey, Numeric, UniqueConstraint, text
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +28,11 @@ class FinancialAccount(Base):
     total_paid: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint("balance_due >= 0", name="ck_financial_accounts_balance_nonnegative"),
+        CheckConstraint("total_paid >= 0", name="ck_financial_accounts_paid_nonnegative"),
+    )
 
 
 class Fee(Base):
@@ -88,6 +93,27 @@ class Fee(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_fees_amount_positive"),
+        CheckConstraint("amount_paid >= 0 AND amount_paid <= amount", name="ck_fees_paid_range"),
+        Index(
+            "ux_fees_related_attendance",
+            "related_attendance_id",
+            unique=True,
+            sqlite_where=text("related_attendance_id IS NOT NULL"),
+            postgresql_where=text("related_attendance_id IS NOT NULL"),
+        ),
+        Index(
+            "ux_fees_source_identity",
+            "source_type",
+            "source_id",
+            "user_id",
+            unique=True,
+            sqlite_where=text("source_type IS NOT NULL AND source_id IS NOT NULL"),
+            postgresql_where=text("source_type IS NOT NULL AND source_id IS NOT NULL"),
+        ),
+    )
+
 
 class Payment(Base):
     __tablename__ = "payments"
@@ -137,6 +163,10 @@ class Payment(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_payments_amount_positive"),
+    )
+
 
 class PaymentAllocation(Base):
     __tablename__ = "payment_allocations"
@@ -162,6 +192,11 @@ class PaymentAllocation(Base):
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("payment_id", "fee_id", name="uq_payment_allocation_fee"),
+        CheckConstraint("amount > 0", name="ck_payment_allocations_amount_positive"),
+    )
 
 
 class ClubTransaction(Base):
@@ -225,3 +260,14 @@ class ClubTransaction(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_club_transactions_amount_positive"),
+        Index(
+            "ux_club_transactions_payment",
+            "payment_id",
+            unique=True,
+            sqlite_where=text("payment_id IS NOT NULL"),
+            postgresql_where=text("payment_id IS NOT NULL"),
+        ),
+    )

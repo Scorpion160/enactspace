@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -33,6 +34,12 @@ from app.api.deps import (
     user_has_any_role,
 )
 from app.services.notification_service import notify_user, notify_users
+from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.operational_integrity import (
+    assert_active_operational_member,
+    lock_row,
+    to_naive_utc,
+)
 
 router = APIRouter(prefix="/tasks", tags=["Tâches"])
 
@@ -44,6 +51,14 @@ VALID_TASK_STATUSES = {
     "termine",
     "valide",
     "annule",
+}
+TASK_STATUS_TRANSITIONS = {
+    "a_faire": {"en_cours", "bloque"},
+    "en_cours": {"bloque", "termine"},
+    "bloque": {"en_cours", "termine"},
+    "termine": {"valide", "en_cours"},
+    "valide": set(),
+    "annule": set(),
 }
 
 VALID_TASK_PRIORITIES = {
@@ -212,6 +227,59 @@ def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
     return is_manager
 
 
+def apply_task_status(
+    task: Task,
+    next_status: str,
+    *,
+    is_manager: bool,
+    actor_id,
+) -> bool:
+    if next_status not in VALID_TASK_STATUSES:
+        raise HTTPException(status_code=400, detail="Statut invalide")
+    if next_status == task.status:
+        return False
+    if task.status in {"valide", "annule"}:
+        raise HTTPException(status_code=409, detail="Cette tâche est terminale")
+
+    allowed = set(TASK_STATUS_TRANSITIONS.get(task.status, set()))
+    if is_manager and task.status in {"a_faire", "en_cours", "bloque"}:
+        allowed.add("annule")
+    if not is_manager:
+        allowed.discard("valide")
+        allowed.discard("annule")
+        if task.status == "termine":
+            allowed.clear()
+    if next_status not in allowed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Transition de tâche interdite : {task.status} -> {next_status}",
+        )
+    if next_status == "termine" and task.proof_required and not task.proof_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Une preuve est requise avant de marquer cette tâche comme terminée",
+        )
+
+    previous = task.status
+    task.status = next_status
+    now = datetime.utcnow()
+    if next_status == "termine":
+        task.completed_at = now
+        task.validated_at = None
+        task.validated_by = None
+    elif next_status == "valide":
+        task.validated_at = now
+        task.validated_by = actor_id
+    elif next_status in {"a_faire", "en_cours", "bloque", "annule"}:
+        task.completed_at = None
+        task.validated_at = None
+        task.validated_by = None
+    if previous == "termine" and next_status == "en_cours":
+        task.completed_at = None
+    task.updated_at = now
+    return True
+
+
 def visible_tasks_query(db: Session, user: User):
     query = db.query(Task)
     if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
@@ -332,9 +400,12 @@ def ensure_assignees_in_scope(
 @router.post("/", response_model=TaskRead)
 def create_task(
     payload: TaskCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    if len(payload.assignee_ids) != len(set(payload.assignee_ids)):
+        raise HTTPException(status_code=409, detail="Un assigné est présent plusieurs fois")
     ensure_task_creation_scope(db, current_user, payload)
     ensure_assignees_in_scope(
         db,
@@ -358,12 +429,18 @@ def create_task(
         project_id=payload.project_id,
         priority=payload.priority,
         status="a_faire",
-        due_date=payload.due_date,
+        due_date=to_naive_utc(payload.due_date),
         proof_required=payload.proof_required,
     )
 
     db.add(task)
     db.flush()
+
+    target_users = db.query(User).filter(User.id.in_(set(payload.assignee_ids))).all()
+    if len(target_users) != len(set(payload.assignee_ids)):
+        raise HTTPException(status_code=404, detail="Un membre assigné est introuvable")
+    for target_user in target_users:
+        assert_active_operational_member(target_user)
 
     for user_id in payload.assignee_ids:
         assignee = TaskAssignee(
@@ -383,6 +460,15 @@ def create_task(
         dedupe=True,
     )
     notify_task_due_soon(db, task, actor_id=current_user.id)
+    create_audit_log(
+        db=db,
+        action="creation_tache",
+        user_id=current_user.id,
+        entity_type="task",
+        entity_id=task.id,
+        new_value={"status": task.status, "assignee_count": len(set(payload.assignee_ids))},
+        ip_address=get_client_ip(request),
+    )
 
     db.commit()
     db.refresh(task)
@@ -486,11 +572,15 @@ def get_task(
 def update_task(
     task_id: str,
     payload: TaskUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_manager(db, task, current_user)
+    old_status = task.status
 
     if payload.priority is not None:
         if payload.priority not in VALID_TASK_PRIORITIES:
@@ -500,23 +590,6 @@ def update_task(
             )
         task.priority = payload.priority
 
-    if payload.status is not None:
-        if payload.status not in VALID_TASK_STATUSES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Statut invalide",
-            )
-
-        task.status = payload.status
-
-        if payload.status == "termine":
-            task.completed_at = datetime.utcnow()
-
-        if payload.status not in {"termine", "valide"}:
-            task.completed_at = None
-            task.validated_at = None
-            task.validated_by = None
-
     if payload.title is not None:
         task.title = payload.title
 
@@ -524,17 +597,28 @@ def update_task(
         task.description = payload.description
 
     if payload.due_date is not None:
-        task.due_date = payload.due_date
+        task.due_date = to_naive_utc(payload.due_date)
 
     if payload.proof_required is not None:
         task.proof_required = payload.proof_required
 
     if payload.proof_url is not None:
+        if task.status in {"valide", "annule"}:
+            raise HTTPException(status_code=409, detail="La preuve d'une tâche terminale est immuable")
         task.proof_url = payload.proof_url
+
+    status_changed = False
+    if payload.status is not None:
+        status_changed = apply_task_status(
+            task,
+            payload.status,
+            is_manager=True,
+            actor_id=current_user.id,
+        )
 
     task.updated_at = datetime.utcnow()
 
-    if payload.status is not None:
+    if status_changed:
         notify_task_assignees(
             db,
             task,
@@ -543,7 +627,7 @@ def update_task(
             notification_type="task_updated",
             actor_id=current_user.id,
         )
-    else:
+    elif payload.status is None:
         notify_task_assignees(
             db,
             task,
@@ -553,6 +637,17 @@ def update_task(
             actor_id=current_user.id,
         )
     notify_task_due_soon(db, task, actor_id=current_user.id)
+
+    create_audit_log(
+        db=db,
+        action="changement_statut_tache" if status_changed else "modification_tache",
+        user_id=current_user.id,
+        entity_type="task",
+        entity_id=task.id,
+        old_value={"status": old_status},
+        new_value={"status": task.status},
+        ip_address=get_client_ip(request),
+    )
 
     db.commit()
     db.refresh(task)
@@ -564,54 +659,42 @@ def update_task(
 def change_task_status(
     task_id: str,
     payload: TaskStatusChange,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     is_manager = ensure_task_actor(db, task, current_user)
-
-    if payload.status not in VALID_TASK_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Statut invalide",
-        )
-    if not is_manager and payload.status not in {
-        "a_faire",
-        "en_cours",
-        "bloque",
-        "termine",
-    }:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Ce statut doit être appliqué par un responsable",
-        )
-
-    if payload.status == "termine" and task.proof_required and not task.proof_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Une preuve est requise avant de marquer cette tâche comme terminée",
-        )
-
-    task.status = payload.status
-
-    if payload.status == "termine":
-        task.completed_at = datetime.utcnow()
-
-    if payload.status in {"a_faire", "en_cours", "bloque"}:
-        task.completed_at = None
-        task.validated_at = None
-        task.validated_by = None
-
-    task.updated_at = datetime.utcnow()
-
-    notify_task_assignees(
-        db,
+    old_status = task.status
+    changed = apply_task_status(
         task,
-        title="Statut de tache modifie",
-        message=f"La tache {task.title} est maintenant {task.status}.",
-        notification_type="task_updated",
+        payload.status,
+        is_manager=is_manager,
         actor_id=current_user.id,
     )
+
+    if changed:
+        notify_task_assignees(
+            db,
+            task,
+            title="Statut de tache modifie",
+            message=f"La tache {task.title} est maintenant {task.status}.",
+            notification_type="task_updated",
+            actor_id=current_user.id,
+            dedupe=True,
+        )
+        create_audit_log(
+            db=db,
+            action="changement_statut_tache",
+            user_id=current_user.id,
+            entity_type="task",
+            entity_id=task.id,
+            old_value={"status": old_status},
+            new_value={"status": task.status},
+            ip_address=get_client_ip(request),
+        )
     notify_task_due_soon(db, task, actor_id=current_user.id)
 
     db.commit()
@@ -624,14 +707,29 @@ def change_task_status(
 def submit_task_proof(
     task_id: str,
     payload: TaskProofSubmit,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_actor(db, task, current_user)
+
+    if task.status in {"valide", "annule"}:
+        raise HTTPException(status_code=409, detail="La preuve d'une tâche terminale est immuable")
 
     task.proof_url = payload.proof_url
     task.updated_at = datetime.utcnow()
+    create_audit_log(
+        db=db,
+        action="preuve_tache",
+        user_id=current_user.id,
+        entity_type="task",
+        entity_id=task.id,
+        new_value={"proof_present": True},
+        ip_address=get_client_ip(request),
+    )
 
     db.commit()
     db.refresh(task)
@@ -642,28 +740,16 @@ def submit_task_proof(
 @router.post("/{task_id}/validate", response_model=TaskRead)
 def validate_task(
     task_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_manager(db, task, current_user)
-
-    if task.status != "termine":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La tâche doit d'abord être marquée comme terminée",
-        )
-
-    if task.proof_required and not task.proof_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible de valider une tâche sans preuve",
-        )
-
-    task.status = "valide"
-    task.validated_by = current_user.id
-    task.validated_at = datetime.utcnow()
-    task.updated_at = datetime.utcnow()
+    old_status = task.status
+    apply_task_status(task, "valide", is_manager=True, actor_id=current_user.id)
 
     notify_task_assignees(
         db,
@@ -672,6 +758,17 @@ def validate_task(
         message=f"La tache {task.title} a ete validee.",
         notification_type="task_validated",
         actor_id=current_user.id,
+        dedupe=True,
+    )
+    create_audit_log(
+        db=db,
+        action="validation_tache",
+        user_id=current_user.id,
+        entity_type="task",
+        entity_id=task.id,
+        old_value={"status": old_status},
+        new_value={"status": task.status, "validated_by": str(current_user.id)},
+        ip_address=get_client_ip(request),
     )
 
     db.commit()
@@ -701,11 +798,16 @@ def delete_task(
 @router.post("/assignees", response_model=list[TaskAssigneeRead])
 def add_task_assignees(
     payload: TaskAssigneeCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, str(payload.task_id))
+    task = lock_row(db, Task, payload.task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_manager(db, task, current_user)
+    if task.status in {"valide", "annule"}:
+        raise HTTPException(status_code=409, detail="Aucun assigné ne peut être ajouté à une tâche terminale")
     ensure_assignees_in_scope(
         db,
         current_user,
@@ -716,6 +818,12 @@ def add_task_assignees(
 
     created = []
 
+    targets = db.query(User).filter(User.id.in_(set(payload.user_ids))).all()
+    if len(targets) != len(set(payload.user_ids)):
+        raise HTTPException(status_code=404, detail="Un membre assigné est introuvable")
+    for target in targets:
+        assert_active_operational_member(target)
+
     for user_id in payload.user_ids:
         existing = db.query(TaskAssignee).filter(
             TaskAssignee.task_id == task.id,
@@ -723,7 +831,7 @@ def add_task_assignees(
         ).first()
 
         if existing:
-            continue
+            raise HTTPException(status_code=409, detail="Ce membre est déjà assigné")
 
         assignee = TaskAssignee(
             task_id=task.id,
@@ -744,7 +852,20 @@ def add_task_assignees(
                 dedupe=True,
             )
 
-    db.commit()
+    create_audit_log(
+        db=db,
+        action="affectation_tache",
+        user_id=current_user.id,
+        entity_type="task",
+        entity_id=task.id,
+        new_value={"user_ids": [str(value) for value in payload.user_ids]},
+        ip_address=get_client_ip(request),
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Assignation concurrente en conflit") from exc
 
     for assignee in created:
         db.refresh(assignee)
