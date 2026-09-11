@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
@@ -1138,6 +1139,18 @@ class _MembersList extends StatelessWidget {
                   value: member.emailVerified == true ? 'Oui' : 'Non',
                 ),
                 _DetailLine(label: 'ID', value: member.id),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  key: const Key('member_memory_link'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go(
+                      '/archives?member_id=${Uri.encodeQueryComponent(member.id)}',
+                    );
+                  },
+                  icon: const Icon(Icons.history),
+                  label: const Text('Voir dans la mémoire'),
+                ),
               ],
             ),
           ),

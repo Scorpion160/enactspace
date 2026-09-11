@@ -167,6 +167,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             return ProjectDetailView(
               data: data,
               onBack: _back,
+              onHistory: () => context.go(
+                '/archives?project_id=${Uri.encodeQueryComponent(widget.projectId)}',
+              ),
               teamSection: ProjectTeamManagementSection(
                 projectName: data.item.project.name,
                 members: data.item.members,

@@ -11,6 +11,7 @@ class ProjectDetailView extends StatelessWidget {
   final VoidCallback onBack;
   final Widget? management;
   final Widget? teamSection;
+  final VoidCallback? onHistory;
 
   const ProjectDetailView({
     super.key,
@@ -18,6 +19,7 @@ class ProjectDetailView extends StatelessWidget {
     required this.onBack,
     this.management,
     this.teamSection,
+    this.onHistory,
   });
 
   @override
@@ -57,6 +59,13 @@ class ProjectDetailView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onHistory != null)
+                    TextButton.icon(
+                      key: const Key('project_memory_link'),
+                      onPressed: onHistory,
+                      icon: const Icon(Icons.history),
+                      label: const Text('Historique'),
+                    ),
                 ],
               ),
             ),

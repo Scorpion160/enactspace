@@ -1,6 +1,7 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/archive_models.dart';
+import '../models/memory_timeline_models.dart';
 
 /// Transport HTTP du domaine Archives. Il ne contient ni politique d'UX,
 /// ni données historiques locales.
@@ -44,6 +45,37 @@ class ArchivesService {
     if (response is! Map) throw const FormatException('Réponse API invalide.');
     return archiveMap(response);
   }
+
+  Future<MemoryTimelinePage> getTimeline({
+    MemoryTimelineFilters filters = const MemoryTimelineFilters(),
+    String? cursor,
+    int limit = 25,
+  }) async => MemoryTimelinePage.fromJson(
+    _object(
+      await _apiClient.get(
+        _path(
+          '/institutional-memory/timeline',
+          filters.toQuery(cursor: cursor, limit: limit),
+        ),
+        token: await _token(),
+      ),
+    ),
+  );
+
+  Future<MemoryTimelineItem> getTimelineDetail(
+    String resourceType,
+    String id, {
+    bool review = false,
+  }) async => MemoryTimelineItem.fromJson(
+    _object(
+      await _apiClient.get(
+        _path('/institutional-memory/timeline/$resourceType/$id', {
+          if (review) 'review': true,
+        }),
+        token: await _token(),
+      ),
+    ),
+  );
 
   Future<List<ArchiveItemModel>> getItems({
     String? search,
@@ -126,7 +158,7 @@ class ArchivesService {
     String? search,
     int? year,
     String? status,
-    bool includeStatic = true,
+    bool includeStatic = false,
   }) async {
     final response = await _apiClient.get(
       _path('/archives/historical-projects', {

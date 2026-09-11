@@ -111,7 +111,7 @@ class ArchivePermissions {
     final canValidate =
         user != null && (user.isAdmin || user.isTeamLeader || user.isSecretary);
     return ArchivePermissions(
-      canCreate: user?.isEnacchef == true || user?.isAdmin == true,
+      canCreate: canValidate,
       canValidate: canValidate,
       canExport: canValidate,
     );

@@ -4,7 +4,9 @@ import os
 import secrets
 import unittest
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from threading import Barrier
 from unittest.mock import patch
 
 from alembic import command
@@ -13,9 +15,19 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import sessionmaker
 
 import app.models.base  # noqa: F401
+from app.api.routes import institutional_memory as memory
 from app.core.config import settings
+from app.models.attendance import AttendanceSession
+from app.models.institutional_memory import InstitutionalEvent, InstitutionalSource
+from app.models.project import Project
+from app.models.user import User
+from app.services.institutional_memory_capture import (
+    capture_attendance_archive,
+    capture_project_completion,
+)
 
 
 MEMORY_TABLES = {
@@ -54,11 +66,14 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
         isolated = url.update_query_dict({"options": f"-csearch_path={cls.schema}"})
         cls.isolated_url = isolated.render_as_string(hide_password=False)
         cls.engine = create_engine(isolated, connect_args={"connect_timeout": 5})
+        cls.Session = sessionmaker(bind=cls.engine, autoflush=False)
         cls.addClassCleanup(cls.engine.dispose)
         cls.config = Config("alembic.ini")
         cls.heads = ScriptDirectory.from_config(cls.config).get_heads()
-        if cls.heads != ["20260909_0007"]:
+        if cls.heads != ["20260910_0008"]:
             raise AssertionError(f"Expected current Alembic head, got {cls.heads}")
+        with patch.object(settings, "DATABASE_URL", cls.isolated_url):
+            command.upgrade(cls.config, "head")
 
     @classmethod
     def _upgrade(cls, revision):
@@ -78,6 +93,173 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
             connection.execute(text(f'DROP SCHEMA "{cls.schema}" CASCADE'))
         cls.admin_engine.dispose()
 
+    def _user(self):
+        db = self.Session()
+        try:
+            user = User(
+                first_name="PR66",
+                last_name="PostgreSQL",
+                email=f"{secrets.token_hex(8)}@example.test",
+                password_hash="unused",
+                status="active",
+                is_active=True,
+                email_verified=True,
+            )
+            db.add(user)
+            db.commit()
+            return user.id
+        finally:
+            db.close()
+
+    def test_capture_key_project_and_attendance_concurrency(self):
+        actor_id = self._user()
+        db = self.Session()
+        try:
+            project = Project(name="Projet PR66 concurrent", status="termine")
+            attendance_session = AttendanceSession(
+                title="Séance PR66 concurrente",
+                session_type="general_meeting",
+                scope_type="club",
+                status="archived",
+                is_closed=True,
+                created_by=actor_id,
+            )
+            db.add_all([project, attendance_session])
+            db.commit()
+            project_id = project.id
+            attendance_id = attendance_session.id
+        finally:
+            db.close()
+
+        def race(model, entity_id, capture):
+            barrier = Barrier(2)
+
+            def worker():
+                worker_db = self.Session()
+                try:
+                    entity = worker_db.query(model).filter(model.id == entity_id).one()
+                    barrier.wait(timeout=10)
+                    result = capture(worker_db, entity, actor_id=actor_id)
+                    worker_db.commit()
+                    return result.id
+                finally:
+                    worker_db.close()
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                return [future.result(timeout=20) for future in [
+                    executor.submit(worker),
+                    executor.submit(worker),
+                ]]
+
+        project_results = race(Project, project_id, capture_project_completion)
+        attendance_results = race(
+            AttendanceSession,
+            attendance_id,
+            capture_attendance_archive,
+        )
+        self.assertEqual(len(set(project_results)), 1)
+        self.assertEqual(len(set(attendance_results)), 1)
+        db = self.Session()
+        try:
+            self.assertEqual(
+                db.query(InstitutionalEvent)
+                .filter(
+                    InstitutionalEvent.capture_key.in_(
+                        [
+                            f"project:{project_id}:termine",
+                            f"attendance_session:{attendance_id}:archived",
+                        ]
+                    )
+                )
+                .count(),
+                2,
+            )
+        finally:
+            db.close()
+
+    def test_timeline_keyset_and_private_source_on_postgresql(self):
+        reader_id = self._user()
+        db = self.Session()
+        try:
+            private_source = InstitutionalSource(
+                source_type="minutes",
+                title="Source privée PR66",
+                visibility="private",
+                validation_status="VERIFIED",
+            )
+            db.add(private_source)
+            db.flush()
+            db.add(
+                InstitutionalEvent(
+                    title="Repère privé PR66",
+                    event_type="milestone",
+                    year=2026,
+                    visibility="internal",
+                    source_id=private_source.id,
+                    validation_status="VERIFIED",
+                    origin="manual",
+                )
+            )
+            db.add_all(
+                [
+                    InstitutionalEvent(
+                        title=f"Repère PostgreSQL {index:04d}",
+                        event_type="milestone",
+                        year=2000 + (index % 26),
+                        visibility="internal",
+                        validation_status="VERIFIED",
+                        origin="manual",
+                    )
+                    for index in range(1001)
+                ]
+            )
+            db.commit()
+            reader = db.query(User).filter(User.id == reader_id).one()
+            seen = []
+            cursor = None
+            while True:
+                page = memory.list_timeline(
+                    start_year=None,
+                    end_year=None,
+                    resource_type=None,
+                    project_id=None,
+                    pole_id=None,
+                    member_id=None,
+                    event_id=None,
+                    validation_status=None,
+                    search="Repère PostgreSQL",
+                    review=False,
+                    limit=100,
+                    cursor=cursor,
+                    db=db,
+                    current_user=reader,
+                )
+                seen.extend(item["id"] for item in page["items"])
+                cursor = page["next_cursor"]
+                if cursor is None:
+                    break
+            self.assertEqual(len(seen), 1001)
+            self.assertEqual(len(set(seen)), 1001)
+            private_page = memory.list_timeline(
+                start_year=None,
+                end_year=None,
+                resource_type=None,
+                project_id=None,
+                pole_id=None,
+                member_id=None,
+                event_id=None,
+                validation_status=None,
+                search="Repère privé PR66",
+                review=False,
+                limit=25,
+                cursor=None,
+                db=db,
+                current_user=reader,
+            )
+            self.assertEqual(private_page["items"], [])
+        finally:
+            db.close()
+
     def test_postgresql_lifecycle_foreign_keys_and_uniqueness(self):
         self._upgrade("head")
         inspector = inspect(self.engine)
@@ -92,7 +274,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
                 connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one(),
-                "20260909_0007",
+                "20260910_0008",
             )
 
         self._downgrade("20260903_0003")

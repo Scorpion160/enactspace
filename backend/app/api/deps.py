@@ -14,6 +14,7 @@ from app.core.roles import (
     FINANCE_MANAGEMENT_ROLES,
     GLOBAL_MANAGEMENT_ROLES,
     JOIN_REQUEST_REVIEWER_ROLES,
+    MEMORY_CURATOR_ROLES,
     RECRUITMENT_ACCESS_ROLES,
     SECRETARIAT_ROLES,
     normalize_role_name,
@@ -161,6 +162,19 @@ def require_sg_or_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée à la Secrétaire Générale, au Team Leader ou à l'administrateur",
+        )
+
+    return current_user
+
+
+def require_memory_curator(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+) -> User:
+    if not user_has_any_role(db, current_user.id, MEMORY_CURATOR_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action reservee aux curateurs de la memoire institutionnelle",
         )
 
     return current_user

@@ -1,9 +1,20 @@
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../models/archive_models.dart';
+import '../models/memory_timeline_models.dart';
 import 'archives_service.dart';
 
 abstract class ArchivesGateway {
+  Future<MemoryTimelinePage> getTimeline({
+    MemoryTimelineFilters filters = const MemoryTimelineFilters(),
+    String? cursor,
+    int limit = 25,
+  });
+  Future<MemoryTimelineItem> getTimelineDetail(
+    String resourceType,
+    String id, {
+    bool review = false,
+  });
   Future<ArchivePermissions> getPermissions();
   Future<ArchivesHomeData> loadHome();
 
@@ -96,6 +107,20 @@ class ApiArchivesGateway implements ArchivesGateway {
   ApiArchivesGateway({ArchivesService? service, AuthService? authService})
     : _service = service ?? ArchivesService(),
       _authService = authService ?? AuthService();
+
+  @override
+  Future<MemoryTimelinePage> getTimeline({
+    MemoryTimelineFilters filters = const MemoryTimelineFilters(),
+    String? cursor,
+    int limit = 25,
+  }) => _service.getTimeline(filters: filters, cursor: cursor, limit: limit);
+
+  @override
+  Future<MemoryTimelineItem> getTimelineDetail(
+    String resourceType,
+    String id, {
+    bool review = false,
+  }) => _service.getTimelineDetail(resourceType, id, review: review);
 
   @override
   Future<ArchivePermissions> getPermissions() async {

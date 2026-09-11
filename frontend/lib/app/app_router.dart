@@ -12,6 +12,7 @@ import '../features/alumni/screens/alumni_profile_detail_screen.dart';
 import '../features/alumni/services/alumni_gateway.dart';
 import '../features/archives/screens/archive_detail_screens.dart';
 import '../features/archives/screens/archives_center_screen.dart';
+import '../features/archives/models/memory_timeline_models.dart';
 import '../features/archives/services/archives_gateway.dart';
 import '../features/attendance/screens/attendance_nfc_enrollment_screen.dart';
 import '../features/attendance/screens/attendance_qr_scanner_screen.dart';
@@ -344,6 +345,20 @@ class AppRouter {
                   gateway: state.extra is ArchivesGateway
                       ? state.extra! as ArchivesGateway
                       : null,
+                  initialFilters: MemoryTimelineFilters(
+                    startYear: int.tryParse(
+                      state.uri.queryParameters['start_year'] ?? '',
+                    ),
+                    endYear: int.tryParse(
+                      state.uri.queryParameters['end_year'] ?? '',
+                    ),
+                    resourceType: state.uri.queryParameters['type'],
+                    projectId: state.uri.queryParameters['project_id'],
+                    poleId: state.uri.queryParameters['pole_id'],
+                    memberId: state.uri.queryParameters['member_id'],
+                    eventId: state.uri.queryParameters['event_id'],
+                    search: state.uri.queryParameters['search'],
+                  ),
                 ),
                 routes: [
                   GoRoute(

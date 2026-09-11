@@ -117,6 +117,9 @@ class _PoleDetailScreenState extends State<PoleDetailScreen> {
           return PoleDetailView(
             data: data,
             onBack: _back,
+            onHistory: () => context.go(
+              '/archives?pole_id=${Uri.encodeQueryComponent(widget.poleId)}',
+            ),
             management: permissions.canEditPole
                 ? PoleManagementActions(onEdit: () => _openEdit(data))
                 : null,

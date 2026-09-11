@@ -152,7 +152,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _references.poleName(event.poleId) ??
         'Tout le club';
     return Scaffold(
-      appBar: AppBar(title: const Text('Fiche événement')),
+      appBar: AppBar(
+        title: const Text('Fiche événement'),
+        actions: [
+          TextButton.icon(
+            key: const Key('event_memory_link'),
+            onPressed: () => context.go(
+              '/archives?event_id=${Uri.encodeQueryComponent(event.id)}',
+            ),
+            icon: const Icon(Icons.history),
+            label: const Text('Voir dans la mémoire'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [

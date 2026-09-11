@@ -23,6 +23,7 @@ from app.models.user import User
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
 from app.services.operational_integrity import assert_active_operational_member, lock_row
+from app.services.institutional_memory_capture import capture_project_completion
 
 
 router = APIRouter(prefix="/projects", tags=["Projets"])
@@ -257,6 +258,8 @@ def update_project(
         new_value={key: str(value) if value is not None else None for key, value in new_value.items()},
         ip_address=get_client_ip(request),
     )
+    if status_changed and project.status == "termine":
+        capture_project_completion(db, project, actor_id=current_user.id)
     db.commit()
     db.refresh(project)
 

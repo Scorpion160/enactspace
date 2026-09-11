@@ -9,6 +9,7 @@ class PoleDetailView extends StatelessWidget {
   final VoidCallback onBack;
   final Widget? management;
   final Widget? teamSection;
+  final VoidCallback? onHistory;
 
   const PoleDetailView({
     super.key,
@@ -16,6 +17,7 @@ class PoleDetailView extends StatelessWidget {
     required this.onBack,
     this.management,
     this.teamSection,
+    this.onHistory,
   });
 
   @override
@@ -31,6 +33,15 @@ class PoleDetailView extends StatelessWidget {
             icon: const Icon(Icons.arrow_back_rounded),
           ),
           title: Text(item.pole.name),
+          actions: [
+            if (onHistory != null)
+              TextButton.icon(
+                key: const Key('pole_memory_link'),
+                onPressed: onHistory,
+                icon: const Icon(Icons.history),
+                label: const Text('Historique'),
+              ),
+          ],
         ),
         SliverToBoxAdapter(
           child: LayoutBuilder(

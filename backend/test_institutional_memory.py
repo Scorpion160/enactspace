@@ -21,8 +21,7 @@ from sqlalchemy.pool import StaticPool
 import app.models.base  # noqa: F401
 from app.api.deps import (
     get_current_active_validated_user,
-    require_enacchef_or_admin,
-    require_sg_or_admin,
+    require_memory_curator,
 )
 from app.api.routes import archives
 from app.api.routes import institutional_memory as memory
@@ -375,23 +374,24 @@ class InstitutionalMemoryTests(unittest.TestCase):
         )
         ordinary = self.member()
         curator = self.curator()
+        memory.validate_memory_entity(
+            "sources", str(private_source.id), db=self.db, current_user=curator
+        )
 
         creator_rows = memory.list_sources(db=self.db, current_user=self.user)
         ordinary_rows = memory.list_sources(db=self.db, current_user=ordinary)
         curator_rows = memory.list_sources(db=self.db, current_user=curator)
 
-        self.assertEqual([row.id for row in creator_rows], [private_source.id])
+        self.assertEqual(creator_rows, [])
         self.assertEqual(ordinary_rows, [])
         self.assertEqual([row.id for row in curator_rows], [private_source.id])
-        self.assertEqual(
+        with self.assertRaises(HTTPException):
             memory.get_memory_entity(
                 "sources",
                 str(private_source.id),
                 db=self.db,
                 current_user=self.user,
-            ).id,
-            private_source.id,
-        )
+            )
         with self.assertRaises(HTTPException) as hidden:
             memory.get_memory_entity(
                 "sources",
@@ -404,6 +404,7 @@ class InstitutionalMemoryTests(unittest.TestCase):
             memory.get_memory_entity(
                 "sources",
                 str(private_source.id),
+                review=True,
                 db=self.db,
                 current_user=curator,
             ).id,
@@ -461,10 +462,13 @@ class InstitutionalMemoryTests(unittest.TestCase):
             db=self.db,
             current_user=self.user,
         )
+        internal_event.validation_status = "VERIFIED"
+        private_event.validation_status = "VERIFIED"
+        self.db.commit()
 
         self.assertEqual(
             {row.id for row in memory.list_events(db=self.db, current_user=self.user)},
-            {internal_event.id, private_event.id},
+            {internal_event.id},
         )
         self.assertEqual(
             [row.id for row in memory.list_events(db=self.db, current_user=ordinary)],
@@ -492,8 +496,8 @@ class InstitutionalMemoryTests(unittest.TestCase):
         self.assertEqual(ordinary_overview["known_events"], 1)
         self.assertEqual(ordinary_overview["earliest_year"], 2020)
         self.assertEqual(ordinary_overview["latest_year"], 2020)
-        self.assertEqual(creator_overview["known_events"], 2)
-        self.assertEqual(creator_overview["earliest_year"], 1000)
+        self.assertEqual(creator_overview["known_events"], 1)
+        self.assertEqual(creator_overview["earliest_year"], 2020)
 
     def test_final_validation_states_are_immutable_and_do_not_reaudit(self):
         source = self.source()
@@ -615,13 +619,14 @@ class InstitutionalMemoryTests(unittest.TestCase):
         self.assertEqual(self.db.query(AuditLog).count(), audit_count)
 
     def test_static_archive_data_stays_compatible_and_not_normalized_verified(self):
+        curator = self.curator()
         archive_awards = archives.list_awards(
             search=None,
             year=None,
             featured=None,
             include_static=True,
             db=self.db,
-            current_user=self.user,
+            current_user=curator,
         )["awards"]
         archive_competitions = archives.list_competitions(
             search=None,
@@ -629,14 +634,14 @@ class InstitutionalMemoryTests(unittest.TestCase):
             featured=None,
             include_static=True,
             db=self.db,
-            current_user=self.user,
+            current_user=curator,
         )["competitions"]
 
         self.assertGreater(len(archive_awards), 0)
         self.assertGreater(len(archive_competitions), 0)
-        self.assertTrue(all("validation_status" not in row for row in archive_awards))
+        self.assertTrue(all(row["legacy"] and not row["verified"] for row in archive_awards))
         self.assertTrue(
-            all("validation_status" not in row for row in archive_competitions)
+            all(row["legacy"] and not row["verified"] for row in archive_competitions)
         )
         self.assertEqual(
             memory.list_awards(
@@ -713,9 +718,9 @@ class InstitutionalMemoryTests(unittest.TestCase):
             methods = getattr(route, "methods", set())
             dependencies = {dependency.call for dependency in route.dependant.dependencies}
             if route.path.endswith("/validate") or route.path.endswith("/reject"):
-                self.assertIn(require_sg_or_admin, dependencies)
+                self.assertIn(require_memory_curator, dependencies)
             elif "POST" in methods or "PATCH" in methods:
-                self.assertIn(require_enacchef_or_admin, dependencies)
+                self.assertIn(require_memory_curator, dependencies)
             elif "GET" in methods:
                 self.assertIn(get_current_active_validated_user, dependencies)
 

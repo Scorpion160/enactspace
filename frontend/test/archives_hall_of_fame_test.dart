@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/features/archives/models/archive_models.dart';
+import 'package:frontend/features/archives/models/memory_timeline_models.dart';
 import 'package:frontend/features/archives/screens/archive_detail_screens.dart';
 import 'package:frontend/features/archives/screens/archives_center_screen.dart';
 import 'package:frontend/features/archives/services/archives_api_service.dart';
@@ -82,6 +84,76 @@ void main() {
         'Ancien',
       ]);
     });
+
+    test('parse une page timeline typée avec source et relation', () {
+      final page = MemoryTimelinePage.fromJson({
+        'items': [
+          {
+            'id': persistedId,
+            'resource_type': 'institutional_event',
+            'title': 'Repère parsé',
+            'year': 2026,
+            'date_precision': 'exact',
+            'validation_status': 'VERIFIED',
+            'origin': 'operational',
+            'captured_at': '2026-09-10T10:30:00Z',
+            'source': {
+              'id': 'source-1',
+              'type': 'document',
+              'label': 'PV',
+              'capability': {'type': 'document', 'url': '/api/documents/doc-1'},
+            },
+            'related_entities': [
+              {'type': 'project', 'id': 'project-1', 'label': 'Projet source'},
+            ],
+          },
+        ],
+        'next_cursor': 'opaque',
+      });
+      expect(page.nextCursor, 'opaque');
+      expect(page.items.single.trustLabel, 'Vérifié');
+      expect(page.items.single.originLabel, 'Origine système');
+      expect(page.items.single.capturedAt?.toUtc().year, 2026);
+      expect(page.items.single.source?.capability?.type, 'document');
+      expect(page.items.single.relatedEntities.single.label, 'Projet source');
+    });
+
+    test('distingue la capture opérationnelle de la date de création', () {
+      final operational = MemoryTimelineItem.fromJson({
+        'id': 'event-1',
+        'resource_type': 'institutional_event',
+        'title': 'Clôture capturée',
+        'year': 2026,
+        'origin': 'operational',
+        'captured_at': '2026-09-10T10:30:00Z',
+        'created_at': '2026-09-10T10:31:00Z',
+      });
+      final manual = MemoryTimelineItem.fromJson({
+        'id': 'event-2',
+        'resource_type': 'institutional_event',
+        'title': 'Repère saisi',
+        'year': 2025,
+        'created_at': '2025-06-01T08:00:00Z',
+      });
+
+      expect(operational.capturedAt?.toUtc().minute, 30);
+      expect(operational.createdAt?.toUtc().minute, 31);
+      expect(manual.capturedAt, isNull);
+      expect(manual.createdAt?.toUtc().year, 2025);
+    });
+
+    test('conserve les quatre filtres contextuels dans la requête', () {
+      const filters = MemoryTimelineFilters(
+        memberId: 'member-1',
+        poleId: 'pole-1',
+        projectId: 'project-1',
+        eventId: 'event-1',
+      );
+      expect(filters.toQuery()['member_id'], 'member-1');
+      expect(filters.toQuery()['pole_id'], 'pole-1');
+      expect(filters.toQuery()['project_id'], 'project-1');
+      expect(filters.toQuery()['event_id'], 'event-1');
+    });
   });
 
   group('gateway statistiques', () {
@@ -140,97 +212,231 @@ void main() {
   });
 
   group('centre Archives mémoire', () {
-    testWidgets('affiche résumé serveur et nuance historique', (tester) async {
+    testWidgets('affiche la timeline vérifiée et sa provenance', (
+      tester,
+    ) async {
       await _pumpCenter(tester, _MemoryArchivesGateway());
-      expect(find.text('Archives & mémoire collective'), findsOneWidget);
-      expect(find.text('Historique à confirmer'), findsOneWidget);
-      expect(find.text('Historique validé'), findsOneWidget);
-      expect(find.text('Initiative source'), findsOneWidget);
+      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
+      expect(find.text('Projet opérationnel terminé'), findsOneWidget);
+      expect(find.text('Vérifié'), findsOneWidget);
+      expect(find.text('Origine système'), findsOneWidget);
+      expect(find.textContaining('Source non accessible'), findsOneWidget);
     });
 
-    testWidgets('erreur gateway ne montre aucun fallback local', (
+    testWidgets('erreur timeline propose une relance explicite', (
       tester,
     ) async {
       await _pumpCenter(tester, _MemoryArchivesGateway(failHome: true));
       expect(
-        find.text('Impossible de charger la mémoire collective.'),
+        find.text('Impossible de charger la mémoire institutionnelle.'),
         findsOneWidget,
       );
       expect(find.text('Réessayer'), findsOneWidget);
-      expect(find.text('Initiative source'), findsNothing);
+      expect(find.text('Projet opérationnel terminé'), findsNothing);
     });
 
-    testWidgets(
-      'recherche et filtres archive catégorie année statut visibilité',
-      (tester) async {
-        final gateway = _MemoryArchivesGateway();
-        await _pumpCenter(tester, gateway);
-        await tester.tap(find.text('Archives'));
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const Key('archives_search')),
-          'Rapport sourcé',
-        );
-        await tester.pump();
-        expect(find.text('Rapport sourcé'), findsWidgets);
-        expect(find.text('Témoignage vérifié'), findsNothing);
-        expect(find.text('Catégorie'), findsOneWidget);
-        expect(find.text('Année'), findsOneWidget);
-        expect(find.text('Statut'), findsOneWidget);
-        expect(find.text('Visibilité'), findsOneWidget);
-      },
-    );
+    testWidgets('recherche redémarre la requête côté serveur', (tester) async {
+      final gateway = _MemoryArchivesGateway();
+      await _pumpCenter(tester, gateway);
+      await tester.enterText(
+        find.byKey(const Key('archives_search')),
+        'projet terminé',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(gateway.lastTimelineFilters?.search, 'projet terminé');
+      expect(gateway.timelineLoads, 2);
+    });
 
-    testWidgets('archive statique non modifiable et DB modifiable', (
+    testWidgets('mode révision et héritage restent réservés au curateur', (
       tester,
     ) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.text('Archives'));
+      final curator = _MemoryArchivesGateway();
+      await _pumpCenter(tester, curator);
+      expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
+      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+      expect(curator.homeLoads, 0);
+      await tester.tap(find.byKey(const Key('memory_review_mode')));
       await tester.pumpAndSettle();
-      expect(find.text('Mémoire historique Enactus ESP'), findsOneWidget);
-      expect(find.byKey(const Key('archive_edit_button')), findsOneWidget);
+      expect(curator.lastTimelineFilters?.review, isTrue);
+      await tester.tap(find.byKey(const Key('memory_legacy_area')));
+      await tester.pumpAndSettle();
+      expect(curator.homeLoads, 1);
+      expect(find.text('Archives héritées à vérifier'), findsWidgets);
+
+      await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
+      expect(find.byKey(const Key('memory_review_mode')), findsNothing);
+      expect(find.byKey(const Key('memory_legacy_area')), findsNothing);
     });
 
-    testWidgets('création préserve garde-fou public et double-submit', (
+    testWidgets('pagination curseur ajoute sans doublon', (tester) async {
+      final gateway = _MemoryArchivesGateway(paginated: true);
+      await _pumpCenter(tester, gateway);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
+      await tester.pumpAndSettle();
+      expect(gateway.timelineCursors, contains('page-2'));
+      expect(find.text('Deuxième repère'), findsOneWidget);
+      expect(find.text('Projet opérationnel terminé'), findsOneWidget);
+    });
+
+    testWidgets('filtres année et type relancent la première page', (
       tester,
     ) async {
       final gateway = _MemoryArchivesGateway();
       await _pumpCenter(tester, gateway);
-      await tester.tap(find.text('Nouvelle archive'));
+      await tester.tap(find.byKey(const Key('memory_filters')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('memory_start_year')),
+        '2020',
+      );
+      await tester.enterText(find.byKey(const Key('memory_end_year')), '2025');
+      await tester.tap(find.byKey(const Key('memory_resource_type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Distinction').last);
+      await tester.pumpAndSettle();
+      tester
+          .widget<FilledButton>(find.byKey(const Key('memory_apply_filters')))
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(gateway.lastTimelineFilters?.startYear, 2020);
+      expect(gateway.lastTimelineFilters?.endYear, 2025);
+      expect(gateway.lastTimelineFilters?.resourceType, 'award');
+      expect(gateway.timelineCursors.last, isNull);
+    });
+
+    testWidgets('état vide filtré et filtre contextuel restent explicites', (
+      tester,
+    ) async {
+      final gateway = _MemoryArchivesGateway(emptyTimeline: true);
+      await tester.pumpWidget(
+        _app(
+          ArchivesScreen(
+            gateway: gateway,
+            initialFilters: const MemoryTimelineFilters(projectId: 'project-1'),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          'Un contenu public doit être visible par le public ou les alumni.',
-        ),
+        find.text('Aucun repère ne correspond à ces filtres.'),
         findsOneWidget,
       );
-      expect(find.text('metadata_json'), findsNothing);
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Titre'),
-        'Nouvelle mémoire',
+      expect(gateway.lastTimelineFilters?.projectId, 'project-1');
+    });
+
+    testWidgets('source autorisée et relation supprimée sont distinguées', (
+      tester,
+    ) async {
+      await _pumpCenter(
+        tester,
+        _MemoryArchivesGateway(
+          sourceAvailable: true,
+          unavailableRelation: true,
+        ),
       );
-      await tester.tap(find.byKey(const Key('save_archive_button')));
-      await tester.tap(find.byKey(const Key('save_archive_button')));
+      expect(find.textContaining('Ouvrir la source'), findsOneWidget);
+      expect(find.text('Élément source indisponible'), findsWidgets);
+    });
+
+    testWidgets('fichier protégé ne déclenche aucun lancement externe', (
+      tester,
+    ) async {
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final launchedUrls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'launch') {
+              launchedUrls.add(
+                (call.arguments as Map<Object?, Object?>)['url']! as String,
+              );
+            }
+            return true;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      await _pumpCenter(
+        tester,
+        _MemoryArchivesGateway(
+          sourceCapability: const MemorySourceCapability(
+            type: 'stored_file',
+            url: '/api/files/protected-file/preview',
+          ),
+        ),
+      );
+      await tester.tap(find.textContaining('Ouvrir la source'));
       await tester.pumpAndSettle();
-      expect(gateway.createItemCalls, 1);
+
+      expect(launchedUrls, isEmpty);
+      expect(find.text('Source non accessible'), findsOneWidget);
     });
 
-    testWidgets('export visible uniquement au validateur', (tester) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      expect(find.text('Exporter les archives'), findsOneWidget);
-      await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
-      expect(find.text('Exporter les archives'), findsNothing);
+    testWidgets('URL externe autorisée reste lancée sans jeton', (
+      tester,
+    ) async {
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final launchedUrls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'launch') {
+              launchedUrls.add(
+                (call.arguments as Map<Object?, Object?>)['url']! as String,
+              );
+            }
+            return true;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      await _pumpCenter(
+        tester,
+        _MemoryArchivesGateway(
+          sourceCapability: const MemorySourceCapability(
+            type: 'external_url',
+            url: 'https://example.test/source-publique',
+          ),
+        ),
+      );
+      await tester.tap(find.textContaining('Ouvrir la source'));
+      await tester.pumpAndSettle();
+
+      expect(launchedUrls, ['https://example.test/source-publique']);
+      expect(launchedUrls.single, isNot(contains('?')));
+      expect(launchedUrls.single.toLowerCase(), isNot(contains('token')));
+      expect(launchedUrls.single.toLowerCase(), isNot(contains('bearer')));
     });
 
-    testWidgets('mobile 390 garde navigation et contenus verticaux', (
+    testWidgets(
+      'erreur de page suivante conserve la timeline et permet reprise',
+      (tester) async {
+        final gateway = _MemoryArchivesGateway(paginated: true, failMore: true);
+        await _pumpCenter(tester, gateway);
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
+        await tester.pumpAndSettle();
+        expect(find.text('Projet opérationnel terminé'), findsOneWidget);
+        expect(find.byKey(const Key('memory_retry_more')), findsOneWidget);
+      },
+    );
+
+    testWidgets('mobile 390 et texte 200 pour cent restent sans débordement', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
+      tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(
+        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+      );
       await _pumpCenter(tester, _MemoryArchivesGateway());
-      expect(find.text('Vue d’ensemble'), findsOneWidget);
+      expect(find.byType(CustomScrollView), findsOneWidget);
+      expect(find.byTooltip('Effacer la recherche'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -326,70 +532,7 @@ void main() {
     });
   });
 
-  group('collections historiques', () {
-    testWidgets(
-      'palmarès différencie compétition rang résultat et édition DB',
-      (tester) async {
-        await _pumpCenter(tester, _MemoryArchivesGateway());
-        await tester.tap(find.text('Palmarès'));
-        await tester.pumpAndSettle();
-        expect(find.textContaining('Finale'), findsOneWidget);
-        expect(find.textContaining('Premier'), findsOneWidget);
-        expect(find.text('Supprimer'), findsNothing);
-      },
-    );
-
-    testWidgets('compétitions affichent timeline serveur et aucun delete', (
-      tester,
-    ) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.text('Compétitions'));
-      await tester.pumpAndSettle();
-      expect(find.text('Challenge documenté'), findsOneWidget);
-      expect(find.text('Supprimer'), findsNothing);
-    });
-
-    testWidgets('médias humanisés avec ouverture preview ou externe', (
-      tester,
-    ) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.text('Médias'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Article de presse'), findsOneWidget);
-      expect(find.text('Ouvrir'), findsOneWidget);
-    });
-
-    testWidgets('documents historiques restent une section dédiée', (
-      tester,
-    ) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.text('Documents'));
-      await tester.pumpAndSettle();
-      expect(find.text('Dossier source'), findsOneWidget);
-      expect(find.text('Ouvrir document'), findsOneWidget);
-    });
-  });
-
   group('Hall of Fame', () {
-    testWidgets('liste respecte contenu score et featured', (tester) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Hall of Fame'));
-      await tester.pumpAndSettle();
-      expect(find.text('Moment documenté'), findsOneWidget);
-      expect(find.text('Mis en avant'), findsWidgets);
-      expect(find.textContaining('92'), findsOneWidget);
-    });
-
-    testWidgets('entrée serveur non modifiable et UUID modifiable', (
-      tester,
-    ) async {
-      await _pumpCenter(tester, _MemoryArchivesGateway());
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Hall of Fame'));
-      await tester.pumpAndSettle();
-      expect(find.text('Mémoire historique Enactus ESP'), findsOneWidget);
-      expect(find.byKey(const Key('archive_edit_button')), findsOneWidget);
-    });
-
     testWidgets('fiche directe résout via liste et masque score absent', (
       tester,
     ) async {
@@ -479,18 +622,68 @@ class _MemoryArchivesGateway implements ArchivesGateway {
   final bool canValidate;
   final String itemStatus;
   final bool emptyHallStory;
+  final bool paginated;
+  final bool failMore;
+  final bool emptyTimeline;
+  final bool sourceAvailable;
+  final MemorySourceCapability? sourceCapability;
+  final bool unavailableRelation;
   int createItemCalls = 0;
   int hallListLoads = 0;
+  int homeLoads = 0;
+  int timelineLoads = 0;
   String? lastAction;
   String? lastReason;
   Map<String, dynamic>? lastPayload;
+  MemoryTimelineFilters? lastTimelineFilters;
+  final List<String?> timelineCursors = [];
 
   _MemoryArchivesGateway({
     this.failHome = false,
     this.canValidate = true,
     this.itemStatus = 'rejected',
     this.emptyHallStory = false,
+    this.paginated = false,
+    this.failMore = false,
+    this.emptyTimeline = false,
+    this.sourceAvailable = false,
+    this.sourceCapability,
+    this.unavailableRelation = false,
   });
+
+  MemoryTimelineItem get timelineItem => MemoryTimelineItem(
+    id: persistedId,
+    resourceType: 'event',
+    title: 'Projet opérationnel terminé',
+    summary: 'Repère capturé depuis le cycle de vie du projet.',
+    year: 2025,
+    datePrecision: 'day',
+    validationStatus: 'VERIFIED',
+    origin: 'operational',
+    source: MemorySourceProvenance(
+      id: 'source-1',
+      type: 'document',
+      label: 'Compte rendu privé',
+      capability:
+          sourceCapability ??
+          (sourceAvailable
+              ? const MemorySourceCapability(
+                  type: 'document',
+                  url: '/api/documents/doc-1',
+                )
+              : null),
+    ),
+    relatedEntities: unavailableRelation
+        ? const [
+            MemoryRelatedEntity(
+              type: 'project',
+              id: 'removed-project',
+              label: 'Élément source indisponible',
+              available: false,
+            ),
+          ]
+        : const [],
+  );
 
   ArchivePermissions get permissions => ArchivePermissions(
     canCreate: true,
@@ -643,9 +836,50 @@ class _MemoryArchivesGateway implements ArchivesGateway {
 
   @override
   Future<ArchivesHomeData> loadHome() async {
+    homeLoads++;
     if (failHome) throw Exception('API indisponible');
     return home;
   }
+
+  @override
+  Future<MemoryTimelinePage> getTimeline({
+    MemoryTimelineFilters filters = const MemoryTimelineFilters(),
+    String? cursor,
+    int limit = 25,
+  }) async {
+    timelineLoads++;
+    timelineCursors.add(cursor);
+    lastTimelineFilters = filters;
+    if (failHome) throw Exception('API indisponible');
+    if (paginated && cursor == 'page-2') {
+      if (failMore) throw Exception('Page suivante indisponible');
+      return const MemoryTimelinePage(
+        items: [
+          MemoryTimelineItem(
+            id: persistedId2,
+            resourceType: 'milestone',
+            title: 'Deuxième repère',
+            year: 2024,
+            datePrecision: 'year',
+            validationStatus: 'VERIFIED',
+            origin: 'manual',
+          ),
+        ],
+      );
+    }
+    if (emptyTimeline) return const MemoryTimelinePage(items: []);
+    return MemoryTimelinePage(
+      items: [timelineItem],
+      nextCursor: paginated ? 'page-2' : null,
+    );
+  }
+
+  @override
+  Future<MemoryTimelineItem> getTimelineDetail(
+    String resourceType,
+    String id, {
+    bool review = false,
+  }) async => timelineItem;
 
   @override
   Future<ArchivePermissions> getPermissions() async => permissions;

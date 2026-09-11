@@ -47,14 +47,14 @@ class OperationalIntegrityMigrationTests(unittest.TestCase):
     def test_fresh_upgrade_downgrade_reupgrade_and_single_head(self):
         self.assertEqual(
             ScriptDirectory.from_config(self.config).get_heads(),
-            ["20260909_0007"],
+            ["20260910_0008"],
         )
         self._upgrade("head")
         engine = create_engine(self.url)
         with engine.connect() as connection:
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                "20260909_0007",
+                "20260910_0008",
             )
         inspector = inspect(engine)
         self.assertIn(

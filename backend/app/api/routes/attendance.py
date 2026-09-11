@@ -64,6 +64,7 @@ from app.services.operational_integrity import (
     lock_row,
     to_naive_utc,
 )
+from app.services.institutional_memory_capture import capture_attendance_archive
 
 router = APIRouter(prefix="/attendance", tags=["Presences"])
 
@@ -1542,6 +1543,7 @@ def archive_attendance_session(
         new_value={"status": "archived"},
         ip_address=get_client_ip(request),
     )
+    capture_attendance_archive(db, session, actor_id=current_user.id)
     db.commit()
     db.refresh(session)
     return _attendance_session_payload(db, current_user, session)

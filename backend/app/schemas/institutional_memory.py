@@ -334,7 +334,15 @@ class InstitutionalEventUpdate(MemoryFactUpdate):
 
 
 class InstitutionalEventRead(InstitutionalEventCreate, MemoryReadMetadata):
-    pass
+    origin: Literal["manual", "operational"] = "manual"
+    capture_key: str | None = None
+    source_entity_type: str | None = None
+    source_entity_id: UUID | None = None
+    source_entity_version: str | None = None
+    captured_at: datetime | None = None
+    operational_project_id: UUID | None = None
+    pole_id: UUID | None = None
+    operational_event_id: UUID | None = None
 
 
 class InstitutionalFrameworkCreate(MemoryFactCreate):

@@ -441,6 +441,21 @@ class InstitutionalEvent(Base):
     generation_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("institutional_generations.id", ondelete="SET NULL"), nullable=True
     )
+    origin: Mapped[str] = mapped_column(String(20), default="manual")
+    capture_key: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    source_entity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_entity_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    source_entity_version: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    operational_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    pole_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("poles.id", ondelete="SET NULL"), nullable=True
+    )
+    operational_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("events.id", ondelete="SET NULL"), nullable=True
+    )
     visibility: Mapped[str] = mapped_column(String(30), default="internal")
     status: Mapped[str] = mapped_column(String(40), default="reported")
     source_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -472,9 +487,25 @@ class InstitutionalEvent(Base):
             "visibility IN ('private', 'internal')",
             name="ck_memory_event_visibility",
         ),
+        CheckConstraint(
+            "origin IN ('manual', 'operational')",
+            name="ck_memory_event_origin",
+        ),
+        CheckConstraint(
+            "(origin = 'manual') OR (capture_key IS NOT NULL AND "
+            "source_entity_type IS NOT NULL AND source_entity_id IS NOT NULL "
+            "AND captured_at IS NOT NULL)",
+            name="ck_memory_event_operational_provenance",
+        ),
         Index("ix_memory_event_timeline", "year", "event_date"),
         Index("ix_memory_event_project", "canonical_project_id", "year"),
         Index("ix_memory_event_territory", "territory_id", "year"),
+        Index("ix_memory_event_capture_key", "capture_key"),
+        Index("ix_memory_event_origin", "origin"),
+        Index("ix_memory_event_source_entity", "source_entity_type", "source_entity_id"),
+        Index("ix_memory_event_operational_project", "operational_project_id", "year"),
+        Index("ix_memory_event_pole", "pole_id", "year"),
+        Index("ix_memory_event_operational_event", "operational_event_id", "year"),
     )
 
 
