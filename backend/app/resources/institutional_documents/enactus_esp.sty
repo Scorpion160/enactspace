@@ -18,6 +18,8 @@
 \RequirePackage{microtype}
 \RequirePackage{hyperref}
 \RequirePackage{etoolbox}
+\RequirePackage{draftwatermark}
+\SetWatermarkText{}
 \definecolor{EnactusYellow}{HTML}{FFC629}
 \definecolor{EnactusBlack}{HTML}{101820}
 \definecolor{EnactusText}{HTML}{151515}
@@ -44,6 +46,12 @@
 \newcommand{\ApproverName}{Enactus ESP}
 \newcommand{\ApproverRole}{Responsable habilité}
 \newcommand{\DocumentShortTitle}{Document institutionnel}
+\newcommand{\EnableDraftWatermark}{%
+  \SetWatermarkText{BROUILLON -- NON OFFICIEL}%
+  \SetWatermarkScale{0.85}%
+  \SetWatermarkAngle{45}%
+  \SetWatermarkColor[gray]{0.88}%
+}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
 \newcolumntype{C}[1]{>{\Centering\arraybackslash}p{#1}}
 \pagestyle{fancy}
