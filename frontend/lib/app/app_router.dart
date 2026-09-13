@@ -20,7 +20,7 @@ import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
-import '../features/documents/screens/documents_screen.dart';
+import '../features/documents/screens/institutional_documents_hub_screen.dart';
 import '../features/documents/screens/document_detail_screen.dart';
 import '../features/documents/services/documents_gateway.dart';
 import '../features/events/screens/events_screen.dart';
@@ -213,7 +213,8 @@ class AppRouter {
               ),
               GoRoute(
                 path: '/documents',
-                builder: (context, state) => const DocumentsScreen(),
+                builder: (context, state) =>
+                    const InstitutionalDocumentsHubScreen(),
                 routes: [
                   GoRoute(
                     path: ':documentId',
