@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../members/models/member_model.dart';
@@ -46,6 +48,7 @@ abstract class InstitutionalDocumentsGateway {
     String requestId, {
     String? reason,
   });
+  Future<Uint8List> preview(String requestId);
   Future<InstitutionalGenerationResult> generate(String requestId);
   Future<bool> rendererAvailable();
 }
@@ -151,6 +154,9 @@ class ApiInstitutionalDocumentsGateway implements InstitutionalDocumentsGateway 
     String requestId, {
     String? reason,
   }) => _service.cancel(requestId, reason: reason);
+
+  @override
+  Future<Uint8List> preview(String requestId) => _service.preview(requestId);
 
   @override
   Future<InstitutionalGenerationResult> generate(String requestId) =>
