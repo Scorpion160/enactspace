@@ -95,6 +95,18 @@ def ensure_file_access(
     if stored_file.visibility in {"internal", "public_club"}:
         return
 
+    if stored_file.entity_type == "document" and stored_file.entity_id:
+        from app.api.routes.documents import visible_documents_query
+        from app.models.document import Document
+
+        visible_document = (
+            visible_documents_query(db, current_user)
+            .filter(Document.id == stored_file.entity_id)
+            .first()
+        )
+        if visible_document:
+            return
+
     if stored_file.entity_type == "chat_thread" and stored_file.entity_id:
         participant = db.query(ChatParticipant.id).filter(
             ChatParticipant.thread_id == stored_file.entity_id,
