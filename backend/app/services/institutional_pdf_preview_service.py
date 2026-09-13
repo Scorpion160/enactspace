@@ -18,6 +18,7 @@ from app.services.institutional_pdf_service import (
 
 
 DRAFT_REFERENCE = "BROUILLON - NON OFFICIEL"
+DRAFT_STATUS = "BROUILLON -- NON OFFICIEL"
 
 
 def build_preview_data_tex(
@@ -30,6 +31,14 @@ def build_preview_data_tex(
         data = build_data_tex(db, request)
     finally:
         request.official_reference = original_reference
+
+    official_status = r"\renewcommand{\DocStatus}{OFFICIEL}"
+    draft_status = rf"\renewcommand{{\DocStatus}}{{{DRAFT_STATUS}}}"
+    if official_status not in data:
+        raise InstitutionalPdfError(
+            "Le statut institutionnel attendu est absent des données LaTeX."
+        )
+    data = data.replace(official_status, draft_status, 1)
     return data + "\\EnableDraftWatermark\n"
 
 

@@ -16,6 +16,7 @@ from app.models.season import Season
 from app.models.user import User
 from app.services.institutional_pdf_preview_service import (
     DRAFT_REFERENCE,
+    DRAFT_STATUS,
     build_preview_data_tex,
     compile_request_preview_pdf,
 )
@@ -79,6 +80,11 @@ class InstitutionalPdfPreviewTests(unittest.TestCase):
         self.assertIsNone(self.request.official_reference)
         data_tex = build_preview_data_tex(self.db, self.request)
         self.assertIn(DRAFT_REFERENCE, data_tex)
+        self.assertIn(
+            rf"\renewcommand{{\DocStatus}}{{{DRAFT_STATUS}}}",
+            data_tex,
+        )
+        self.assertNotIn(r"\renewcommand{\DocStatus}{OFFICIEL}", data_tex)
         self.assertIn(r"\EnableDraftWatermark", data_tex)
         self.assertIsNone(self.request.official_reference)
         self.assertIsNone(self.request.sequence_number)
