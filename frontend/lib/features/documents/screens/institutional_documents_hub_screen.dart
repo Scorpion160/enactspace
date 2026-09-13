@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -52,16 +54,18 @@ class _InstitutionalDocumentsHubScreenState
       body: Column(
         children: [
           Material(
-            elevation: 0,
             child: SafeArea(
               bottom: false,
               child: TabBar(
                 controller: _tabs,
-                isScrollable: MediaQuery.sizeOf(context).width < 560,
+                isScrollable: MediaQuery.sizeOf(context).width < 600,
                 tabs: const [
                   Tab(icon: Icon(Icons.folder_outlined), text: 'Bibliothèque'),
                   Tab(icon: Icon(Icons.approval_outlined), text: 'Demandes'),
-                  Tab(icon: Icon(Icons.post_add_outlined), text: 'Créer un document'),
+                  Tab(
+                    icon: Icon(Icons.post_add_outlined),
+                    text: 'Créer un document',
+                  ),
                 ],
               ),
             ),
@@ -121,17 +125,17 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
       _error = null;
     });
     try {
-      final values = await widget.gateway.loadTemplates();
+      final templates = await widget.gateway.loadTemplates();
       if (!mounted) return;
       setState(() {
-        _templates = values;
+        _templates = templates;
         _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _error = _message(error);
         _loading = false;
-        _error = _msg(error);
       });
     }
   }
@@ -144,6 +148,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
       template: template,
     );
     if (result == null || !mounted) return;
+
     setState(() => _saving = true);
     try {
       await widget.gateway.createRequest(
@@ -155,10 +160,12 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
         seasonId: result.seasonId,
       );
       if (!mounted) return;
-      _notice('Brouillon créé. Vous pouvez maintenant le relire puis le soumettre.');
+      _notice(
+        'Brouillon créé. Relisez-le, téléchargez son aperçu PDF puis soumettez-le.',
+      );
       widget.onCreated();
     } catch (error) {
-      if (mounted) _notice(_msg(error), error: true);
+      if (mounted) _notice(_message(error), error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -167,11 +174,9 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return _PanelError(message: _error!, onRetry: _load);
-    }
+    if (_error != null) return _PanelError(message: _error!, onRetry: _load);
 
-    final allowed = _templates.where((template) => template.canCreate).toList();
+    final allowed = _templates.where((item) => item.canCreate).toList();
     return RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(
@@ -190,7 +195,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Sélectionnez un modèle. Les modèles affichés dépendent de vos responsabilités dans Enactus ESP.',
+                    'Les modèles proposés dépendent de votre rôle et de votre périmètre dans Enactus ESP.',
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -221,19 +226,16 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
               sliver: SliverGrid.builder(
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 430,
-                  mainAxisExtent: 240,
+                  mainAxisExtent: 235,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
                 itemCount: allowed.length,
-                itemBuilder: (context, index) {
-                  final template = allowed[index];
-                  return _TemplateCard(
-                    template: template,
-                    busy: _saving,
-                    onTap: () => _start(template),
-                  );
-                },
+                itemBuilder: (context, index) => _TemplateCard(
+                  template: allowed[index],
+                  busy: _saving,
+                  onTap: () => _start(allowed[index]),
+                ),
               ),
             ),
         ],
@@ -276,9 +278,7 @@ class _TemplateCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    child: Icon(_templateIcon(template.code)),
-                  ),
+                  CircleAvatar(child: Icon(_templateIcon(template.code))),
                   const Spacer(),
                   Chip(label: Text(template.referencePrefix)),
                 ],
@@ -388,8 +388,8 @@ class _InstitutionalRequestsPanelState
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _error = _message(error);
         _loading = false;
-        _error = _msg(error);
       });
     }
   }
@@ -399,6 +399,7 @@ class _InstitutionalRequestsPanelState
     Future<InstitutionalDocumentRequestModel> Function() action,
     String success,
   ) async {
+    if (_busyId != null) return;
     setState(() => _busyId = request.id);
     try {
       final updated = await action();
@@ -406,7 +407,7 @@ class _InstitutionalRequestsPanelState
       _replace(updated);
       _notice(success);
     } catch (error) {
-      if (mounted) _notice(_msg(error), error: true);
+      if (mounted) _notice(_message(error), error: true);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
@@ -444,6 +445,36 @@ class _InstitutionalRequestsPanelState
     );
   }
 
+  Future<void> _preview(InstitutionalDocumentRequestModel request) async {
+    if (_busyId != null) return;
+    setState(() => _busyId = request.id);
+    try {
+      final bytes = await widget.gateway.preview(request.id);
+      final shortId = request.id.length > 8
+          ? request.id.substring(0, 8)
+          : request.id;
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Enregistrer l’aperçu PDF',
+        fileName: 'BROUILLON-${request.templateCode}-$shortId.pdf',
+        type: FileType.custom,
+        allowedExtensions: const ['pdf'],
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      if (kIsWeb || result != null) {
+        _notice(
+          'Aperçu PDF enregistré. Il est marqué « BROUILLON — NON OFFICIEL ».',
+        );
+      } else {
+        _notice('Enregistrement de l’aperçu annulé.');
+      }
+    } catch (error) {
+      if (mounted) _notice(_message(error), error: true);
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
   Future<void> _reject(InstitutionalDocumentRequestModel request) async {
     final reason = await _askText(
       title: 'Demander une correction / rejeter',
@@ -472,6 +503,7 @@ class _InstitutionalRequestsPanelState
   }
 
   Future<void> _generate(InstitutionalDocumentRequestModel request) async {
+    if (_busyId != null) return;
     setState(() => _busyId = request.id);
     try {
       final result = await widget.gateway.generate(request.id);
@@ -483,7 +515,7 @@ class _InstitutionalRequestsPanelState
             : 'PDF officiel généré et archivé.',
       );
     } catch (error) {
-      if (mounted) _notice(_msg(error), error: true);
+      if (mounted) _notice(_message(error), error: true);
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
@@ -498,105 +530,7 @@ class _InstitutionalRequestsPanelState
       onRefresh: _load,
       child: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Demandes institutionnelles',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                            const SizedBox(height: 5),
-                            const Text(
-                              'Brouillons, validation SG, approbation Team Leader et génération des PDF officiels.',
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Actualiser',
-                        onPressed: _load,
-                        icon: const Icon(Icons.refresh_rounded),
-                      ),
-                    ],
-                  ),
-                  if (_canGenerate && !_rendererAvailable) ...[
-                    const SizedBox(height: 12),
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.warning_amber_rounded),
-                        title: const Text('Moteur PDF indisponible'),
-                        subtitle: const Text(
-                          'Les validations restent possibles, mais pdflatex doit être installé sur le backend avant la génération.',
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      SizedBox(
-                        width: 245,
-                        child: DropdownButtonFormField<String>(
-                          value: _status,
-                          decoration: const InputDecoration(labelText: 'Statut'),
-                          items: const [
-                            DropdownMenuItem(value: 'all', child: Text('Tous les statuts')),
-                            DropdownMenuItem(value: 'draft', child: Text('Brouillons')),
-                            DropdownMenuItem(value: 'pending_sg_validation', child: Text('À valider par le SG')),
-                            DropdownMenuItem(value: 'pending_approval', child: Text('À approuver par le TL')),
-                            DropdownMenuItem(value: 'validated', child: Text('Validés')),
-                            DropdownMenuItem(value: 'generated', child: Text('PDF générés')),
-                            DropdownMenuItem(value: 'rejected', child: Text('À corriger')),
-                            DropdownMenuItem(value: 'cancelled', child: Text('Annulés')),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _status = value);
-                            _load();
-                          },
-                        ),
-                      ),
-                      SizedBox(
-                        width: 300,
-                        child: DropdownButtonFormField<String>(
-                          value: _templates.containsKey(_template) ? _template : 'all',
-                          decoration: const InputDecoration(labelText: 'Type de document'),
-                          items: [
-                            const DropdownMenuItem(value: 'all', child: Text('Tous les modèles')),
-                            ..._templates.values.map(
-                              (template) => DropdownMenuItem(
-                                value: template.code,
-                                child: Text(template.label),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _template = value);
-                            _load();
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+          SliverToBoxAdapter(child: _header()),
           if (_requests.isEmpty)
             const SliverFillRemaining(
               child: Center(child: Text('Aucune demande pour ces filtres.')),
@@ -607,9 +541,121 @@ class _InstitutionalRequestsPanelState
               sliver: SliverList.separated(
                 itemCount: _requests.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) => _requestCard(_requests[index]),
+                itemBuilder: (context, index) =>
+                    _requestCard(_requests[index]),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Demandes institutionnelles',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Prévisualisez le brouillon, soumettez-le, suivez les validations puis générez le PDF officiel.',
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualiser',
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          if (!_rendererAvailable) ...[
+            const SizedBox(height: 12),
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.warning_amber_rounded),
+                title: Text('Moteur PDF indisponible'),
+                subtitle: Text(
+                  'Les formulaires et validations restent disponibles, mais pdflatex doit être installé sur le backend pour les aperçus et PDF officiels.',
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              SizedBox(
+                width: 250,
+                child: DropdownButtonFormField<String>(
+                  value: _status,
+                  decoration: const InputDecoration(labelText: 'Statut'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('Tous les statuts')),
+                    DropdownMenuItem(value: 'draft', child: Text('Brouillons')),
+                    DropdownMenuItem(
+                      value: 'pending_sg_validation',
+                      child: Text('À valider par le SG'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'pending_approval',
+                      child: Text('À approuver par le TL'),
+                    ),
+                    DropdownMenuItem(value: 'validated', child: Text('Validés')),
+                    DropdownMenuItem(
+                      value: 'generated',
+                      child: Text('PDF générés'),
+                    ),
+                    DropdownMenuItem(value: 'rejected', child: Text('À corriger')),
+                    DropdownMenuItem(value: 'cancelled', child: Text('Annulés')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _status = value);
+                    _load();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 310,
+                child: DropdownButtonFormField<String>(
+                  value: _templates.containsKey(_template) ? _template : 'all',
+                  decoration: const InputDecoration(labelText: 'Type de document'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Tous les modèles'),
+                    ),
+                    ..._templates.values.map(
+                      (template) => DropdownMenuItem(
+                        value: template.code,
+                        child: Text(template.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _template = value);
+                    _load();
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -619,6 +665,11 @@ class _InstitutionalRequestsPanelState
     final busy = _busyId == request.id;
     final theme = Theme.of(context);
     final scope = _scopeLabel(request);
+    final canPreview =
+        _rendererAvailable &&
+        request.status != 'cancelled' &&
+        request.generatedDocumentId == null;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -664,7 +715,9 @@ class _InstitutionalRequestsPanelState
                   color: theme.colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('Correction demandée : ${request.rejectionReason}'),
+                child: Text(
+                  'Correction demandée : ${request.rejectionReason}',
+                ),
               ),
             ],
             const SizedBox(height: 12),
@@ -679,6 +732,12 @@ class _InstitutionalRequestsPanelState
                       onPressed: () => _edit(request),
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Modifier'),
+                    ),
+                  if (canPreview)
+                    OutlinedButton.icon(
+                      onPressed: () => _preview(request),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Télécharger l’aperçu'),
                     ),
                   if (request.canSubmit)
                     FilledButton.icon(
@@ -718,9 +777,11 @@ class _InstitutionalRequestsPanelState
                     ),
                   if (request.isValidated && _canGenerate)
                     FilledButton.icon(
-                      onPressed: _rendererAvailable ? () => _generate(request) : null,
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('Générer le PDF'),
+                      onPressed: _rendererAvailable
+                          ? () => _generate(request)
+                          : null,
+                      icon: const Icon(Icons.workspace_premium_outlined),
+                      label: const Text('Générer le PDF officiel'),
                     ),
                   if (request.generatedDocumentId != null)
                     FilledButton.tonalIcon(
@@ -728,7 +789,7 @@ class _InstitutionalRequestsPanelState
                         '/documents/${request.generatedDocumentId}',
                       ),
                       icon: const Icon(Icons.open_in_new_rounded),
-                      label: const Text('Ouvrir le document'),
+                      label: const Text('Ouvrir le document officiel'),
                     ),
                   if (request.canCancel)
                     TextButton.icon(
@@ -823,6 +884,7 @@ class _InstitutionalRequestsPanelState
 
 class _StatusChip extends StatelessWidget {
   final InstitutionalDocumentRequestModel request;
+
   const _StatusChip({required this.request});
 
   @override
@@ -845,24 +907,27 @@ class _StatusChip extends StatelessWidget {
 class _PanelError extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
+
   const _PanelError({required this.message, required this.onRetry});
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline_rounded, size: 44),
-          const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
-        ],
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 44),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 IconData _templateIcon(String code) {
@@ -898,7 +963,9 @@ String _visibilityLabel(String visibility) {
   }
 }
 
-String _msg(Object error) {
+String _message(Object error) {
   final text = error.toString();
-  return text.startsWith('Exception: ') ? text.substring(11) : text;
+  if (text.startsWith('Exception: ')) return text.substring(11);
+  if (text.startsWith('ArgumentError: ')) return text.substring(15);
+  return text;
 }
