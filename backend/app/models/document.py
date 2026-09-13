@@ -37,13 +37,6 @@ class Document(Base):
         nullable=True,
     )
 
-    recipient_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        GUID(),
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-
     validated_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("users.id"),
