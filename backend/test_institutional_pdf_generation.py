@@ -142,22 +142,52 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
         return {
             "pv_pole": {
                 **common_meeting,
-                "reminders": ["Respecter les délais"],
+                "reminders": "Respecter les délais\nMettre à jour les tâches",
+                "decisions": [
+                    {"title": "Répartition", "details": "Le plan d'action est adopté."}
+                ],
+                "escalations": "Besoin d'un arbitrage sur le budget",
                 "miscellaneous": "Néant",
                 "enactor_minute": "Empowering our society is our priority",
+                "next_meeting": "2026-09-20T15:00:00",
             },
             "pv_projet": {
                 **common_meeting,
                 "project_phase": "Pilote",
-                "risks": "Aucun blocage critique",
+                "deliverables": [
+                    {"title": "Prototype", "details": "Version terrain terminée"}
+                ],
+                "kpis": [
+                    {"title": "Tests réussis", "details": "8 sur 10"}
+                ],
+                "risks": [
+                    {"title": "Approvisionnement", "details": "Délai fournisseur"}
+                ],
                 "needs": "Validation terrain",
+                "decisions": [
+                    {"title": "Déploiement", "details": "Pilote maintenu"}
+                ],
                 "next_review": "2026-09-27T15:00:00",
             },
             "pv_reunion_generale": {
                 **common_meeting,
-                "announcements": ["Rentrée Enactus"],
+                "announcements": "Rentrée Enactus\nLancement Academy",
+                "quorum": 42,
+                "pole_updates": [
+                    {"title": "Pôle IT", "details": "EnactSpace avance"}
+                ],
+                "project_updates": [
+                    {"title": "Hydro-Connect", "details": "Prototype finalisé"}
+                ],
+                "votes": [
+                    {"title": "Adoption du calendrier", "for": 31, "against": 2, "abstain": 3}
+                ],
+                "decisions": [
+                    {"title": "Calendrier", "details": "Adopté à la majorité"}
+                ],
                 "miscellaneous": "Questions diverses traitées",
                 "enactor_minute": "Merci à tous",
+                "next_meeting": "2026-09-27T15:00:00",
             },
             "pv_enacchef": {
                 **common_meeting,
@@ -165,7 +195,19 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
                     {"title": "Gouvernance", "details": "Arbitrage validé"}
                 ],
                 "governance": "Organisation de la saison",
-                "confidential_notes": "Diffusion restreinte",
+                "pole_followup": [
+                    {"title": "Pôle Veille", "details": "Suivi assiduité renforcé"}
+                ],
+                "project_followup": [
+                    {"title": "Hydro-Connect", "details": "Phase pilote"}
+                ],
+                "member_cases": [
+                    {"title": "Cas individuel", "details": "Suivi confidentiel"}
+                ],
+                "decisions": [
+                    {"title": "Arbitrage", "details": "Décision actée"}
+                ],
+                "club_communications": "Communiquer le calendrier uniquement",
                 "next_meeting": "2026-09-20T18:00:00",
             },
             "autorisation_parentale_voyage": {
@@ -175,44 +217,72 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
                 "destination": "Thiès",
                 "departure_at": "2026-10-10T08:00:00",
                 "return_at": "2026-10-11T18:00:00",
+                "meeting_point": "ESP - entrée principale",
+                "transport": "Bus ESP",
+                "accommodation": "Centre partenaire",
                 "coverage": "Transport et hébergement pris en charge",
                 "supervision": "encadrement par l'équipe Enactus ESP",
                 "trip_leader_id": tl_id,
                 "trip_leader_phone": "770000000",
+                "additional_information": "Prévoir une pièce d'identité",
             },
             "demande_rse": {
                 "company": "Entreprise Exemple SA",
                 "recipient_name": "Direction RSE",
                 "recipient_role": "Responsable RSE",
+                "recipient_address": "Dakar, Sénégal",
                 "initiative": "Projet Impact",
                 "context": "Accès à l'eau & résilience",
                 "beneficiaries": "100 ménages",
                 "territory": "Thiès",
+                "objectives": ["Réduire les pertes", "Améliorer le suivi"],
                 "expected_impact": "Réduire les pertes de 20%",
+                "sdgs": ["ODD 6", "ODD 9"],
+                "measurable_results": [
+                    {"title": "Ménages équipés", "details": "100"},
+                    {"title": "Pertes réduites", "details": "20%"},
+                ],
                 "request_description": "Appui matériel et expertise",
                 "requested_value": "2 000 000 FCFA",
+                "implementation_period": "Octobre 2026 - mars 2027",
                 "partner_value": "Reporting d'impact trimestriel",
                 "attachments": ["Note conceptuelle", "Budget"],
+                "contact_name": "Fatou Fall",
+                "contact_phone": "770000000",
+                "contact_email": "enactus@esp.sn",
             },
             "demande_bus": {
                 "recipient_organization": "École Supérieure Polytechnique",
                 "recipient_name": "Cheffe des Services Administratifs",
                 "trip_purpose": "immersion terrain",
+                "linked_activity": "Mission Hydro-Connect",
                 "departure_at": "2026-10-10T08:00:00",
+                "departure_place": "ESP",
                 "return_at": "2026-10-11T18:00:00",
+                "return_place": "ESP",
                 "passenger_count": 25,
+                "requested_capacity": 30,
                 "route": [
                     {"from": "ESP", "to": "Thiès", "distance_km": 70},
                     {"from": "Thiès", "to": "ESP", "distance_km": 70},
                 ],
+                "group_leader_id": tl_id,
+                "group_leader_phone": "770000000",
                 "justification": "Déplacement collectif du club",
+                "observations": "Départ souhaité à 08h00",
             },
             "notification_renvoi": {
                 "member_id": member_id,
+                "member_role": "Membre du Pôle IT",
                 "decision_date": "2026-09-12",
-                "decision_body": "Pôle Veille",
+                "decision_body": "Pôle Veille et instances compétentes",
                 "effective_date": "2026-09-13",
                 "facts": "Absences répétées malgré les relances. % test \\input{evil}",
+                "prior_warnings": "Deux rappels écrits",
+                "procedure_history": "Situation revue lors du suivi hebdomadaire",
+                "consequences": "Retrait de la liste des membres actifs",
+                "return_instructions": "Restituer tout matériel appartenant au club",
+                "review_process": "Réexamen possible sur présentation d'un justificatif",
             },
         }
 
@@ -239,6 +309,20 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
         data_tex = build_data_tex(self.db, request)
         self.assertNotIn(r"\\input{evil}", data_tex)
         self.assertIn(r"\textbackslash{}input\{evil\}", data_tex)
+
+    def test_structured_fields_are_rendered_without_python_repr(self):
+        cases = (
+            ("pv_projet", self._payloads()["pv_projet"], {"project_id": self.project.id}, self.member),
+            ("pv_reunion_generale", self._payloads()["pv_reunion_generale"], {}, self.member),
+            ("pv_enacchef", self._payloads()["pv_enacchef"], {}, self.member),
+            ("demande_rse", self._payloads()["demande_rse"], {}, self.member),
+        )
+        for code, payload, kwargs, author in cases:
+            with self.subTest(template=code):
+                request = self._request(code, payload, requested_by=author, **kwargs)
+                data_tex = build_data_tex(self.db, request)
+                self.assertNotIn("[{'", data_tex)
+                self.assertNotIn("'}]", data_tex)
 
     @unittest.skipUnless(shutil.which("pdflatex"), "pdflatex not installed")
     def test_all_eight_templates_compile_to_pdf(self):
