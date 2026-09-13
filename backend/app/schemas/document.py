@@ -48,6 +48,7 @@ class DocumentRead(BaseModel):
     category: Optional[str]
     status: str
     uploaded_by: Optional[UUID]
+    recipient_user_id: Optional[UUID]
     validated_by: Optional[UUID]
     validated_at: Optional[datetime]
     rejected_by: Optional[UUID]
