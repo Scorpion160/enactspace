@@ -20,6 +20,7 @@ from app.api.routes import (
     tasks,
     files,
     documents,
+    institutional_documents,
     posts,
     chat,
     recruitment,
@@ -136,6 +137,7 @@ app.include_router(payments.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
+app.include_router(institutional_documents.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(recruitment.router, prefix="/api")
