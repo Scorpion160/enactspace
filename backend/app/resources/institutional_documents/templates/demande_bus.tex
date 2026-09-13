@@ -1,0 +1,27 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/demande_bus_data.tex}
+\begin{document}
+\MakeLetterStart
+\begin{flushright}Dakar, le \LetterDate\end{flushright}
+\begin{flushright}\textbf{À \RecipientTitle}\\\RecipientOrganization\end{flushright}
+\vspace{2mm}
+\Label{Référence :} \DocReference\\
+\Label{Objet :} \textbf{Demande d'obtention d'un bus}
+\vspace{3mm}
+
+\textbf{Madame, Monsieur,}
+
+\justifying
+Nous, l'équipe Enactus de l'École Supérieure Polytechnique de Dakar, venons par la présente solliciter auprès de votre haute bienveillance la mise à disposition d'un bus de l'École pour \textbf{\PassengerCount{} personnes}, dans le cadre d'un voyage de \textbf{\TripPurpose}.
+
+En effet, toujours dans notre mission de service à la communauté et de création d'impacts à travers l'entrepreneuriat social, nous souhaitons organiser ce déplacement \textbf{\TravelPeriod}, selon l'itinéraire prévisionnel suivant :
+\begin{itemize}\RouteItems\end{itemize}
+
+\Label{Précision logistique :} \AdditionalNeed.
+
+Dans l'attente d'une suite favorable, veuillez recevoir, Madame, Monsieur, l'expression de nos sentiments les plus respectueux.
+
+\SingleSignature{\SignerRole}{\SignerName}{\SignerPhone}
+\end{document}
