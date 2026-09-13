@@ -147,13 +147,22 @@ def _names(db: Session, values: Any, fallback: str = "Néant") -> str:
 
 
 def _list_items(values: Any, *, numbered: bool = False, fallback: str = "Néant") -> str:
+    if isinstance(values, str):
+        values = [line.strip() for line in values.splitlines() if line.strip()]
     if not isinstance(values, list) or not values:
         values = [fallback]
     environment = "enumerate" if numbered else "itemize"
     items = []
     for value in values:
         if isinstance(value, dict):
-            value = value.get("label") or value.get("title") or value.get("text") or value.get("name") or str(value)
+            value = (
+                value.get("label")
+                or value.get("title")
+                or value.get("text")
+                or value.get("name")
+                or value.get("details")
+                or str(value)
+            )
         items.append(f"\\item {latex_text(value, fallback)}")
     return f"\\begin{{{environment}}}" + "".join(items) + f"\\end{{{environment}}}"
 
@@ -168,14 +177,79 @@ def _dict_value(item: Any, keys: tuple[str, ...], fallback: str = "") -> Any:
     return item if item not in (None, "") else fallback
 
 
+def _structured_text(values: Any, *, fallback: str = "Néant") -> str:
+    if values in (None, "", [], {}):
+        return latex_text(fallback, fallback)
+    if not isinstance(values, list):
+        return latex_text(values, fallback)
+
+    parts: list[str] = []
+    for item in values:
+        if not isinstance(item, dict):
+            parts.append(latex_text(item, fallback))
+            continue
+
+        title = _dict_value(
+            item,
+            ("title", "topic", "subject", "name", "point", "label", "resolution"),
+            "",
+        )
+        details = _dict_value(
+            item,
+            ("details", "detail", "decision", "notes", "description", "summary", "value"),
+            "",
+        )
+        if any(key in item for key in ("for", "against", "abstain")):
+            vote = (
+                f"Pour : {item.get('for', 0)} ; "
+                f"Contre : {item.get('against', 0)} ; "
+                f"Abstention : {item.get('abstain', 0)}"
+            )
+            if title:
+                parts.append(f"{latex_text(title)} — {latex_text(vote)}")
+            else:
+                parts.append(latex_text(vote))
+            continue
+
+        if title and details:
+            parts.append(f"{latex_text(title)} — {latex_text(details)}")
+        elif title:
+            parts.append(latex_text(title))
+        elif details:
+            parts.append(latex_text(details))
+        else:
+            compact = "; ".join(
+                f"{key}: {value}"
+                for key, value in item.items()
+                if value not in (None, "", [], {})
+            )
+            if compact:
+                parts.append(latex_text(compact))
+
+    return r"\par ".join(parts) if parts else latex_text(fallback, fallback)
+
+
 def _rows_two(values: Any, *, fallback_left: str = "Néant", fallback_right: str = "Aucun détail") -> str:
     if not isinstance(values, list) or not values:
         values = [{"title": fallback_left, "details": fallback_right}]
     rows = []
     for item in values:
-        left = _dict_value(item, ("title", "topic", "subject", "name", "point", "label"), fallback_left)
-        right = _dict_value(item, ("details", "detail", "decision", "notes", "description", "summary", "value"), fallback_right)
-        rows.append(f"{latex_text(left, fallback_left)} & {latex_text(right, fallback_right)}\\\\")
+        left = _dict_value(
+            item,
+            ("title", "topic", "subject", "name", "point", "label"),
+            fallback_left,
+        )
+        right = _dict_value(
+            item,
+            ("details", "detail", "decision", "notes", "description", "summary", "value"),
+            fallback_right,
+        )
+        right_text = (
+            _structured_text(right, fallback=fallback_right)
+            if isinstance(right, list)
+            else latex_text(right, fallback_right)
+        )
+        rows.append(f"{latex_text(left, fallback_left)} & {right_text}\\\\")
     return "\n".join(rows)
 
 
@@ -302,6 +376,22 @@ def _pv_pole_data(db: Session, request: InstitutionalDocumentRequest, p: dict[st
     chair = p.get("chairperson_id") or request.submitted_by or request.requested_by
     secretary = p.get("secretary_id") or request.requested_by
     present = p.get("participants") or []
+    discussions = list(p.get("discussion_points") or [])
+    decisions = p.get("decisions")
+    if decisions:
+        if isinstance(decisions, list):
+            discussions.extend(decisions)
+        else:
+            discussions.append({"title": "Décisions / remarques", "details": decisions})
+
+    miscellaneous_parts = []
+    if p.get("escalations"):
+        miscellaneous_parts.append(
+            f"Points à remonter : {latex_text(p.get('escalations'))}"
+        )
+    if p.get("miscellaneous"):
+        miscellaneous_parts.append(latex_text(p.get("miscellaneous")))
+
     return [
         _cmd("PoleName", _pole_name(db, request.pole_id)),
         _cmd("MeetingDate", format_date(p.get("meeting_date"))),
@@ -316,9 +406,14 @@ def _pv_pole_data(db: Session, request: InstitutionalDocumentRequest, p: dict[st
         _cmd("UnexcusedAbsentees", _names(db, p.get("unexcused_absentees"))),
         _cmd("Agenda", _list_items(p.get("agenda"), numbered=True)),
         _cmd("Reminders", _list_items(p.get("reminders"), fallback="Aucun rappel particulier")),
-        _cmd("DiscussionRows", _rows_two(p.get("discussion_points"))),
+        _cmd("DiscussionRows", _rows_two(discussions)),
         _cmd("ActionRows", _action_rows(db, p.get("action_plan"))),
-        _cmd("Miscellaneous", latex_text(p.get("miscellaneous") or p.get("escalations"), "Néant")),
+        _cmd(
+            "Miscellaneous",
+            r"\par ".join(miscellaneous_parts)
+            if miscellaneous_parts
+            else latex_text("Néant"),
+        ),
         _cmd("EnactorMinute", latex_text(p.get("enactor_minute"), "Néant")),
         _cmd("NextMeeting", format_datetime(p.get("next_meeting"), "À déterminer")),
         _cmd("PresentCount", latex_text(len(present), "0")),
@@ -328,11 +423,22 @@ def _pv_pole_data(db: Session, request: InstitutionalDocumentRequest, p: dict[st
 def _pv_project_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, Any]) -> list[str]:
     chair = p.get("chairperson_id") or request.submitted_by or request.requested_by
     secretary = p.get("secretary_id") or request.requested_by
-    discussions = p.get("discussion_points") or p.get("deliverables")
+    discussions = list(p.get("discussion_points") or [])
+    for key, label in (
+        ("deliverables", "Livrables / jalons"),
+        ("kpis", "Indicateurs / KPI"),
+        ("decisions", "Décisions"),
+    ):
+        value = p.get(key)
+        if value:
+            discussions.append({"title": label, "details": value})
+
     risk_parts = []
-    for key in ("risks", "needs"):
-        if p.get(key):
-            risk_parts.append(latex_text(p.get(key)))
+    if p.get("risks"):
+        risk_parts.append(f"Difficultés / risques : {_structured_text(p.get('risks'))}")
+    if p.get("needs"):
+        risk_parts.append(f"Besoins / ressources : {latex_text(p.get('needs'))}")
+
     return [
         _cmd("ProjectName", _project_name(db, request.project_id)),
         _cmd("ProjectPhase", latex_text(p.get("project_phase"), "Non renseignée")),
@@ -359,7 +465,12 @@ def _pv_general_data(db: Session, request: InstitutionalDocumentRequest, p: dict
     secretary = p.get("secretary_id") or _user_with_role(db, request, SECRETARY_ROLE)
     present = p.get("participants") or []
     discussions = list(p.get("discussion_points") or [])
-    for key, label in (("pole_updates", "Point des pôles"), ("project_updates", "Point des projets"), ("votes", "Votes / résolutions")):
+    for key, label in (
+        ("pole_updates", "Point des pôles"),
+        ("project_updates", "Point des projets"),
+        ("votes", "Votes / résolutions"),
+        ("decisions", "Décisions"),
+    ):
         value = p.get(key)
         if value:
             discussions.append({"title": label, "details": value})
@@ -375,22 +486,35 @@ def _pv_general_data(db: Session, request: InstitutionalDocumentRequest, p: dict
         _cmd("ExcusedAbsentees", _names(db, p.get("excused_absentees") or p.get("absentees"))),
         _cmd("UnexcusedAbsentees", _names(db, p.get("unexcused_absentees"))),
         _cmd("Agenda", _list_items(p.get("agenda"), numbered=True)),
-        _cmd("Reminders", _list_items(p.get("reminders") or p.get("announcements"), fallback="Aucun rappel particulier")),
+        _cmd("Reminders", _list_items(p.get("reminders") or p.get("announcements"), fallback="Aucune annonce particulière")),
         _cmd("DiscussionRows", _rows_two(discussions)),
         _cmd("ActionRows", _action_rows(db, p.get("action_plan"))),
         _cmd("Miscellaneous", latex_text(p.get("miscellaneous"), "Néant")),
         _cmd("EnactorMinute", latex_text(p.get("enactor_minute"), "Néant")),
         _cmd("PresentCount", latex_text(len(present), "0")),
+        _cmd("Quorum", latex_text(p.get("quorum"), "Non renseigné")),
+        _cmd("NextMeeting", format_datetime(p.get("next_meeting"), "À déterminer")),
     ]
 
 
 def _pv_enacchef_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, Any]) -> list[str]:
     chair = p.get("chairperson_id") or _user_with_role(db, request, TEAM_LEADER_ROLE)
     secretary = p.get("secretary_id") or _user_with_role(db, request, SECRETARY_ROLE)
+    discussions = list(p.get("strategic_topics") or [])
+    decisions = p.get("decisions")
+    if decisions:
+        discussions.append({"title": "Décisions / arbitrages", "details": decisions})
+
     followup = []
-    for key, label in (("governance", "Gouvernance"), ("pole_followup", "Suivi des pôles"), ("project_followup", "Suivi des projets"), ("member_cases", "Situations particulières")):
+    if p.get("governance"):
+        followup.append(f"Gouvernance : {latex_text(p.get('governance'))}")
+    for key, label in (
+        ("pole_followup", "Suivi des pôles"),
+        ("project_followup", "Suivi des projets"),
+        ("member_cases", "Situations particulières"),
+    ):
         if p.get(key):
-            followup.append(f"{label} : {latex_text(p.get(key))}")
+            followup.append(f"{label} : {_structured_text(p.get(key))}")
     return [
         _cmd("MeetingDate", format_date(p.get("meeting_date"))),
         _cmd("MeetingLocation", latex_text(p.get("location"))),
@@ -400,8 +524,9 @@ def _pv_enacchef_data(db: Session, request: InstitutionalDocumentRequest, p: dic
         _cmd("MeetingSecretary", user_name(db, secretary)),
         _cmd("ApprovalText", "Enac'chefs présents"),
         _cmd("Attendees", _names(db, p.get("participants"))),
+        _cmd("Absentees", _names(db, p.get("absentees"))),
         _cmd("Agenda", _list_items(p.get("agenda"), numbered=True)),
-        _cmd("DiscussionRows", _rows_two(p.get("strategic_topics") or p.get("decisions"))),
+        _cmd("DiscussionRows", _rows_two(discussions)),
         _cmd("ActionRows", _action_rows(db, p.get("action_plan"), fourth_default="Enac'chefs")),
         _cmd("ProjectPoleFollowUp", r"\par ".join(followup) if followup else latex_text("Néant")),
         _cmd("ConfidentialNotes", latex_text(p.get("confidential_notes") or p.get("club_communications"), "Néant")),
@@ -419,6 +544,15 @@ def _parental_data(db: Session, request: InstitutionalDocumentRequest, p: dict[s
     period = f"du {departure} au {return_at}"
     parent = p.get("guardian_name")
     recipient = f"Madame / Monsieur {latex_text(parent)}" if parent else "Madame / Monsieur le parent ou représentant légal"
+    logistics = []
+    if p.get("meeting_point"):
+        logistics.append(f"Lieu de rassemblement : {latex_text(p.get('meeting_point'))}")
+    if p.get("transport"):
+        logistics.append(f"Transport : {latex_text(p.get('transport'))}")
+    if p.get("accommodation"):
+        logistics.append(f"Hébergement : {latex_text(p.get('accommodation'))}")
+    if p.get("additional_information"):
+        logistics.append(latex_text(p.get("additional_information")))
     return [
         _cmd("LetterDate", format_long_date(datetime.utcnow())),
         _cmd("ParentRecipient", recipient),
@@ -430,6 +564,7 @@ def _parental_data(db: Session, request: InstitutionalDocumentRequest, p: dict[s
         _cmd("TravelLocations", latex_text(p.get("destination"))),
         _cmd("TravelFunding", latex_text(p.get("coverage"), "La prise en charge sera assurée conformément aux modalités communiquées par Enactus ESP")),
         _cmd("OrderMissionInfo", latex_text(p.get("supervision"), "un encadrement assuré par les responsables désignés")),
+        _cmd("TravelLogistics", r"\par ".join(logistics) if logistics else latex_text("Les précisions logistiques seront communiquées avant le départ")),
         _cmd("TripContactName", user_name(db, p.get("trip_leader_id"), "le responsable du voyage")),
         _cmd("TripContactPhone", latex_text(p.get("trip_leader_phone"), "le contact officiel d'Enactus ESP")),
         _cmd("SignerName", signer_name),
@@ -442,6 +577,19 @@ def _bus_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, A
     signer_name, signer_role, signer_phone = _signer(db, request)
     recipient_name = p.get("recipient_name") or "la personne responsable"
     period = f"du {format_long_date(p.get('departure_at'))} au {format_long_date(p.get('return_at'))}"
+    logistics = []
+    if p.get("departure_place"):
+        logistics.append(f"Départ : {latex_text(p.get('departure_place'))}")
+    if p.get("return_place"):
+        logistics.append(f"Retour : {latex_text(p.get('return_place'))}")
+    if p.get("requested_capacity"):
+        logistics.append(f"Capacité souhaitée : {latex_text(p.get('requested_capacity'))} places")
+    if p.get("linked_activity"):
+        logistics.append(f"Activité liée : {latex_text(p.get('linked_activity'))}")
+    if p.get("justification"):
+        logistics.append(f"Justification : {latex_text(p.get('justification'))}")
+    if p.get("observations"):
+        logistics.append(f"Observations : {latex_text(p.get('observations'))}")
     return [
         _cmd("LetterDate", format_long_date(datetime.utcnow())),
         _cmd("RecipientTitle", latex_text(recipient_name)),
@@ -450,7 +598,9 @@ def _bus_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, A
         _cmd("TripPurpose", latex_text(p.get("trip_purpose"))),
         _cmd("TravelPeriod", period),
         _cmd("RouteItems", _route_items(p.get("route"))),
-        _cmd("AdditionalNeed", latex_text(p.get("observations") or p.get("justification"), "Aucune contrainte particulière signalée")),
+        _cmd("AdditionalNeed", r"\par ".join(logistics) if logistics else latex_text("Aucune contrainte particulière signalée")),
+        _cmd("GroupLeaderName", user_name(db, p.get("group_leader_id"), "Non renseigné")),
+        _cmd("GroupLeaderPhone", latex_text(p.get("group_leader_phone"), "Non renseigné")),
         _cmd("SignerName", signer_name),
         _cmd("SignerRole", signer_role),
         _cmd("SignerPhone", signer_phone),
@@ -459,27 +609,41 @@ def _bus_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, A
 
 def _rse_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, Any]) -> list[str]:
     signer_name, signer_role, signer_phone = _signer(db, request)
-    impact_objectives = p.get("expected_impact") or p.get("objectives") or p.get("measurable_results")
+    impact_parts = []
+    if p.get("objectives"):
+        impact_parts.append(f"Objectifs : {_structured_text(p.get('objectives'))}")
+    if p.get("expected_impact"):
+        impact_parts.append(f"Impact attendu : {latex_text(p.get('expected_impact'))}")
+    if p.get("measurable_results"):
+        impact_parts.append(f"Résultats mesurables : {_structured_text(p.get('measurable_results'))}")
     attachments = p.get("attachments")
     if isinstance(attachments, list):
         attachments = ", ".join(str(item) for item in attachments)
+    sdgs = p.get("sdgs")
+    if isinstance(sdgs, list):
+        sdgs = ", ".join(str(item) for item in sdgs)
     return [
         _cmd("LetterDate", format_long_date(datetime.utcnow())),
         _cmd("RecipientName", latex_text(p.get("recipient_name"), "Madame, Monsieur")),
         _cmd("RecipientRole", latex_text(p.get("recipient_role"), "Responsable RSE")),
+        _cmd("RecipientAddress", latex_text(p.get("recipient_address"), "")),
         _cmd("CompanyName", latex_text(p.get("company"))),
         _cmd("InitiativeName", latex_text(p.get("initiative"))),
         _cmd("ContextNeed", latex_text(p.get("context"), "Contexte à préciser")),
         _cmd("Beneficiaries", latex_text(p.get("beneficiaries"), "À préciser")),
         _cmd("ImpactArea", latex_text(p.get("territory"), "À préciser")),
-        _cmd("ImpactObjectives", latex_text(impact_objectives, "À préciser")),
+        _cmd("ImpactObjectives", r"\par ".join(impact_parts) if impact_parts else latex_text("À préciser")),
+        _cmd("Sdgs", latex_text(sdgs, "À préciser")),
+        _cmd("ImplementationPeriod", latex_text(p.get("implementation_period"), "À préciser")),
         _cmd("SupportRequested", latex_text(p.get("request_description"))),
         _cmd("SupportAmount", latex_text(p.get("requested_value"), "À définir avec le partenaire")),
         _cmd("PartnerValue", latex_text(p.get("partner_value"), "un suivi d'impact et une valorisation adaptée au partenariat")),
         _cmd("Attachments", latex_text(attachments, "selon disponibilité")),
         _cmd("SignerName", signer_name),
         _cmd("SignerRole", signer_role),
+        _cmd("ContactName", latex_text(p.get("contact_name"), signer_name)),
         _cmd("ContactPhone", latex_text(p.get("contact_phone"), signer_phone)),
+        _cmd("ContactEmail", latex_text(p.get("contact_email"), "enactus@esp.sn")),
     ]
 
 
@@ -489,14 +653,31 @@ def _renvoi_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str
     member = user_for_value(db, p.get("member_id"))
     issuer_name = latex_text(f"{issuer.first_name} {issuer.last_name}" if issuer else "Responsable Pôle Veille")
     approval_name = latex_text(f"{approver.first_name} {approver.last_name}" if approver else "Team Leader")
+    procedure_parts = []
+    if p.get("prior_warnings"):
+        procedure_parts.append(f"Rappels / avertissements antérieurs : {latex_text(p.get('prior_warnings'))}")
+    if p.get("procedure_history"):
+        procedure_parts.append(f"Éléments de procédure : {latex_text(p.get('procedure_history'))}")
+    if p.get("consequences"):
+        procedure_parts.append(f"Conséquences administratives : {latex_text(p.get('consequences'))}")
+    if p.get("return_instructions"):
+        procedure_parts.append(f"Restitution : {latex_text(p.get('return_instructions'))}")
+    if p.get("review_process"):
+        procedure_parts.append(f"Réexamen : {latex_text(p.get('review_process'))}")
+    if p.get("internal_notes"):
+        procedure_parts.append(f"Observation interne : {latex_text(p.get('internal_notes'))}")
     return [
         _cmd("LetterDate", format_long_date(datetime.utcnow())),
         _cmd("IssuingScope", _pole_name(db, request.pole_id)),
         _cmd("MemberName", user_name(db, p.get("member_id"))),
         _cmd("MemberFirstName", latex_text(member.first_name if member else "Membre")),
+        _cmd("MemberRole", latex_text(p.get("member_role"), "Membre actif")),
+        _cmd("DecisionDate", format_long_date(p.get("decision_date"))),
+        _cmd("DecisionBody", latex_text(p.get("decision_body"))),
         _cmd("NotificationObject", "Notification de fin du statut de membre actif"),
         _cmd("Facts", latex_text(p.get("facts"))),
         _cmd("EffectiveDate", format_long_date(p.get("effective_date"))),
+        _cmd("ProcedureDetails", r"\par ".join(procedure_parts) if procedure_parts else latex_text("Aucune précision complémentaire")),
         _cmd("AppreciationText", latex_text("Nous tenons néanmoins à souligner que votre présence passée, votre intérêt pour Enactus et toute contribution apportée au club restent considérés et appréciés. Cette décision ne remet pas en cause la valeur de votre passage au sein de l'équipe.")),
         _cmd("IssuerLabel", "Pour le Pôle Veille"),
         _cmd("IssuerName", issuer_name),
