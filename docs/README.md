@@ -14,6 +14,10 @@ These documents define the current V1.0.0 target and should be updated with oper
 - [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md)
 - [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md)
 - [Release checklist](RELEASE_CHECKLIST.md)
+- [Store release metadata](STORE_RELEASE_METADATA.md)
+- [Privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md)
+- [Release evidence index](RELEASE_EVIDENCE_INDEX.md)
+- [Artifact provenance](ARTIFACT_PROVENANCE.md)
 - [Pôle IT handoff](POLE_IT_HANDOFF.md)
 
 Repository governance also lives in [CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md), [MAINTAINERS](../MAINTAINERS.md), [NOTICE](../NOTICE.md), and [CHANGELOG](../CHANGELOG.md).

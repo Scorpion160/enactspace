@@ -1,0 +1,43 @@
+# Release evidence index
+
+This matrix links every unchecked gate in [the V1.0.0 release checklist](RELEASE_CHECKLIST.md) to its evidence contract. It does not close the checklist or authorize a release. Repository baseline: `36a6e572b769b275797ddc5dcd18c169b3f7cd1e`; Flutter target `1.0.0+1`; backend `1.0.0`.
+
+Allowed states are `NOT_RUN`, `LOCAL_PASS`, `EXTERNAL_GATE_OPEN`, `BLOCKED`, `APPROVED_EXCEPTION`, and `FINAL_PASS`. `LOCAL_PASS` records PR-7 evidence only and must be replayed on the future RC commit if application source or build inputs change. No external gate is `FINAL_PASS` here.
+
+| # | Checklist gate | State | Commit/version | Evidence type | Evidence location/reference | Date | Operator | Reviewer | Gate owner | Exception / expiry or reevaluation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Release commit and scope approval | NOT_RUN | Future RC | Diff and approval | Future final staged/commit review | — | — | — | Release authority | Reevaluate at RC freeze |
+| 2 | Successful replacement Application CI or approved exception | EXTERNAL_GATE_OPEN | PR-7 baseline | GitHub Actions run | `GITHUB_ACTIONS_EXECUTION_GATE_OPEN` | 2026-09-13 | — | — | Repository owner | Execution/billing gate; no remote PASS |
+| 3 | Security workflow and dependency audit | EXTERNAL_GATE_OPEN | PR-7 baseline | Local guard PASS; remote workflow not executed | `.github/workflows/security.yml`; `GITHUB_ACTIONS_EXECUTION_GATE_OPEN` | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Security owner | Replay remotely or approve explicit exception |
+| 4 | `main` policy or approved fallback | EXTERNAL_GATE_OPEN | Repository | Provider settings evidence | [Pôle IT handoff](POLE_IT_HANDOFF.md) | — | — | — | Repository owner | Capability and approval required |
+| 5 | Pôle IT GitHub mapping | EXTERNAL_GATE_OPEN | Repository | Organization/team mapping | `MAINTAINERS.md`; [Pôle IT handoff](POLE_IT_HANDOFF.md) | — | — | — | Enactus ESP | Formal handles/team required |
+| 6 | Merge and stale-branch policy | EXTERNAL_GATE_OPEN | Repository | Approved governance decision | [Pôle IT handoff](POLE_IT_HANDOFF.md) | — | — | — | Repository owner | Approval required |
+| 7 | Backend compile, OpenAPI and full suite without PostgreSQL skips | LOCAL_PASS | PR-7 baseline / 1.0.0 | Local command logs | [Test matrix](TEST_MATRIX.md); PR-7 local validation (208 tests) | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Backend maintainer | Replay if source/build inputs change |
+| 8 | PostgreSQL 16 migration/reversal/concurrency | LOCAL_PASS | PR-7 baseline / schema 0008 | Isolated PostgreSQL result | PR-7 local validation, PostgreSQL 16.15, no skips | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Database maintainer | Replay if source/migration inputs change |
+| 9 | One Alembic head | LOCAL_PASS | PR-7 baseline / 1.0.0 | Command result | `20260910_0008 (head)` | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Backend maintainer | Replay on RC |
+| 10 | Flutter lock, analysis and full tests | LOCAL_PASS | PR-7 baseline / 1.0.0+1 | Local command logs | [Test matrix](TEST_MATRIX.md); PR-7 local validation (604 tests) | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Mobile maintainer | Replay if source/build inputs change |
+| 11 | Web release and Android debug compile | LOCAL_PASS | PR-7 baseline / 1.0.0+1 | Local build logs | PR-7 web release PASS; Android debug PASS | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Mobile maintainer | Debug APK is not a release artifact; replay on RC |
+| 12 | Backup and accepted restore rehearsal | EXTERNAL_GATE_OPEN | Production candidate | Backup/restore record | [Operations runbook](OPERATIONS_RUNBOOK.md) | — | — | — | Database/operations owner | Infrastructure and approval required |
+| 13 | Deployment and database rollback decisions | EXTERNAL_GATE_OPEN | Production candidate | Approved runbook rehearsal | [Operations runbook](OPERATIONS_RUNBOOK.md) | — | — | — | Release authority | Infrastructure and approval required |
+| 14 | No sensitive/private material in source or artifacts | LOCAL_PASS | PR-7 baseline | Repository security guard and review | `.github/workflows/security.yml` | 2026-09-13 | PR-7 local validation | Independent review reported PASS | Security owner | Replay on RC and on every artifact set |
+| 15 | Production secret generation/custody/rotation | EXTERNAL_GATE_OPEN | Production | Secret-manager access review | [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) | — | — | — | Security/operations owner | Accounts and secret store required |
+| 16 | Privacy/legal and account deletion approval | EXTERNAL_GATE_OPEN | V1.0.0 | Approved legal records | [Privacy worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md); `docs/legal/*_draft.md` | — | — | — | Enactus ESP legal/privacy authority | Drafts are not approvals |
+| 17 | Monitoring, logging, contacts, escalation, window | EXTERNAL_GATE_OPEN | Production | Operations readiness record | [Operations runbook](OPERATIONS_RUNBOOK.md) | — | — | — | Operations owner | Infrastructure and named contacts required |
+| 18 | RPO/RTO approval or accepted risk | EXTERNAL_GATE_OPEN | Production | Signed decision/risk record | [Operations runbook](OPERATIONS_RUNBOOK.md) | — | — | — | Enactus ESP release authority | Institutional decision required |
+| 19 | Android release signing and verification | EXTERNAL_GATE_OPEN | Future RC / 1.0.0+1 | Signed artifact and signature verification | [Artifact provenance](ARTIFACT_PROVENANCE.md) | — | — | — | Android release owner | Store/signing custody required |
+| 20 | Physical Android FCM lifecycle | EXTERNAL_GATE_OPEN | Future RC / 1.0.0+1 | Physical-device test record | [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md) | — | — | — | Mobile/provider owner | Firebase account and device required |
+| 21 | APNs capability for production App ID | EXTERNAL_GATE_OPEN | Future RC / iOS bundle ID | Apple portal evidence | [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md) | — | — | — | Apple account owner | Apple account required |
+| 22 | iOS distribution signing/provisioning and production entitlement | EXTERNAL_GATE_OPEN | Future RC / 1.0.0+1 | Signed archive entitlement report | [Artifact provenance](ARTIFACT_PROVENANCE.md) | — | — | — | iOS release owner | Signing account/infrastructure required |
+| 23 | Signed iOS distribution archive | EXTERNAL_GATE_OPEN | Future RC / 1.0.0+1 | Archive checksum/validation | [Artifact provenance](ARTIFACT_PROVENANCE.md) | — | — | — | iOS release owner | Authorized macOS/signing required |
+| 24 | Physical iOS APNs/FCM lifecycle | EXTERNAL_GATE_OPEN | Future RC / 1.0.0+1 | Physical-device test record | [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md) | — | — | — | Mobile/provider owner | Apple/Firebase accounts and device required |
+| 25 | Store listings, privacy, support and URL ownership | EXTERNAL_GATE_OPEN | V1.0.0 | Store-console approvals | [Store metadata](STORE_RELEASE_METADATA.md); [privacy worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md) | — | — | — | Store/legal owners | Accounts and institutional approval required |
+| 26 | Release identifier/date | NOT_RUN | Future RC | Release record | This index and final release record | — | — | — | Release authority | Decide at go/no-go |
+| 27 | Commit/tag after approval | NOT_RUN | Future RC | Git reference | Future approved commit/tag | — | — | — | Release authority | No tag exists for this pack |
+| 28 | Release authority | NOT_RUN | V1.0.0 | Named approval | Future release record | — | — | — | Enactus ESP | Name/role not supplied |
+| 29 | Operations owner | NOT_RUN | V1.0.0 | Named acceptance | Future release record | — | — | — | Enactus ESP / Pôle IT | Name/role not supplied |
+| 30 | Security/privacy reviewer | NOT_RUN | V1.0.0 | Named review | Future release record | — | — | — | Enactus ESP | Name/role not supplied |
+| 31 | Evidence location | NOT_RUN | Future RC | Controlled evidence index | Approved evidence store reference | — | — | — | Release authority | Storage location not supplied |
+| 32 | Remaining exceptions, owner, expiry | NOT_RUN | Future RC | Exception register | Future approved exception record | — | — | — | Release authority | No exception is approved by this document |
+| 33 | Go/no-go decision and timestamp | NOT_RUN | Future RC | Signed decision | Future release record | — | — | — | Release authority | Final decision required |
+
+Evidence must be sanitized. Do not attach credentials, signing material, provider files, full tokens, private URLs, member data, or unsanitized production logs.

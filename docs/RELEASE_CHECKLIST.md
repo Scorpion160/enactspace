@@ -2,6 +2,8 @@
 
 This checklist is for PR-8/release execution. PR-7 does not create a tag, release, signed artifact, deployment, or merge to `main`.
 
+Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md). Store preparation uses [store release metadata](STORE_RELEASE_METADATA.md), the [privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md), and [artifact provenance](ARTIFACT_PROVENANCE.md). These records do not close a gate by themselves.
+
 ## Repository and governance
 
 - [ ] Release commit and scope approved; no unrelated changes.
