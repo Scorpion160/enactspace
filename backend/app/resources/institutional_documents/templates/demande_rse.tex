@@ -1,0 +1,42 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/demande_rse_data.tex}
+\begin{document}
+\MakeLetterStart
+\begin{flushright}Dakar, le \LetterDate\end{flushright}
+\begin{flushright}
+\textbf{À l'attention de \RecipientName}\\
+\RecipientRole\\
+\CompanyName
+\end{flushright}
+\vspace{2mm}
+\Label{Référence :} \DocReference\\
+\Label{Objet :} \textbf{Demande d'appui au titre de la Responsabilité Sociétale des Entreprises (RSE)}\\
+\hspace*{18mm}\textbf{Projet / initiative : \InitiativeName}
+\vspace{3mm}
+
+\textbf{Madame, Monsieur,}
+
+\justifying
+Enactus ESP est une équipe d'étudiants de l'École Supérieure Polytechnique de Dakar engagée dans le développement de solutions entrepreneuriales à impact social, économique et environnemental. À travers nos projets, nous travaillons aux côtés des communautés afin de transformer des besoins concrets en initiatives durables et mesurables.
+
+Dans le cadre de \textbf{\InitiativeName}, nous souhaitons solliciter l'accompagnement de \textbf{\CompanyName} au titre de sa politique RSE. Cette initiative répond au besoin suivant : \ContextNeed.
+
+\InfoBand{Impact recherché}
+\Label{Bénéficiaires :} \Beneficiaries\par
+\Label{Zone d'intervention :} \ImpactArea\par
+\Label{Résultats attendus :} \ImpactObjectives\par
+
+\InfoBand{Appui sollicité}
+\SupportRequested\\
+\Label{Montant / quantité indicative :} \SupportAmount.
+
+En contrepartie de cet appui, nous proposons une collaboration fondée sur \PartnerValue, avec un suivi permettant de rendre compte des résultats obtenus.
+
+Nous serions honorés de pouvoir présenter plus en détail cette initiative à vos équipes et d'étudier ensemble les modalités d'un partenariat adapté à vos priorités RSE. Les pièces suivantes peuvent accompagner cette demande : \Attachments.
+
+Dans l'attente d'une suite favorable, veuillez agréer, Madame, Monsieur, l'expression de notre considération distinguée.
+
+\SingleSignature{\SignerRole}{\SignerName}{\InstitutionEmail{} -- \ContactPhone}
+\end{document}
