@@ -6,11 +6,13 @@ on:
       - main
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
+      - feat/institutional-pdf-generation-v1
   push:
     branches:
       - main
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
+      - feat/institutional-pdf-generation-v1
   workflow_dispatch:
 
 permissions:
