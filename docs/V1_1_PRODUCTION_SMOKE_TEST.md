@@ -1,5 +1,7 @@
 # EnactSpace V1.1 - Smoke test production VPS
 
+> **HISTORIQUE / NON AUTORITATIF.** Utiliser [Operations runbook](OPERATIONS_RUNBOOK.md) et [Release checklist](RELEASE_CHECKLIST.md). Toute exécution exige un environnement autorisé et des identités de recette dédiées; ne jamais copier de credential dans la commande ou dans la preuve.
+
 Objectif: verifier rapidement qu'un backend VPS est exploitable par l'APK et par les outils d'administration.
 
 ## Prealable
@@ -26,7 +28,7 @@ Resultat attendu:
 {
   "ok": true,
   "service": "EnactSpace",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "environment": "production"
 }
 ```
@@ -61,12 +63,11 @@ Si `ok=false`, le code HTTP attendu est `503`.
 
 ## 3. API authentification
 
-Tester avec un compte admin reel ou un compte temporaire cree pour la recette.
+Tester uniquement avec un compte de recette temporaire autorisé. Fournir les données d'authentification depuis le processus/environnement local sans les inscrire dans le document ou l'historique du shell.
 
 ```powershell
-curl.exe -X POST https://api.enactspace.example.com/api/auth/token `
-  -H "Content-Type: application/x-www-form-urlencoded" `
-  -d "username=admin@example.com&password=CHANGE_ME"
+# Construire la requête depuis les variables locales de recette selon la procédure approuvée.
+# Ne pas écrire le mot de passe ou le token dans le terminal partagé ou la preuve.
 ```
 
 Le resultat doit contenir un `access_token`.
@@ -111,12 +112,12 @@ Si erreur CORS:
 2. Redemarrer `enactspace-backend`.
 3. Verifier Nginx.
 
-## 7. APK production
+## 7. APK de distribution (gate externe)
 
-Construire l'APK avec:
+Construire uniquement après fourniture de la signature externe approuvée; une signature debug n'est jamais acceptable. Depuis la racine du dépôt:
 
 ```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\frontend
+Set-Location frontend
 flutter build apk --release --dart-define=ENACTSPACE_API_URL=https://api.enactspace.example.com
 ```
 

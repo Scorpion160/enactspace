@@ -1,5 +1,7 @@
 # EnactSpace V1.1 - Deploiement backend VPS
 
+> **HISTORIQUE / NON AUTORITATIF.** Ne pas exécuter ce guide comme procédure actuelle. Utiliser [Operations runbook](OPERATIONS_RUNBOOK.md), [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) et [Release checklist](RELEASE_CHECKLIST.md). PostgreSQL 16 et Alembic jusqu'au head unique `20260910_0008` sont les références actuelles.
+
 Objectif: deployer le backend FastAPI sur un VPS propre, securise et pret pour les tests V1.1.
 
 ## 1. Prerequis serveur
@@ -8,7 +10,7 @@ Recommandation:
 
 - Ubuntu LTS recent.
 - Python 3.12 ou version compatible avec les dependances du projet.
-- PostgreSQL 15+ pour les donnees reelles.
+- PostgreSQL 16 pour les donnees reelles.
 - Nginx comme reverse proxy.
 - Certbot pour HTTPS.
 - UFW pour le firewall.
@@ -33,7 +35,7 @@ Cloner le projet:
 ```bash
 sudo -u enactspace git clone https://github.com/Scorpion160/enactspace.git /opt/enactspace
 cd /opt/enactspace
-git checkout main
+git checkout <approved-release-ref>
 ```
 
 ## 3. Base PostgreSQL
@@ -97,23 +99,15 @@ sudo mkdir -p /var/lib/enactspace/uploads
 sudo chown -R enactspace:enactspace /var/lib/enactspace
 ```
 
-## 6. Tables et compatibilite
+## 6. Migrations obligatoires avant démarrage
 
-Le backend actuel cree/ajuste certaines colonnes au demarrage via `ensure_compatibility_columns`.
-
-Verification locale sur le VPS:
+Sauvegarder la base, vérifier le head attendu, puis appliquer les migrations avant de lancer la nouvelle application. `AUTO_CREATE_TABLES=false` reste obligatoire en production.
 
 ```bash
 cd /opt/enactspace/backend
 . .venv/bin/activate
-python -m compileall app
-python create_tables.py
-```
-
-Si Alembic est ajoute plus tard, remplacer cette etape par:
-
-```bash
-alembic upgrade head
+python -m alembic heads
+python -m alembic upgrade head
 ```
 
 ## 7. Creation admin

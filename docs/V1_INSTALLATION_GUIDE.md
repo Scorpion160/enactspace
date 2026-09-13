@@ -1,141 +1,23 @@
-# EnactSpace V1 - Guide installation
+# EnactSpace V1 — guide d'installation historique
 
-Date: 2026-07-03
+> **DÉPRÉCIÉ / NON AUTORITATIF.** Ce document conserve le contexte du premier parcours V1. Pour toute installation actuelle, utiliser [Development](DEVELOPMENT.md), [Operations runbook](OPERATIONS_RUNBOOK.md), [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) et [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md).
 
-## 1. Preparer le backend
+Date historique: 2026-07-03.
 
-Depuis le dossier projet:
+## Principes conservés
 
-```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\backend
-```
+Le backend s'installe depuis `backend/` dans un environnement virtuel Python 3.12 avec `backend/requirements.txt`. Le client s'installe depuis `frontend/` avec Flutter 3.44.9 et le `pubspec.lock` suivi. Les migrations Alembic doivent atteindre le head courant avant le démarrage d'un environnement de production.
 
-Installer les dependances Python selon l'environnement local du projet, puis verifier que la configuration `.env` contient les variables necessaires.
+Le seed V1 est réservé au développement/test local avec `APP_ENV=test` ou `development` et `ENABLE_SEED=true`. Fournir à la requête de seed un mot de passe aléatoire généré pour cette exécution ou chargé depuis une variable locale ignorée. Il n'existe aucun mot de passe partagé ou par défaut; ne jamais réutiliser un secret de production. Désactiver le seed après le test.
 
-Pour un test local Android, lancer FastAPI sur toutes les interfaces:
+## Configuration réseau corrigée
 
-```powershell
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+Une exécution de développement peut utiliser une adresse de boucle locale ou l'adresse d'émulateur adaptée à la machine, sans la documenter comme constante du projet. Une release doit recevoir une URL d'API HTTPS autorisée via `ENACTSPACE_API_URL`. Une URL HTTP/LAN ou un identifiant de terminal ne constitue jamais une configuration de release.
 
-Verifier:
+## Artefacts
 
-```powershell
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health
-Invoke-WebRequest -UseBasicParsing http://10.7.7.228:8000/health
-```
+`flutter build apk --debug` produit uniquement un artefact de développement. Il ne doit pas être distribué comme release. La distribution Android exige la signature externe et la garde de clé Enactus ESP; iOS exige les capacités, profils et certificats Apple approuvés. Consulter les gates externes dans le document mobile canonique.
 
-## 2. Initialiser les donnees V1
+## Validation actuelle
 
-Activer temporairement le seed uniquement en environnement local:
-
-```text
-ENABLE_SEED=true
-```
-
-Appeler ensuite `POST /api/seed/v1-demo` avec un compte Admin ou Team Leader.
-
-Mot de passe par defaut des comptes V1:
-
-```text
-EnactSpaceV1!
-```
-
-Voir:
-
-```text
-docs/v1_test_accounts.md
-```
-
-## 3. Configurer l'adresse API Flutter
-
-Sur navigateur ou emulateur Android, l'adresse peut rester locale selon le cas.
-
-Sur telephone Android reel:
-
-```text
-http://10.7.7.228:8000
-```
-
-Lancer l'app sur le telephone:
-
-```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\frontend
-flutter run -d R83XA0BB4FK --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:8000
-```
-
-## 4. Construire l'APK
-
-APK debug:
-
-```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\frontend
-flutter clean
-flutter pub get
-flutter build apk --debug --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:8000
-```
-
-APK release candidate:
-
-```powershell
-flutter build apk --release --dart-define=ENACTSPACE_API_URL=http://10.7.7.228:8000
-```
-
-Fichiers attendus:
-
-```text
-frontend\build\app\outputs\flutter-apk\app-debug.apk
-frontend\build\app\outputs\flutter-apk\app-release.apk
-```
-
-## 5. Installer l'APK
-
-Avec ADB:
-
-```powershell
-adb install -r frontend\build\app\outputs\flutter-apk\app-debug.apk
-```
-
-Ou transferer l'APK sur le telephone et autoriser l'installation depuis cette source.
-
-## 6. Tester les modules principaux
-
-1. Login Admin.
-2. Login Team Leader.
-3. Login SG.
-4. Login Financier.
-5. Login Chef de pole.
-6. Login Chef de projet.
-7. Login membre simple.
-8. Login Alumni valide.
-9. Dashboard.
-10. Chat.
-11. Posts.
-12. Notifications.
-13. Documents.
-14. Membres.
-15. Poles.
-16. Projets.
-17. Presences.
-18. Finance.
-19. Impact.
-20. Academy.
-21. Archives.
-22. Hall of Fame.
-
-## 7. Points de controle
-
-1. Aucun overflow visible.
-2. Le clavier ne cache pas les champs critiques.
-3. Les roles ne voient que les modules prevus.
-4. Les messages chat arrivent chez le destinataire.
-5. Les notifications sont creees et lisibles.
-6. Les fichiers uploades restent accessibles.
-7. Les exports CSV se telechargent correctement.
-
-## 8. Depannage rapide
-
-- Si le telephone ne voit pas le backend, verifier le Wi-Fi, le firewall et `--host 0.0.0.0`.
-- Si login impossible sur telephone, verifier `ENACTSPACE_API_URL`.
-- Si `flutter` reste bloque, fermer VS Code/Android Studio, tuer les processus Dart/Flutter restants, ouvrir un nouveau terminal et relancer `flutter --version`.
-- Si la release ne s'installe pas, produire d'abord un APK debug.
+Utiliser le [test matrix](TEST_MATRIX.md) pour les commandes maintenues. Ce document historique ne doit pas servir à déduire que les tests, le déploiement, la signature ou le push physique ont été validés.

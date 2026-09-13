@@ -1,5 +1,7 @@
 # EnactSpace V1 - Notes de release
 
+> **HISTORIQUE / NON AUTORITATIF.** État observé le 2026-07-03, avant les lots de product readiness. Pour le statut V1.0.0 actuel et ses gates, utiliser [README](../README.md), [Test matrix](TEST_MATRIX.md) et [Release checklist](RELEASE_CHECKLIST.md).
+
 Date: 2026-07-03
 
 ## Nom
@@ -54,17 +56,17 @@ EnactSpace V1 est la premiere release candidate de la plateforme interne Enactus
 - Android reel: telephone detecte par ADB, configuration reseau documentee.
 - APK: commandes pretes, generation bloquee dans cette session par l'outil Flutter local.
 
-## Limites connues
+## Limites connues à cette date historique
 
 1. Push natif FCM non integre en V1.
 2. QR code et NFC presence hors scope V1.
 3. Mobile Money reel hors scope V1.
-4. Signature Android release encore basee sur la signature debug pour usage interne.
-5. Backend local necessaire pour les tests Android via IP du PC.
+4. La signature debug servait uniquement aux essais internes; elle n'a jamais constitué une signature de release valide.
+5. Les essais Android utilisaient alors un backend local; une release doit utiliser une API HTTPS autorisée.
 6. Certains tests multi-role restent manuels.
 7. Deploiement production non finalise.
 
-## Prochaines fonctionnalites prevues
+## Fonctionnalités alors prévues
 
 1. QR code presence.
 2. NFC presence.

@@ -1,42 +1,18 @@
-# Comptes de test V1
+# Comptes de test V1 — procédure historique sécurisée
 
-Date: 2026-07-03
+> **DÉPRÉCIÉ / NON AUTORITATIF.** Utiliser [Development](DEVELOPMENT.md) et [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md). Les identités ci-dessous sont locales et ne sont jamais des comptes ou credentials de production.
 
-## Activation
+Date historique: 2026-07-03.
 
-Le seed de demonstration V1 est volontairement protege.
+Le seed de démonstration est volontairement protégé:
 
-- `ENABLE_SEED` doit etre active cote backend.
-- Un Admin ou Team Leader connecte doit appeler `POST /api/seed/v1-demo`.
-- Le seed est idempotent: il cree seulement les comptes/roles manquants et ne supprime rien.
-- Mot de passe par defaut: `EnactSpaceV1!`
+- `ENABLE_SEED` doit être activé uniquement en environnement `development` ou `test`.
+- Un Admin ou Team Leader local autorisé appelle `POST /api/seed/v1-demo`.
+- Le mot de passe est fourni dans le corps de cette requête; il doit être généré pour l'exécution ou lu depuis une variable d'environnement locale ignorée.
+- Aucun mot de passe partagé, réutilisable ou par défaut n'est documenté.
+- Les credentials de production ne sont jamais utilisés.
+- Après la vérification, désactiver le seed et supprimer l'environnement/base de test conformément au plan local.
 
-## Comptes
+Le seed peut créer des identités synthétiques `.local` pour exercer les rôles Admin, Team Leader, SG, finance, chefs de pôle/projet, membre, alumni et candidat. Leur existence, leur adresse et leur état dépendent du code de seed de la révision testée; ne pas copier ces identités dans un autre environnement.
 
-| Role a tester | Email | Mot de passe | Attendu |
-| --- | --- | --- | --- |
-| Admin | `admin.v1@enactspace.local` | `EnactSpaceV1!` | Vue globale |
-| Team Leader | `teamleader.v1@enactspace.local` | `EnactSpaceV1!` | Vue globale |
-| SG | `sg.v1@enactspace.local` | `EnactSpaceV1!` | Membres, presences, validations |
-| Financier | `finance.v1@enactspace.local` | `EnactSpaceV1!` | Finance globale |
-| Chef de pole | `chefpole.v1@enactspace.local` | `EnactSpaceV1!` | Perimetre pole/projets |
-| Chef de projet | `chefprojet.v1@enactspace.local` | `EnactSpaceV1!` | Perimetre projet |
-| Membre simple | `membre.v1@enactspace.local` | `EnactSpaceV1!` | Espace enacteur |
-| Alumni valide | `alumni.v1@enactspace.local` | `EnactSpaceV1!` | Espace alumni |
-| Alumni en attente | `alumni.pending.v1@enactspace.local` | `EnactSpaceV1!` | Connexion bloquee |
-| Candidat | `candidat.v1@enactspace.local` | `EnactSpaceV1!` | Connexion interne bloquee |
-
-## Donnees creees ou verifiees
-
-- Roles principaux EnactSpace.
-- Saison courante.
-- Poles Tech, Chimie, Gestion, IT, Communication, Organisation et Veille.
-- Projets Aquatus, Men Nan, Terrasen, Cherry et Dimbali.
-- Badges de gamification de base.
-- Comptes de test non sensibles.
-
-## Notes
-
-- Changer le mot de passe dans la requete si un autre secret local est souhaite.
-- Ne pas activer `ENABLE_SEED` en production.
-- Les comptes pending servent a verifier les blocages d'acces et ne doivent pas entrer dans l'app interne.
+Conserver comme preuve uniquement la date, le commit, les rôles exercés et le résultat attendu/observé. Ne jamais consigner le mot de passe, un token, une base réelle ou des données membres.

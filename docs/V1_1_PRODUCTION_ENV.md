@@ -1,5 +1,7 @@
 # EnactSpace V1.1 - Variables production
 
+> **HISTORIQUE / NON AUTORITATIF.** Utiliser la liste et les règles actuelles de [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) et la procédure [Operations runbook](OPERATIONS_RUNBOOK.md). Ce fichier ne doit jamais devenir un inventaire de valeurs réelles.
+
 Ce document decrit les variables a definir sur le VPS. Ne jamais committer le fichier `.env` reel.
 
 ## Fichier de reference
@@ -9,7 +11,7 @@ Un modele sans secret est disponible dans `backend/.env.production.example`.
 Copie recommandee sur le serveur:
 
 ```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\backend
+Set-Location backend
 copy .env.production.example .env
 ```
 
@@ -71,7 +73,7 @@ python -m app.scripts.validate_environment
 Sur Windows local:
 
 ```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\backend
+Set-Location backend
 python -m app.scripts.validate_environment
 ```
 

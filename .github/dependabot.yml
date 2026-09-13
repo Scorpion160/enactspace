@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    groups:
+      backend-python:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pub
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+    groups:
+      flutter-dart:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gradle
+    directory: "/frontend/android"
+    schedule:
+      interval: weekly
+    groups:
+      android-gradle:
+        patterns:
+          - "*"

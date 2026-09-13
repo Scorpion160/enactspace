@@ -1,5 +1,7 @@
 # EnactSpace V1.1 - Migrations base de donnees
 
+> **HISTORIQUE / NON AUTORITATIF.** Ce document décrit l'introduction d'Alembic. La procédure actuelle est dans [Operations runbook](OPERATIONS_RUNBOOK.md). Le head courant unique est `20260910_0008`; ne jamais utiliser l'ancien baseline comme head courant ni exécuter un `stamp` sans preuve de schéma, backup et plan approuvés.
+
 ## Objectif
 
 La production ne doit pas dependre uniquement de `Base.metadata.create_all()` au demarrage de l'application. En V1.1, Alembic est prepare pour rendre les migrations reproductibles sur le VPS.
@@ -35,7 +37,7 @@ python -m alembic upgrade head
 Sur Windows local:
 
 ```powershell
-cd C:\Users\DIOP\Documents\Enactus\enactspace\backend
+Set-Location backend
 .\.venv\Scripts\python.exe -m alembic current
 .\.venv\Scripts\python.exe -m alembic heads
 .\.venv\Scripts\python.exe -m alembic upgrade head
@@ -80,7 +82,7 @@ pg_dump -Fc -f /var/backups/enactspace/enactspace-before-v1-1.dump enactspace
 
 3. Restaurer la sauvegarde sur une base de test.
 4. Comparer le schema avec les modeles V1.1.
-5. Si la base correspond deja au baseline, utiliser `alembic stamp 20260713_0001`.
+5. Si une ancienne base semble correspondre au baseline, arrêter la procédure et faire approuver une comparaison de schéma et un plan de migration explicite; ne pas appliquer `stamp` sur simple supposition.
 6. Sinon, creer une migration de transition testee sur la copie.
 7. Executer `alembic upgrade head`.
 8. Redemarrer le backend.

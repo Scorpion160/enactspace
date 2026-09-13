@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "EnactSpace"
     APP_ENV: str = "development"
     APP_DEBUG: bool = True
-    APP_VERSION: str = "1.1-dev"
+    APP_VERSION: str = "1.0.0"
 
     DATABASE_URL: str
 
@@ -80,6 +80,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_attendance_qr_settings(self):
+        if self.ALGORITHM != "HS256":
+            raise ValueError("ALGORITHM must be HS256")
         if self.ATTENDANCE_QR_TTL_SECONDS < 15:
             raise ValueError("ATTENDANCE_QR_TTL_SECONDS must be at least 15")
         if self.ATTENDANCE_QR_ROTATION_SECONDS < 10:

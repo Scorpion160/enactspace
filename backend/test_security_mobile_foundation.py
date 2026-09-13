@@ -28,6 +28,36 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
     )
 
 
+class JwtAlgorithmConfigTests(unittest.TestCase):
+    def make_settings(self, *, algorithm: str | None = None) -> Settings:
+        values = {
+            "_env_file": None,
+            "APP_ENV": "test",
+            "APP_DEBUG": False,
+            "DATABASE_URL": "sqlite:///security-foundation-test.db",
+            "SECRET_KEY": "unit-test-secret-not-for-production",
+            "ATTENDANCE_QR_ENABLED": False,
+            "ATTENDANCE_NFC_ENABLED": False,
+        }
+        if algorithm is not None:
+            values["ALGORITHM"] = algorithm
+        return Settings(**values)
+
+    def test_default_algorithm_is_hs256(self):
+        self.assertEqual(self.make_settings().ALGORITHM, "HS256")
+
+    def test_explicit_hs256_algorithm_is_accepted(self):
+        self.assertEqual(self.make_settings(algorithm="HS256").ALGORITHM, "HS256")
+
+    def test_es256_algorithm_is_rejected_during_settings_validation(self):
+        with self.assertRaisesRegex(ValueError, "ALGORITHM must be HS256"):
+            self.make_settings(algorithm="ES256")
+
+    def test_rs256_algorithm_is_rejected_during_settings_validation(self):
+        with self.assertRaisesRegex(ValueError, "ALGORITHM must be HS256"):
+            self.make_settings(algorithm="RS256")
+
+
 class SeedRouteSecurityTests(unittest.TestCase):
     def test_production_requires_dedicated_refresh_hmac_key(self):
         common = {
