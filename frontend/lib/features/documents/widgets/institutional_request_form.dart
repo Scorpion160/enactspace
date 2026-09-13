@@ -240,7 +240,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
 
     if (template.requiresPole) {
       return DropdownButtonFormField<String>(
-        value: _valueIfPresent(_poleId, veillePoles.map((p) => p.id)),
+        initialValue: _valueIfPresent(_poleId, veillePoles.map((p) => p.id)),
         decoration: InputDecoration(
           labelText: template.isVeilleOnly ? 'Pôle Veille *' : 'Pôle *',
           prefixIcon: const Icon(Icons.groups_2_outlined),
@@ -260,7 +260,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
 
     if (template.requiresProject) {
       return DropdownButtonFormField<String>(
-        value: _valueIfPresent(
+        initialValue: _valueIfPresent(
           _projectId,
           _references.projects.map((project) => project.id),
         ),
@@ -311,7 +311,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
           const SizedBox(height: 10),
           if (_optionalScope == 'pole')
             DropdownButtonFormField<String>(
-              value: _valueIfPresent(
+              initialValue: _valueIfPresent(
                 _poleId,
                 _references.poles.map((pole) => pole.id),
               ),
@@ -332,7 +332,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
             ),
           if (_optionalScope == 'project')
             DropdownButtonFormField<String>(
-              value: _valueIfPresent(
+              initialValue: _valueIfPresent(
                 _projectId,
                 _references.projects.map((project) => project.id),
               ),
@@ -362,7 +362,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
     switch (field.type) {
       case 'user':
         return DropdownButtonFormField<String>(
-          value: _valueIfPresent(
+          initialValue: _valueIfPresent(
             _singleUsers[field.name],
             _members.map((member) => member.id),
           ),

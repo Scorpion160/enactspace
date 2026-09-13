@@ -540,7 +540,7 @@ class _InstitutionalRequestsPanelState
               padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
               sliver: SliverList.separated(
                 itemCount: _requests.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) =>
                     _requestCard(_requests[index]),
               ),
@@ -602,7 +602,7 @@ class _InstitutionalRequestsPanelState
               SizedBox(
                 width: 250,
                 child: DropdownButtonFormField<String>(
-                  value: _status,
+                  initialValue: _status,
                   decoration: const InputDecoration(labelText: 'Statut'),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('Tous les statuts')),
@@ -633,7 +633,7 @@ class _InstitutionalRequestsPanelState
               SizedBox(
                 width: 310,
                 child: DropdownButtonFormField<String>(
-                  value: _templates.containsKey(_template) ? _template : 'all',
+                  initialValue: _templates.containsKey(_template) ? _template : 'all',
                   decoration: const InputDecoration(labelText: 'Type de document'),
                   items: [
                     const DropdownMenuItem(

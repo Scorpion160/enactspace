@@ -93,7 +93,7 @@ class ApiInstitutionalDocumentsGateway implements InstitutionalDocumentsGateway 
   Future<UserExperience?> loadCurrentUser() async {
     var raw = await _authService.getCachedCurrentUser();
     raw ??= await _authService.getCurrentUser();
-    if (raw == null) return null;
+
     return UserExperience.fromJson(raw);
   }
 
