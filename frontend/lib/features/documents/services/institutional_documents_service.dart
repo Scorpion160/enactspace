@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/institutional_document_models.dart';
@@ -156,6 +158,19 @@ class InstitutionalDocumentsService {
       data: {'reason': _nullable(reason)},
     );
     return _requestFrom(response);
+  }
+
+  Future<Uint8List> preview(String requestId) async {
+    final token = await _requireToken();
+    final bytes = await _apiClient.getBytes(
+      '${ApiClient.baseUrl}/institutional-documents/requests/$requestId/preview',
+      token: token,
+    );
+    if (bytes.length < 5 ||
+        String.fromCharCodes(bytes.take(5)) != '%PDF-') {
+      throw Exception('Le serveur n’a pas retourné un aperçu PDF valide.');
+    }
+    return Uint8List.fromList(bytes);
   }
 
   Future<InstitutionalGenerationResult> generate(String requestId) async {
