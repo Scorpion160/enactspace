@@ -1,0 +1,167 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{enactus_esp}[2026/09/13 Enactus ESP institutional documents v2]
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[french]{babel}
+\RequirePackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\RequirePackage[a4paper,top=15mm,bottom=17mm,left=18mm,right=18mm,headheight=15pt,footskip=10mm]{geometry}
+\RequirePackage[table]{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{tabularx}
+\RequirePackage{longtable}
+\RequirePackage{array}
+\RequirePackage{booktabs}
+\RequirePackage{enumitem}
+\RequirePackage{fancyhdr}
+\RequirePackage{lastpage}
+\RequirePackage{ragged2e}
+\RequirePackage{microtype}
+\RequirePackage{hyperref}
+\RequirePackage{etoolbox}
+\definecolor{EnactusYellow}{HTML}{FFC629}
+\definecolor{EnactusBlack}{HTML}{101820}
+\definecolor{EnactusText}{HTML}{151515}
+\definecolor{EnactusGray}{HTML}{66707A}
+\definecolor{EnactusLine}{HTML}{D8DDE2}
+\definecolor{EnactusPale}{HTML}{EAF1F6}
+\definecolor{EnactusPaleGreen}{HTML}{E7F3EF}
+\definecolor{EnactusBg}{HTML}{F7F7F3}
+\definecolor{EnactusRed}{HTML}{9B2226}
+\hypersetup{colorlinks=false,pdfborder={0 0 0}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\setlength{\emergencystretch}{2em}
+\setlist[itemize]{leftmargin=5.5mm,itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=6mm,itemsep=2pt,topsep=2pt}
+\newcommand{\Placeholder}[1]{\textcolor{EnactusGray}{\textit{[#1]}}}
+\newcommand{\Label}[1]{\textbf{\color{EnactusGray}#1}}
+\newcommand{\DocReference}{ENACTUS-ESP/XXXX/AAAA/NNN}
+\newcommand{\DocStatus}{OFFICIEL}
+\newcommand{\DocVersion}{2.0}
+\newcommand{\Season}{AAAA--AAAA}
+\newcommand{\GeneratedDate}{JJ/MM/AAAA}
+\newcommand{\GeneratedBy}{EnactSpace}
+\newcommand{\ApproverName}{Enactus ESP}
+\newcommand{\ApproverRole}{Responsable habilité}
+\newcommand{\DocumentShortTitle}{Document institutionnel}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{C}[1]{>{\Centering\arraybackslash}p{#1}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\scriptsize\color{EnactusGray}\DocumentShortTitle}
+\fancyhead[R]{\scriptsize\color{EnactusGray}\DocReference}
+\fancyfoot[C]{\scriptsize\itshape\color{EnactusGray}Empowering our society is our priority}
+\fancyfoot[R]{\scriptsize\color{EnactusGray}\thepage/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\newcommand{\InstitutionHeader}{%
+  \thispagestyle{fancy}
+  \noindent\begin{tabularx}{\textwidth}{@{}C{23mm} X C{25mm}@{}}
+  \IfFileExists{assets/ucad_logo.png}{\includegraphics[height=15mm]{assets/ucad_logo.png}}{} &
+  \centering\small
+  \textbf{\InstitutionCountry}\\[-0.2mm]
+  \footnotesize \InstitutionMotto\\[0.7mm]
+  \normalsize\textbf{\InstitutionUniversity}\\[-0.3mm]
+  \textbf{\InstitutionSchool}\\[-0.3mm]
+  \textbf{\InstitutionClub} &
+  \IfFileExists{assets/enactus_esp_round.png}{\includegraphics[height=17mm]{assets/enactus_esp_round.png}}{\textbf{ENACTUS ESP}}
+  \end{tabularx}
+  \vspace{0.5mm}
+  \begin{center}\footnotesize\itshape\color{EnactusGray}\InstitutionSlogan\end{center}
+  \vspace{-1mm}{\color{EnactusYellow}\rule{\textwidth}{2pt}}\par\vspace{1mm}
+}
+\newcommand{\CompactInstitutionHeader}{%
+  \thispagestyle{fancy}
+  \noindent\begin{tabularx}{\textwidth}{@{}C{30mm} X@{}}
+  \IfFileExists{assets/enactus_wordmark.png}{\includegraphics[width=28mm]{assets/enactus_wordmark.png}}{\textbf{ENACTUS}} &
+  \centering\small\textbf{\InstitutionUniversity}\\[-0.2mm]
+  \textbf{\InstitutionSchool}\\[-0.2mm]
+  \textbf{\InstitutionClub}\\[0.3mm]
+  \footnotesize\href{mailto:enactus@esp.sn}{\InstitutionEmail}\quad\InstitutionPhone
+  \end{tabularx}
+  \vspace{1mm}{\color{EnactusYellow}\rule{\textwidth}{2pt}}\par\vspace{3mm}
+}
+\newcommand{\MakeMeetingHeader}[2]{%
+  \renewcommand{\DocumentShortTitle}{#1 -- #2}%
+  \InstitutionHeader
+  \begin{center}
+  {\Large\bfseries\color{EnactusBlack}FICHE DE COMPTE RENDU DE RÉUNION}\\[1mm]
+  {\normalsize\bfseries #1 -- #2}
+  \end{center}
+  \vspace{2mm}
+}
+\newcommand{\MakeLetterStart}{%
+  \renewcommand{\DocumentShortTitle}{Courrier officiel Enactus ESP}%
+  \CompactInstitutionHeader
+}
+\newcommand{\ReferenceLine}{%
+  \begin{tabularx}{\textwidth}{@{}>{\bfseries\color{EnactusGray}}p{22mm}Y >{\bfseries\color{EnactusGray}}p{17mm}Y@{}}
+  Référence & \DocReference & Saison & \Season\\
+  Statut & \DocStatus & Version & \DocVersion
+  \end{tabularx}\par\vspace{2mm}
+}
+\newcommand{\InfoBand}[1]{%
+  \par\vspace{1mm}\noindent
+  \colorbox{EnactusPale}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\bfseries\color{EnactusBlack}#1}}\par\vspace{1mm}
+}
+\newcommand{\SectionTitle}[1]{\InfoBand{#1}}
+\newcommand{\SubtleBox}[1]{%
+  \par\begingroup\setlength{\fboxsep}{7pt}%
+  \noindent\colorbox{EnactusBg}{\parbox{\dimexpr\textwidth-14pt\relax}{#1}}%
+  \endgroup\par}
+\newcommand{\MeetingMeta}[5]{%
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabularx}{\textwidth}{@{}>{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X@{}}
+  \cellcolor{EnactusPaleGreen}\textbf{DATE ET LIEU} &
+  \cellcolor{EnactusPaleGreen}\textbf{HEURE} &
+  \cellcolor{EnactusPaleGreen}\textbf{RÉDACTION}\\
+  #1 -- #2 & #3 & #4\\[1mm]
+  \multicolumn{2}{c}{\cellcolor{EnactusPaleGreen}\textbf{APPROBATION}} &
+  \cellcolor{EnactusPaleGreen}\textbf{RÉFÉRENCE}\\
+  \multicolumn{2}{c}{#5} & \DocReference
+  \end{tabularx}\par\vspace{2mm}
+}
+\newcommand{\SignaturePair}[6]{%
+  \par\vspace{4mm}
+  \noindent\begin{minipage}[t]{0.47\textwidth}\centering
+  {\small\textbf{#1}}\\[7mm]
+  #2\\[-0.5mm]{\footnotesize\color{EnactusGray}#3}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.47\textwidth}\centering
+  {\small\textbf{#4}}\\[7mm]
+  #5\\[-0.5mm]{\footnotesize\color{EnactusGray}#6}
+  \end{minipage}\par
+}
+\newcommand{\MeetingSignaturePair}[6]{%
+  \par\vspace{1mm}
+  \noindent\begin{minipage}[t]{0.47\textwidth}\centering
+  {\footnotesize\textbf{#1}}\\[4mm]
+  #2\\[-0.5mm]{\scriptsize\color{EnactusGray}#3}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.47\textwidth}\centering
+  {\footnotesize\textbf{#4}}\\[4mm]
+  #5\\[-0.5mm]{\scriptsize\color{EnactusGray}#6}
+  \end{minipage}\par
+}
+\newcommand{\SingleSignature}[3]{%
+  \par\vspace{5mm}\begin{flushright}
+  \begin{minipage}{62mm}\centering\textbf{#1}\\[10mm]#2\\[-0.5mm]{\small\color{EnactusGray}#3}\end{minipage}
+  \end{flushright}}
+\newcommand{\ApprovalBlock}{%
+  \InfoBand{Validation institutionnelle}
+  \begin{tabularx}{\textwidth}{@{}>{\bfseries\color{EnactusGray}}p{40mm}Y@{}}
+  Validé par & \ApproverName\\
+  Qualité & \ApproverRole\\
+  Date & \GeneratedDate
+  \end{tabularx}}
+\newcommand{\NoticeHeader}[1]{%
+  \renewcommand{\DocumentShortTitle}{Notification officielle -- #1}%
+  \noindent\begin{tabularx}{\textwidth}{@{}C{28mm} X@{}}
+  \IfFileExists{assets/enactus_esp_round.png}{\includegraphics[height=21mm]{assets/enactus_esp_round.png}}{} &
+  \raggedleft {\Large\bfseries Club Enactus ESP}\\[-0.5mm]
+  \raggedleft \InstitutionSchool{} -- UCAD\\[-0.5mm]
+  \raggedleft\color{EnactusGray}#1
+  \end{tabularx}
+  \vspace{1mm}{\color{EnactusYellow}\rule{\textwidth}{1.5pt}}\par\vspace{5mm}
+}
