@@ -1,0 +1,29 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/autorisation_parentale_voyage_data.tex}
+\begin{document}
+\MakeLetterStart
+\begin{flushright}Dakar, le \LetterDate\end{flushright}
+\vspace{1mm}
+\begin{flushright}\textbf{À : \ParentRecipient}\end{flushright}
+\vspace{2mm}
+\Label{Référence :} \DocReference\\
+\Label{Objet :} \textbf{Demande d'autorisation parentale}
+\vspace{3mm}
+
+\textbf{Madame, Monsieur,}
+
+\justifying
+L'équipe Enactus de l'École Supérieure Polytechnique de Dakar (ESP), dans sa mission de service à la communauté, mobilise l'entrepreneuriat social afin de contribuer à l'amélioration durable des conditions de vie sur les plans économique, social et environnemental, à travers les initiatives et réalisations de ses étudiants.
+
+C'est dans cette dynamique que nous organisons un \textbf{\TripPurpose}, prévu \textbf{\TravelPeriod}, dans les lieux suivants : \textbf{\TravelLocations}. \TravelFunding. L'activité sera encadrée conformément aux dispositions prévues par l'organisation, avec \OrderMissionInfo.
+
+Ainsi, nous vous demandons de bien vouloir accorder votre autorisation à \textbf{\ParticipantName}, étudiant(e) en \textbf{\ParticipantClass} au Département de \textbf{\ParticipantDepartment} de l'ESP et par ailleurs membre de notre équipe, afin de prendre part à ce déplacement.
+
+Pour toute information complémentaire relative à l'organisation du voyage, vous pouvez contacter \TripContactName{} au \TripContactPhone.
+
+Nous vous remercions par avance pour votre confiance et votre accompagnement.
+
+\SingleSignature{\SignerRole}{\SignerName}{\SignerPhone}
+\end{document}
