@@ -6,6 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app/backend
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        texlive-latex-extra \
+        texlive-lang-french \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 enactspace \
     && useradd --uid 10001 --gid enactspace --create-home --shell /usr/sbin/nologin enactspace
 
@@ -13,6 +19,7 @@ COPY backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY backend /app/backend
+COPY frontend/assets/img/logo_enactus_esp.png /app/backend/app/resources/institutional_documents/assets/enactus_esp_round.png
 RUN mkdir -p /app/uploads /app/private_import \
     && chown -R enactspace:enactspace /app
 
