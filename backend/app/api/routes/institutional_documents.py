@@ -39,6 +39,7 @@ from app.services.institutional_document_service import (
     validate_payload,
     validate_request_scope,
 )
+from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/institutional-documents", tags=["Institutional documents"])
@@ -162,6 +163,106 @@ def _ensure_entity_ids_exist(
 def _officialize_if_validated(db: Session, item: InstitutionalDocumentRequest) -> None:
     if item.status == "validated":
         allocate_official_reference(db, item)
+
+
+def _role_user_ids(
+    db: Session,
+    role_name: str,
+    *,
+    exclude: set | None = None,
+) -> list:
+    excluded = exclude or set()
+    result = []
+    users = db.query(User).filter(
+        User.is_active.is_(True),
+        User.status == "active",
+    ).all()
+    for user in users:
+        if user.id in excluded:
+            continue
+        if role_name in get_user_role_names(db, user.id):
+            result.append(user.id)
+    return result
+
+
+def _notify_next_actor(
+    db: Session,
+    item: InstitutionalDocumentRequest,
+    *,
+    actor: User,
+) -> None:
+    rule = get_template_rule(item.template_code)
+    common = {
+        "type": "institutional_document",
+        "entity_type": "institutional_document_request",
+        "entity_id": item.id,
+        "created_by_id": actor.id,
+    }
+    if item.status == "pending_sg_validation":
+        recipients = _role_user_ids(
+            db,
+            SECRETARY_ROLE,
+            exclude={item.requested_by, actor.id},
+        )
+        if recipients:
+            notify_users(
+                db,
+                recipient_ids=recipients,
+                title="Document institutionnel à valider",
+                body=f"{rule.label} attend votre validation au Secrétariat Général.",
+                **common,
+            )
+        return
+
+    if item.status == "pending_approval":
+        recipients = _role_user_ids(
+            db,
+            TEAM_LEADER_ROLE,
+            exclude={item.requested_by, item.sg_validated_by, actor.id},
+        )
+        if recipients:
+            notify_users(
+                db,
+                recipient_ids=recipients,
+                title="Document institutionnel à approuver",
+                body=f"{rule.label} a passé le contrôle SG et attend votre approbation.",
+                **common,
+            )
+        return
+
+    if item.status == "validated" and item.requested_by != actor.id:
+        reference = item.official_reference or "référence en cours d’attribution"
+        notify_user(
+            db,
+            recipient_id=item.requested_by,
+            title="Document institutionnel validé",
+            body=f"{rule.label} est validé ({reference}). Le PDF officiel peut être généré.",
+            **common,
+        )
+
+
+def _notify_rejection(
+    db: Session,
+    item: InstitutionalDocumentRequest,
+    *,
+    actor: User,
+) -> None:
+    if item.requested_by == actor.id:
+        return
+    rule = get_template_rule(item.template_code)
+    notify_user(
+        db,
+        recipient_id=item.requested_by,
+        title="Correction demandée sur un document",
+        body=(
+            f"{rule.label} a été renvoyé pour correction : "
+            f"{item.rejection_reason or 'motif non renseigné'}."
+        ),
+        type="institutional_document",
+        entity_type="institutional_document_request",
+        entity_id=item.id,
+        created_by_id=actor.id,
+    )
 
 
 @router.get("/templates", response_model=list[InstitutionalTemplateRead])
@@ -408,6 +509,7 @@ def submit_institutional_document_request(
         "institutional_document.submitted",
         old_status=old_status,
     )
+    _notify_next_actor(db, item, actor=current_user)
     db.commit()
     db.refresh(item)
     return _request_payload(db, current_user, item)
@@ -450,6 +552,7 @@ def sg_validate_institutional_document_request(
         "institutional_document.sg_validated",
         old_status=old_status,
     )
+    _notify_next_actor(db, item, actor=current_user)
     db.commit()
     db.refresh(item)
     return _request_payload(db, current_user, item)
@@ -491,6 +594,7 @@ def approve_institutional_document_request(
         "institutional_document.approved",
         old_status=old_status,
     )
+    _notify_next_actor(db, item, actor=current_user)
     db.commit()
     db.refresh(item)
     return _request_payload(db, current_user, item)
@@ -549,6 +653,7 @@ def reject_institutional_document_request(
         old_status=old_status,
         extra={"reason": item.rejection_reason},
     )
+    _notify_rejection(db, item, actor=current_user)
     db.commit()
     db.refresh(item)
     return _request_payload(db, current_user, item)

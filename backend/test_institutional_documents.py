@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base
 import app.models.base  # noqa: F401
+from app.api.routes.institutional_documents import _role_user_ids
 from app.models.institutional_document import InstitutionalDocumentRequest
 from app.models.pole import Pole, PoleMember
 from app.models.project import Project, ProjectMember
@@ -284,6 +285,22 @@ class InstitutionalDocumentWorkflowTests(unittest.TestCase):
         self.assertEqual(
             allocate_official_reference(self.db, second),
             "EESP/PV-POLE/2026-2027/002",
+        )
+
+    def test_role_notification_recipients_respect_role_and_exclusions(self):
+        sg_ids = _role_user_ids(self.db, "secretaire_generale")
+        self.assertEqual(sg_ids, [self.sg.id])
+        self.assertEqual(
+            _role_user_ids(
+                self.db,
+                "secretaire_generale",
+                exclude={self.sg.id},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _role_user_ids(self.db, "team_leader"),
+            [self.tl.id],
         )
 
 
