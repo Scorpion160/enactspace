@@ -41,7 +41,7 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
         )
         self.veille = Pole(name="Pôle Veille", short_name="Veille", type="support")
         self.tech = Pole(name="Pôle IT", short_name="IT", type="support")
-        self.project = Project(name="Hydro-Connect", status="pilote")
+        self.project = Project(name="Hydro-Connect", status="test")
         self.db.add_all([self.season, self.veille, self.tech, self.project])
         self.db.flush()
 

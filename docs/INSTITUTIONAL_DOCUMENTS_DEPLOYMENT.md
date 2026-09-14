@@ -4,7 +4,7 @@ La génération des documents institutionnels Enactus ESP utilise les modèles L
 
 ## Moteur PDF
 
-Le backend doit disposer de `pdflatex` avec les paquets LaTeX utilisés par la charte (`babel` français, `geometry`, `xcolor`, `tabularx`, `longtable`, `booktabs`, `enumitem`, `fancyhdr`, `ragged2e`, `microtype`, `hyperref`).
+Le backend doit disposer de `pdflatex` avec les paquets LaTeX utilisés par la charte (`babel` français, `geometry`, `xcolor`, `tabularx`, `longtable`, `booktabs`, `enumitem`, `fancyhdr`, `ragged2e`, `microtype`, `hyperref`) ainsi que des fontes PostScript standard utilisées par `helvet`.
 
 ### Déploiement Docker
 
@@ -13,6 +13,7 @@ Le backend doit disposer de `pdflatex` avec les paquets LaTeX utilisés par la c
 ```bash
 texlive-latex-extra
 texlive-lang-french
+texlive-fonts-recommended
 ```
 
 L'image copie également le logo Enactus ESP déjà présent dans `frontend/assets/img/logo_enactus_esp.png` vers les ressources du moteur PDF.
@@ -23,7 +24,7 @@ Avant de redémarrer `enactspace-api.service` :
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french
+sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended
 pdflatex --version | head -n 1
 ```
 

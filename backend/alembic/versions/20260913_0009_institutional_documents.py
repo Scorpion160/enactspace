@@ -28,7 +28,48 @@ REQUEST_STATUSES = (
 )
 
 
+def _status_check_sql() -> str:
+    return "status IN (" + ",".join(f"'{value}'" for value in REQUEST_STATUSES) + ")"
+
+
 def upgrade() -> None:
+    # The historical baseline builds from live metadata. On a brand-new
+    # database it can therefore create these tables before this explicit
+    # revision. Existing installations at 0008 have neither table.
+    # Accept only those two complete states; reject partial schemas.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    target_tables = {
+        "institutional_document_requests",
+        "institutional_document_sequences",
+    }
+    present = target_tables.intersection(inspector.get_table_names())
+
+    if present == target_tables:
+        # The ORM metadata that the historical baseline consumes does not carry
+        # this named status CHECK. Add it when the tables came from the baseline
+        # so fresh databases and incremental 0008 -> 0009 upgrades enforce the
+        # same workflow-state invariant.
+        check_names = {
+            item.get("name")
+            for item in inspector.get_check_constraints(
+                "institutional_document_requests"
+            )
+        }
+        if "ck_institutional_document_request_status" not in check_names:
+            op.create_check_constraint(
+                "ck_institutional_document_request_status",
+                "institutional_document_requests",
+                _status_check_sql(),
+            )
+        return
+
+    if present:
+        raise RuntimeError(
+            "Partial institutional document schema detected; manual migration "
+            "review required: " + ", ".join(sorted(present))
+        )
+
     op.create_table(
         "institutional_document_requests",
         sa.Column("id", GUID(), nullable=False),
@@ -70,7 +111,7 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.CheckConstraint(
-            "status IN (" + ",".join(f"'{value}'" for value in REQUEST_STATUSES) + ")",
+            _status_check_sql(),
             name="ck_institutional_document_request_status",
         ),
         sa.ForeignKeyConstraint(["requested_by"], ["users.id"], ondelete="RESTRICT"),
