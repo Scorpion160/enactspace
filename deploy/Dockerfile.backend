@@ -10,6 +10,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         texlive-latex-extra \
         texlive-lang-french \
+        texlive-fonts-recommended \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 enactspace \
