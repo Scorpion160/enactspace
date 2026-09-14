@@ -107,7 +107,7 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
             pole_id=pole_id,
             project_id=project_id,
             season_id=self.season.id,
-            official_reference=f"EESP/TEST/2026-2027/{template_code[:3].upper()}",
+            official_reference=f"EESP/TEST/2026-2027/{template_code.upper()}",
         )
         self.db.add(item)
         self.db.flush()
