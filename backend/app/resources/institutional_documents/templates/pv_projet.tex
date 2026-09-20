@@ -1,0 +1,40 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/pv_projet_data.tex}
+\begin{document}
+\MakeMeetingHeader{RÉUNION DE PROJET}{\ProjectName}
+\MeetingMeta{\MeetingDate}{\MeetingLocation}{\StartTime{} -- \EndTime}{\MeetingSecretary}{\ApprovalText}
+\Label{Présidence / responsabilité :} \MeetingChair\hfill\Label{Phase :} \ProjectPhase
+
+\InfoBand{PRÉSENTS ET ORDRE DU JOUR}
+\begin{tabularx}{\textwidth}{@{}Y Y@{}}
+\textbf{Présents} & \textbf{Ordre du jour}\\
+\Attendees & \Agenda
+\end{tabularx}
+\Label{Absents / excusés :} \Absentees
+
+\InfoBand{POINTS DISCUTÉS / DÉCISIONS / REMARQUES}
+{\small\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{@{}p{42mm}p{116mm}@{}}
+\toprule\textbf{Points discutés} & \textbf{Détails / décisions / remarques}\\\midrule\endhead
+\DiscussionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{TÂCHES ET PROCHAINES ÉCHÉANCES}
+{\small\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{@{}p{54mm}p{31mm}p{25mm}p{28mm}@{}}
+\toprule\textbf{Tâche / livrable} & \textbf{Responsable} & \textbf{Échéance} & \textbf{Statut}\\\midrule\endhead
+\ActionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{BLOCAGES / BESOINS}
+\RisksNeeds
+\InfoBand{DIVERS}
+\Miscellaneous
+
+\Label{Prochaine réunion :} \NextMeeting
+\MeetingSignaturePair{PRÉSIDENT(E) DE SÉANCE}{\MeetingChair}{Chef(fe) de projet}{SECRÉTAIRE DE SÉANCE}{\MeetingSecretary}{Responsable de la rédaction}
+\end{document}

@@ -1,0 +1,46 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/pv_pole_data.tex}
+\begin{document}
+\MakeMeetingHeader{RÉUNION DE PÔLE}{\PoleName}
+\MeetingMeta{\MeetingDate}{\MeetingLocation}{\StartTime{} -- \EndTime}{\MeetingSecretary}{\ApprovalText}
+\Label{Présidence de séance :} \MeetingChair
+
+\InfoBand{ORDRE DU JOUR}
+\Agenda
+
+\InfoBand{RAPPELS}
+\Reminders
+
+\InfoBand{POINTS DISCUTÉS / DÉCISIONS / REMARQUES}
+{\small\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{@{}p{42mm}p{116mm}@{}}
+\toprule\textbf{Points discutés} & \textbf{Détails / décisions / remarques}\\\midrule\endhead
+\DiscussionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{PLAN D'ACTIONS}
+{\small\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{@{}p{54mm}p{31mm}p{25mm}p{28mm}@{}}
+\toprule\textbf{Action} & \textbf{Responsable} & \textbf{Échéance} & \textbf{Statut}\\\midrule\endhead
+\ActionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{DIVERS}
+\Miscellaneous
+
+\InfoBand{MINUTE DE L'ENACTEUR}
+\EnactorMinute
+
+\Label{Prochaine réunion :} \NextMeeting
+\MeetingSignaturePair{PRÉSIDENT(E) DE SÉANCE}{\MeetingChair}{\PoleName}{SECRÉTAIRE DE SÉANCE}{\MeetingSecretary}{Responsable de la rédaction}
+
+\InfoBand{ANNEXE -- LISTE DE PRÉSENCE}
+\Label{Présents :} \Attendees\par
+\Label{Absents excusés :} \ExcusedAbsentees\par
+\Label{Absents non excusés :} \UnexcusedAbsentees\par
+\Label{Total des membres présents :} \PresentCount
+\end{document}
