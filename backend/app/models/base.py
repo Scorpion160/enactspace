@@ -30,6 +30,10 @@ from app.models.task import (
     TaskComment,
 )
 from app.models.document import Document
+from app.models.institutional_document import (
+    InstitutionalDocumentRequest,
+    InstitutionalDocumentSequence,
+)
 from app.models.stored_file import StoredFile
 from app.models.post import Post, PostComment, PostReaction
 from app.models.chat import (

@@ -292,7 +292,7 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
             heads = ScriptDirectory.from_config(config).get_heads()
-            self.assertEqual(heads, ["20260910_0008"])
+            self.assertEqual(heads, ["20260913_0009"])
 
             def upgrade(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -340,7 +340,7 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
                 revision = connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-            self.assertEqual(revision, "20260910_0008")
+            self.assertEqual(revision, "20260913_0009")
 
             downgrade("20260903_0003")
             inspector = inspect(engine)
@@ -390,7 +390,7 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
                 revision = connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-            self.assertEqual(revision, "20260910_0008")
+            self.assertEqual(revision, "20260913_0009")
             engine.dispose()
 
 

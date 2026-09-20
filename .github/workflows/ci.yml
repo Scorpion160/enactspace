@@ -101,7 +101,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20260910_0008 (head)"
+          test "$output" = "20260913_0009 (head)"
 
       - name: Run complete backend suite with PostgreSQL tests
         shell: bash
