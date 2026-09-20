@@ -57,11 +57,21 @@ def upgrade() -> None:
             )
         }
         if "ck_institutional_document_request_status" not in check_names:
-            op.create_check_constraint(
-                "ck_institutional_document_request_status",
-                "institutional_document_requests",
-                _status_check_sql(),
-            )
+            if bind.dialect.name == "sqlite":
+                with op.batch_alter_table(
+                    "institutional_document_requests",
+                    recreate="always",
+                ) as batch_op:
+                    batch_op.create_check_constraint(
+                        "ck_institutional_document_request_status",
+                        _status_check_sql(),
+                    )
+            else:
+                op.create_check_constraint(
+                    "ck_institutional_document_request_status",
+                    "institutional_document_requests",
+                    _status_check_sql(),
+                )
         return
 
     if present:
