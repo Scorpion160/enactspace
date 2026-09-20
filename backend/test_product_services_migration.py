@@ -35,7 +35,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
             config = Config("alembic.ini")
             self.assertEqual(
                 ScriptDirectory.from_config(config).get_heads(),
-                ["20260910_0008"],
+                ["20260913_0009"],
             )
 
             def upgrade(revision: str) -> None:
@@ -61,7 +61,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
             with engine.connect() as connection:
                 self.assertEqual(
                     connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                    "20260910_0008",
+                    "20260913_0009",
                 )
                 for table in ("app_installations", "app_releases", "app_version_policies"):
                     self.assertEqual(
@@ -289,7 +289,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
             with engine.connect() as connection:
                 self.assertEqual(
                     connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                    "20260910_0008",
+                    "20260913_0009",
                 )
             engine.dispose()
 
