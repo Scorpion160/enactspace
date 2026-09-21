@@ -18,6 +18,33 @@ const _androidAppId = String.fromEnvironment(
 );
 const _iosApiKey = String.fromEnvironment('ENACTSPACE_FIREBASE_API_KEY_IOS');
 const _iosAppId = String.fromEnvironment('ENACTSPACE_FIREBASE_APP_ID_IOS');
+const _apnsReadinessAttempts = 20;
+const _apnsReadinessDelay = Duration(milliseconds: 250);
+
+typedef PushTokenReader = Future<String?> Function();
+typedef PushReadinessDelay = Future<void> Function(Duration duration);
+
+@visibleForTesting
+Future<String?> readFirebaseTokenWhenReady({
+  required bool requiresApnsToken,
+  required PushTokenReader readFirebaseToken,
+  required PushTokenReader readApnsToken,
+  int maxAttempts = _apnsReadinessAttempts,
+  Duration retryDelay = _apnsReadinessDelay,
+  PushReadinessDelay delay = Future<void>.delayed,
+}) async {
+  if (!requiresApnsToken) return readFirebaseToken();
+  if (maxAttempts < 1) return null;
+
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    final apnsToken = await readApnsToken();
+    if (apnsToken != null && apnsToken.isNotEmpty) {
+      return readFirebaseToken();
+    }
+    if (attempt + 1 < maxAttempts) await delay(retryDelay);
+  }
+  return null;
+}
 
 FirebaseOptions? _runtimeFirebaseOptions() {
   final isAndroid = defaultTargetPlatform == TargetPlatform.android;
@@ -139,9 +166,14 @@ class FirebasePushPlatform implements PushPlatform {
   }
 
   @override
-  Future<String?> currentToken() => _initialized
-      ? FirebaseMessaging.instance.getToken()
-      : Future<String?>.value();
+  Future<String?> currentToken() {
+    if (!_initialized) return Future<String?>.value();
+    return readFirebaseTokenWhenReady(
+      requiresApnsToken: defaultTargetPlatform == TargetPlatform.iOS,
+      readFirebaseToken: FirebaseMessaging.instance.getToken,
+      readApnsToken: FirebaseMessaging.instance.getAPNSToken,
+    );
+  }
 
   @override
   Future<void> deleteToken() async {

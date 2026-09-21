@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/core/api/api_client.dart';
 import 'package:frontend/core/auth/auth_storage.dart';
+import 'package:frontend/core/storage/secure_storage_options.dart';
+import 'package:frontend/core/storage/session_private_data.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -81,6 +84,54 @@ void main() {
     expect(preferences.getString(AuthStorage.legacyAccessTokenKey), isNull);
     expect(preferences.getString(AuthStorage.legacyCurrentUserKey), isNull);
   });
+
+  test('iOS secure storage is device-bound and not synchronized', () {
+    expect(
+      enactSpaceDeviceBoundIosOptions.accessibility,
+      KeychainAccessibility.unlocked_this_device,
+    );
+    expect(enactSpaceDeviceBoundIosOptions.synchronizable, isFalse);
+    expect(
+      enactSpaceSecureStorage.iOptions.accessibility,
+      KeychainAccessibility.unlocked_this_device,
+    );
+  });
+
+  test(
+    'session teardown removes private data but preserves device settings',
+    () async {
+      final secureStore = _MemorySecureStore();
+      final storage = AuthStorage(secureStore: secureStore);
+      await storage.writeAccessToken('secure-token');
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        'enactspace_chat_messages_member-1_thread-1',
+        'private body',
+      );
+      await preferences.setString('_chat_messages_cache_thread-1', 'legacy');
+      await preferences.setString(legacyChatAttachmentDraftsKey, 'draft');
+      await preferences.setString('enactspace_theme_mode', 'dark');
+      sessionPrivateMemoryCache.write('enactspace_chat_messages_member-1_x', [
+        'private body',
+      ]);
+
+      await storage.clearAuthSecrets();
+
+      expect(
+        preferences.getString('enactspace_chat_messages_member-1_thread-1'),
+        isNull,
+      );
+      expect(preferences.getString('_chat_messages_cache_thread-1'), isNull);
+      expect(preferences.getString(legacyChatAttachmentDraftsKey), isNull);
+      expect(preferences.getString('enactspace_theme_mode'), 'dark');
+      expect(
+        sessionPrivateMemoryCache.read<List<String>>(
+          'enactspace_chat_messages_member-1_x',
+        ),
+        isNull,
+      );
+    },
+  );
 
   test('release API configuration requires an absolute HTTPS URL', () {
     expect(

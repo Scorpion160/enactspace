@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-// ignore: implementation_imports
-import 'package:nfc_manager/src/nfc_manager_android/tags/tag.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
@@ -11,6 +9,7 @@ import '../models/attendance_nfc_model.dart';
 import '../models/attendance_qr_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
+import '../services/nfc_tag_payload.dart';
 
 class AttendanceNfcCheckInScreen extends StatefulWidget {
   final AttendanceSessionModel session;
@@ -28,7 +27,7 @@ String _nfcFailureMessage(Object error) {
   if (normalized.contains('not supported') ||
       normalized.contains('windows') ||
       normalized.contains('unavailable')) {
-    return 'NFC indisponible sur cet appareil. Utilisez un téléphone Android compatible pour pointer les présences.';
+    return 'NFC indisponible sur cet appareil. Utilisez un téléphone compatible pour pointer les présences.';
   }
   return message;
 }
@@ -93,20 +92,31 @@ class _AttendanceNfcCheckInScreenState
       _error = null;
     });
     await NfcManager.instance.startSession(
-      pollingOptions: const {
-        NfcPollingOption.iso14443,
-        NfcPollingOption.iso15693,
-        NfcPollingOption.iso18092,
-      },
+      pollingOptions: supportedAttendanceNfcPollingOptions,
       onDiscovered: (tag) async {
         if (_processing) return;
         await NfcManager.instance.stopSession();
         if (!mounted) return;
+        String payload;
+        try {
+          payload = attendanceNfcTagPayload(tag);
+        } on UnsupportedAttendanceNfcTag catch (error) {
+          setState(() {
+            _listening = false;
+            _error = error.toString();
+          });
+          if (!_paused && widget.session.status == 'open') {
+            Timer(const Duration(milliseconds: 900), () {
+              if (mounted) unawaited(_startListening());
+            });
+          }
+          return;
+        }
         setState(() {
           _listening = false;
           _processing = true;
         });
-        await _submitTag(_tagPayload(tag));
+        await _submitTag(payload);
       },
     );
   }
@@ -477,16 +487,6 @@ class _NfcResultPanel extends StatelessWidget {
       ),
     );
   }
-}
-
-String _tagPayload(NfcTag tag) {
-  final androidTag = NfcTagAndroid.from(tag);
-  if (androidTag != null) {
-    return androidTag.id
-        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-        .join();
-  }
-  return tag.hashCode.toString();
 }
 
 String _readerStatusLabel({
