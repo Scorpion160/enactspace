@@ -1,6 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import '../storage/secure_storage_options.dart';
+
 abstract interface class PushInstallationStore {
   Future<String> installationKey(String userId);
   Future<String?> serverInstallationId(String userId);
@@ -12,7 +14,7 @@ class SecurePushInstallationStore implements PushInstallationStore {
   final Uuid uuid;
 
   const SecurePushInstallationStore({
-    this.storage = const FlutterSecureStorage(),
+    this.storage = enactSpaceSecureStorage,
     this.uuid = const Uuid(),
   });
 

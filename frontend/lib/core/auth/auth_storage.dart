@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../storage/secure_storage_options.dart';
+import '../storage/session_private_data.dart';
+
 abstract interface class SecureKeyValueStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
@@ -13,9 +16,7 @@ abstract interface class SecureKeyValueStore {
 class FlutterSecureKeyValueStore implements SecureKeyValueStore {
   final FlutterSecureStorage _storage;
 
-  const FlutterSecureKeyValueStore({
-    this._storage = const FlutterSecureStorage(),
-  });
+  const FlutterSecureKeyValueStore({this._storage = enactSpaceSecureStorage});
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
@@ -131,6 +132,7 @@ class AuthStorage {
       await Future.wait([
         _secureStore.delete(_currentUserKey),
         _removeLegacyValue(legacyCurrentUserKey),
+        _purgePrivateSessionData(),
       ]);
       await _writePair(tokens);
       sessionChanges.value++;
@@ -204,7 +206,14 @@ class AuthStorage {
     _secureStore.delete(_currentUserKey),
     _removeLegacyValue(legacyAccessTokenKey),
     _removeLegacyValue(legacyCurrentUserKey),
+    _purgePrivateSessionData(),
   ]);
+
+  Future<void> _purgePrivateSessionData() async {
+    purgePrivateSessionMemory();
+    final preferences = await _preferencesFactory();
+    await purgePrivateSessionPreferences(preferences);
+  }
 
   Future<String?> _readAndMigrate({
     required String secureKey,

@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/storage/session_private_data.dart';
 import '../models/chat_models.dart';
 
 class ChatMediaCacheSettings {
@@ -29,6 +28,7 @@ class ChatMediaCacheSettings {
 class ChatService {
   final ApiClient _apiClient;
   final AuthService _authService;
+  Future<void>? _legacyCachePurge;
 
   ChatService({ApiClient? apiClient, AuthService? authService})
     : _apiClient = apiClient ?? ApiClient(),
@@ -69,32 +69,23 @@ class ChatService {
   Future<List<ChatThreadModel>> getCachedThreads({
     required String userId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_threadsCacheKey(userId));
-
-    if (raw == null || raw.isEmpty) return [];
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-
-      return decoded
-          .whereType<Map<String, dynamic>>()
-          .map(ChatThreadModel.fromJson)
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    await _purgeLegacyContentCache();
+    return List<ChatThreadModel>.of(
+      sessionPrivateMemoryCache.read<List<ChatThreadModel>>(
+            _threadsCacheKey(userId),
+          ) ??
+          [],
+    );
   }
 
   Future<void> cacheThreads({
     required String userId,
     required List<ChatThreadModel> threads,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _purgeLegacyContentCache();
+    sessionPrivateMemoryCache.write(
       _threadsCacheKey(userId),
-      jsonEncode(threads.map((thread) => thread.toJson()).toList()),
+      List<ChatThreadModel>.of(threads),
     );
   }
 
@@ -220,22 +211,13 @@ class ChatService {
     required String userId,
     required String threadId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_messagesCacheKey(userId, threadId));
-
-    if (raw == null || raw.isEmpty) return [];
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-
-      return decoded
-          .whereType<Map<String, dynamic>>()
-          .map(ChatMessageModel.fromJson)
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    await _purgeLegacyContentCache();
+    return List<ChatMessageModel>.of(
+      sessionPrivateMemoryCache.read<List<ChatMessageModel>>(
+            _messagesCacheKey(userId, threadId),
+          ) ??
+          [],
+    );
   }
 
   Future<void> cacheMessages({
@@ -243,10 +225,10 @@ class ChatService {
     required String threadId,
     required List<ChatMessageModel> messages,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _purgeLegacyContentCache();
+    sessionPrivateMemoryCache.write(
       _messagesCacheKey(userId, threadId),
-      jsonEncode(messages.map((message) => message.toJson()).toList()),
+      List<ChatMessageModel>.of(messages),
     );
   }
 
@@ -277,38 +259,32 @@ class ChatService {
   }
 
   Future<int> estimateLocalMediaCacheBytes({required String userId}) async {
-    final prefs = await SharedPreferences.getInstance();
+    await _purgeLegacyContentCache();
     var total = 0;
-    for (final key in prefs.getKeys()) {
+    for (final key in sessionPrivateMemoryCache.keys.toList()) {
       if (!key.startsWith(_messagesCachePrefix(userId))) continue;
-      final raw = prefs.getString(key);
-      if (raw == null || raw.isEmpty) continue;
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is! List) continue;
-        for (final item in decoded.whereType<Map<String, dynamic>>()) {
-          final message = ChatMessageModel.fromJson(item);
-          if (message.isMedia) {
-            total += message.attachmentSizeBytes ?? 0;
-          }
+      final messages = sessionPrivateMemoryCache.read<List<ChatMessageModel>>(
+        key,
+      );
+      for (final message in messages ?? const <ChatMessageModel>[]) {
+        if (message.isMedia) {
+          total += message.attachmentSizeBytes ?? 0;
         }
-      } catch (_) {
-        continue;
       }
     }
     return total;
   }
 
   Future<int> clearLocalMediaCache({required String userId}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs
-        .getKeys()
+    final keys = sessionPrivateMemoryCache.keys
         .where((key) => key.startsWith(_messagesCachePrefix(userId)))
         .toList();
     for (final key in keys) {
-      await prefs.remove(key);
+      sessionPrivateMemoryCache.remove(key);
     }
-    return keys.length;
+    final preferences = await SharedPreferences.getInstance();
+    final legacyRemoved = await purgeLegacyChatContentPreferences(preferences);
+    return keys.length + legacyRemoved;
   }
 
   Future<ChatMessageModel> sendMessage({
@@ -506,5 +482,11 @@ class ChatService {
 
   String _mediaEphemeralDurationKey(String userId) {
     return 'enactspace_chat_media_ephemeral_duration_$userId';
+  }
+
+  Future<void> _purgeLegacyContentCache() {
+    return _legacyCachePurge ??= SharedPreferences.getInstance().then(
+      purgeLegacyChatContentPreferences,
+    );
   }
 }
