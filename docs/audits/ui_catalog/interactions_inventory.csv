@@ -1,0 +1,61 @@
+interaction_id,view_id_source,élément,action,view_id_destination,méthode,rôles,permission,confirmation,retour_possible,commentaire
+I001,V001,bootstrap,redirection auth,V002 ou V013,context.go,tous,session,non,non,Etat session
+I002,V002,bouton connexion,submit,V013,_login,tous,auth valide,non,non,Erreur credentials et loading a tester
+I003,V002,mot de passe oublié,ouvrir,V003,showDialog,tous,aucune,non,oui,OTP reset
+I004,V002,compte enacteur,ouvrir,V004,showModalBottomSheet,public,aucune,non,oui,Join request membre
+I005,V002,compte alumni,ouvrir,V004,showModalBottomSheet,public,aucune,non,oui,Join request alumni
+I006,V002,postuler,ouvrir,V005,showDialog,public,campagne active,non,oui,Route formulaire indirecte
+I007,V002,suivi candidature,naviguer,V008,context.go,public,aucune,non,oui,URL directe possible
+I008,V002,guide débutant,ouvrir,V006,showDialog,tous,aucune,non,oui,Onboarding
+I009,V002,biométrie,ouvrir,V007,showDialog,tous,appareil,non,oui,Permission native
+I010,V008,afficher suivi,submit,V009,_track,candidat,code email,non,oui,Statut candidature
+I011,V010,item menu,naviguer,V013 à V066,context.go,selon role,visibleRoutesFor,non,oui,Desktop
+I012,V012,destination mobile,naviguer,V013 à V066,context.go,selon role,visibleRoutesFor,non,oui,Maximum cinq destinations
+I013,V011,icône notification,naviguer,V046,context.go,tous connectes,route visible,non,oui,Badge shell
+I014,V011,déconnexion,confirmer,V002,_logout,tous connectes,session,non,non,Confirmation runtime a verifier
+I015,V013,action hero Chat,naviguer,V042,context.go,tous connectes,route visible,non,oui,Dashboard
+I016,V013,carte métrique,naviguer,module cible,context.go,selon role,route visible,non,oui,Routes data-driven
+I017,V017,ligne membre,ouvrir,V018,local sheet/dialog,roles membres,canViewMembersDirectory,non,oui,Detail profil
+I018,V017,action lifecycle,ouvrir,V019,showDialog,manage members,canManageMembers,oui,oui,Desactivation suppression role
+I019,V017,import,ouvrir,V020,showModalBottomSheet,manage members,canManageMembers,non,oui,FilePicker CSV
+I020,V021,session,ouvrir,V023,Navigator.push,roles presence,scope session,non,oui,Detail non URL
+I021,V021,créer/modifier,ouvrir,V022,showDialog,manage attendance,canManageAttendance,non,oui,Date time pickers
+I022,V021,QR scanner,naviguer,V024,Navigator route,roles presence,attendance access,non,oui,Camera
+I023,V021,NFC,naviguer,V025,Navigator route,roles presence,attendance access,non,oui,Device native
+I024,V023,ajouter attendu,ouvrir,sélecteur membre,showDialog,roles presence,scope session,non,oui,Local dialog
+I025,V023,clôturer session,confirmer,V023,showDialog,manage attendance,canManageAttendance,oui,oui,Destructive
+I026,V027,créer/modifier,ouvrir,V028,showDialog,create tasks,canCreateTasks,non,oui,Form task
+I027,V027,carte tâche,ouvrir,V029,local action,tous non alumni,task scope,non,oui,Detail/actions
+I028,V030,payer mobile,ouvrir,V031,showModalBottomSheet,membre eligible,payment access,non,oui,Provider test disabled expected
+I029,V030,créer frais,ouvrir,V032,showDialog,finance,canManageFinance,non,oui,Cotisation/amende
+I030,V030,valider/refuser,confirmer,V030,showDialog,finance,canManageFinance,oui,oui,Payment state
+I031,V033,déposer,ouvrir,V034,showDialog,authorized uploader,document access,non,oui,FilePicker
+I032,V033,menu document,ouvrir,V035,PopupMenuButton,document viewer,document permission,oui,oui,Preview/share/delete
+I033,V036,nouvelle campagne,ouvrir,formulaire campagne,showDialog,manage recruitment,recruitment lead,non,oui,Date picker
+I034,V036,candidature,ouvrir,détail candidat,showDialog,recruitment roles,review permission,non,oui,Profile attachments
+I035,V036,évaluer/décider,ouvrir,V038,showDialog,recruitment roles,review permission,oui,oui,Decision state
+I036,V037,soumettre candidature,submit,confirmation candidature,local form,candidat,campaign open,non,oui,Attachments and duplicate
+I037,V039,composer,submit,V039,_createPost,authorized poster,post create,non,non,Media upload
+I038,V039,commentaires,expand,V041,local state,tous connectes,post access,non,oui,Loads comments lazily
+I039,V039,réaction,submit,V039,service action,tous connectes,post access,non,non,Repeated action
+I040,V039,supprimer post,confirmer,V039,showDialog,author/moderator,ownership,oui,oui,Destructive
+I041,V042,conversation,select,V043,setState,tous connectes,participant,non,oui,Responsive master/detail
+I042,V042,nouvelle discussion,ouvrir,V045,showDialog,tous connectes,thread create,non,oui,Private/group scope
+I043,V043,long press message,ouvrir,V044,showModalBottomSheet,participant,message policy,non,oui,Reply/react/pin/delete
+I044,V043,pièce jointe,ouvrir,file picker,V043,FilePicker,participant,attachment policy,non,oui,Size/error states
+I045,V043,info groupe,ouvrir,panneau info,showDialog,participant/group admin,group policy,non,oui,Members/admin actions
+I046,V046,notification,tap,target route,context.go,tous connectes,target access,non,oui,Deleted target possible
+I047,V046,tout marquer lu,submit,V046,service action,tous connectes,own notifications,non,non,Repeated action
+I048,V048,pole,ouvrir,V049,showModalBottomSheet,enacchef,pole scope,non,oui,Detail
+I049,V048,créer/modifier,ouvrir,V050,showModalBottomSheet,managers,pole manage,non,oui,Form and archive
+I050,V051,projet,ouvrir,V052,showModalBottomSheet,enacchef,project scope,non,oui,Detail
+I051,V051,créer/modifier,ouvrir,V053,showModalBottomSheet,managers,project manage,non,oui,Form dates/budget
+I052,V054,événement,ouvrir,V055,showDialog,tous,event access,non,oui,Participants
+I053,V054,créer/modifier,ouvrir,V056,showModalBottomSheet,authorized runtime,event manage,non,oui,Date/time picker
+I054,V055,annuler,confirmer,V055,showDialog,event manager,event manage,oui,oui,Destructive
+I055,V057,onglet mentorat,select,V058,TabBar,alumni access,alumni route,non,oui,Explicit tab
+I056,V057,demande mentorat,ouvrir,formulaire mentorat,showModalBottomSheet,alumni,mentorship policy,non,oui,Form
+I057,V059,attribuer points,ouvrir,V060,showDialog,managers,canManageGamification,non,oui,Member/pole filter
+I058,V061,cours/cas,ouvrir,V062,showModalBottomSheet,tous connectes,course access,non,oui,Progress/favorite
+I059,V063,filtrer période,ouvrir,V064,showModalBottomSheet,enacchef,canViewImpact,non,oui,Period project comparison
+I060,V065,archive,ouvrir,V066,showModalBottomSheet,tous connectes,archive visibility,non,oui,Media/story

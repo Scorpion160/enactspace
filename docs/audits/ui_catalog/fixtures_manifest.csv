@@ -1,0 +1,22 @@
+fixture_id,domain,target_count,deterministic_cases,relationships,local_only,status
+FX01,users,50,35 active 5 inactive 10 alumni long names incomplete profiles photos and no photos multi-role and former roles,all domains reference synthetic users,yes,planned
+FX02,roles,11,admin teamleader secretary finance polelead poledeputy projectlead member alumni candidate multirole,users and permissions,yes,planned
+FX03,poles,7,leader deputy missing deputy empty pole dense pole,users projects tasks documents events,yes,planned
+FX04,projects,8,active suspended completed missing leader no impact dense budget dense documents,poles users tasks documents events impact,yes,planned
+FX05,tasks,50,todo in progress completed overdue blocked varied priority,users poles projects comments checklist,yes,planned
+FX06,attendance_sessions,20,planned open closed QR NFC delay and justified absence,users events poles projects records,yes,planned
+FX07,attendance_records,300,present absent late pending approved refused justification,users sessions files fees,yes,planned
+FX08,finance,100,40 fees 20 fines 40 payments pending validated rejected zero low high values,users files accounts transactions,yes,planned
+FX09,recruitment,34,4 campaign states and 30 applications accepted rejected pending incomplete,campaigns reviewers candidates,yes,planned
+FX10,posts,30,text image multi-image official pole project long content,users poles projects comments reactions,yes,planned
+FX11,chat,10,private group empty pinned media reply reaction failure fixture,users participants messages,yes,planned
+FX12,chat_messages,100,text image file reply reaction long and failed send fixture,threads users local fake media,yes,planned
+FX13,notifications,30,read unread expired valid target deleted target,users all domain targets,yes,planned
+FX14,documents,30,pdf image spreadsheet document link private public invalid missing thumbnail,users poles projects events stored files,yes,planned
+FX15,events,10,future past full cancelled registered and empty,event participants attendance documents,yes,planned
+FX16,academy,15,category completed not started unavailable partial progression,users poles projects lessons quizzes,yes,planned
+FX17,impact,8,global project full partial empty high positive negative evolution,projects users evidence metrics,yes,planned
+FX18,archives,5,years former offices leaders projects awards photos long and short stories,documents stored files hall of fame,yes,planned
+FX19,gamification,40,points badges leaderboard empty member attribution,users season poles projects,yes,planned
+FX20,local_media,12,placeholder pdf png jpg xlsx docx invalid extension missing file,stored files uploads only,yes,planned
+FX21,external_failure_profiles,10,offline timeout server error realtime failure QR NFC and payment mock only,intercepted local responses no external calls,yes,planned

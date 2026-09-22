@@ -1,0 +1,13 @@
+preflight_id,scenario_driver,runtime_ready,locator_strategy,interaction_contract,subview_required
+PF01,preflight_login_public_mobile,true,semantic text and input labels,open /login and assert two form inputs,false
+PF02,preflight_login_public_desktop,true,semantic text and input labels,open /login and assert two form inputs,false
+PF03,preflight_invalid_login,true,semantic inputs plus submit button,submit invalid credentials and assert the real 401 response,false
+PF04,preflight_member_shell_mobile,true,semantic navigation label Chat,open mobile navigation and activate Chat action,false
+PF05,preflight_admin_shell_desktop,true,semantic navigation label Membres,open desktop navigation and activate Membres action,false
+PF06,preflight_admin_dashboard_dense,true,semantic dashboard headings,wait for the dense dashboard markers,false
+PF07,preflight_member_dashboard_mobile,true,semantic my-space action,activate member workspace action,false
+PF08,preflight_member_profile_tablet,true,semantic text Audit MultiRole,open profile sheet and assert close action,true
+PF09,preflight_attendance_open_tablet,true,management tab then semantic session card,open the actual attendance session MaterialPageRoute,true
+PF10,preflight_payment_pending_actions_desktop,true,semantic finance search and payment action menu,open and dismiss the rejection dialog,true
+PF11,preflight_chat_conversation_mobile,true,semantic text Conversation audit 7,open message-bearing conversation and focus composer,true
+PF12,preflight_archive_project_detail_desktop,true,semantic archive search and project card,open historical project detail and assert close action,true

@@ -1,0 +1,22 @@
+{
+  "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+  "run_started_at": "2026-08-02T12:43:03Z",
+  "reference_commit": "7f0a9fd5ade92c1fbe88e9316016fab299c0005a",
+  "build_hash": "FBDFD7E496163918A9032BE0A1012F2F41DC9A3DD2C4374F4FC0BC6D0002A7E6",
+  "runner_sha256": "2c54a3aa740783afc1a054f66f6b4a13662b07acc8ef2299563be0a1b4b48b93",
+  "preflight_plan_sha256": "52041427ae76766917bf0b43a2b2971699e688fd78540841d38e9a371c5337f7",
+  "preflight_drivers_sha256": "76987f00410c49a77ac0a1076a21f6ced837520283f764d966b080598a0466c9",
+  "build_manifest_sha256": "128bea2bff0f9123673905e55d1d2dc95ee94b75e09212631c9fea017cd46e85",
+  "url_strategy": "hash_strategy",
+  "number_of_scenarios": 12,
+  "capture_enabled": false,
+  "screenshot_method_present": false,
+  "output_files": [
+    "docs/audits/ui_catalog/preflight_contract_results.csv",
+    "docs/audits/ui_catalog/preflight_results.csv",
+    "docs/audits/ui_catalog/external_requests.csv",
+    "docs/audits/ui_catalog/preflight_locator_trace.json",
+    "docs/audits/ui_catalog/preflight_surface_trace.json",
+    "docs/audits/ui_catalog/preflight_console_events.csv"
+  ]
+}

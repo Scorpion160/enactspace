@@ -1,0 +1,24 @@
+route_id,route,nom,fichier,widget,public,roles,redirection,ecran_parent,acces_direct,commentaire
+R01,/splash,Splash,frontend/lib/features/splash/screens/splash_screen.dart,SplashScreen,oui,tous,vers login ou dashboard,root,oui,Etat de session requis
+R02,/login,Connexion,frontend/lib/features/auth/screens/login_screen.dart,LoginScreen,oui,tous,vers dashboard apres login,root,oui,Inclut compte, recrutement, guide et biometrie
+R03,/application-tracking,Suivi candidature,frontend/lib/features/recruitment/screens/application_tracking_screen.dart,ApplicationTrackingScreen,oui,candidat,retour login,root,oui,Pas de session necessaire
+R04,/dashboard,Tableau de bord,frontend/lib/features/dashboard/screens/dashboard_screen.dart,DashboardScreen,non,tous connectes,login si non connecte,AppShell,oui,Contenu et titre par role
+R05,/members,Membres,frontend/lib/features/members/screens/members_screen.dart,MembersScreen,non,admin|team_leader|secretary|pole_lead|pole_deputy|project_lead,login ou dashboard,AppShell,oui,Acces route filtre par UserExperience
+R06,/attendance,Presences,frontend/lib/features/attendance/screens/attendance_screen.dart,AttendanceScreen,non,admin|team_leader|secretary|pole_lead|pole_deputy|project_lead,login ou dashboard,AppShell,oui,Sous-routes QR et NFC
+R07,/attendance/scan,Scanner QR,frontend/lib/features/attendance/screens/attendance_qr_scanner_screen.dart,AttendanceQrScannerScreen,non,roles presence,login ou dashboard,AppShell,oui,Camera et permissions a tester
+R08,/attendance/nfc,Enrolement NFC,frontend/lib/features/attendance/screens/attendance_nfc_enrollment_screen.dart,AttendanceNfcEnrollmentScreen,non,roles presence,login ou dashboard,AppShell,oui,Capacite appareil a tester
+R09,/tasks,Taches,frontend/lib/features/tasks/screens/tasks_screen.dart,TasksScreen,non,tous non alumni,login ou dashboard,AppShell,oui,Creation restreinte
+R10,/finance,Finance,frontend/lib/features/finance/screens/finance_screen.dart,FinanceScreen,non,admin|team_leader|finance,login ou dashboard,AppShell,oui,Actions sensibles
+R11,/recruitment,Recrutement,frontend/lib/features/recruitment/screens/recruitment_screen.dart,RecruitmentScreen,non,admin|team_leader|secretary|recruitment_lead|enacchef,login ou dashboard,AppShell,oui,Formulaire public ouvert indirectement depuis login
+R12,/documents,Documents,frontend/lib/features/documents/screens/documents_screen.dart,DocumentsScreen,non,tous non alumni,login ou dashboard,AppShell,oui,Depot et permissions a tester
+R13,/notifications,Notifications,frontend/lib/features/notifications/screens/notifications_screen.dart,NotificationsScreen,non,tous connectes,login ou dashboard,AppShell,oui,Ouverture cible via routePath
+R14,/posts,Communication,frontend/lib/features/posts/screens/posts_screen.dart,PostsScreen,non,tous connectes,login ou dashboard,AppShell,oui,Publication selon droits
+R15,/chat,Chat,frontend/lib/features/chat/screens/chat_screen.dart,ChatScreen,non,tous connectes,login ou dashboard,AppShell,oui,Query thread possible
+R16,/poles,Poles,frontend/lib/features/poles/screens/poles_screen.dart,PolesScreen,non,enacchef,login ou dashboard,AppShell,oui,Creation et detail locaux
+R17,/projects,Projets,frontend/lib/features/projects/screens/projects_screen.dart,ProjectsScreen,non,enacchef,login ou dashboard,AppShell,oui,Creation et detail locaux
+R18,/events,Evenements,frontend/lib/features/events/screens/events_screen.dart,EventsScreen,non,tous connectes,login ou dashboard,AppShell,oui,Creation selon permissions runtime
+R19,/alumni,Alumni,frontend/lib/features/alumni/screens/alumni_screen.dart,AlumniScreen,non,alumni|admin|team_leader|secretary|pole_lead|pole_deputy|project_lead,login ou dashboard,AppShell,oui,Contenu differencie a tester
+R20,/gamification,Gamification,frontend/lib/features/gamification/screens/gamification_screen.dart,GamificationScreen,non,tous non alumni,login ou dashboard,AppShell,oui,Attribution reservee
+R21,/academy,Academy,frontend/lib/features/academy/screens/academy_home_screen.dart,AcademyHomeScreen,non,tous connectes,login ou dashboard,AppShell,oui,Cours et cas locaux
+R22,/archives,Archives,frontend/lib/features/archives/screens/archives_screen.dart,ArchivesScreen,non,tous connectes,login ou dashboard,AppShell,oui,Hall of Fame inclus sans route propre
+R23,/impact,Impact,frontend/lib/features/impact/screens/impact_dashboard_screen.dart,ImpactDashboardScreen,non,enacchef,login ou dashboard,AppShell,oui,Indicateurs et classement
