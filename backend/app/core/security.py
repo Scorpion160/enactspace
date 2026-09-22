@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -18,7 +19,11 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return pwd_context.verify(plain_password, password_hash)
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+    session_id: str | None = None,
+) -> str:
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
@@ -27,7 +32,10 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     payload = {
         "sub": subject,
         "exp": expire,
+        "jti": secrets.token_urlsafe(16),
     }
+    if session_id:
+        payload["sid"] = session_id
 
     return jwt.encode(
         payload,
@@ -37,12 +45,16 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 
 
 def decode_access_token(token: str) -> Optional[str]:
+    payload = decode_access_token_payload(token)
+    return payload.get("sub") if payload else None
+
+
+def decode_access_token_payload(token: str) -> dict | None:
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             settings.signing_secret,
             algorithms=[settings.ALGORITHM],
         )
-        return payload.get("sub")
     except JWTError:
         return None

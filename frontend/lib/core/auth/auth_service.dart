@@ -1,20 +1,24 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
+import 'auth_storage.dart';
 
 class AuthService {
-  static const String _tokenKey = 'enactspace_token';
-  static const String _userKey = 'enactspace_current_user';
+  static final AuthStorage _defaultStorage = AuthStorage.instance;
 
   final ApiClient _apiClient;
+  final AuthStorage _authStorage;
 
-  AuthService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  AuthService({ApiClient? apiClient, AuthStorage? authStorage})
+    : _apiClient =
+          apiClient ?? ApiClient(authStorage: authStorage ?? _defaultStorage),
+      _authStorage = authStorage ?? apiClient?.authStorage ?? _defaultStorage;
 
   Future<String> login({
     required String email,
     required String password,
   }) async {
+    final generation = _authStorage.generation;
     final data = await _apiClient.postForm(
       '/auth/token',
       data: {'username': email, 'password': password},
@@ -26,11 +30,18 @@ class AuthService {
       throw Exception('Token non reçu depuis le serveur.');
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token.toString());
+    await _authStorage.writeTokenPair(
+      AuthTokens(
+        accessToken: token.toString(),
+        refreshToken: data['refresh_token'] as String?,
+      ),
+      expectedGeneration: generation,
+    );
 
     try {
       await getCurrentUser();
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
     } catch (_) {
       // The token is enough to enter the app; navigation can refresh the
       // profile again once the shell is mounted.
@@ -40,8 +51,7 @@ class AuthService {
   }
 
   Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    return _authStorage.readAccessToken();
   }
 
   Future<String?> requestPasswordResetOtp({required String email}) async {
@@ -118,46 +128,78 @@ class AuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    final token = await getToken();
-    return token != null && token.isNotEmpty;
+    final pair = await _authStorage.readTokenPair();
+    return pair != null &&
+        (pair.accessToken.isNotEmpty ||
+            (pair.refreshToken?.isNotEmpty ?? false));
+  }
+
+  Future<bool> restoreSession() async {
+    if (!await isLoggedIn()) return false;
+    try {
+      await getCurrentUser();
+      return true;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) return false;
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getCurrentUser() async {
-    final token = await getToken();
-
-    if (token == null) {
-      throw Exception('Utilisateur non connecté.');
-    }
-
+    final generation = _authStorage.generation;
     try {
+      final token =
+          await getToken() ??
+          await _apiClient.refreshSession(expectedGeneration: generation);
       final user = await _apiClient.get('/users/me', token: token);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_userKey, jsonEncode(user));
+      if (generation != _authStorage.generation) {
+        throw ApiException(
+          statusCode: 401,
+          message: 'Session expirée. Reconnectez-vous.',
+        );
+      }
+      await _authStorage.writeCurrentUser(
+        jsonEncode(user),
+        expectedGeneration: generation,
+      );
       return user;
     } on ApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 403) {
-        await logout();
+        await _authStorage.clearAuthSecrets(expectedGeneration: generation);
       }
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>?> getCachedCurrentUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_userKey);
+  static Future<Map<String, dynamic>?> readCachedCurrentUser() async {
+    final value = await _defaultStorage.readCurrentUser();
     if (value == null || value.isEmpty) return null;
 
     try {
       final decoded = jsonDecode(value);
       return decoded is Map<String, dynamic> ? decoded : null;
     } catch (_) {
-      await prefs.remove(_userKey);
+      await _defaultStorage.deleteCurrentUser();
       return null;
     }
   }
 
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await Future.wait([prefs.remove(_tokenKey), prefs.remove(_userKey)]);
+  Future<Map<String, dynamic>?> getCachedCurrentUser() =>
+      _readCachedCurrentUser();
+
+  Future<Map<String, dynamic>?> _readCachedCurrentUser() async {
+    final value = await _authStorage.readCurrentUser();
+    if (value == null || value.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(value);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      await _authStorage.deleteCurrentUser();
+      return null;
+    }
   }
+
+  Future<void> logout() => _apiClient.logoutSession();
+
+  Future<void> logoutAll() => _apiClient.logoutSession(all: true);
 }

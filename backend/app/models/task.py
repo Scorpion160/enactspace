@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     String,
     Text,
     DateTime,
@@ -11,7 +12,7 @@ from sqlalchemy import (
 )
 
 from app.db.types import GUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.db.database import Base
 
@@ -73,6 +74,17 @@ class Task(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    @validates("status")
+    def normalize_status(self, _key, value):
+        return "termine" if value in {"completed", "done"} else value
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('a_faire','en_cours','bloque','termine','valide','annule')",
+            name="ck_tasks_status",
+        ),
+    )
 
 
 class TaskAssignee(Base):

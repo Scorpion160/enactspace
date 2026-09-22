@@ -102,19 +102,21 @@ class PostModel {
   String get visibilityLabel {
     switch (visibility) {
       case 'public_club':
-        return 'Club';
+        return 'Tout le club';
+      case 'internal':
+        return 'Membres';
       case 'pole_only':
-        return 'Pôle';
+        return poleId == null ? 'Mon pôle' : 'Pôle sélectionné';
       case 'project_only':
-        return 'Projet';
+        return 'Projet sélectionné';
       case 'enacchef_only':
-        return 'Bureau';
+        return 'Responsables';
       case 'alumni_only':
         return 'Alumni';
       case 'private':
         return 'Privé';
       default:
-        return 'Interne';
+        return 'Membres';
     }
   }
 

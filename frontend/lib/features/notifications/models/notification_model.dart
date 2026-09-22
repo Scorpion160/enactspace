@@ -1,3 +1,6 @@
+import 'notification_presentation.dart';
+import '../../../core/push/push_navigation_resolver.dart';
+
 class NotificationModel {
   final String id;
   final String userId;
@@ -38,7 +41,11 @@ class NotificationModel {
     );
   }
 
-  NotificationModel copyWith({bool? isRead, String? readAt}) {
+  NotificationModel copyWith({
+    bool? isRead,
+    String? readAt,
+    bool clearReadAt = false,
+  }) {
     return NotificationModel(
       id: id,
       userId: userId,
@@ -48,95 +55,24 @@ class NotificationModel {
       isRead: isRead ?? this.isRead,
       relatedType: relatedType,
       relatedId: relatedId,
-      readAt: readAt ?? this.readAt,
+      readAt: clearReadAt ? null : readAt ?? this.readAt,
       createdAt: createdAt,
     );
   }
 
   String? get routePath {
-    final source =
-        (relatedType == null || relatedType!.isEmpty ? type : relatedType!)
-            .toLowerCase();
-
-    if (type == 'chat_message' && relatedId != null && relatedId!.isNotEmpty) {
-      return '/chat?thread=${Uri.encodeComponent(relatedId!)}';
-    }
-    if (source.contains('task')) return '/tasks';
-    if (source.contains('attendance') || source.contains('presence')) {
-      return '/attendance';
-    }
-    if (source.contains('absence')) return '/attendance';
-    if (source.contains('payment') ||
-        source.contains('finance') ||
-        source.contains('fee')) {
-      return '/finance';
-    }
-    if (source.contains('document')) return '/documents';
-    if (source.contains('recruitment') || source.contains('application')) {
-      return '/recruitment';
-    }
-    if (source.contains('post') || source.contains('communication')) {
-      return '/posts';
-    }
-    if (source.contains('announcement')) return '/posts';
-    if (source.contains('chat') || source.contains('message')) return '/chat';
-    if (source.contains('event')) return '/events';
-    if (source.contains('project')) return '/projects';
-    if (source.contains('pole')) return '/poles';
-
-    return null;
+    return PushNavigationResolver.resolve(
+      type: type,
+      relatedType: relatedType,
+      relatedId: relatedId,
+    );
   }
 
   String get typeLabel {
-    switch (type) {
-      case 'task_assigned':
-        return 'Tâche assignée';
-      case 'deadline_near':
-        return 'Échéance proche';
-      case 'task_late':
-        return 'Tache en retard';
-      case 'new_announcement':
-        return 'Annonce';
-      case 'event_scheduled':
-        return 'Evenement';
-      case 'absence_recorded':
-        return 'Absence';
-      case 'fee_due':
-        return 'Cotisation';
-      case 'payment_validated':
-        return 'Paiement valide';
-      case 'payment_submitted':
-        return 'Paiement à vérifier';
-      case 'application_received':
-        return 'Candidature recue';
-      case 'recruitment_update':
-        return 'Recrutement';
-      case 'document_shared':
-        return 'Document partage';
-      case 'mentorship_assigned':
-        return 'Mentorat';
-      case 'chat_message':
-        return 'Nouveau message';
-      case 'post_comment':
-        return 'Nouveau commentaire';
-      case 'post_reaction':
-        return 'Nouvelle réaction';
-      case 'post_mention':
-        return 'Mention';
-      case 'attendance':
-        return 'Présence';
-      case 'payment':
-        return 'Paiement';
-      case 'document':
-        return 'Document';
-      case 'recruitment':
-        return 'Recrutement';
-      case 'system':
-        return 'Système';
-      default:
-        return type;
-    }
+    return notificationPresentation(type).label;
   }
+
+  NotificationFamily get family => notificationPresentation(type).family;
 
   String get createdAtLabel {
     if (createdAt == null || createdAt!.isEmpty) return 'Date inconnue';

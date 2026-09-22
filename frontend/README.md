@@ -1,17 +1,19 @@
-# frontend
+# EnactSpace Flutter client
 
-A new Flutter project.
+This directory contains the EnactSpace Flutter client.
 
-## Getting Started
+- Release target: `1.0.0+1`
+- Application/bundle identifier: `sn.enactusesp.enactspace`
+- Validated toolchain: Flutter `3.44.9` stable
 
-This project is a starting point for a Flutter application.
+## Maintainer references
 
-A few resources to get you started if this is your first Flutter project:
+- [Repository overview](../README.md)
+- [Development guide](../docs/DEVELOPMENT.md)
+- [Test matrix](../docs/TEST_MATRIX.md)
+- [Mobile release and push](../docs/MOBILE_RELEASE_AND_PUSH.md)
+- [Release checklist](../docs/RELEASE_CHECKLIST.md)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+`pubspec.lock` is authoritative for resolved Flutter and Dart dependencies.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Release API URLs must use HTTPS and be explicitly authorized. Android debug builds are validation artifacts only. Android and iOS release signing and physical-device push tests remain external release gates; use the canonical documents above for the maintained process.

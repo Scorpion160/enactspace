@@ -1,0 +1,47 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/notification_renvoi_data.tex}
+\begin{document}
+\NoticeHeader{\IssuingScope}
+\begin{flushright}Dakar, le \textbf{\LetterDate}\end{flushright}
+\vspace{2mm}
+\begin{center}
+{\LARGE\bfseries Notification officielle de renvoi}\\[1mm]
+{\large\color{EnactusGray}Retrait de la liste des membres actifs du Club Enactus ESP}
+\end{center}
+\vspace{3mm}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{35mm}Y@{}}
+Référence & \DocReference\\
+Destinataire & \MemberName\\
+Fonction / rattachement & \MemberRole\\
+Émetteur & \IssuingScope{} -- Club Enactus ESP\\
+Instance de décision & \DecisionBody\\
+Date de décision & \DecisionDate\\
+Objet & \NotificationObject
+\end{tabularx}
+\vspace{3mm}
+
+Bonjour \textbf{\MemberFirstName},
+
+Nous espérons que tu vas bien.
+
+\justifying
+\Facts
+
+L'appartenance au Club Enactus ESP implique une présence régulière, une implication minimale dans les activités et une disponibilité à contribuer aux actions collectives. Lorsque ces éléments ne sont plus observés sur une période prolongée, il devient difficile de maintenir le membre concerné dans l'effectif actif.
+
+Compte tenu de ces constats, nous sommes au regret de t'informer que ton statut de membre actif au sein du Club Enactus ESP prend fin à compter du \textbf{\EffectiveDate}.
+
+\InfoBand{Éléments de procédure et suites administratives}
+\ProcedureDetails
+
+\AppreciationText
+
+Nous te remercions pour le temps que tu as accordé à Enactus ESP et te souhaitons une très bonne continuation dans tes projets personnels, académiques et professionnels.
+
+\SignaturePair{\IssuerLabel}{\IssuerName}{\IssuerRole}{\ApprovalLabel}{\ApprovalName}{\ApprovalRole}
+
+\vfill
+{\footnotesize\color{EnactusGray}\textbf{NB :} \AdministrativeNote}
+\end{document}

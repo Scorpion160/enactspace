@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/impact_models.dart';
-import '../services/impact_service.dart';
+import '../services/impact_gateway.dart';
 
 class ImpactDashboardScreen extends StatefulWidget {
-  const ImpactDashboardScreen({super.key});
+  final ImpactGateway? gateway;
+  const ImpactDashboardScreen({super.key, this.gateway});
 
   @override
   State<ImpactDashboardScreen> createState() => _ImpactDashboardScreenState();
 }
 
 class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
-  final ImpactService _service = ImpactService();
+  late final ImpactGateway _gateway;
 
   bool _loading = true;
   String? _error;
@@ -21,6 +23,7 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiImpactGateway();
     _loadImpact();
   }
 
@@ -31,7 +34,7 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
     });
 
     try {
-      final data = await _service.getDashboard();
+      final data = await _gateway.loadDashboard();
       if (!mounted) return;
       setState(() => _data = data);
     } catch (e) {
@@ -50,6 +53,15 @@ class _ImpactDashboardScreenState extends State<ImpactDashboardScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const _ImpactHeader(),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: () => context.go('/impact/records', extra: _gateway),
+              icon: const Icon(Icons.fact_check_rounded),
+              label: const Text('Gérer les fiches Impact'),
+            ),
+          ),
           const SizedBox(height: 18),
           if (_loading)
             const Center(
@@ -207,39 +219,37 @@ class _ImpactContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (data.usesDemoData) ...[
-          const _DemoDataNotice(),
-          const SizedBox(height: 16),
-        ],
         _OrganizationScoreCard(organization: organization),
         const SizedBox(height: 16),
-        _HistoricalImpactSection(impact: data.historicalImpact),
-        const SizedBox(height: 22),
+        if (data.historicalImpact != null) ...[
+          _HistoricalImpactSection(impact: data.historicalImpact!),
+          const SizedBox(height: 22),
+        ],
         _KpiGrid(
           items: [
             _KpiItem(
               label: 'Impact direct',
-              value: organization.directImpactTotal.toString(),
+              value: impactNumber(organization.directImpactTotal),
               icon: Icons.volunteer_activism_rounded,
             ),
             _KpiItem(
               label: 'Impact indirect',
-              value: organization.indirectImpactTotal.toString(),
+              value: impactNumber(organization.indirectImpactTotal),
               icon: Icons.groups_2_rounded,
             ),
             _KpiItem(
               label: 'Reach total',
-              value: organization.reachTotal.toString(),
+              value: impactNumber(organization.reachTotal),
               icon: Icons.public_rounded,
             ),
             _KpiItem(
               label: 'Vies impactees',
-              value: organization.livesImpactedTotal.toString(),
+              value: impactNumber(organization.livesImpactedTotal),
               icon: Icons.favorite_rounded,
             ),
             _KpiItem(
               label: 'Emplois crees',
-              value: organization.jobsCreatedTotal.toString(),
+              value: impactNumber(organization.jobsCreatedTotal),
               icon: Icons.work_rounded,
             ),
             _KpiItem(
@@ -254,7 +264,7 @@ class _ImpactContent extends StatelessWidget {
             ),
             _KpiItem(
               label: 'Arbres plantes',
-              value: organization.treesPlantedTotal.toString(),
+              value: impactNumber(organization.treesPlantedTotal),
               icon: Icons.park_rounded,
             ),
             _KpiItem(
@@ -264,21 +274,23 @@ class _ImpactContent extends StatelessWidget {
             ),
             _KpiItem(
               label: 'ODD touches',
-              value: organization.touchedSdgs.toString(),
+              value: impactNumber(organization.touchedSdgs),
               icon: Icons.hub_rounded,
             ),
             _KpiItem(
               label: 'Academy',
-              value: '${organization.academyParticipation.toStringAsFixed(0)}%',
+              value: organization.academyParticipation == null
+                  ? 'Non renseigné'
+                  : '${organization.academyParticipation!.toStringAsFixed(0)}%',
               icon: Icons.school_rounded,
             ),
           ],
         ),
         const SizedBox(height: 22),
         _SectionTitle(
-          title: 'Top projets par impact',
+          title: 'Projets et données d’impact',
           subtitle:
-              'Score indicatif /100 basé sur impact, preuves, ODD, innovation et viabilité.',
+              'Seules les déclarations mesurées et vérifiées alimentent les totaux réalisés.',
         ),
         const SizedBox(height: 12),
         _ProjectImpactList(projects: data.projects),
@@ -313,36 +325,6 @@ class _ImpactContent extends StatelessWidget {
   }
 }
 
-class _DemoDataNotice extends StatelessWidget {
-  const _DemoDataNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.42),
-        ),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: AppTheme.softBlack),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Données de démonstration affichées. Le module basculera automatiquement sur les données backend dès qu’elles seront disponibles.',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _OrganizationScoreCard extends StatelessWidget {
   final OrganizationPerformanceModel organization;
 
@@ -360,18 +342,18 @@ class _OrganizationScoreCard extends StatelessWidget {
             final wide = constraints.maxWidth >= 680;
             final scoreWidget = _RadialScore(
               score: score,
-              label: 'Organization Health',
+              label: 'Santé opérationnelle',
             );
             final copy = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Santé globale Enactus ESP',
+                  'Santé opérationnelle Enactus ESP',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Un score de pilotage qui combine présence, rétention, avancement, impact, preuves, Academy, communication et finance.',
+                  'Indicateur de pilotage opérationnel. Il ne constitue pas une mesure d’impact.',
                   style: TextStyle(color: Colors.black54, height: 1.4),
                 ),
                 const SizedBox(height: 14),
@@ -389,11 +371,12 @@ class _OrganizationScoreCard extends StatelessWidget {
                         '${organization.activeProjects} projets actifs',
                       ),
                     ),
-                    Chip(
-                      label: Text(
-                        '${organization.competitionReadiness.toStringAsFixed(0)}% compétition',
+                    if (organization.competitionReadiness != null)
+                      Chip(
+                        label: Text(
+                          '${organization.competitionReadiness!.toStringAsFixed(0)}% préparation compétition',
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -609,14 +592,14 @@ class _HistoricalPillar extends StatelessWidget {
 }
 
 class _RadialScore extends StatelessWidget {
-  final double score;
+  final double? score;
   final String label;
 
   const _RadialScore({required this.score, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final normalized = (score / 100).clamp(0.0, 1.0);
+    final normalized = ((score ?? 0) / 100).clamp(0.0, 1.0);
 
     return SizedBox(
       width: 150,
@@ -638,7 +621,7 @@ class _RadialScore extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                score.toStringAsFixed(0),
+                score?.toStringAsFixed(0) ?? '—',
                 style: const TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.w900,
@@ -783,7 +766,7 @@ class _ProjectImpactList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sorted = [...projects]
-      ..sort((a, b) => b.projectImpactScore.compareTo(a.projectImpactScore));
+      ..sort((a, b) => a.projectName.compareTo(b.projectName));
 
     return Column(
       children: [
@@ -815,7 +798,7 @@ class _ProjectImpactCard extends StatelessWidget {
               final wide = constraints.maxWidth >= 760;
               final score = _RadialScore(
                 score: project.projectImpactScore,
-                label: 'Project Impact',
+                label: 'Score d’impact',
               );
               final details = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,14 +838,28 @@ class _ProjectImpactCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      Chip(label: Text('${project.directImpact} direct')),
-                      Chip(label: Text('${project.indirectImpact} indirect')),
-                      Chip(label: Text('${project.reach} reach')),
-                      if (project.jobsCreated > 0)
+                      Chip(
+                        label: Text(
+                          '${impactNumber(project.directImpact)} direct',
+                        ),
+                      ),
+                      Chip(
+                        label: Text(
+                          '${impactNumber(project.indirectImpact)} indirect',
+                        ),
+                      ),
+                      Chip(label: Text('${impactNumber(project.reach)} reach')),
+                      if ((project.jobsCreated ?? 0) > 0)
                         Chip(label: Text('${project.jobsCreated} emplois')),
-                      if (project.livesImpacted > 0)
+                      if ((project.livesImpacted ?? 0) > 0)
                         Chip(label: Text('${project.livesImpacted} vies')),
                       Chip(label: Text('${project.evidenceCount} preuves')),
+                      for (final claim in project.claims)
+                        Chip(
+                          label: Text(
+                            '${claim.claimTypeLabel} · ${claim.validationLabel}',
+                          ),
+                        ),
                       for (final sdg in project.sdgs) Chip(label: Text(sdg)),
                       if (project.sdgs.isEmpty)
                         const Chip(label: Text('ODD à définir')),
@@ -987,23 +984,23 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                     final wide = constraints.maxWidth >= 760;
                     final score = _RadialScore(
                       score: project.projectImpactScore,
-                      label: 'Impact',
+                      label: 'Score d’impact',
                     );
                     final metrics = _KpiGrid(
                       items: [
                         _KpiItem(
                           label: 'Impact direct',
-                          value: project.directImpact.toString(),
+                          value: impactNumber(project.directImpact),
                           icon: Icons.volunteer_activism_rounded,
                         ),
                         _KpiItem(
                           label: 'Impact indirect',
-                          value: project.indirectImpact.toString(),
+                          value: impactNumber(project.indirectImpact),
                           icon: Icons.groups_rounded,
                         ),
                         _KpiItem(
                           label: 'Reach',
-                          value: project.reach.toString(),
+                          value: impactNumber(project.reach),
                           icon: Icons.public_rounded,
                         ),
                         _KpiItem(
@@ -1018,17 +1015,17 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                         ),
                         _KpiItem(
                           label: 'Emplois',
-                          value: project.jobsCreated.toString(),
+                          value: impactNumber(project.jobsCreated),
                           icon: Icons.work_rounded,
                         ),
                         _KpiItem(
                           label: 'Vies impactees',
-                          value: project.livesImpacted.toString(),
+                          value: impactNumber(project.livesImpacted),
                           icon: Icons.favorite_rounded,
                         ),
                         _KpiItem(
-                          label: 'Preuves',
-                          value: project.evidenceCount.toString(),
+                          label: 'Preuves vérifiées',
+                          value: project.verifiedEvidenceCount.toString(),
                           icon: Icons.verified_rounded,
                         ),
                       ],
@@ -1087,32 +1084,32 @@ class _ProjectImpactDetailSheet extends StatelessWidget {
                 _ProjectDetailBlock(
                   title: 'Preuves disponibles',
                   text:
-                      '${project.evidenceCount} preuve(s) rattachee(s), ${project.documentsCount} document(s) projet. Les fichiers sont consultables via Documents, sans afficher les liens techniques ici.',
+                      '${project.evidenceCount} preuve(s) rattachee(s), dont ${project.verifiedEvidenceCount} vérifiée(s), et ${project.documentsCount} document(s) projet. Les fichiers sont consultables via Documents, sans afficher les liens techniques ici.',
                   icon: Icons.verified_rounded,
                 ),
                 if (project.hasEnvironmentalImpact)
                   _ProjectDetailBlock(
                     title: 'Impact environnemental',
                     text: [
-                      if (project.treesPlanted > 0)
+                      if ((project.treesPlanted ?? 0) > 0)
                         '${project.treesPlanted} arbre(s) plantes',
-                      if (project.wasteReduced > 0)
-                        '${project.wasteReduced.toStringAsFixed(0)} kg de dechets reduits',
-                      if (project.waterSaved > 0)
-                        '${project.waterSaved.toStringAsFixed(0)} litres economises',
-                      if (project.co2Reduced > 0)
-                        '${project.co2Reduced.toStringAsFixed(0)} kg CO2 reduits',
+                      if ((project.wasteReduced ?? 0) > 0)
+                        '${project.wasteReduced!.toStringAsFixed(0)} kg de dechets reduits',
+                      if ((project.waterSaved ?? 0) > 0)
+                        '${project.waterSaved!.toStringAsFixed(0)} litres economises',
+                      if ((project.co2Reduced ?? 0) > 0)
+                        '${project.co2Reduced!.toStringAsFixed(0)} kg CO2 reduits',
                     ].join(' - '),
                     icon: Icons.eco_rounded,
                   ),
                 _ProjectDetailBlock(
                   title: 'Methode de mesure',
-                  text: project.methodology,
+                  text: project.methodology ?? 'Non renseigné',
                   icon: Icons.fact_check_rounded,
                 ),
                 _ProjectDetailBlock(
                   title: 'Projection et hypotheses',
-                  text: project.assumptions,
+                  text: project.assumptions ?? 'Non renseigné',
                   icon: Icons.rule_rounded,
                 ),
                 const SizedBox(height: 8),
@@ -1182,18 +1179,6 @@ class _ProjectScoreBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      ('Innovation', project.innovationScore),
-      ('Viabilite', project.businessViabilityScore),
-      ('Scalabilite', project.scalabilityScore),
-      ('Competition', project.competitionReadinessScore),
-      ('Planete', project.planetImpact),
-      ('Emplois', project.jobsCreated.toDouble()),
-      ('Vies', project.livesImpacted.toDouble()),
-      ('Arbres', project.treesPlanted.toDouble()),
-      ('Budget utilise', project.budgetUsed),
-    ];
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1205,8 +1190,20 @@ class _ProjectScoreBreakdown extends StatelessWidget {
         spacing: 10,
         runSpacing: 10,
         children: [
-          for (final item in items)
-            Chip(label: Text('${item.$1}: ${item.$2.toStringAsFixed(0)}')),
+          Chip(
+            label: Text(
+              'Budget opérationnel: ${project.budgetUsed.toStringAsFixed(0)}',
+            ),
+          ),
+          if (project.claims.isEmpty)
+            const Chip(label: Text('Aucune déclaration d’impact')),
+          for (final claim in project.claims)
+            Chip(
+              label: Text(
+                '${claim.title}: ${impactNumber(claim.value)} ${claim.unit} · '
+                '${claim.claimTypeLabel} · ${claim.validationLabel}',
+              ),
+            ),
         ],
       ),
     );
@@ -1225,7 +1222,7 @@ class _QualityAlerts extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.all(18),
           child: Text(
-            'Tous les projets ont des preuves et des ODD renseignés.',
+            'Tous les projets ont des preuves validées et des ODD renseignés.',
           ),
         ),
       );
@@ -1251,7 +1248,7 @@ class _QualityAlerts extends StatelessWidget {
                 ),
                 subtitle: Text(
                   [
-                    if (project.needsEvidence) 'preuves insuffisantes',
+                    if (project.needsEvidence) 'preuves validées insuffisantes',
                     if (project.needsSdg) 'ODD manquants',
                   ].join(' • '),
                 ),
@@ -1408,14 +1405,13 @@ class _ScoreFrameworkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const weights = [
-      ('Impact direct', '25%'),
-      ('Viabilité économique', '15%'),
-      ('Innovation', '15%'),
-      ('Preuves / méthodologie', '15%'),
-      ('Avancement opérationnel', '10%'),
-      ('Alignement ODD', '10%'),
-      ('Scalabilité', '10%'),
+    const rules = [
+      'Mesuré + vérifié = réalisé',
+      'Estimation ≠ réalisé',
+      'Projection ≠ réalisé',
+      'Historique déclaré ≠ mesuré',
+      'Preuve jointe ≠ vérifié',
+      'Non renseigné ≠ zéro',
     ];
 
     return Card(
@@ -1425,22 +1421,19 @@ class _ScoreFrameworkCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Grille Project Impact Score',
+              'Règles de lecture des données',
               style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Score indicatif et configurable. Il sert à guider la préparation, pas à masquer le jugement humain.',
+              'Le type de déclaration et son statut de validation restent deux dimensions distinctes.',
               style: TextStyle(color: Colors.black54, height: 1.4),
             ),
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                for (final weight in weights)
-                  Chip(label: Text('${weight.$1} • ${weight.$2}')),
-              ],
+              children: [for (final rule in rules) Chip(label: Text(rule))],
             ),
           ],
         ),
@@ -1487,7 +1480,8 @@ class _ImpactErrorCard extends StatelessWidget {
   }
 }
 
-String _money(double amount) {
+String _money(double? amount) {
+  if (amount == null) return 'Non renseigné';
   if (amount >= 1000000) {
     return '${(amount / 1000000).toStringAsFixed(1)}M';
   }

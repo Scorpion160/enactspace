@@ -19,6 +19,7 @@ from app.models.mobile_money import (
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
 from app.services.payments import get_payment_provider
+from app.services.operational_integrity import lock_row
 
 
 ACTIVE_MOBILE_MONEY_STATUSES = {"created", "pending", "processing"}
@@ -93,6 +94,14 @@ def create_event(
     error_message: str | None = None,
     metadata_json: dict | None = None,
 ) -> MobileMoneyTransactionEvent:
+    if provider_event_id:
+        existing = db.query(MobileMoneyTransactionEvent).filter(
+            MobileMoneyTransactionEvent.transaction_id == transaction.id,
+            MobileMoneyTransactionEvent.provider_event_id == provider_event_id,
+        ).first()
+        if existing is not None:
+            existing.is_duplicate = True
+            return existing
     event = MobileMoneyTransactionEvent(
         transaction_id=transaction.id,
         event_type=event_type,
@@ -177,7 +186,13 @@ def selected_fees(db: Session, transaction: MobileMoneyTransaction) -> list[Fee]
             continue
     if not fee_ids:
         return []
-    fees = db.query(Fee).filter(Fee.id.in_(fee_ids)).all()
+    fees = (
+        db.query(Fee)
+        .filter(Fee.id.in_(fee_ids))
+        .order_by(Fee.id.asc())
+        .with_for_update()
+        .all()
+    )
     fee_by_id = {str(fee.id): fee for fee in fees}
     return [fee_by_id[str(fee_id)] for fee_id in fee_ids if str(fee_id) in fee_by_id]
 
@@ -185,7 +200,7 @@ def selected_fees(db: Session, transaction: MobileMoneyTransaction) -> list[Fee]
 def ensure_financial_account(db: Session, user_id) -> FinancialAccount:
     account = db.query(FinancialAccount).filter(
         FinancialAccount.user_id == user_id
-    ).first()
+    ).populate_existing().with_for_update().first()
     if not account:
         account = FinancialAccount(user_id=user_id, balance_due=0, total_paid=0)
         db.add(account)
@@ -242,6 +257,10 @@ def mark_not_successful(
     provider_status: str | None,
     provider_event_id: str | None = None,
 ) -> None:
+    locked = lock_row(db, MobileMoneyTransaction, transaction.id)
+    if locked is None:
+        return
+    transaction = locked
     if transaction.status == "successful":
         return
     old_status = transaction.status
@@ -285,6 +304,10 @@ def confirm_transaction(
     provider_event_id: str | None = None,
     request: Request | None = None,
 ) -> Payment:
+    locked = lock_row(db, MobileMoneyTransaction, transaction.id)
+    if locked is None:
+        raise HTTPException(status_code=404, detail="Transaction Mobile Money introuvable")
+    transaction = locked
     if transaction.payment_id:
         payment = db.query(Payment).filter(Payment.id == transaction.payment_id).first()
         if payment:

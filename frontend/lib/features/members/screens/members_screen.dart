@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../poles/models/pole_model.dart';
 import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
@@ -32,6 +34,7 @@ class _MembersScreenState extends State<MembersScreen> {
   String _search = '';
   String _statusFilter = 'all';
   String _roleFilter = 'all';
+  String _poleFilter = 'all';
 
   @override
   void initState() {
@@ -370,7 +373,9 @@ class _MembersScreenState extends State<MembersScreen> {
           _statusFilter == 'all' || member.status == _statusFilter;
       final matchesRole =
           _roleFilter == 'all' || member.roles.contains(_roleFilter);
-      return matchesSearch && matchesStatus && matchesRole;
+      final matchesPole =
+          _poleFilter == 'all' || member.department == _poleFilter;
+      return matchesSearch && matchesStatus && matchesRole && matchesPole;
     }).toList();
   }
 
@@ -384,6 +389,29 @@ class _MembersScreenState extends State<MembersScreen> {
     return _members.where((m) => m.status == 'pending').length;
   }
 
+  Future<void> _openEditMemberDialog(MemberModel member) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          EditMemberDialog(member: member, membersService: _membersService),
+    );
+    if (updated != true) return;
+    await _loadMembers();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${member.displayName} a été mis à jour.')),
+    );
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _search = '';
+      _statusFilter = 'all';
+      _roleFilter = 'all';
+      _poleFilter = 'all';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMembers = _filteredMembers;
@@ -393,70 +421,74 @@ class _MembersScreenState extends State<MembersScreen> {
     final canManageLifecycle =
         _userExperience?.isAdmin == true ||
         _userExperience?.isTeamLeader == true;
-    final horizontalPadding = MediaQuery.sizeOf(context).width < 560
-        ? 14.0
-        : 24.0;
-
     return RefreshIndicator(
       onRefresh: _loadMembers,
       child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          horizontalPadding,
-          20,
-          horizontalPadding,
-          28,
-        ),
+        padding: const EdgeInsets.only(bottom: 28),
         children: [
-          _MembersHeader(
-            total: _members.length,
-            active: _activeCount,
-            pending: _pendingCount,
-            onRefresh: _loadMembers,
-          ),
-          const SizedBox(height: 20),
-          _SearchAndActions(
-            onChanged: (value) {
-              setState(() {
-                _search = value;
-              });
-            },
-            statusFilter: _statusFilter,
-            roleFilter: _roleFilter,
-            onStatusChanged: (value) {
-              setState(() => _statusFilter = value);
-            },
-            onRoleChanged: (value) {
-              setState(() => _roleFilter = value);
-            },
-            onAdd: canManageMembers ? _openAddMemberDialog : null,
-            onImport: canManageMembers ? _openImportMembersPanel : null,
-          ),
-          const SizedBox(height: 20),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_error != null)
-            _ErrorCard(message: _error!, onRetry: _loadMembers)
-          else if (filteredMembers.isEmpty)
-            const _EmptyMembersCard()
-          else
-            _MembersList(
-              members: filteredMembers,
-              canManageMembers: canManageMembers,
-              canReviewJoinRequests: canReviewJoinRequests,
-              canManageLifecycle: canManageLifecycle,
-              currentUserId: _userExperience?.id,
-              onApprove: _approveMember,
-              onReject: _rejectMember,
-              onManageLifecycle: _openLifecycleDialog,
-              onAssignRole: _openAssignRoleDialog,
-              onAssignDepartment: _openAssignDepartmentDialog,
-              onAssignPlacement: _openMemberAssignmentSheet,
+          AppResponsiveContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _MembersHeader(
+                  total: _members.length,
+                  active: _activeCount,
+                  pending: _pendingCount,
+                  canManage: canManageMembers,
+                  onRefresh: _loadMembers,
+                  onAdd: _openAddMemberDialog,
+                ),
+                const SizedBox(height: 18),
+                _SearchAndActions(
+                  onChanged: (value) => setState(() => _search = value),
+                  statusFilter: _statusFilter,
+                  roleFilter: _roleFilter,
+                  poleFilter: _poleFilter,
+                  poles:
+                      _members
+                          .map((member) => member.department)
+                          .whereType<String>()
+                          .where((value) => value.trim().isNotEmpty)
+                          .toSet()
+                          .toList()
+                        ..sort(),
+                  onStatusChanged: (value) =>
+                      setState(() => _statusFilter = value),
+                  onRoleChanged: (value) => setState(() => _roleFilter = value),
+                  onPoleChanged: (value) => setState(() => _poleFilter = value),
+                  onReset: _resetFilters,
+                  onImport: canManageMembers ? _openImportMembersPanel : null,
+                ),
+                const SizedBox(height: 18),
+                if (_loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (_error != null)
+                  _ErrorCard(message: _error!, onRetry: _loadMembers)
+                else if (filteredMembers.isEmpty)
+                  const _EmptyMembersCard()
+                else
+                  _MembersList(
+                    members: filteredMembers,
+                    canManageMembers: canManageMembers,
+                    canReviewJoinRequests: canReviewJoinRequests,
+                    canManageLifecycle: canManageLifecycle,
+                    currentUserId: _userExperience?.id,
+                    onApprove: _approveMember,
+                    onReject: _rejectMember,
+                    onManageLifecycle: _openLifecycleDialog,
+                    onAssignRole: _openAssignRoleDialog,
+                    onEdit: _openEditMemberDialog,
+                    onAssignDepartment: _openAssignDepartmentDialog,
+                    onAssignPlacement: _openMemberAssignmentSheet,
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -467,65 +499,98 @@ class _MembersHeader extends StatelessWidget {
   final int total;
   final int active;
   final int pending;
+  final bool canManage;
   final VoidCallback onRefresh;
+  final VoidCallback onAdd;
 
   const _MembersHeader({
     required this.total,
     required this.active,
     required this.pending,
+    required this.canManage,
     required this.onRefresh,
+    required this.onAdd,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final identity = Row(
+      children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: AppTheme.enactusYellow,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Icon(
+            Icons.people_alt_rounded,
+            color: AppTheme.softBlack,
+            size: 34,
+          ),
+        ),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Membres',
+                style: TextStyle(
+                  color: AppTheme.softBlack,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$total membre(s) • $active actif(s) • $pending en attente',
+                style: const TextStyle(
+                  color: AppTheme.secondaryText,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        AppSecondaryButton(
+          label: 'Actualiser',
+          icon: Icons.refresh_rounded,
+          onPressed: onRefresh,
+        ),
+        if (canManage)
+          AppPrimaryButton(
+            label: 'Ajouter',
+            icon: Icons.person_add_alt_1_rounded,
+            onPressed: onAdd,
+          ),
+      ],
+    );
+
+    return AppDataCard(
       padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppTheme.enactusYellow,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.people_alt_rounded,
-              color: AppTheme.softBlack,
-              size: 34,
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Membres',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$total membre(s) • $active actif(s) • $pending en attente',
-                  style: const TextStyle(color: Colors.white70, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onRefresh,
-            tooltip: 'Actualiser',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 700) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [identity, const SizedBox(height: 18), actions],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: identity),
+              const SizedBox(width: 16),
+              actions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -535,24 +600,30 @@ class _SearchAndActions extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final String statusFilter;
   final String roleFilter;
+  final String poleFilter;
+  final List<String> poles;
   final ValueChanged<String> onStatusChanged;
   final ValueChanged<String> onRoleChanged;
-  final VoidCallback? onAdd;
+  final ValueChanged<String> onPoleChanged;
+  final VoidCallback onReset;
   final VoidCallback? onImport;
 
   const _SearchAndActions({
     required this.onChanged,
     required this.statusFilter,
     required this.roleFilter,
+    required this.poleFilter,
+    required this.poles,
     required this.onStatusChanged,
     required this.onRoleChanged,
-    required this.onAdd,
+    required this.onPoleChanged,
+    required this.onReset,
     required this.onImport,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 980;
+    final isWide = MediaQuery.of(context).size.width >= 1180;
 
     final searchField = TextField(
       onChanged: onChanged,
@@ -605,14 +676,21 @@ class _SearchAndActions extends StatelessWidget {
         if (value != null) onRoleChanged(value);
       },
     );
+    final poleFilterField = DropdownButtonFormField<String>(
+      initialValue: poleFilter,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Pôle'),
+      items: [
+        const DropdownMenuItem(value: 'all', child: Text('Tous les pôles')),
+        ...poles.map(
+          (pole) => DropdownMenuItem(value: pole, child: Text(pole)),
+        ),
+      ],
+      onChanged: (value) {
+        if (value != null) onPoleChanged(value);
+      },
+    );
 
-    final addButton = onAdd == null
-        ? null
-        : ElevatedButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.person_add_alt_1_rounded),
-            label: const Text('Ajouter'),
-          );
     final importButton = onImport == null
         ? null
         : OutlinedButton.icon(
@@ -621,44 +699,87 @@ class _SearchAndActions extends StatelessWidget {
             label: const Text('Importer'),
           );
 
-    if (isWide && (addButton != null || importButton != null)) {
+    if (isWide && importButton != null) {
       return Row(
         children: [
           Expanded(child: searchField),
           const SizedBox(width: 14),
-          SizedBox(width: 170, child: statusFilterField),
+          SizedBox(width: 145, child: statusFilterField),
           const SizedBox(width: 12),
-          SizedBox(width: 210, child: roleFilterField),
+          SizedBox(width: 170, child: roleFilterField),
           const SizedBox(width: 14),
-          ?importButton,
-          if (importButton != null && addButton != null)
-            const SizedBox(width: 10),
-          ?addButton,
+          SizedBox(width: 150, child: poleFilterField),
+          const SizedBox(width: 14),
+          importButton,
         ],
       );
     }
 
-    final filters = [
-      searchField,
-      const SizedBox(height: 12),
-      statusFilterField,
-      const SizedBox(height: 12),
-      roleFilterField,
-    ];
-
-    final actionButtons = [?importButton, ?addButton];
+    final actionButtons = [?importButton];
 
     if (actionButtons.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: filters,
+        children: [
+          searchField,
+          const SizedBox(height: 12),
+          AppDataCard(
+            padding: EdgeInsets.zero,
+            child: ExpansionTile(
+              title: const Text('Filtres avancés'),
+              subtitle: const Text('Statut, rôle et pôle'),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                statusFilterField,
+                const SizedBox(height: 12),
+                roleFilterField,
+                const SizedBox(height: 12),
+                poleFilterField,
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onReset,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Réinitialiser'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ...filters,
+        searchField,
+        const SizedBox(height: 12),
+        AppDataCard(
+          padding: EdgeInsets.zero,
+          child: ExpansionTile(
+            title: const Text('Filtres avancés'),
+            subtitle: const Text('Statut, rôle et pôle'),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              statusFilterField,
+              const SizedBox(height: 12),
+              roleFilterField,
+              const SizedBox(height: 12),
+              poleFilterField,
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onReset,
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text('Réinitialiser'),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         Wrap(spacing: 10, runSpacing: 10, children: actionButtons),
       ],
@@ -676,6 +797,7 @@ class _MembersList extends StatelessWidget {
   final ValueChanged<MemberModel> onReject;
   final ValueChanged<MemberModel> onManageLifecycle;
   final ValueChanged<MemberModel> onAssignRole;
+  final ValueChanged<MemberModel> onEdit;
   final ValueChanged<MemberModel> onAssignDepartment;
   final ValueChanged<MemberModel> onAssignPlacement;
 
@@ -689,20 +811,23 @@ class _MembersList extends StatelessWidget {
     required this.onReject,
     required this.onManageLifecycle,
     required this.onAssignRole,
+    required this.onEdit,
     required this.onAssignDepartment,
     required this.onAssignPlacement,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 1200;
+    // The desktop shell reserves a navigation rail. Keep primary actions on
+    // screen below ultra-wide widths by using the responsive member cards.
+    final isWide = MediaQuery.of(context).size.width >= 1600;
 
     if (isWide) {
       return Card(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
-            width: 1510,
+            width: canManageMembers ? 1640 : 1450,
             child: DataTable(
               columnSpacing: 28,
               horizontalMargin: 24,
@@ -762,25 +887,24 @@ class _MembersList extends StatelessWidget {
 
                     DataCell(
                       SizedBox(
-                        width: 236,
+                        width: canManageMembers ? 350 : 160,
                         child: Wrap(
                           spacing: 2,
                           runSpacing: 2,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints(
-                                minWidth: 36,
-                                minHeight: 36,
-                              ),
-                              padding: EdgeInsets.zero,
-                              onPressed: () {
-                                _showMemberDetails(context, member);
-                              },
+                            TextButton.icon(
+                              onPressed: () =>
+                                  _showMemberDetails(context, member),
                               icon: const Icon(Icons.visibility_rounded),
-                              tooltip: 'Voir',
+                              label: const Text('Profil'),
                             ),
+                            if (canManageMembers)
+                              TextButton.icon(
+                                onPressed: () => onEdit(member),
+                                icon: const Icon(Icons.edit_outlined),
+                                label: const Text('Modifier'),
+                              ),
                             if (canManageMembers) ...[
                               IconButton(
                                 visualDensity: VisualDensity.compact,
@@ -915,6 +1039,7 @@ class _MembersList extends StatelessWidget {
                       : null,
                   onManageLifecycle: () => onManageLifecycle(member),
                   onAssignRole: () => onAssignRole(member),
+                  onEdit: onEdit,
                   onAssignDepartment: () => onAssignDepartment(member),
                   onAssignPlacement: () => onAssignPlacement(member),
                 ),
@@ -980,8 +1105,13 @@ class _MembersList extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
+                const AppSectionHeader(title: 'Contact'),
+                const SizedBox(height: 10),
                 _DetailLine(label: 'Email', value: member.email),
                 _DetailLine(label: 'Téléphone', value: member.phoneLabel),
+                const SizedBox(height: 8),
+                const AppSectionHeader(title: 'Organisation'),
+                const SizedBox(height: 10),
                 _DetailLine(label: 'Statut', value: member.statusLabel),
                 _DetailLine(label: 'Profil', value: member.memberLabel),
                 _DetailLine(
@@ -990,10 +1120,16 @@ class _MembersList extends StatelessWidget {
                 ),
                 _DetailLine(label: 'Rôles', value: member.rolesLabel),
                 _DetailLine(label: 'Pôle cœur', value: member.departmentLabel),
+                const SizedBox(height: 8),
+                const AppSectionHeader(title: 'Parcours'),
+                const SizedBox(height: 10),
                 _DetailLine(label: 'Niveau', value: member.studyLevelLabel),
                 _DetailLine(label: 'Promotion', value: member.promotionLabel),
                 _DetailLine(label: 'Adhésion', value: member.joinedAtLabel),
                 _DetailLine(label: 'Bio', value: member.bioLabel),
+                const SizedBox(height: 8),
+                const AppSectionHeader(title: 'État du compte'),
+                const SizedBox(height: 10),
                 _DetailLine(
                   label: 'Actif',
                   value: member.isActive == true ? 'Oui' : 'Non',
@@ -1003,6 +1139,18 @@ class _MembersList extends StatelessWidget {
                   value: member.emailVerified == true ? 'Oui' : 'Non',
                 ),
                 _DetailLine(label: 'ID', value: member.id),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  key: const Key('member_memory_link'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go(
+                      '/archives?member_id=${Uri.encodeQueryComponent(member.id)}',
+                    );
+                  },
+                  icon: const Icon(Icons.history),
+                  label: const Text('Voir dans la mémoire'),
+                ),
               ],
             ),
           ),
@@ -1042,6 +1190,7 @@ class _MemberCard extends StatelessWidget {
   final VoidCallback? onReject;
   final VoidCallback onManageLifecycle;
   final VoidCallback onAssignRole;
+  final ValueChanged<MemberModel> onEdit;
   final VoidCallback onAssignDepartment;
   final VoidCallback onAssignPlacement;
 
@@ -1055,6 +1204,7 @@ class _MemberCard extends StatelessWidget {
     required this.onReject,
     required this.onManageLifecycle,
     required this.onAssignRole,
+    required this.onEdit,
     required this.onAssignDepartment,
     required this.onAssignPlacement,
   });
@@ -1199,6 +1349,24 @@ class _MemberCard extends StatelessWidget {
                 _DepartmentChip(department: member.departmentLabel),
               ],
             ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                TextButton.icon(
+                  onPressed: onDetails,
+                  icon: const Icon(Icons.visibility_rounded),
+                  label: const Text('Voir le profil'),
+                ),
+                if (canManageMembers)
+                  TextButton.icon(
+                    onPressed: () => onEdit(member),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Modifier'),
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
             if (!isCompact) ...[
               const Divider(height: 20),
@@ -1207,11 +1375,6 @@ class _MemberCard extends StatelessWidget {
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  IconButton(
-                    onPressed: onDetails,
-                    icon: const Icon(Icons.visibility_rounded),
-                    tooltip: 'Voir',
-                  ),
                   if (canManageMembers) ...[
                     IconButton(
                       onPressed: onAssignRole,
@@ -2509,6 +2672,136 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
                   ),
                 )
               : const Icon(Icons.save_rounded),
+          label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
+        ),
+      ],
+    );
+  }
+}
+
+class EditMemberDialog extends StatefulWidget {
+  const EditMemberDialog({
+    super.key,
+    required this.member,
+    required this.membersService,
+  });
+
+  final MemberModel member;
+  final MembersService membersService;
+
+  @override
+  State<EditMemberDialog> createState() => _EditMemberDialogState();
+}
+
+class _EditMemberDialogState extends State<EditMemberDialog> {
+  late bool _emailVerified;
+  final _departmentController = TextEditingController();
+  final _studyLevelController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailVerified = widget.member.emailVerified ?? false;
+    _departmentController.text = widget.member.department ?? '';
+    _studyLevelController.text = widget.member.studyLevel ?? '';
+  }
+
+  @override
+  void dispose() {
+    _departmentController.dispose();
+    _studyLevelController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await widget.membersService.updateMemberAdmin(
+        userId: widget.member.id,
+        emailVerified: _emailVerified,
+        department: _departmentController.text.trim(),
+        studyLevel: _studyLevelController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      setState(() => _error = error.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Modifier le membre'),
+      content: SizedBox(
+        width: _dialogWidth(context, 520),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppIdentityCell(
+                name: widget.member.displayName,
+                subtitle: widget.member.email,
+                imageUrl: _absoluteMemberPhotoUrl(widget.member.photoUrl),
+              ),
+              const SizedBox(height: 20),
+              if (_error != null) ...[
+                AppStatusBadge(label: _error!, tone: AppStatusTone.error),
+                const SizedBox(height: 12),
+              ],
+              const Text(
+                'Le statut du membre se gère avec les actions dédiées '
+                'Approuver, Suspendre, Réactiver ou Passer Alumni.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _departmentController,
+                enabled: !_loading,
+                decoration: const InputDecoration(
+                  labelText: 'Pôle ou département',
+                  prefixIcon: Icon(Icons.account_tree_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _studyLevelController,
+                enabled: !_loading,
+                decoration: const InputDecoration(
+                  labelText: 'Niveau ou filière',
+                  prefixIcon: Icon(Icons.school_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Email vérifié'),
+                subtitle: const Text('Indicateur de validation du contact.'),
+                value: _emailVerified,
+                onChanged: _loading
+                    ? null
+                    : (value) => setState(() => _emailVerified = value),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _loading ? null : _submit,
+          icon: const Icon(Icons.save_rounded),
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],

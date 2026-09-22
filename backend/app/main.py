@@ -20,6 +20,8 @@ from app.api.routes import (
     tasks,
     files,
     documents,
+    institutional_documents,
+    institutional_document_generation,
     posts,
     chat,
     recruitment,
@@ -31,10 +33,14 @@ from app.api.routes import (
     dashboard,
     academy,
     archives,
+    institutional_memory,
     audit,
     seed,
     system,
     realtime,
+    account,
+    legal,
+    product_services,
 )
 
 
@@ -110,6 +116,16 @@ def health():
 
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(account.router, prefix="/api")
+app.include_router(account.admin_router, prefix="/api")
+app.include_router(legal.router, prefix="/api")
+app.include_router(product_services.installation_router, prefix="/api")
+app.include_router(product_services.support_router, prefix="/api")
+app.include_router(product_services.support_admin_router, prefix="/api")
+app.include_router(product_services.feedback_router, prefix="/api")
+app.include_router(product_services.feedback_admin_router, prefix="/api")
+app.include_router(product_services.product_router, prefix="/api")
+app.include_router(product_services.product_admin_router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(seasons.router, prefix="/api")
 app.include_router(poles.router, prefix="/api")
@@ -122,6 +138,8 @@ app.include_router(payments.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
+app.include_router(institutional_documents.router, prefix="/api")
+app.include_router(institutional_document_generation.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(recruitment.router, prefix="/api")
@@ -133,7 +151,8 @@ app.include_router(members_import.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(academy.router, prefix="/api")
 app.include_router(archives.router, prefix="/api")
+app.include_router(institutional_memory.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
-app.include_router(seed.router, prefix="/api")
+seed.register_seed_routes(app)
 app.include_router(system.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")

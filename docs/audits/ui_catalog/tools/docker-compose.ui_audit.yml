@@ -1,0 +1,107 @@
+name: enactspace_ui_audit
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: enactspace_ui_audit_postgres
+    env_file:
+      - ../../../../backend/.ui_audit/.env
+    volumes:
+      - enactspace_ui_audit_postgres_data:/var/lib/postgresql/data
+    networks:
+      - enactspace_ui_audit_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+
+  backend:
+    build:
+      context: ../../../../backend
+      dockerfile: ../docs/audits/ui_catalog/tools/Dockerfile.audit_backend
+    container_name: enactspace_ui_audit_backend
+    env_file:
+      - ../../../../backend/.ui_audit/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - enactspace_ui_audit_uploads:/audit/uploads
+      - ./:/audit-tools:ro
+      - ../:/audit-catalog
+    environment:
+      UI_AUDIT_CATALOG: /audit-catalog
+      UI_AUDIT_CDP_URL: http://host.docker.internal:9222
+      UI_AUDIT_API_URL: http://127.0.0.1:8000/api
+    networks:
+      - enactspace_ui_audit_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: enactspace_ui_audit_web
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - C:/Users/DIOP/Documents/Enactus/enactspace-ui-v1/frontend/build/web:/usr/share/nginx/html:ro
+      - ./nginx-ui-audit.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - enactspace_ui_audit_network
+    restart: "no"
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: enactspace_ui_audit_gateway
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_started
+    ports:
+      - "127.0.0.1:18080:80"
+      - "127.0.0.1:18002:8000"
+    volumes:
+      - ./nginx-ui-audit-gateway-main.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-ui-audit-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:uid=0,gid=0,mode=1777
+      - /var/run:uid=0,gid=0,mode=1777
+      - /tmp:uid=101,gid=101,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - enactspace_ui_audit_network
+      - enactspace_ui_audit_exposure
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+networks:
+  enactspace_ui_audit_network:
+    name: enactspace_ui_audit_network
+    internal: true
+  enactspace_ui_audit_exposure:
+    name: enactspace_ui_audit_exposure
+    driver: bridge
+
+volumes:
+  enactspace_ui_audit_postgres_data:
+    name: enactspace_ui_audit_postgres_data
+  enactspace_ui_audit_uploads:
+    name: enactspace_ui_audit_uploads

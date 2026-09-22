@@ -8,6 +8,15 @@ __pycache__/
 
 # Environments
 .env
+.env.*.local
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*firebase-admin*.json
+*.p8
+*.p12
+*.pem
+*.key
 .venv/
 venv/
 env/

@@ -1,3 +1,65 @@
+String impactClaimTypeLabel(String value) => switch (value) {
+  'MEASURED' => 'Mesuré',
+  'ESTIMATE' => 'Estimation',
+  'PROJECTION' => 'Projection',
+  'HISTORICAL_CLAIM' => 'Historique déclaré',
+  _ => 'Type non renseigné',
+};
+
+String impactValidationLabel(String value) => switch (value) {
+  'VERIFIED' => 'Vérifié',
+  'REJECTED' => 'Rejeté',
+  'SUPERSEDED' => 'Remplacé',
+  'UNDER_REVIEW' => 'En vérification',
+  'EVIDENCE_ATTACHED' => 'Preuve jointe · à vérifier',
+  'EVIDENCE_PENDING' => 'Preuve attendue',
+  'DRAFT' => 'Brouillon · à vérifier',
+  _ => 'À vérifier',
+};
+
+String impactNumber(num? value) => value == null ? 'Non renseigné' : '$value';
+
+class ImpactClaimModel {
+  final String id;
+  final String semanticKey;
+  final String title;
+  final double? value;
+  final String unit;
+  final String claimType;
+  final String validationStatus;
+  final String? periodStart;
+  final String? periodEnd;
+  final String? populationScope;
+  final String? source;
+  final String? sourceReference;
+  final String? methodology;
+  final String? notesLimitations;
+  final int evidenceCount;
+
+  const ImpactClaimModel({
+    required this.id,
+    required this.semanticKey,
+    required this.title,
+    required this.value,
+    required this.unit,
+    required this.claimType,
+    required this.validationStatus,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.populationScope,
+    required this.source,
+    required this.sourceReference,
+    required this.methodology,
+    required this.notesLimitations,
+    required this.evidenceCount,
+  });
+
+  bool get isRealized =>
+      claimType == 'MEASURED' && validationStatus == 'VERIFIED';
+  String get claimTypeLabel => impactClaimTypeLabel(claimType);
+  String get validationLabel => impactValidationLabel(validationStatus);
+}
+
 class ProjectImpactMetricModel {
   final String id;
   final String projectName;
@@ -9,30 +71,32 @@ class ProjectImpactMetricModel {
   final String problem;
   final String solution;
   final String targetBeneficiaries;
-  final int directImpact;
-  final int indirectImpact;
-  final int reach;
-  final double revenue;
-  final double surplus;
-  final int jobsCreated;
-  final int livesImpacted;
-  final int treesPlanted;
-  final double wasteReduced;
-  final double waterSaved;
-  final double co2Reduced;
-  final double planetImpact;
+  final int? directImpact;
+  final int? indirectImpact;
+  final int? reach;
+  final double? revenue;
+  final double? surplus;
+  final int? jobsCreated;
+  final int? livesImpacted;
+  final int? treesPlanted;
+  final double? wasteReduced;
+  final double? waterSaved;
+  final double? co2Reduced;
+  final double? planetImpact;
   final int evidenceCount;
-  final String methodology;
-  final String assumptions;
+  final int verifiedEvidenceCount;
+  final String? methodology;
+  final String? assumptions;
   final double budgetUsed;
   final double progress;
   final int completedTasks;
   final int lateTasks;
   final int documentsCount;
-  final double innovationScore;
-  final double businessViabilityScore;
-  final double scalabilityScore;
-  final double competitionReadinessScore;
+  final double? innovationScore;
+  final double? businessViabilityScore;
+  final double? scalabilityScore;
+  final double? competitionReadinessScore;
+  final List<ImpactClaimModel> claims;
 
   const ProjectImpactMetricModel({
     required this.id,
@@ -58,6 +122,7 @@ class ProjectImpactMetricModel {
     required this.co2Reduced,
     required this.planetImpact,
     required this.evidenceCount,
+    required this.verifiedEvidenceCount,
     required this.methodology,
     required this.assumptions,
     required this.budgetUsed,
@@ -69,33 +134,24 @@ class ProjectImpactMetricModel {
     required this.businessViabilityScore,
     required this.scalabilityScore,
     required this.competitionReadinessScore,
+    this.claims = const [],
   });
 
-  double get projectImpactScore {
-    final directImpactScore = (directImpact / 200).clamp(0, 1) * 25;
-    final viability = businessViabilityScore.clamp(0, 100) * 0.15;
-    final innovation = innovationScore.clamp(0, 100) * 0.15;
-    final evidence = (evidenceCount / 8).clamp(0, 1) * 15;
-    final operational = progress.clamp(0, 100) * 0.10;
-    final sdgAlignment = (sdgs.length / 4).clamp(0, 1) * 10;
-    final scalability = scalabilityScore.clamp(0, 100) * 0.10;
+  // No authoritative composite impact score exists without an explicit method.
+  double? get projectImpactScore => null;
 
-    return directImpactScore +
-        viability +
-        innovation +
-        evidence +
-        operational +
-        sdgAlignment +
-        scalability;
-  }
-
-  bool get needsEvidence => evidenceCount < 2;
+  bool get needsEvidence => verifiedEvidenceCount < 2;
   bool get needsSdg => sdgs.isEmpty;
-  int get totalBeneficiaries => directImpact + indirectImpact;
+  int? get totalBeneficiaries => directImpact == null || indirectImpact == null
+      ? null
+      : directImpact! + indirectImpact!;
   bool get hasEnvironmentalImpact =>
-      treesPlanted > 0 || wasteReduced > 0 || waterSaved > 0 || co2Reduced > 0;
+      (treesPlanted ?? 0) > 0 ||
+      (wasteReduced ?? 0) > 0 ||
+      (waterSaved ?? 0) > 0 ||
+      (co2Reduced ?? 0) > 0;
 
-  String get scoreLabel => '${projectImpactScore.toStringAsFixed(0)}/100';
+  String get scoreLabel => '—';
 }
 
 class EnacteurPerformanceModel {
@@ -203,26 +259,26 @@ class PolePerformanceModel {
 
 class OrganizationPerformanceModel {
   final int activeMembers;
-  final double attendanceRate;
-  final double retentionRate;
+  final double? attendanceRate;
+  final double? retentionRate;
   final int completedTasks;
   final int lateTasks;
   final int activeProjects;
-  final int directImpactTotal;
-  final int indirectImpactTotal;
-  final int reachTotal;
-  final int jobsCreatedTotal;
-  final int livesImpactedTotal;
-  final int treesPlantedTotal;
+  final int? directImpactTotal;
+  final int? indirectImpactTotal;
+  final int? reachTotal;
+  final int? jobsCreatedTotal;
+  final int? livesImpactedTotal;
+  final int? treesPlantedTotal;
   final int validatedEvidenceCount;
-  final int touchedSdgs;
-  final double revenueTotal;
-  final double surplusTotal;
+  final int? touchedSdgs;
+  final double? revenueTotal;
+  final double? surplusTotal;
   final int officialDocuments;
-  final double competitionReadiness;
-  final double academyParticipation;
-  final double communicationEngagement;
-  final double financialHealth;
+  final double? competitionReadiness;
+  final double? academyParticipation;
+  final double? communicationEngagement;
+  final double? financialHealth;
 
   const OrganizationPerformanceModel({
     required this.activeMembers,
@@ -248,28 +304,27 @@ class OrganizationPerformanceModel {
     required this.financialHealth,
   });
 
-  double get organizationHealthScore {
-    final attendance = attendanceRate.clamp(0, 100) * 0.14;
-    final retention = retentionRate.clamp(0, 100) * 0.12;
+  double? get organizationHealthScore {
+    if (attendanceRate == null ||
+        retentionRate == null ||
+        academyParticipation == null ||
+        communicationEngagement == null ||
+        financialHealth == null) {
+      return null;
+    }
+    final attendance = attendanceRate!.clamp(0, 100) * 0.18;
+    final retention = retentionRate!.clamp(0, 100) * 0.16;
     final taskDelivery =
-        (completedTasks / (completedTasks + lateTasks + 1)).clamp(0, 1) * 14;
-    final projectActivity = (activeProjects / 8).clamp(0, 1) * 10;
-    final impact = (directImpactTotal / 800).clamp(0, 1) * 12;
-    final reach = (reachTotal / 5000).clamp(0, 1) * 8;
-    final evidence = (officialDocuments / 35).clamp(0, 1) * 8;
-    final competition = competitionReadiness.clamp(0, 100) * 0.08;
-    final academy = academyParticipation.clamp(0, 100) * 0.06;
-    final communication = communicationEngagement.clamp(0, 100) * 0.04;
-    final finance = financialHealth.clamp(0, 100) * 0.04;
+        (completedTasks / (completedTasks + lateTasks + 1)).clamp(0, 1) * 20;
+    final projectActivity = (activeProjects / 8).clamp(0, 1) * 14;
+    final academy = academyParticipation!.clamp(0, 100) * 0.12;
+    final communication = communicationEngagement!.clamp(0, 100) * 0.10;
+    final finance = financialHealth!.clamp(0, 100) * 0.10;
 
     return attendance +
         retention +
         taskDelivery +
         projectActivity +
-        impact +
-        reach +
-        evidence +
-        competition +
         academy +
         communication +
         finance;
@@ -308,11 +363,10 @@ class HistoricalImpactModel {
 
 class ImpactDashboardData {
   final OrganizationPerformanceModel organization;
-  final HistoricalImpactModel historicalImpact;
+  final HistoricalImpactModel? historicalImpact;
   final List<ProjectImpactMetricModel> projects;
   final List<EnacteurPerformanceModel> enacteurs;
   final List<PolePerformanceModel> poles;
-  final bool usesDemoData;
 
   const ImpactDashboardData({
     required this.organization,
@@ -320,6 +374,5 @@ class ImpactDashboardData {
     required this.projects,
     required this.enacteurs,
     required this.poles,
-    this.usesDemoData = false,
   });
 }

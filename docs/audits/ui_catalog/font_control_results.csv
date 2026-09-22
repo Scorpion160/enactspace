@@ -1,0 +1,4 @@
+numero,domaine,vue,role,viewport,etat,fichier,reussite,probleme_visible,erreur_console_inattendue,erreur_reseau_inattendue,font_loaded,font_source,text_render_verified,commentaire
+01,auth,connexion,public,390x844,default,docs/audits/ui_catalog/screenshots/master/01__auth__connexion__public__390x844.png,true,,false,false,true,google_fonts_audit_allowlist,true,
+09,dashboard,admin_dense,admin,1440x900,default,docs/audits/ui_catalog/screenshots/master/09__dashboard__admin_dense__admin__1440x900.png,true,,false,false,true,google_fonts_audit_allowlist,true,
+33,communaute,conversation_messages,member,390x844,chat_conversation,docs/audits/ui_catalog/screenshots/master/33__communaute__conversation_messages__member__390x844.png,true,,false,false,true,google_fonts_audit_allowlist,true,

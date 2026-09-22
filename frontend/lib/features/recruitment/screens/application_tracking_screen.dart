@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../models/application_status_presentation.dart';
 import '../models/application_tracking_model.dart';
-import '../services/recruitment_service.dart';
+import '../services/public_recruitment_gateway.dart';
+import '../widgets/public/public_recruitment_widgets.dart';
 
 class ApplicationTrackingScreen extends StatefulWidget {
-  const ApplicationTrackingScreen({super.key});
+  final PublicRecruitmentGateway? gateway;
+
+  const ApplicationTrackingScreen({super.key, this.gateway});
 
   @override
   State<ApplicationTrackingScreen> createState() =>
@@ -14,43 +18,54 @@ class ApplicationTrackingScreen extends StatefulWidget {
 }
 
 class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _referenceController = TextEditingController();
+  late final PublicRecruitmentGateway _gateway;
+  final _codeController = TextEditingController();
   final _emailController = TextEditingController();
-  final _service = RecruitmentService();
-
-  bool _loading = false;
-  String? _error;
   ApplicationTrackingModel? _tracking;
+  bool _loading = false;
+  TrackingErrorKind? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _gateway = widget.gateway ?? RecruitmentPublicGateway();
+  }
 
   @override
   void dispose() {
-    _referenceController.dispose();
+    _codeController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
-  Future<void> _track() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  Future<void> _search() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
-      final tracking = await _service.trackApplication(
-        applicationId: _referenceController.text,
+      final result = await _gateway.trackApplication(
+        code: _codeController.text,
         email: _emailController.text,
       );
-      if (!mounted) return;
-      setState(() => _tracking = tracking);
-    } catch (error) {
+      if (mounted) setState(() => _tracking = result);
+    } on PublicRecruitmentFailure catch (error) {
       if (!mounted) return;
       setState(() {
         _tracking = null;
-        _error = error.toString().replaceAll('Exception: ', '');
+        _error = switch (error.kind) {
+          PublicRecruitmentFailureKind.notFound => TrackingErrorKind.notFound,
+          PublicRecruitmentFailureKind.network => TrackingErrorKind.network,
+          PublicRecruitmentFailureKind.server => TrackingErrorKind.server,
+        };
       });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _tracking = null;
+          _error = TrackingErrorKind.server;
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -58,61 +73,81 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 900;
-            final horizontalPadding = constraints.maxWidth < 560 ? 16.0 : 32.0;
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                18,
-                horizontalPadding,
-                32,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1120),
-                  child: Column(
+    return PublicRecruitmentShell(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+          vertical: 28,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1080),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final form = TrackingSearchForm(
+                  codeController: _codeController,
+                  emailController: _emailController,
+                  loading: _loading,
+                  error: _error,
+                  onSearch: _search,
+                );
+                final result = _tracking == null
+                    ? const _TrackingIntroduction()
+                    : TrackingResultView(tracking: _tracking!);
+                if (constraints.maxWidth < 860) {
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _TopBar(onBack: () => context.go('/login')),
-                      const SizedBox(height: 24),
-                      if (isWide)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: _buildFormCard()),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _tracking == null
-                                  ? const _TrackingWelcome()
-                                  : _TrackingResult(tracking: _tracking!),
-                            ),
-                          ],
-                        )
-                      else ...[
-                        _buildFormCard(),
-                        const SizedBox(height: 18),
-                        if (_tracking == null)
-                          const _TrackingWelcome()
-                        else
-                          _TrackingResult(tracking: _tracking!),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+                    children: [form, const SizedBox(height: 20), result],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 4, child: form),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 5, child: result),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildFormCard() {
+enum TrackingErrorKind { notFound, network, server }
+
+class TrackingSearchForm extends StatefulWidget {
+  final TextEditingController codeController;
+  final TextEditingController emailController;
+  final bool loading;
+  final TrackingErrorKind? error;
+  final VoidCallback onSearch;
+
+  const TrackingSearchForm({
+    super.key,
+    required this.codeController,
+    required this.emailController,
+    required this.loading,
+    required this.error,
+    required this.onSearch,
+  });
+
+  @override
+  State<TrackingSearchForm> createState() => _TrackingSearchFormState();
+}
+
+class _TrackingSearchFormState extends State<TrackingSearchForm> {
+  final _formKey = GlobalKey<FormState>();
+
+  void _submit() {
+    if (_formKey.currentState?.validate() == true) widget.onSearch();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(22),
@@ -123,81 +158,83 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
             children: [
               const Text(
                 'Suivre ma candidature',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
-                'Utilisez le code reçu après votre inscription et le même email.',
-                style: TextStyle(color: Colors.black54, height: 1.4),
+                'Saisis le code reçu après l’envoi et la même adresse e-mail.',
+                style: TextStyle(color: AppTheme.secondaryText, height: 1.5),
               ),
               const SizedBox(height: 22),
               TextFormField(
-                controller: _referenceController,
+                controller: widget.codeController,
                 autocorrect: false,
+                textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Code de suivi',
                   prefixIcon: Icon(Icons.confirmation_number_outlined),
                 ),
                 validator: (value) {
-                  final reference = value?.trim() ?? '';
-                  if (reference.isEmpty) return 'Code obligatoire.';
-                  if (reference.length < 8) return 'Code invalide.';
+                  final code = value?.trim() ?? '';
+                  if (code.isEmpty) return 'Indique ton code de suivi.';
+                  if (code.length < 8) return 'Ce code semble incomplet.';
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               TextFormField(
-                controller: _emailController,
+                controller: widget.emailController,
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
                 decoration: const InputDecoration(
-                  labelText: 'Email de candidature',
+                  labelText: 'Adresse e-mail de candidature',
                   prefixIcon: Icon(Icons.alternate_email_rounded),
                 ),
                 validator: (value) {
                   final email = value?.trim() ?? '';
-                  if (email.isEmpty) return 'Email obligatoire.';
-                  if (!email.contains('@') || !email.contains('.')) {
-                    return 'Email invalide.';
+                  if (email.isEmpty) return 'Indique ton adresse e-mail.';
+                  final parts = email.split('@');
+                  if (parts.length != 2 || !parts.last.contains('.')) {
+                    return 'Vérifie le format de l’adresse e-mail.';
                   }
                   return null;
                 },
                 onFieldSubmitted: (_) {
-                  if (!_loading) _track();
+                  if (!widget.loading) _submit();
                 },
               ),
-              if (_error != null) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'Code perdu ? Consulte le message affiché après ton envoi. Aucun mécanisme de récupération automatique n’est disponible actuellement.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.secondaryText,
+                  height: 1.4,
+                ),
+              ),
+              if (widget.error != null) ...[
                 const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade100),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Colors.red.shade800,
-                      fontWeight: FontWeight.w700,
-                    ),
+                _TrackingError(kind: widget.error!),
+              ],
+              const SizedBox(height: 20),
+              Semantics(
+                button: true,
+                label: 'Consulter ma candidature',
+                child: FilledButton.icon(
+                  onPressed: widget.loading ? null : _submit,
+                  icon: widget.loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search_rounded),
+                  label: Text(
+                    widget.loading
+                        ? 'Recherche en cours…'
+                        : 'Consulter ma candidature',
                   ),
                 ),
-              ],
-              const SizedBox(height: 18),
-              ElevatedButton.icon(
-                onPressed: _loading ? null : _track,
-                icon: _loading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.search_rounded),
-                label: Text(_loading ? 'Recherche...' : 'Afficher mon suivi'),
               ),
             ],
           ),
@@ -207,69 +244,65 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  final VoidCallback onBack;
-
-  const _TopBar({required this.onBack});
+class _TrackingError extends StatelessWidget {
+  final TrackingErrorKind kind;
+  const _TrackingError({required this.kind});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: onBack,
-          tooltip: 'Retour à la connexion',
-          icon: const Icon(Icons.arrow_back_rounded),
+    final message = switch (kind) {
+      TrackingErrorKind.notFound =>
+        'Aucune candidature ne correspond à ce code et à cette adresse e-mail.',
+      TrackingErrorKind.network =>
+        'La connexion semble interrompue. Vérifie ton accès internet puis réessaie.',
+      TrackingErrorKind.server =>
+        'Le suivi est momentanément indisponible. Réessaie dans quelques instants.',
+    };
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+      ),
+      child: Text(
+        message,
+        style: const TextStyle(
+          color: AppTheme.error,
+          fontWeight: FontWeight.w700,
         ),
-        const SizedBox(width: 8),
-        Image.asset(
-          'assets/img/logo_enactus_esp.png',
-          width: 74,
-          height: 54,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Text(
-            'Espace candidat',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _TrackingWelcome extends StatelessWidget {
-  const _TrackingWelcome();
+class _TrackingIntroduction extends StatelessWidget {
+  const _TrackingIntroduction();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.route_rounded, color: AppTheme.enactusYellow, size: 42),
+          Icon(Icons.route_rounded, color: AppTheme.enactusYellow, size: 44),
           SizedBox(height: 18),
           Text(
-            'Votre parcours, sans compte membre',
+            'Ton parcours candidat, simplement',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 23,
               fontWeight: FontWeight.w900,
             ),
           ),
           SizedBox(height: 10),
           Text(
-            'Consultez uniquement l’avancement de votre dossier. L’accès aux espaces internes sera ouvert après acceptation et validation du compte.',
-            style: TextStyle(color: Colors.white70, height: 1.5),
+            'Consulte l’avancement de ton dossier sans créer de compte. Les mises à jour importantes apparaîtront ici.',
+            style: TextStyle(color: Colors.white70, height: 1.55),
           ),
         ],
       ),
@@ -277,379 +310,142 @@ class _TrackingWelcome extends StatelessWidget {
   }
 }
 
-class _TrackingResult extends StatelessWidget {
+class TrackingResultView extends StatelessWidget {
   final ApplicationTrackingModel tracking;
-
-  const _TrackingResult({required this.tracking});
-
-  static const _steps = [
-    ('Dossier reçu', Icons.inbox_rounded),
-    ('Étude du dossier', Icons.fact_check_rounded),
-    ('Entretien', Icons.record_voice_over_rounded),
-    ('Décision', Icons.verified_rounded),
-  ];
+  const TrackingResultView({super.key, required this.tracking});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const CircleAvatar(
-                  backgroundColor: AppTheme.enactusYellow,
-                  foregroundColor: AppTheme.softBlack,
-                  child: Icon(Icons.how_to_reg_rounded),
+    final presentation = ApplicationStatusPresentation.fromStatus(
+      tracking.status,
+    );
+    return Semantics(
+      container: true,
+      label: 'Statut de la candidature, ${presentation.title}',
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(presentation.icon, size: 38, color: AppTheme.softBlack),
+              const SizedBox(height: 12),
+              Text(
+                presentation.title,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tracking.campaignTitle,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        tracking.statusLabel,
-                        style: const TextStyle(
-                          color: AppTheme.softBlack,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tracking.candidateName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                    ),
-                  ),
-                  if (tracking.candidateSummary.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      tracking.candidateSummary,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    'Code de suivi : ${tracking.trackingCode.isEmpty ? tracking.applicationId : tracking.trackingCode}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
+              const SizedBox(height: 6),
+              Text(
+                presentation.explanation,
+                style: const TextStyle(height: 1.5),
               ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _TrackingInfoPill(
-                  icon: Icons.calendar_month_rounded,
-                  label: 'Soumise',
-                  value: _formatDate(tracking.submittedAt),
-                ),
-                _TrackingInfoPill(
-                  icon: Icons.update_rounded,
-                  label: 'Mise à jour',
-                  value: _formatDate(tracking.updatedAt),
+              const SizedBox(height: 16),
+              Text(
+                tracking.campaignTitle,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                tracking.candidateName,
+                style: const TextStyle(color: AppTheme.secondaryText),
+              ),
+              const SizedBox(height: 6),
+              Semantics(
+                label: 'Code de suivi ${tracking.trackingCode}',
+                child: SelectableText('Code : ${tracking.trackingCode}'),
+              ),
+              const SizedBox(height: 24),
+              ApplicationTimeline(tracking: tracking),
+              const SizedBox(height: 18),
+              _InformationPanel(
+                title: 'Prochaine étape',
+                text: presentation.nextAction,
+                icon: Icons.arrow_forward_rounded,
+              ),
+              if (tracking.hasInterviewDetails) ...[
+                const SizedBox(height: 12),
+                _InformationPanel(
+                  title: 'Ton entretien',
+                  text: tracking.interviewDetails!.trim(),
+                  icon: Icons.event_available_outlined,
                 ),
               ],
-            ),
-            const SizedBox(height: 22),
-            for (var index = 0; index < _steps.length; index++)
-              _TrackingStep(
-                title: _steps[index].$1,
-                icon: _steps[index].$2,
-                active: index <= tracking.currentStep,
-                isLast: index == _steps.length - 1,
-                rejected: tracking.isRejected && index == 3,
-                waiting: tracking.isWaitingList && index == 3,
-                cancelled: tracking.isCancelled && index == 3,
+              if (tracking.candidateMessage?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 12),
+                _InformationPanel(
+                  title: 'Message de l’équipe',
+                  text: tracking.candidateMessage!.trim(),
+                  icon: Icons.mark_email_read_outlined,
+                ),
+              ],
+              if (tracking.hasFinalResult) ...[
+                const SizedBox(height: 12),
+                _InformationPanel(
+                  title: 'Décision',
+                  text: tracking.finalResult!.trim(),
+                  icon: Icons.flag_outlined,
+                ),
+              ],
+              const SizedBox(height: 18),
+              Text(
+                'Dernière mise à jour : ${_formatDate(tracking.updatedAt)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.secondaryText,
+                ),
               ),
-            const SizedBox(height: 18),
-            if (tracking.candidateMessage?.trim().isNotEmpty == true) ...[
-              _TrackingMessageCard(
-                icon: Icons.mark_email_read_rounded,
-                title: 'Message',
-                message: tracking.candidateMessage!.trim(),
-                color: Colors.grey.shade50,
-              ),
-              const SizedBox(height: 12),
-            ],
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.enactusYellow.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Prochaine étape',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(tracking.nextStep),
-                ],
-              ),
-            ),
-            if (tracking.hasInterviewDetails) ...[
-              const SizedBox(height: 12),
-              _TrackingMessageCard(
-                icon: Icons.record_voice_over_rounded,
-                title: 'Entretien',
-                message: tracking.interviewDetails!.trim(),
-                color: Colors.blueGrey.shade50,
+              const SizedBox(height: 14),
+              TextButton.icon(
+                onPressed: () => context.go('/recruitment/apply'),
+                icon: const Icon(Icons.campaign_outlined),
+                label: const Text('Voir les campagnes ouvertes'),
               ),
             ],
-            if (tracking.hasFinalResult) ...[
-              const SizedBox(height: 12),
-              _TrackingMessageCard(
-                icon: tracking.isAccepted
-                    ? Icons.verified_rounded
-                    : Icons.flag_rounded,
-                title: 'Résultat',
-                message: tracking.finalResult!.trim(),
-                color: tracking.isAccepted
-                    ? Colors.green.shade50
-                    : Colors.orange.shade50,
-              ),
-            ],
-            const SizedBox(height: 14),
-            Text(
-              'Dernière mise à jour : ${_formatDate(tracking.updatedAt)}',
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-            if (tracking.accountCreated) ...[
-              const SizedBox(height: 12),
-              const Chip(
-                avatar: Icon(Icons.person_rounded, size: 18),
-                label: Text('Compte EnactSpace créé'),
-              ),
-            ] else if (tracking.isAccepted) ...[
-              const SizedBox(height: 12),
-              const Chip(
-                avatar: Icon(Icons.verified_rounded, size: 18),
-                label: Text('Compte EnactSpace en préparation'),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TrackingInfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _TrackingInfoPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: AppTheme.softBlack),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackingMessageCard extends StatelessWidget {
-  final IconData icon;
+class _InformationPanel extends StatelessWidget {
   final String title;
-  final String message;
-  final Color color;
-
-  const _TrackingMessageCard({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppTheme.softBlack),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 4),
-                Text(message, style: const TextStyle(height: 1.35)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackingStep extends StatelessWidget {
-  final String title;
+  final String text;
   final IconData icon;
-  final bool active;
-  final bool isLast;
-  final bool rejected;
-  final bool waiting;
-  final bool cancelled;
-
-  const _TrackingStep({
+  const _InformationPanel({
     required this.title,
+    required this.text,
     required this.icon,
-    required this.active,
-    required this.isLast,
-    required this.rejected,
-    required this.waiting,
-    required this.cancelled,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final color = rejected || cancelled
-        ? Colors.red.shade700
-        : waiting
-        ? Colors.orange.shade800
-        : active
-        ? AppTheme.softBlack
-        : Colors.grey.shade400;
-    final terminalSoftColor = waiting
-        ? Colors.orange.shade50
-        : Colors.red.shade50;
-    final label = rejected
-        ? 'Candidature non retenue'
-        : waiting
-        ? 'Liste d’attente'
-        : cancelled
-        ? 'Candidature clôturée'
-        : title;
-
-    return Row(
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: AppTheme.enactusYellow.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+    ),
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: active
-                  ? rejected || waiting || cancelled
-                        ? terminalSoftColor
-                        : AppTheme.enactusYellow
-                  : Colors.grey.shade100,
-              foregroundColor: color,
-              child: Icon(icon, size: 19),
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 34,
-                color: active ? AppTheme.enactusYellow : Colors.grey.shade200,
-              ),
-          ],
-        ),
-        const SizedBox(width: 12),
+        Icon(icon),
+        const SizedBox(width: 10),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 7),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-              ),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text(text, style: const TextStyle(height: 1.4)),
+            ],
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 }
 
 String _formatDate(DateTime? value) {

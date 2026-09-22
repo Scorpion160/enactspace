@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
 import '../models/attendance_expected_member_model.dart';
@@ -691,12 +692,8 @@ class _SessionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppDataCard(
       padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 560 ? 18 : 26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 640;
@@ -724,7 +721,7 @@ class _SessionHeader extends StatelessWidget {
                     Text(
                       session.title,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.darkText,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
@@ -733,7 +730,7 @@ class _SessionHeader extends StatelessWidget {
                     Text(
                       '${session.typeLabel} • ${isClosed ? 'Clôturée' : session.statusLabel} • ${session.dateLabel}',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppTheme.secondaryText,
                         height: 1.35,
                       ),
                     ),

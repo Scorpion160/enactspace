@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/api/api_client.dart';
 import '../../core/auth/user_experience.dart';
 import '../../core/brand/brand_assets.dart';
 import '../../core/realtime/realtime_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/push/push_lifecycle_controller.dart';
+import '../../core/push/push_navigation_resolver.dart';
+import '../../core/push/push_platform.dart';
 import '../../features/chat/services/chat_service.dart';
 import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/services/notifications_service.dart';
@@ -38,10 +42,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Timer? _metricsTimer;
   Timer? _notificationTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
+  StreamSubscription<PushIncomingMessage>? _foregroundPushSubscription;
+  StreamSubscription<PushIncomingMessage>? _openedPushSubscription;
   bool _metricsLoading = false;
   bool _notificationLoading = false;
   bool _chatMetricLoading = false;
   String? _lastPresentedNotificationId;
+  final PushOpenReadinessGate _pushOpenGate = PushOpenReadinessGate();
 
   @override
   void initState() {
@@ -68,7 +75,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     });
     unawaited(_realtimeService.start());
-    _loadNavigationMetrics();
+    unawaited(_startPushLifecycle());
     _metricsTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _loadNavigationMetrics();
     });
@@ -81,9 +88,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pushOpenGate.discard();
     _metricsTimer?.cancel();
     _notificationTimer?.cancel();
     unawaited(_realtimeSubscription?.cancel());
+    unawaited(_foregroundPushSubscription?.cancel());
+    unawaited(_openedPushSubscription?.cancel());
     unawaited(_realtimeService.dispose());
     super.dispose();
   }
@@ -92,7 +102,81 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadNavigationMetrics();
+      unawaited(PushLifecycleController.instance.reconcileOnResume());
     }
+  }
+
+  Future<void> _startPushLifecycle() async {
+    final push = PushLifecycleController.instance;
+    _foregroundPushSubscription = push.foregroundMessages.listen(
+      _presentForegroundPush,
+    );
+    _openedPushSubscription = push.openedMessages.listen(_receivePushOpen);
+    final initial = await push.platform.initialMessage();
+    if (initial != null) _receivePushOpen(initial);
+    await push.activateForAuthenticatedUser();
+
+    bool? authenticated;
+    try {
+      await _authService.getCurrentUser();
+      authenticated = true;
+    } on ApiException catch (exception) {
+      if (exception.statusCode == 401 || exception.statusCode == 403) {
+        authenticated = false;
+      }
+    } catch (_) {
+      authenticated = false;
+    }
+    if (!mounted) return;
+    if (authenticated != null) _resolvePushSession(authenticated);
+    _loadNavigationMetrics();
+  }
+
+  void _resolvePushSession(bool authenticated) {
+    if (!mounted) return;
+    setState(() => _hasSession = authenticated);
+    final pending = _pushOpenGate.resolve(authenticated: authenticated);
+    if (pending != null) unawaited(_openAuthenticatedPush(pending));
+  }
+
+  void _receivePushOpen(PushIncomingMessage message) {
+    final ready = _pushOpenGate.receive(message);
+    if (ready != null) unawaited(_openAuthenticatedPush(ready));
+  }
+
+  void _presentForegroundPush(PushIncomingMessage message) {
+    if (!mounted || !_hasSession) return;
+    final title = message.title?.trim();
+    final body = message.body?.trim();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+          content: Text(
+            [
+              if (title?.isNotEmpty == true) title!,
+              if (body?.isNotEmpty == true) body!,
+            ].join('\n'),
+          ),
+          action: SnackBarAction(
+            label: 'Ouvrir',
+            onPressed: () => _openAuthenticatedPush(message),
+          ),
+        ),
+      );
+    _loadNotificationMetric();
+  }
+
+  Future<void> _openAuthenticatedPush(PushIncomingMessage message) async {
+    if (!mounted || !_hasSession) return;
+    await PushLifecycleController.instance.markReadBestEffort(
+      message.data['notification_id'],
+    );
+    if (!mounted) return;
+    context.go(PushNavigationResolver.fromData(message.data));
+    _loadNotificationMetric();
   }
 
   @override
@@ -141,6 +225,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       try {
         final user = await _authService.getCurrentUser();
         userExperience = UserExperience.fromJson(user);
+        _resolvePushSession(true);
+      } on ApiException catch (exception) {
+        if (exception.statusCode == 401 || exception.statusCode == 403) {
+          _resolvePushSession(false);
+        }
+        userExperience = null;
       } catch (_) {
         userExperience = null;
       }
@@ -247,7 +337,48 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _logout(BuildContext context) async {
-    await _authService.logout();
+    final all = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Déconnecter cet appareil ou tous vos appareils ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cet appareil'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tous les appareils'),
+          ),
+        ],
+      ),
+    );
+    if (all == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await runLogoutWithPushCleanup(
+        cleanup: () =>
+            PushLifecycleController.instance.cleanupForLogout(allDevices: all),
+        logout: all ? _authService.logoutAll : _authService.logout,
+      );
+    } catch (_) {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Déconnexion serveur non confirmée. Vérifiez votre connexion avant de réessayer.',
+            ),
+          ),
+        );
+      }
+    }
+
+    _pushOpenGate.discard();
 
     if (!context.mounted) return;
     context.go('/login');
@@ -260,7 +391,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 900;
+    final isWide = MediaQuery.of(context).size.width >= 1100;
     final title = _navigationTitle(widget.currentPath);
 
     if (isWide) {
@@ -296,23 +427,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            Image.asset(
-              BrandAssets.icon,
-              width: 30,
-              height: 30,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
+        titleSpacing: 8,
+        title: Text(_mobileNavigationTitle(widget.currentPath)),
         actions: [
           _NotificationIconButton(
             unreadNotifications: _unreadNotifications,
             onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            onPressed: () => context.go('/settings'),
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings_rounded),
           ),
           IconButton(
             onPressed: () => _logout(context),
@@ -321,7 +446,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ),
         ],
       ),
-      bottomNavigationBar: _MobileBottomNavigation(
+      bottomNavigationBar: MobileBottomNavigation(
         currentPath: widget.currentPath,
         userExperience: _userExperience,
         unreadNotifications: _unreadNotifications,
@@ -363,9 +488,11 @@ class _TopBar extends StatelessWidget {
     return Container(
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE8E8E8))),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
       ),
       child: Row(
         children: [
@@ -384,6 +511,11 @@ class _TopBar extends StatelessWidget {
           _NotificationIconButton(
             unreadNotifications: unreadNotifications,
             onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            onPressed: () => context.go('/settings'),
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings_rounded),
           ),
           IconButton(
             onPressed: onLogout,
@@ -546,7 +678,7 @@ class _SideMenu extends StatelessWidget {
     return Material(
       color: AppTheme.softBlack,
       child: SizedBox(
-        width: compact ? null : 284,
+        width: compact ? null : 232,
         child: SafeArea(
           child: Column(
             children: [
@@ -573,7 +705,20 @@ class _SideMenu extends StatelessWidget {
               const Divider(color: Colors.white12, height: 1),
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: _LogoutTile(onLogout: onLogout),
+                child: Column(
+                  children: [
+                    _NavigationTile(
+                      item: const _MenuItem(
+                        label: 'Réglages',
+                        icon: Icons.settings_rounded,
+                        path: '/settings',
+                      ),
+                      selected: _isSelected(currentPath, '/settings'),
+                      compact: compact,
+                    ),
+                    _LogoutTile(onLogout: onLogout),
+                  ],
+                ),
               ),
             ],
           ),
@@ -622,7 +767,7 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           SizedBox(
@@ -699,28 +844,26 @@ class _NavigationTile extends StatelessWidget {
     final mutedForeground = selected ? AppTheme.softBlack : Colors.white70;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected
-            ? AppTheme.enactusYellow
-            : Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
+        color: selected ? AppTheme.enactusYellow : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           onTap: () {
             if (compact) Navigator.of(context).pop();
             context.go(item.path);
           },
           child: Container(
-            height: 52,
+            height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected
-                    ? AppTheme.enactusYellow
-                    : Colors.white.withValues(alpha: 0.05),
-              ),
+              borderRadius: BorderRadius.circular(12),
+              border: selected
+                  ? const Border(
+                      left: BorderSide(color: Colors.white, width: 3),
+                    )
+                  : null,
             ),
             child: Row(
               children: [
@@ -830,14 +973,15 @@ class _NotificationIconButton extends StatelessWidget {
   }
 }
 
-class _MobileBottomNavigation extends StatelessWidget {
+class MobileBottomNavigation extends StatelessWidget {
   final String currentPath;
   final UserExperience? userExperience;
   final int? unreadNotifications;
   final int? unreadChatMessages;
   final int? lateTasks;
 
-  const _MobileBottomNavigation({
+  const MobileBottomNavigation({
+    super.key,
     required this.currentPath,
     required this.userExperience,
     required this.unreadNotifications,
@@ -919,6 +1063,48 @@ class _MobileBottomNavigation extends StatelessWidget {
         icon: Icons.history_edu_outlined,
         selectedIcon: Icons.history_edu_rounded,
         path: '/archives',
+      ),
+      _MobileDestination(
+        label: 'Présences',
+        icon: Icons.fact_check_outlined,
+        selectedIcon: Icons.fact_check_rounded,
+        path: '/attendance',
+      ),
+      _MobileDestination(
+        label: 'Pôles',
+        icon: Icons.hub_outlined,
+        selectedIcon: Icons.hub_rounded,
+        path: '/poles',
+      ),
+      _MobileDestination(
+        label: 'Projets',
+        icon: Icons.rocket_launch_outlined,
+        selectedIcon: Icons.rocket_launch_rounded,
+        path: '/projects',
+      ),
+      _MobileDestination(
+        label: 'Événements',
+        icon: Icons.event_outlined,
+        selectedIcon: Icons.event_rounded,
+        path: '/events',
+      ),
+      _MobileDestination(
+        label: 'Finance',
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments_rounded,
+        path: '/finance',
+      ),
+      _MobileDestination(
+        label: 'Alumni',
+        icon: Icons.school_outlined,
+        selectedIcon: Icons.school_rounded,
+        path: '/alumni',
+      ),
+      _MobileDestination(
+        label: 'Recrutement',
+        icon: Icons.how_to_reg_outlined,
+        selectedIcon: Icons.how_to_reg_rounded,
+        path: '/recruitment',
       ),
     ];
     final allowedDestinations = preferred
@@ -1113,6 +1299,8 @@ String _navigationTitle(String currentPath) {
     '/gamification': 'Gamification',
     '/academy': 'EnactSpace Academy',
     '/impact': 'Impact & Performance',
+    '/settings': 'Réglages',
+    '/help': 'Centre d’aide',
   };
 
   return sections.entries
@@ -1121,4 +1309,9 @@ String _navigationTitle(String currentPath) {
         orElse: () => const MapEntry('/dashboard', 'EnactSpace'),
       )
       .value;
+}
+
+String _mobileNavigationTitle(String currentPath) {
+  if (_isSelected(currentPath, '/dashboard')) return 'Accueil';
+  return _navigationTitle(currentPath);
 }

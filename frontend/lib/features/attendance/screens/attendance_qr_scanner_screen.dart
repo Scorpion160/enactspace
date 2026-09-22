@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../models/attendance_qr_model.dart';
 import '../services/attendance_service.dart';
 
@@ -152,72 +153,132 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(width < 560 ? 14 : 24),
-          child: isWide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 5, child: _buildScannerCard()),
-                    const SizedBox(width: 20),
-                    Expanded(flex: 4, child: _buildResultCard()),
-                  ],
-                )
-              : ListView(
-                  children: [
-                    _buildScannerCard(),
-                    const SizedBox(height: 18),
-                    _buildResultCard(),
-                  ],
-                ),
+        child: AppResponsiveContainer(
+          child: Padding(
+            padding: EdgeInsets.all(width < 560 ? 14 : 24),
+            child: isWide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 5, child: _buildScannerCard()),
+                      const SizedBox(width: 20),
+                      Expanded(flex: 4, child: _buildResultCard()),
+                    ],
+                  )
+                : ListView(
+                    children: [
+                      _buildScannerCard(),
+                      const SizedBox(height: 18),
+                      _buildResultCard(),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildScannerCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    MobileScanner(
-                      controller: _scannerController,
-                      onDetect: _handleCapture,
-                    ),
-                    _ScannerFrame(processing: _processing),
-                  ],
-                ),
+    return AppDataCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppSectionHeader(title: 'Pointage de présence'),
+          const SizedBox(height: 6),
+          const Text(
+            'Le QR signé permet d’identifier automatiquement la session concernée.',
+            style: TextStyle(color: AppTheme.secondaryText),
+          ),
+          const SizedBox(height: 16),
+          AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MobileScanner(
+                    controller: _scannerController,
+                    onDetect: _handleCapture,
+                    errorBuilder: (context, error) {
+                      return ColoredBox(
+                        color: AppTheme.softBlack,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.videocam_off_rounded,
+                                  color: AppTheme.enactusYellow,
+                                  size: 44,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Caméra indisponible',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Autorisez la caméra ou utilisez la saisie du code QR.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                OutlinedButton.icon(
+                                  onPressed: _processing
+                                      ? null
+                                      : _openManualEntry,
+                                  icon: const Icon(Icons.keyboard_rounded),
+                                  label: const Text('Saisir un code'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: AppTheme.enactusYellow,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _ScannerFrame(processing: _processing),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _processing ? null : _scanAgain,
-                  icon: const Icon(Icons.qr_code_scanner_rounded),
-                  label: const Text('Scanner'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _processing ? null : _openManualEntry,
-                  icon: const Icon(Icons.keyboard_rounded),
-                  label: const Text('Saisie'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _processing ? null : _scanAgain,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Scanner'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _processing ? null : _openManualEntry,
+                icon: const Icon(Icons.keyboard_rounded),
+                label: const Text('Saisie'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,28 +1,25 @@
+// ignore_for_file: curly_braces_in_flow_control_structures, unused_element
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
-import '../../members/services/members_service.dart';
 import '../../poles/models/pole_model.dart';
-import '../../poles/services/poles_service.dart';
 import '../models/gamification_models.dart';
-import '../services/gamification_service.dart';
+import '../services/gamification_gateway.dart';
 
 class GamificationScreen extends StatefulWidget {
-  const GamificationScreen({super.key});
+  final GamificationGateway? gateway;
+  const GamificationScreen({super.key, this.gateway});
 
   @override
   State<GamificationScreen> createState() => _GamificationScreenState();
 }
 
 class _GamificationScreenState extends State<GamificationScreen> {
-  final AuthService _authService = AuthService();
-  final GamificationService _gamificationService = GamificationService();
-  final MembersService _membersService = MembersService();
-  final PolesService _polesService = PolesService();
+  late final GamificationGateway _gateway;
 
   bool _loading = true;
   String? _error;
@@ -45,6 +42,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiGamificationGateway();
     _loadGamification();
   }
 
@@ -55,38 +53,21 @@ class _GamificationScreenState extends State<GamificationScreen> {
     });
 
     try {
-      final user = UserExperience.fromJson(await _authService.getCurrentUser());
-      final results = await Future.wait<dynamic>([
-        _polesService.getPoles(),
-        _gamificationService.getPoints(
-          userId: user.canManageGamification ? null : user.id,
-        ),
-        _gamificationService.getBadges(),
-        _gamificationService.getUserBadges(
-          userId: user.canManageGamification ? null : user.id,
-        ),
-        _gamificationService.getUserRanking(month: _month, year: _year),
-        _gamificationService.getPoleRanking(month: _month, year: _year),
-        _gamificationService.getMemberOfMonth(month: _month, year: _year),
-        _gamificationService.getPoleOfMonth(month: _month, year: _year),
-      ]);
-      final members = user.canManageGamification
-          ? await _membersService.getMembers()
-          : <MemberModel>[];
+      final data = await _gateway.load(month: _month, year: _year);
 
       if (!mounted) return;
 
       setState(() {
-        _user = user;
-        _members = members;
-        _poles = results[0] as List<PoleModel>;
-        _points = results[1] as List<EngagementPointModel>;
-        _badges = results[2] as List<BadgeModel>;
-        _userBadges = results[3] as List<UserBadgeModel>;
-        _userRanking = results[4] as List<UserRankingModel>;
-        _poleRanking = results[5] as List<PoleRankingModel>;
-        _memberOfMonth = results[6] as MonthlyWinnerModel;
-        _poleOfMonth = results[7] as MonthlyWinnerModel;
+        _user = data.user;
+        _members = data.members;
+        _poles = data.poles;
+        _points = data.points;
+        _badges = data.badges;
+        _userBadges = data.userBadges;
+        _userRanking = data.userRanking;
+        _poleRanking = data.poleRanking;
+        _memberOfMonth = data.memberOfMonth;
+        _poleOfMonth = data.poleOfMonth;
       });
     } catch (e) {
       if (!mounted) return;
@@ -104,7 +85,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
 
   Future<void> _initBadges() async {
     try {
-      final created = await _gamificationService.initDefaultBadges();
+      final created = await _gateway.initDefaultBadges();
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +116,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
         return AwardPointsDialog(
           members: _members,
           poles: _poles,
-          gamificationService: _gamificationService,
+          gateway: _gateway,
         );
       },
     );
@@ -143,6 +124,20 @@ class _GamificationScreenState extends State<GamificationScreen> {
     if (created == true) {
       await _loadGamification();
     }
+  }
+
+  Future<void> _openBadgeManagement() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _BadgeManagementDialog(
+        gateway: _gateway,
+        badges: _badges,
+        userBadges: _userBadges,
+        members: _members,
+        onInitDefaults: _initBadges,
+      ),
+    );
+    await _loadGamification();
   }
 
   void _showError(String message) {
@@ -156,13 +151,13 @@ class _GamificationScreenState extends State<GamificationScreen> {
     if (userId == null || userId.isEmpty) return 'Aucun membre';
     if (userId == _user?.id) return _user!.displayName;
     final member = _members.where((item) => item.id == userId).firstOrNull;
-    return member?.displayName ?? _shortId(userId);
+    return member?.displayName ?? 'Membre indisponible';
   }
 
   String _poleName(String? poleId) {
     if (poleId == null || poleId.isEmpty) return 'Aucun pôle';
     final pole = _poles.where((item) => item.id == poleId).firstOrNull;
-    return pole?.name ?? _shortId(poleId);
+    return pole?.name ?? 'Pôle indisponible';
   }
 
   int get _totalPoints {
@@ -215,7 +210,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
                         personal: !_canManage,
                         onRefresh: _loadGamification,
                         onAwardPoints: _openAwardPointsDialog,
-                        onInitBadges: _initBadges,
+                        onManageBadges: _openBadgeManagement,
                       ),
                       const SizedBox(height: 18),
                       if (_loading)
@@ -274,14 +269,14 @@ class _GamificationHeader extends StatelessWidget {
   final bool personal;
   final VoidCallback onRefresh;
   final VoidCallback onAwardPoints;
-  final VoidCallback onInitBadges;
+  final VoidCallback onManageBadges;
 
   const _GamificationHeader({
     required this.monthLabel,
     required this.personal,
     required this.onRefresh,
     required this.onAwardPoints,
-    required this.onInitBadges,
+    required this.onManageBadges,
   });
 
   @override
@@ -348,9 +343,9 @@ class _GamificationHeader extends StatelessWidget {
                 ),
                 if (!personal) ...[
                   OutlinedButton.icon(
-                    onPressed: onInitBadges,
+                    onPressed: onManageBadges,
                     icon: const Icon(Icons.workspace_premium_rounded),
-                    label: const Text('Badges par défaut'),
+                    label: const Text('Gérer les badges'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white24),
@@ -979,13 +974,13 @@ class _PointTile extends StatelessWidget {
 class AwardPointsDialog extends StatefulWidget {
   final List<MemberModel> members;
   final List<PoleModel> poles;
-  final GamificationService gamificationService;
+  final GamificationGateway gateway;
 
   const AwardPointsDialog({
     super.key,
     required this.members,
     required this.poles,
-    required this.gamificationService,
+    required this.gateway,
   });
 
   @override
@@ -1019,6 +1014,7 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
   }
 
   Future<void> _submit() async {
+    if (_loading) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -1027,7 +1023,7 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
     });
 
     try {
-      await widget.gamificationService.createPoint(
+      await widget.gateway.createPoint(
         userId: _selectedUserId!,
         poleId: _selectedPoleId,
         sourceType: _sourceType,
@@ -1187,6 +1183,253 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
   }
 }
 
+class _BadgeManagementDialog extends StatefulWidget {
+  final GamificationGateway gateway;
+  final List<BadgeModel> badges;
+  final List<UserBadgeModel> userBadges;
+  final List<MemberModel> members;
+  final Future<void> Function() onInitDefaults;
+  const _BadgeManagementDialog({
+    required this.gateway,
+    required this.badges,
+    required this.userBadges,
+    required this.members,
+    required this.onInitDefaults,
+  });
+  @override
+  State<_BadgeManagementDialog> createState() => _BadgeManagementDialogState();
+}
+
+class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
+  bool busy = false;
+  Future<void> _createOrEdit([BadgeModel? badge]) async {
+    final name = TextEditingController(text: badge?.name ?? '');
+    final label = TextEditingController(text: badge?.label ?? '');
+    final description = TextEditingController(text: badge?.description ?? '');
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(badge == null ? 'Créer un badge' : 'Modifier le badge'),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Nom technique'),
+              ),
+              TextField(
+                controller: label,
+                decoration: const InputDecoration(labelText: 'Libellé'),
+              ),
+              TextField(
+                controller: description,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+    if (submitted == true && !busy) {
+      setState(() => busy = true);
+      if (badge == null)
+        await widget.gateway.createBadge(
+          name: name.text,
+          label: label.text,
+          description: description.text,
+        );
+      else
+        await widget.gateway.updateBadge(
+          badge.id,
+          name: name.text,
+          label: label.text,
+          description: description.text,
+        );
+      if (mounted) setState(() => busy = false);
+    }
+    name.dispose();
+    label.dispose();
+    description.dispose();
+  }
+
+  Future<void> _award() async {
+    if (widget.members.isEmpty || widget.badges.isEmpty) return;
+    var userId = widget.members.first.id;
+    var badgeId = widget.badges.first.id;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: const Text('Attribuer un badge'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField(
+                  initialValue: userId,
+                  decoration: const InputDecoration(labelText: 'Membre'),
+                  items: widget.members
+                      .map(
+                        (m) => DropdownMenuItem(
+                          value: m.id,
+                          child: Text(m.displayName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setLocal(() => userId = v!),
+                ),
+                DropdownButtonFormField(
+                  initialValue: badgeId,
+                  decoration: const InputDecoration(labelText: 'Badge'),
+                  items: widget.badges
+                      .map(
+                        (b) =>
+                            DropdownMenuItem(value: b.id, child: Text(b.label)),
+                      )
+                      .toList(),
+                  onChanged: (v) => setLocal(() => badgeId = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Attribuer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && !busy) {
+      setState(() => busy = true);
+      await widget.gateway.awardBadge(userId: userId, badgeId: badgeId);
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Gestion des badges'),
+    content: SizedBox(
+      width: 680,
+      height: 500,
+      child: ListView(
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: busy ? null : () => _createOrEdit(),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Créer badge'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : _award,
+                icon: const Icon(Icons.person_add_rounded),
+                label: const Text('Attribuer badge'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : widget.onInitDefaults,
+                icon: const Icon(Icons.settings_rounded),
+                label: const Text('Initialiser les badges par défaut'),
+              ),
+            ],
+          ),
+          const Divider(height: 28),
+          for (final badge in widget.badges)
+            ListTile(
+              title: Text(badge.label),
+              subtitle: Text(badge.description ?? 'Sans description'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Modifier le badge',
+                    onPressed: busy ? null : () => _createOrEdit(badge),
+                    icon: const Icon(Icons.edit_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Supprimer le badge',
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            setState(() => busy = true);
+                            await widget.gateway.deleteBadge(badge.id);
+                            if (mounted) setState(() => busy = false);
+                          },
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ),
+            ),
+          if (widget.userBadges.isNotEmpty) ...[
+            const Divider(),
+            const Text(
+              'Attributions',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            for (final award in widget.userBadges)
+              ListTile(
+                title: Text(
+                  widget.badges
+                          .where((b) => b.id == award.badgeId)
+                          .firstOrNull
+                          ?.label ??
+                      'Badge',
+                ),
+                subtitle: Text(
+                  widget.members
+                          .where((m) => m.id == award.userId)
+                          .firstOrNull
+                          ?.displayName ??
+                      'Membre',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Retirer le badge',
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          setState(() => busy = true);
+                          await widget.gateway.removeUserBadge(award.id);
+                          if (mounted) setState(() => busy = false);
+                        },
+                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                ),
+              ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      FilledButton(
+        onPressed: busy ? null : () => Navigator.pop(context),
+        child: const Text('Fermer'),
+      ),
+    ],
+  );
+}
+
 class _SectionTitle extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -1318,7 +1561,7 @@ const _sourceTypes = <String, String>{
 };
 
 String _sourceLabel(String sourceType) {
-  return _sourceTypes[sourceType] ?? sourceType;
+  return _sourceTypes[sourceType] ?? 'Source non renseignée';
 }
 
 IconData _badgeIcon(String name) {

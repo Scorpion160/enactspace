@@ -30,6 +30,10 @@ from app.models.task import (
     TaskComment,
 )
 from app.models.document import Document
+from app.models.institutional_document import (
+    InstitutionalDocumentRequest,
+    InstitutionalDocumentSequence,
+)
 from app.models.stored_file import StoredFile
 from app.models.post import Post, PostComment, PostReaction
 from app.models.chat import (
@@ -47,6 +51,13 @@ from app.models.alumni import AlumniProfile, Mentorship
 from app.models.notification import Notification
 from app.models.gamification import EngagementPoint, Badge, UserBadge
 from app.models.audit import AuditLog
+from app.models.account import (
+    UserPreference,
+    LegalDocument,
+    LegalAcceptance,
+    AccountDeletionRequest,
+    AuthSession,
+)
 from app.models.impact import ImpactProject, ImpactMetric, ImpactEvidence
 from app.models.academy import (
     AcademyCourse,
@@ -66,4 +77,26 @@ from app.models.archive import (
     HistoricalDocument,
     HallOfFameEntry,
     HistoricalImpactStatistic,
+)
+from app.models.institutional_memory import (
+    CanonicalProject,
+    CompetitionParticipation,
+    InstitutionalEvent,
+    InstitutionalFramework,
+    InstitutionalGeneration,
+    InstitutionalSource,
+    LeadershipTerm,
+    ProjectAlias,
+    ProjectRelationship,
+    ProjectYear,
+    Territory,
+)
+from app.models.product_services import (
+    AppInstallation,
+    PushDelivery,
+    AppRelease,
+    AppVersionPolicy,
+    ProductFeedback,
+    SupportTicket,
+    SupportTicketMessage,
 )

@@ -2,13 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/realtime/realtime_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/notification_model.dart';
-import '../services/notifications_service.dart';
+import '../models/notification_presentation.dart';
+import '../services/notifications_gateway.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  final NotificationsGateway? gateway;
+
+  const NotificationsScreen({super.key, this.gateway});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -16,11 +18,11 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen>
     with WidgetsBindingObserver {
-  final NotificationsService _service = NotificationsService();
-  final RealtimeService _realtimeService = RealtimeService();
+  late final NotificationsGateway _gateway;
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
+  bool _refreshing = false;
   String? _error;
   Timer? _refreshTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
@@ -36,8 +38,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiNotificationsGateway();
     WidgetsBinding.instance.addObserver(this);
-    _realtimeSubscription = _realtimeService.events.listen((event) {
+    _realtimeSubscription = _gateway.events.listen((event) {
       if (!mounted) return;
       if (event['type'] == 'connected' && event['unread_count'] != null) {
         final unreadCount = int.tryParse(event['unread_count'].toString());
@@ -49,7 +52,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         _loadNotifications(showLoading: false);
       }
     });
-    unawaited(_realtimeService.start());
+    unawaited(_gateway.startRealtime());
     _loadNotifications();
     _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!_loading && mounted) {
@@ -63,7 +66,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     unawaited(_realtimeSubscription?.cancel());
-    unawaited(_realtimeService.dispose());
+    unawaited(_gateway.disposeRealtime());
     _searchController.dispose();
     super.dispose();
   }
@@ -76,6 +79,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Future<void> _loadNotifications({bool showLoading = true}) async {
+    if (_refreshing) return;
+    _refreshing = true;
     if (showLoading) {
       setState(() {
         _loading = true;
@@ -84,17 +89,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
 
     try {
-      final notifications = await _service.getNotifications(
-        unreadOnly: _unreadOnly ? true : null,
-        type: _type,
-      );
-      final unreadCount = await _service.getUnreadCount();
+      final data = await _gateway.load(unreadOnly: _unreadOnly);
 
       if (!mounted) return;
 
       setState(() {
-        _notifications = notifications;
-        _unreadCount = unreadCount;
+        _notifications = data.notifications;
+        _unreadCount = data.unreadCount;
         _lastSyncedAt = DateTime.now();
       });
     } catch (e) {
@@ -104,6 +105,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         _error = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
+      _refreshing = false;
       if (mounted) {
         setState(() {
           if (showLoading) _loading = false;
@@ -112,8 +114,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
-  Future<void> _markAsRead(NotificationModel notification) async {
+  Future<void> _markAsRead(
+    NotificationModel notification, {
+    bool announce = true,
+  }) async {
     if (notification.isRead) return;
+
+    final previousNotifications = List<NotificationModel>.from(_notifications);
+    final previousUnreadCount = _unreadCount;
 
     setState(() {
       _busyNotificationIds.add(notification.id);
@@ -131,16 +139,60 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     });
 
     try {
-      await _service.markAsRead(notification.id);
-      await _loadNotifications();
+      await _gateway.markAsRead(notification.id);
 
       if (!mounted) return;
+      if (announce) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification marquée comme lue.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications = previousNotifications;
+          _unreadCount = previousUnreadCount;
+        });
+      }
+      _showError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _busyNotificationIds.remove(notification.id));
+      }
+    }
+  }
+
+  Future<void> _markAsUnread(NotificationModel notification) async {
+    if (!notification.isRead) return;
+    final previousNotifications = List<NotificationModel>.from(_notifications);
+    final previousUnreadCount = _unreadCount;
+
+    setState(() {
+      _busyNotificationIds.add(notification.id);
+      _notifications = _notifications
+          .map(
+            (item) => item.id == notification.id
+                ? item.copyWith(isRead: false, clearReadAt: true)
+                : item,
+          )
+          .toList();
+      _unreadCount += 1;
+    });
+
+    try {
+      await _gateway.markAsUnread(notification.id);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification marquée comme lue.')),
+        const SnackBar(content: Text('Notification marquée comme non lue.')),
       );
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications = previousNotifications;
+          _unreadCount = previousUnreadCount;
+        });
+      }
       _showError(e);
-      await _loadNotifications();
     } finally {
       if (mounted) {
         setState(() => _busyNotificationIds.remove(notification.id));
@@ -149,6 +201,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Future<void> _markAllAsRead() async {
+    final previousNotifications = List<NotificationModel>.from(_notifications);
+    final previousUnreadCount = _unreadCount;
     setState(() {
       _notifications = _notifications
           .map(
@@ -162,8 +216,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     });
 
     try {
-      final updated = await _service.markAllAsRead();
-      await _loadNotifications();
+      final updated = await _gateway.markAllAsRead();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -172,12 +225,37 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         ),
       );
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _notifications = previousNotifications;
+          _unreadCount = previousUnreadCount;
+        });
+      }
       _showError(e);
-      await _loadNotifications();
     }
   }
 
   Future<void> _deleteNotification(NotificationModel notification) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer la notification'),
+        content: Text('Supprimer « ${notification.title} » ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     final previousNotifications = List<NotificationModel>.from(_notifications);
     final previousUnreadCount = _unreadCount;
 
@@ -190,7 +268,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     });
 
     try {
-      await _service.deleteNotification(notification.id);
+      await _gateway.deleteNotification(notification.id);
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -212,11 +290,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Future<void> _openNotification(NotificationModel notification) async {
-    await _markAsRead(notification);
+    await _markAsRead(notification, announce: false);
     if (!mounted) return;
 
     final route = notification.routePath;
-    if (route == null) {
+    if (route == null || route == '/notifications') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Aucune page liée pour cette notification.'),
@@ -251,9 +329,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         return _notificationDate(b).compareTo(_notificationDate(a));
       });
 
-    if (query.isEmpty) return sorted;
-
     return sorted.where((notification) {
+      if (_type != 'all' && notification.family.value != _type) return false;
+      if (query.isEmpty) return true;
       final searchable = [
         notification.title,
         notification.message ?? '',
@@ -270,7 +348,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return RefreshIndicator(
       onRefresh: _loadNotifications,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).width < 560 ? 10 : 24,
+        ),
         children: [
           _NotificationsHeader(
             total: _notifications.length,
@@ -290,7 +370,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             },
             onTypeChanged: (value) async {
               setState(() => _type = value);
-              await _loadNotifications();
             },
           ),
           const SizedBox(height: 18),
@@ -317,6 +396,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               notifications: _filteredNotifications,
               busyNotificationIds: _busyNotificationIds,
               onMarkAsRead: _markAsRead,
+              onMarkAsUnread: _markAsUnread,
               onOpen: _openNotification,
               onDelete: _deleteNotification,
             ),
@@ -528,82 +608,16 @@ class _NotificationsFilters extends StatelessWidget {
                     isExpanded: true,
                     initialValue: type,
                     decoration: const InputDecoration(labelText: 'Type'),
-                    items: const [
-                      DropdownMenuItem(
+                    items: [
+                      const DropdownMenuItem(
                         value: 'all',
                         child: Text('Tous les types'),
                       ),
-                      DropdownMenuItem(
-                        value: 'task_assigned',
-                        child: Text('Tâche assignée'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'deadline_near',
-                        child: Text('Échéance proche'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'task_late',
-                        child: Text('Tache en retard'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'new_announcement',
-                        child: Text('Annonce'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'chat_message',
-                        child: Text('Nouveau message'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'post_comment',
-                        child: Text('Commentaire'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'post_reaction',
-                        child: Text('Réaction'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'event_scheduled',
-                        child: Text('Evenement'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'absence_recorded',
-                        child: Text('Absence'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'attendance',
-                        child: Text('Présence'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'fee_due',
-                        child: Text('Cotisation'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'payment_validated',
-                        child: Text('Paiement validé'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'payment_submitted',
-                        child: Text('Paiement à vérifier'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'document_shared',
-                        child: Text('Document'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'application_received',
-                        child: Text('Candidature'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'recruitment_update',
-                        child: Text('Recrutement'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'mentorship_assigned',
-                        child: Text('Mentorat'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'general',
-                        child: Text('General'),
+                      ...NotificationFamily.values.map(
+                        (family) => DropdownMenuItem(
+                          value: family.value,
+                          child: Text(family.label),
+                        ),
                       ),
                     ],
                     onChanged: (value) {
@@ -661,6 +675,7 @@ class _NotificationsList extends StatelessWidget {
   final List<NotificationModel> notifications;
   final Set<String> busyNotificationIds;
   final ValueChanged<NotificationModel> onMarkAsRead;
+  final ValueChanged<NotificationModel> onMarkAsUnread;
   final ValueChanged<NotificationModel> onOpen;
   final ValueChanged<NotificationModel> onDelete;
 
@@ -668,6 +683,7 @@ class _NotificationsList extends StatelessWidget {
     required this.notifications,
     required this.busyNotificationIds,
     required this.onMarkAsRead,
+    required this.onMarkAsUnread,
     required this.onOpen,
     required this.onDelete,
   });
@@ -682,6 +698,7 @@ class _NotificationsList extends StatelessWidget {
             notification: notification,
             busy: busyNotificationIds.contains(notification.id),
             onMarkAsRead: onMarkAsRead,
+            onMarkAsUnread: onMarkAsUnread,
             onOpen: onOpen,
             onDelete: onDelete,
           ),
@@ -695,6 +712,7 @@ class _NotificationCard extends StatelessWidget {
   final NotificationModel notification;
   final bool busy;
   final ValueChanged<NotificationModel> onMarkAsRead;
+  final ValueChanged<NotificationModel> onMarkAsUnread;
   final ValueChanged<NotificationModel> onOpen;
   final ValueChanged<NotificationModel> onDelete;
 
@@ -702,13 +720,27 @@ class _NotificationCard extends StatelessWidget {
     required this.notification,
     required this.busy,
     required this.onMarkAsRead,
+    required this.onMarkAsUnread,
     required this.onOpen,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final icon = _iconForType(notification.type);
+    final presentation = notificationPresentation(notification.type);
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
+    final actions = <PopupMenuEntry<String>>[
+      if (notification.routePath != null)
+        const PopupMenuItem(value: 'open', child: Text('Ouvrir')),
+      PopupMenuItem(
+        value: notification.isRead ? 'unread' : 'read',
+        child: Text(
+          notification.isRead ? 'Marquer non lue' : 'Marquer comme lue',
+        ),
+      ),
+      const PopupMenuItem(value: 'delete', child: Text('Supprimer')),
+    ];
 
     return Card(
       child: InkWell(
@@ -724,7 +756,7 @@ class _NotificationCard extends StatelessWidget {
                     ? Colors.grey.shade200
                     : AppTheme.enactusYellow,
                 foregroundColor: AppTheme.softBlack,
-                child: Icon(icon),
+                child: Icon(presentation.icon),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -757,6 +789,7 @@ class _NotificationCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         Chip(label: Text(notification.typeLabel)),
+                        Chip(label: Text(presentation.family.label)),
                         Chip(
                           label: Text(notification.isRead ? 'Lue' : 'Non lue'),
                         ),
@@ -776,6 +809,22 @@ class _NotificationCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
+              else if (compact)
+                Semantics(
+                  label: 'Options de la notification',
+                  button: true,
+                  child: PopupMenuButton<String>(
+                    tooltip: 'Options',
+                    constraints: const BoxConstraints(minWidth: 190),
+                    onSelected: (value) {
+                      if (value == 'open') onOpen(notification);
+                      if (value == 'read') onMarkAsRead(notification);
+                      if (value == 'unread') onMarkAsUnread(notification);
+                      if (value == 'delete') onDelete(notification);
+                    },
+                    itemBuilder: (context) => actions,
+                  ),
+                )
               else
                 Wrap(
                   spacing: 6,
@@ -792,6 +841,12 @@ class _NotificationCard extends StatelessWidget {
                         icon: const Icon(Icons.mark_email_read_rounded),
                         tooltip: 'Marquer comme lue',
                       ),
+                    if (notification.isRead)
+                      IconButton(
+                        onPressed: () => onMarkAsUnread(notification),
+                        icon: const Icon(Icons.mark_email_unread_rounded),
+                        tooltip: 'Marquer comme non lue',
+                      ),
                     IconButton(
                       onPressed: () => onDelete(notification),
                       icon: const Icon(Icons.delete_rounded),
@@ -805,55 +860,6 @@ class _NotificationCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData _iconForType(String type) {
-    switch (type) {
-      case 'task_assigned':
-        return Icons.task_alt_rounded;
-      case 'deadline_near':
-        return Icons.timer_rounded;
-      case 'task_late':
-        return Icons.warning_amber_rounded;
-      case 'new_announcement':
-        return Icons.campaign_rounded;
-      case 'post_comment':
-        return Icons.mode_comment_rounded;
-      case 'post_reaction':
-        return Icons.add_reaction_rounded;
-      case 'event_scheduled':
-        return Icons.event_rounded;
-      case 'absence_recorded':
-        return Icons.person_off_rounded;
-      case 'fee_due':
-        return Icons.account_balance_wallet_rounded;
-      case 'payment_validated':
-        return Icons.verified_rounded;
-      case 'payment_submitted':
-        return Icons.manage_search_rounded;
-      case 'application_received':
-        return Icons.assignment_ind_rounded;
-      case 'recruitment_update':
-        return Icons.how_to_reg_rounded;
-      case 'document_shared':
-        return Icons.description_rounded;
-      case 'mentorship_assigned':
-        return Icons.diversity_3_rounded;
-      case 'chat_message':
-        return Icons.chat_bubble_rounded;
-      case 'attendance':
-        return Icons.fact_check_rounded;
-      case 'payment':
-        return Icons.payments_rounded;
-      case 'document':
-        return Icons.description_rounded;
-      case 'recruitment':
-        return Icons.how_to_reg_rounded;
-      case 'system':
-        return Icons.info_rounded;
-      default:
-        return Icons.notifications_rounded;
-    }
   }
 }
 

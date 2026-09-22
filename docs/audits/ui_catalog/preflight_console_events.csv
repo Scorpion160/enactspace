@@ -1,0 +1,278 @@
+run_id,preflight_id,event_type,level,message,stack,url,expected,classification,fingerprint
+13fce9c0bbc6464aaebb5b58e821cc82,PF01,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF01,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF01,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF02,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF02,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF02,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF03,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF03,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF03,log,error,Failed to load resource: the server responded with a status of 401 (Unauthorized),,http://127.0.0.1:18002/api/auth/token,true,expected_contract_exception,208c0dcd702cb935
+13fce9c0bbc6464aaebb5b58e821cc82,PF03,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF04,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF04,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF04,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF05,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF05,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF05,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF06,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF06,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF06,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF07,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF07,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF07,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF08,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF08,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF08,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF09,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF09,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF09,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF10,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF10,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF10,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF11,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF11,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF11,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c
+13fce9c0bbc6464aaebb5b58e821cc82,PF12,log,error,Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector,,https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2,true,expected_blocked_font_exception,11b35f474b97f654
+13fce9c0bbc6464aaebb5b58e821cc82,PF12,log,verbose,[DOM] Password field is not contained in a form: (More info: https://www.chromium.org/developers/design-documents/create-amazing-password-forms) %o,,http://127.0.0.1:18080/#/login,true,expected_contract_exception,a9412079214729f8
+13fce9c0bbc6464aaebb5b58e821cc82,PF12,runtime_exception,error,"Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)","Error
+    at Object.o (http://127.0.0.1:18080/main.dart.js:3988:20)
+    at http://127.0.0.1:18080/main.dart.js:38918:9
+    at bml.a (http://127.0.0.1:18080/main.dart.js:5338:63)
+    at bml.$2 (http://127.0.0.1:18080/main.dart.js:53602:14)
+    at bkN.$2 (http://127.0.0.1:18080/main.dart.js:53599:16)
+    at afq.yN (http://127.0.0.1:18080/main.dart.js:54720:35)
+    at lZ.Ww (http://127.0.0.1:18080/main.dart.js:53878:18)
+    at b2D.$0 (http://127.0.0.1:18080/main.dart.js:54049:37)
+    at Object.zG (http://127.0.0.1:18080/main.dart.js:5483:78)
+    at aB.iZ (http://127.0.0.1:18080/main.dart.js:53956:3)",http://127.0.0.1:18080/main.dart.js,true,expected_blocked_font_exception,cd5734101734b36c

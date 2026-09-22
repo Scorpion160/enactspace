@@ -42,20 +42,20 @@ class MobileMoneyTransactionModel {
   String get statusLabel {
     switch (status) {
       case 'created':
-        return 'Cree';
+        return 'Créé';
       case 'pending':
       case 'processing':
-        return 'En verification';
+        return 'En vérification';
       case 'successful':
-        return 'Confirme';
+        return 'Confirmé';
       case 'failed':
-        return 'Refuse';
+        return 'Refusé';
       case 'cancelled':
-        return 'Annule';
+        return 'Annulé';
       case 'expired':
-        return 'Expire';
+        return 'Expiré';
       case 'refunded':
-        return 'Rembourse';
+        return 'Remboursé';
       default:
         return status;
     }

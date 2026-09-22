@@ -1,0 +1,362 @@
+[
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "attendance_list_loaded",
+    "active_surface": "attendance_list",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Gestion"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "attendance_card_targeted",
+    "active_surface": "attendance_list",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {
+      "label": "Session audit 2",
+      "text_role": "group",
+      "text_backendDOMNodeId": 193,
+      "text_box": {
+        "x": 654.0,
+        "y": 473.25
+      },
+      "ancestor_role": "rendered_card_hit_target",
+      "ancestor_backendDOMNodeId": null,
+      "ancestor_rect": {
+        "x": 308,
+        "y": 345.75,
+        "width": 692,
+        "height": 255.0
+      },
+      "clicked_box": {
+        "x": 654.0,
+        "y": 409.5
+      },
+      "fallback_reason": "semantic_action_not_exposed_by_flutter",
+      "hit_test": {
+        "tag": "FLT-SEMANTICS",
+        "role": "group",
+        "aria": "Session audit 2\nSession audit 2\nSession deterministe pour QR NFC et justificatifs."
+      },
+      "scroll_steps": 0
+    },
+    "clicked_box": {
+      "x": 654.0,
+      "y": 409.5
+    },
+    "visible_markers": [
+      "Session audit 2"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "attendance_detail_confirmed",
+    "active_surface": "attendance_detail",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Clôturer"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "confirmed"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "detail_marker:Pilotage de la session",
+    "active_surface": "attendance_detail",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Pilotage de la session"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "scroll",
+    "active_surface": "attendance_detail",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {
+      "tag": "FLT-SEMANTICS",
+      "role": "",
+      "scrollTop": 0
+    },
+    "clicked_box": {},
+    "visible_markers": [],
+    "scroll_target": {
+      "x": 512.0,
+      "y": 552.96
+    },
+    "scroll_steps": 1,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "detail_marker:Pointage NFC",
+    "active_surface": "attendance_detail",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Pointage NFC"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 1,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF09",
+    "step": "detail_marker:Visibilité SG",
+    "active_surface": "attendance_detail",
+    "route": "/attendance",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Visibilité SG"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "archive_list_loaded",
+    "active_surface": "archive_list",
+    "route": "/archives",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "DIMBALI"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "archive_card_targeted",
+    "active_surface": "archive_list",
+    "route": "/archives",
+    "modal_count": 0,
+    "dialog_count": 0,
+    "actionable_target": {
+      "label": "DIMBALI",
+      "text_role": "group",
+      "text_backendDOMNodeId": 172,
+      "text_box": {
+        "x": 581.5,
+        "y": 566.5000305175781
+      },
+      "ancestor_role": "rendered_card_hit_target",
+      "ancestor_backendDOMNodeId": null,
+      "ancestor_rect": {
+        "x": 308,
+        "y": 397.00006103515625,
+        "width": 547,
+        "height": 338.99993896484375
+      },
+      "clicked_box": {
+        "x": 581.5,
+        "y": 481.7500457763672
+      },
+      "fallback_reason": "semantic_action_not_exposed_by_flutter",
+      "hit_test": {
+        "tag": "FLT-SEMANTICS",
+        "role": "group",
+        "aria": "DIMBALI\nProjet lancé à Ngayène Sabakh pour combattre la malnutrition et renforcer durablement les revenus des femmes."
+      },
+      "scroll_steps": 1
+    },
+    "clicked_box": {
+      "x": 581.5,
+      "y": 481.7500457763672
+    },
+    "visible_markers": [
+      "DIMBALI"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "archive_modal_confirmed",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "DIMBALI",
+      "Fermer"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "confirmed"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Problème",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Problème"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Solution",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Solution"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Impacts et indicateurs",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Impacts et indicateurs"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "scroll",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {
+      "tag": "FLT-SEMANTICS",
+      "role": "",
+      "scrollTop": 0
+    },
+    "clicked_box": {},
+    "visible_markers": [],
+    "scroll_target": {
+      "x": 720.0,
+      "y": 612.0
+    },
+    "scroll_steps": 1,
+    "result": ""
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Prix",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Prix"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 1,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Leçons apprises",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Leçons apprises"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  },
+  {
+    "run_id": "13fce9c0bbc6464aaebb5b58e821cc82",
+    "preflight_id": "PF12",
+    "step": "modal_marker:Fermer",
+    "active_surface": "archive_project_modal",
+    "route": "/archives",
+    "modal_count": 7,
+    "dialog_count": 0,
+    "actionable_target": {},
+    "clicked_box": {},
+    "visible_markers": [
+      "Fermer"
+    ],
+    "scroll_target": {},
+    "scroll_steps": 0,
+    "result": "found"
+  }
+]

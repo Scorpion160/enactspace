@@ -1,0 +1,87 @@
+{
+  "runtime_verified": true,
+  "applications_count": 37,
+  "mutation_performed": false,
+  "captures": [
+    {
+      "filename": "01_recruitment_workbench_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": null,
+      "expected_markers": ["Recrutement", "37 candidatures", "1–15 sur 37 candidatures", "Ouvrir le dossier"],
+      "reached_markers": ["Recrutement", "37 candidatures", "1–15 sur 37 candidatures", "Ouvrir le dossier"],
+      "screenshot_sha256": "66e238fcd18a8a3b0e0b3a7040badacc40565b87e1856cae4cec2476b5974c0b",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_recruitment_filters_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": null,
+      "expected_markers": ["Filtres (1)", "Mode anonymisé", "Réinitialiser", "1–15 sur 37 candidatures"],
+      "reached_markers": ["Filtres (1)", "Mode anonymisé", "Réinitialiser", "1–15 sur 37 candidatures"],
+      "screenshot_sha256": "8aea8f3af7b498dd2d03dbd520fbd1b05376e50d274b850881acf942488684b9",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_recruitment_filters_mobile_390x844.png",
+      "viewport": "390x844",
+      "target_reference": null,
+      "expected_markers": ["Filtres", "Rechercher", "Campagne", "Statut", "Pôle", "37 candidatures"],
+      "reached_markers": ["Filtres", "Rechercher", "Campagne", "Statut", "Pôle", "37 candidatures"],
+      "screenshot_sha256": "69b03309f9182ff66d196758a823d47345a56344385ac81ac83d538db875e21f",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_candidate_summary_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "expected_markers": ["Complete Dossier", "En cours d’étude", "Résumé", "03/08/2026", "Disponibilité"],
+      "reached_markers": ["Complete Dossier", "En cours d’étude", "Résumé", "03/08/2026", "Disponibilité"],
+      "screenshot_sha256": "78c25b7b4a9e1f7f474df003eb2f112125f0a740598bd341a2ebc2373afce5dc",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_candidate_responses_documents_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "expected_markers": ["Réponses", "Documents", "CV", "Lettre de motivation", "Document complémentaire", "Consulter"],
+      "reached_markers": ["Réponses", "Documents", "CV", "Lettre de motivation", "Document complémentaire", "Consulter"],
+      "screenshot_sha256": "4ec4189156128869cd3872f86055f39b4aa679fb5a56f70da8edf3b15f850bfb",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_candidate_reviews_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "expected_markers": ["Évaluations", "Moyenne officielle : 16.5/20", "17.0/20 · Favorable", "16.0/20 · Avec réserves"],
+      "reached_markers": ["Évaluations", "Moyenne officielle : 16.5/20", "17.0/20 · Favorable", "16.0/20 · Avec réserves"],
+      "screenshot_sha256": "f14c84ad5eb8bfcfb75f842f8f8b0737bef4f9753cc45ce76a7775fb8f9c93e2",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_candidate_interview_tablet_768x1024.png",
+      "viewport": "768x1024",
+      "target_reference": "AUDIT-REC-INTERVIEW-001",
+      "expected_markers": ["Interview Planifie", "Entretien programmé", "10/08/2026 14:30", "Salle Audit Synthétique A1"],
+      "reached_markers": ["Interview Planifie", "Entretien programmé", "10/08/2026 14:30", "Salle Audit Synthétique A1"],
+      "screenshot_sha256": "dc466cc5b08c175cbc70dcd7d75c02349f5ebf2d876afda86657addb444697f8",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_candidate_detail_mobile_390x844.png",
+      "viewport": "390x844",
+      "target_reference": "AUDIT-REC-COMPLETE-001",
+      "expected_markers": ["Complete Dossier", "En cours d’étude", "Résumé", "Identité", "Pôle préféré"],
+      "reached_markers": ["Complete Dossier", "En cours d’étude", "Résumé", "Identité", "Pôle préféré"],
+      "screenshot_sha256": "ea31bbc82f626836d8cf982cb36926288ad2e3e412fa7150b48c8323458e245e",
+      "mutation_performed": false,
+      "success": true
+    }
+  ]
+}

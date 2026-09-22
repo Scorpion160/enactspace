@@ -1,0 +1,95 @@
+[
+  {
+    "filename": "01_campaign_mobile_390x844.png",
+    "viewport": "390x844",
+    "route": "/recruitment/apply",
+    "target_reference": "AUDIT-REC-CAMPAIGN-OPEN",
+    "expected_markers": ["EnactSpace", "campagne ouverte", "période", "description", "Commencer ma candidature"],
+    "reached_markers": ["EnactSpace", "AUDIT-REC-CAMPAIGN-OPEN", "Période : Du 04/07/2026 au 01/11/2026", "DOCUMENT SYNTHÉTIQUE — AUDIT UNIQUEMENT", "Commencer ma candidature"],
+    "screenshot_sha256": "6ffefea2d7ff12f2be9c25b6a715751bbfe1403a60c0bd207891996ca6554770",
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "02_application_identity_mobile_390x844.png",
+    "viewport": "390x844",
+    "route": "/recruitment/apply/b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+    "target_reference": "AUDIT-REC-CAMPAIGN-OPEN",
+    "expected_markers": ["Étape 1 sur 6", "Ton identité", "Prénom", "Nom", "Adresse e-mail", "Suivant"],
+    "reached_markers": ["Étape 1 sur 6", "Ton identité", "Prénom", "Nom", "Adresse e-mail", "Suivant"],
+    "screenshot_sha256": "fc8ae48b0a8632b115c68f86304676eab67abde088784301967e5099a18f6439",
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "03_application_progress_tablet_768x1024.png",
+    "viewport": "768x1024",
+    "route": "/recruitment/apply/b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+    "target_reference": "LOCAL_SYNTHETIC_DRAFT",
+    "expected_markers": ["Étape 2 sur 6", "Ton parcours", "progression", "champs remplis", "Retour", "Suivant"],
+    "reached_markers": ["Étape 2 sur 6", "Ton parcours", "Master 1 synthétique", "Innovation sociale", "Promotion Audit 2026", "Retour", "Suivant"],
+    "screenshot_sha256": "c61f0fc4bb00e6e27a65ca6e46cc9289dd22e6780d604717d47feb0947359ba3",
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "04_application_review_desktop_1366x768.png",
+    "viewport": "1366x768",
+    "route": "/recruitment/apply/b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+    "target_reference": "LOCAL_SYNTHETIC_DRAFT",
+    "expected_markers": ["Étape 6 sur 6", "Vérification", "Campagne", "Identité", "Parcours", "Motivations", "Disponibilités", "Documents", "Modifier", "confirmation", "Envoyer ma candidature"],
+    "reached_markers": ["Étape 6 sur 6", "Vérification", "Campagne", "Identité", "Parcours", "Motivations", "Disponibilités", "Documents", "Modifier", "J’ai vérifié les informations de ma candidature", "Envoyer ma candidature"],
+    "screenshot_sha256": "d03603b150fc95d44215409fba4ad5b193ebba810e836537b0cf1ff16a6009a8",
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "05_application_success_mobile_390x844.png",
+    "viewport": "390x844",
+    "route": "/recruitment/apply/b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+    "target_reference": "AUDIT-REC-SIMULATED-LOCAL",
+    "expected_markers": ["Candidature envoyée", "campagne", "e-mail", "code de suivi", "Copier le code", "Suivre ma candidature", "Retour à la connexion"],
+    "reached_markers": ["Candidature envoyée", "AUDIT-REC-CAMPAIGN-OPEN", "audit.local.capture@example.com", "AUDIT-REC-SIMULATED-LOCAL", "Copier le code", "Suivre ma candidature", "Retour à la connexion"],
+    "screenshot_sha256": "97f810dbb81526ece68472fb278becb2878e211bcadabdbac35700e4a5baff74",
+    "simulation_used": true,
+    "real_submission_performed": false,
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "06_tracking_submitted_mobile_390x844.png",
+    "viewport": "390x844",
+    "route": "/application-tracking",
+    "target_reference": "AUDIT-REC-TRACK-001",
+    "expected_markers": ["Reçue", "explication", "chronologie", "Prochaine étape"],
+    "reached_markers": ["Reçue", "Ta candidature a bien été transmise à l’équipe", "Candidature reçue", "Étude du dossier", "Entretien", "Décision", "Prochaine étape"],
+    "screenshot_sha256": "4040f24a10a709304c68b406aef0ac3467846c4d0c477df07dc27fbdfa465af8",
+    "runtime_fixture_used": true,
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "07_tracking_interview_desktop_1366x768.png",
+    "viewport": "1366x768",
+    "route": "/application-tracking",
+    "target_reference": "AUDIT-REC-INTERVIEW-001",
+    "expected_markers": ["Entretien programmé", "chronologie", "10/08/2026 à 14:30", "Salle Audit Synthétique A1"],
+    "reached_markers": ["Entretien programmé", "Candidature reçue", "Étude du dossier", "Entretien", "Décision", "10/08/2026 à 14:30", "Salle Audit Synthétique A1"],
+    "screenshot_sha256": "f5f2f6934e8b4b08514afad64361acbb8d9cc151b8065c5c84ba87b3c28f4957",
+    "runtime_fixture_used": true,
+    "mutation_performed": false,
+    "success": true
+  },
+  {
+    "filename": "08_tracking_decision_mobile_390x844.png",
+    "viewport": "390x844",
+    "route": "/application-tracking",
+    "target_reference": "AUDIT-REC-ACCEPTED-001",
+    "expected_markers": ["Candidature retenue", "chronologie", "explication", "Prochaine étape"],
+    "reached_markers": ["Candidature retenue", "Candidature reçue", "Étude du dossier", "Entretien", "Décision", "Profil retenu pour la prochaine étape d’intégration", "Prochaine étape"],
+    "screenshot_sha256": "d8ab229bd4c530deb1f5f3b9bbd189550c57d4a85deb89845570fa347a06479f",
+    "runtime_fixture_used": true,
+    "mutation_performed": false,
+    "success": true
+  }
+]

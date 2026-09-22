@@ -628,7 +628,7 @@ class _ProjectCard extends StatelessWidget {
               style: const TextStyle(height: 1.4),
             ),
             const SizedBox(height: 16),
-            _ProgressLine(progress: project.progress, color: statusColor),
+            _ProgressLine(progress: 0, color: statusColor),
             const SizedBox(height: 16),
             _ProjectInfoBlock(
               icon: Icons.report_problem_rounded,
@@ -1054,7 +1054,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     ),
                   ],
                   const SizedBox(height: 18),
-                  _ProgressLine(progress: project.progress, color: statusColor),
+                  _ProgressLine(progress: 0, color: statusColor),
                   const SizedBox(height: 12),
                   _ProjectStatusPanel(
                     project: project,
@@ -1119,10 +1119,6 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (_isTerrasenProject(project)) ...[
-                    const _TerrasenReferenceCard(),
-                    const SizedBox(height: 16),
-                  ],
                   const _ProjectActionPanel(),
                   const SizedBox(height: 16),
                   _ProjectLogPreview(project: project),
@@ -1198,7 +1194,7 @@ class _ProjectStatusPanel extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${project.statusLabel} · ${project.progress}% · $started · $ended',
+                '${project.statusLabel} · Progression non disponible · $started · $ended',
                 style: const TextStyle(color: Colors.black54, height: 1.35),
               ),
               if (updating) ...[
@@ -1422,136 +1418,6 @@ class _ProjectTeamPanel extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-
-class _TerrasenReferenceCard extends StatelessWidget {
-  const _TerrasenReferenceCard();
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (
-        Icons.agriculture_rounded,
-        'Volets',
-        'Production, transformation, conservation et distribution.',
-      ),
-      (
-        Icons.groups_2_rounded,
-        'Cibles',
-        'Yeumbeul, Passy, Khaffe, Ngayenne Sabakh, vendeuses de legumes, COUD et UCAD.',
-      ),
-      (
-        Icons.memory_rounded,
-        'Innovation',
-        'Arrosage automatise ESP32, capteur humidite, relais, pompe et controle Wi-Fi.',
-      ),
-      (
-        Icons.verified_rounded,
-        'Preuves',
-        'Transferts 2024, immersions terrain, recettes produits et budget documente.',
-      ),
-    ];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.auto_stories_rounded, color: AppTheme.enactusYellow),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Repères document TERRASEN',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = constraints.maxWidth >= 620
-                  ? (constraints.maxWidth - 12) / 2
-                  : constraints.maxWidth;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final item in items)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _TerrasenReferenceItem(
-                        icon: item.$1,
-                        title: item.$2,
-                        body: item.$3,
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TerrasenReferenceItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _TerrasenReferenceItem({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CircleAvatar(
-          radius: 17,
-          backgroundColor: AppTheme.enactusYellow,
-          foregroundColor: AppTheme.softBlack,
-          child: Icon(icon, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                body,
-                style: const TextStyle(color: Colors.white70, height: 1.35),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -2196,31 +2062,6 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
     }
   }
 
-  void _prefillTerrasenFromDocument() {
-    setState(() {
-      _nameController.text = 'TERRASEN';
-      _status = 'deploiement';
-      _descriptionController.text =
-          'Projet integre agriculture et elevage concu par Enactus ESP pour renforcer l’autonomie alimentaire des menages vulnerables au Senegal. Il articule micro-jardinage sur table, irrigation, transformation agroalimentaire, conservation et distribution.';
-      _problemController.text =
-          'L’insecurite alimentaire, la dependance aux importations, la rarete des terres cultivables, les variations climatiques et le cout eleve des intrants fragilisent les menages ruraux et periurbains ainsi que les petits producteurs.';
-      _solutionController.text =
-          'Deployement de micro-jardins sur table, systeme goutte-a-goutte, arrosage automatise ESP32, transformation de produits locaux (sirop de menthe, jus betterave-carotte, the de bissap, confiture, sauce verte, conserves), conservation par sechage solaire/sacs thermiques et distribution ciblee.';
-      _objectivesController.text =
-          'Former les beneficiaires, transferer des technologies simples, produire localement, reduire les pertes post-recolte, creer de la valeur economique et structurer une chaine production-transformation-conservation-distribution reproductible.';
-      _impactController.text =
-          'Cibles documentees: GIE Anddeu takku ligueye a Yeumbeul (10 a 15 personnes), GIE Waar wi a Passy (35 personnes dont 20 femmes), Khaffe, Ngayenne Sabakh, Passy, vendeuses de legumes, personnels du COUD et etudiants UCAD. ODD: 8, 11, 12, 13 et 15.';
-      _budgetController.text = '1406820';
-      _startedAt = DateTime(2024, 8);
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fiche TERRASEN pre-remplie depuis le document projet.'),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -2244,12 +2085,6 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _saving ? null : _prefillTerrasenFromDocument,
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('Préremplir TERRASEN'),
-                  ),
-                  const SizedBox(height: 18),
                   TextFormField(
                     controller: _nameController,
                     decoration: const InputDecoration(
@@ -2531,7 +2366,7 @@ String _initials(String name) {
 }
 
 int _projectReadinessScore(ProjectModel project) {
-  var score = project.progress;
+  var score = 0;
 
   if ((project.problemStatement ?? '').trim().length >= 40) score += 10;
   if ((project.solution ?? '').trim().length >= 40) score += 10;
@@ -2542,10 +2377,6 @@ int _projectReadinessScore(ProjectModel project) {
   if (project.endedAt != null) score += 5;
 
   return score.clamp(0, 100);
-}
-
-bool _isTerrasenProject(ProjectModel project) {
-  return project.name.trim().toLowerCase().contains('terrasen');
 }
 
 String _money(double value) {

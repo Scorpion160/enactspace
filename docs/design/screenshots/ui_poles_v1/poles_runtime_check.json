@@ -1,0 +1,68 @@
+{
+  "environment": "ui_audit",
+  "checked_at": "2026-08-27",
+  "read_only": true,
+  "application_mutation_performed": false,
+  "endpoints": [
+    {"method": "GET", "path": "/api/poles/", "status": 200},
+    {"method": "GET", "path": "/api/poles/9d6dfde4-38dc-5716-aea5-63cf976d2921/members", "status": 200},
+    {"method": "GET", "path": "/api/poles/4a6e778d-d6f6-5dee-886e-a964ba7f9388/members", "status": 200},
+    {"method": "GET", "path": "/api/tasks/pole/9d6dfde4-38dc-5716-aea5-63cf976d2921", "status": 200},
+    {"method": "GET", "path": "/api/tasks/4b32ab9b-c676-5029-9497-577f3ed68f41/assignees", "status": 200},
+    {"method": "GET", "path": "/api/events/", "status": 200},
+    {"method": "GET", "path": "/api/documents/?pole_id=9d6dfde4-38dc-5716-aea5-63cf976d2921", "status": 200},
+    {"method": "GET", "path": "/api/posts/?pole_id=9d6dfde4-38dc-5716-aea5-63cf976d2921", "status": 200}
+  ],
+  "poles_count": 8,
+  "technique": {
+    "pole_id": "9d6dfde4-38dc-5716-aea5-63cf976d2921",
+    "active_members_count": 8,
+    "positions": {
+      "chef_pole": 1,
+      "adjoint_chef_pole": 1,
+      "membre": 6
+    },
+    "legacy_positions_present": false,
+    "canonical_managers_authorized": true,
+    "blocked_tasks_count": 1,
+    "overdue_tasks_count": 5
+  },
+  "empty_pole": {
+    "id": "4a6e778d-d6f6-5dee-886e-a964ba7f9388",
+    "active_members_count": 0,
+    "project_links_count": 0
+  },
+  "inactive_membership": {
+    "id": "441be915-688f-5b23-b6f3-0e91d62d459d",
+    "hidden_from_active_members_endpoint": true,
+    "reactivable_by_existing_post_contract": true
+  },
+  "future_task": {
+    "id": "4b32ab9b-c676-5029-9497-577f3ed68f41",
+    "reference": "AUDIT-POLE-NEXT-ACTION-001",
+    "present": true,
+    "assignee_present": true,
+    "assignee_is_active_pole_member": true
+  },
+  "future_event": {
+    "id": "acd3068c-803e-5544-bb84-ccf4b2c99bd3",
+    "reference": "AUDIT-POLE-EVENT-FUTURE-001",
+    "present": true
+  },
+  "documents": {
+    "available": true,
+    "count": 5,
+    "sample_id": "5c194df1-52ac-5bf2-821e-7c0c1e9eae1b",
+    "sample_title": "Document audit 1",
+    "sample_status": "validated",
+    "sample_visibility": "public"
+  },
+  "activity": {
+    "available": true,
+    "count": 2,
+    "sample_id": "17ab6cea-0984-5d9a-9b2e-99bfc821dd38",
+    "sample_type": "official",
+    "sample_visibility": "internal"
+  },
+  "contains_credentials_or_tokens": false
+}

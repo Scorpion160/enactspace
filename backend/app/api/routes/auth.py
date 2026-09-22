@@ -1,8 +1,10 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -11,6 +13,8 @@ from app.models.user import User, PasswordResetOtp
 from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
+    RefreshTokenRequest,
+    AuthSessionRead,
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordResetRequestRead,
@@ -20,7 +24,17 @@ from app.schemas.auth import (
 from app.core.security import (
     verify_password,
     hash_password,
-    create_access_token,
+)
+from app.api.deps import get_current_active_validated_user
+from app.models.account import AuthSession
+from app.services.audit_service import create_audit_log
+from app.services.session_service import (
+    create_session_tokens,
+    revoke_current_session,
+    revoke_user_sessions,
+    rotate_refresh_token,
+    session_seconds_remaining,
+    utc_now,
 )
 
 
@@ -55,7 +69,13 @@ def normalize_login_email(email: str) -> str:
 
 def authenticate_user(email: str, password: str, db: Session) -> User:
     normalized_email = normalize_login_email(email)
-    user = db.query(User).filter(User.email == normalized_email).first()
+    user = (
+        db.query(User)
+        .filter(func.lower(User.email) == normalized_email)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if not user:
         raise HTTPException(
@@ -118,16 +138,26 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = authenticate_user(
         email=payload.email,
         password=payload.password,
         db=db,
     )
 
-    token = create_access_token(str(user.id))
-
-    return TokenResponse(access_token=token)
+    _, access_token, refresh_token = create_session_tokens(
+        db,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        platform=payload.platform,
+    )
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
 
 
 @router.post("/join-requests", response_model=JoinRequestRead)
@@ -162,7 +192,8 @@ def create_join_request(
             detail="Complétez au moins identité, email et filière",
         )
 
-    existing = db.query(User).filter(User.email == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    existing = db.query(User).filter(func.lower(User.email) == normalized_email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -172,7 +203,7 @@ def create_join_request(
     user = User(
         first_name=first_name,
         last_name=last_name,
-        email=payload.email,
+        email=normalized_email,
         phone=optional_text(payload.phone),
         gender=gender,
         profile_type=profile_type,
@@ -191,7 +222,14 @@ def create_join_request(
     )
 
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte existe déjà avec cet email",
+        ) from exc
     db.refresh(user)
 
     return JoinRequestRead(
@@ -208,7 +246,9 @@ def request_password_reset(
     payload: PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(
+        func.lower(User.email) == payload.email.strip().lower()
+    ).first()
     otp = f"{secrets.randbelow(1_000_000):06d}"
 
     if user and user.is_active:
@@ -241,7 +281,9 @@ def confirm_password_reset(
     payload: PasswordResetConfirm,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(
+        func.lower(User.email) == payload.email.strip().lower()
+    ).first()
     reset_otp = None
     if user:
         reset_otp = db.query(PasswordResetOtp).filter(
@@ -276,6 +318,16 @@ def confirm_password_reset(
         )
 
     user.password_hash = hash_password(new_password)
+    revoked_count = revoke_user_sessions(db, user.id)
+    if revoked_count:
+        create_audit_log(
+            db,
+            action="session_revoked",
+            user_id=user.id,
+            entity_type="user",
+            entity_id=user.id,
+            new_value={"reason": "password_reset", "count": revoked_count},
+        )
     db.delete(reset_otp)
     user.updated_at = datetime.utcnow()
     db.commit()
@@ -285,6 +337,7 @@ def confirm_password_reset(
 
 @router.post("/token", response_model=TokenResponse)
 def login_for_swagger(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -294,6 +347,106 @@ def login_for_swagger(
         db=db,
     )
 
-    token = create_access_token(str(user.id))
+    _, access_token, refresh_token = create_session_tokens(
+        db,
+        user,
+        user_agent=request.headers.get("user-agent"),
+        platform="api",
+    )
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+    )
 
-    return TokenResponse(access_token=token)
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
+    auth_session, access_token, refresh_token = rotate_refresh_token(db, payload.refresh_token)
+    remaining = session_seconds_remaining(auth_session)
+    db.commit()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_expires_in=remaining,
+    )
+
+
+@router.post("/logout", status_code=204)
+def logout(payload: RefreshTokenRequest, request: Request, db: Session = Depends(get_db)):
+    authorization = request.headers.get("authorization", "")
+    access_token = authorization[7:] if authorization.lower().startswith("bearer ") else None
+    auth_session = revoke_current_session(db, payload.refresh_token, access_token=access_token)
+    if auth_session is not None:
+        create_audit_log(
+            db, "session_revoked", auth_session.user_id, "auth_session", auth_session.id,
+        )
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/sessions", response_model=list[AuthSessionRead])
+def list_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    return db.query(AuthSession).filter(
+        AuthSession.user_id == current_user.id,
+        AuthSession.revoked_at.is_(None),
+        AuthSession.expires_at > utc_now(),
+    ).order_by(AuthSession.created_at.desc()).all()
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def revoke_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    # Match rotation's lock order before touching the session or its audit FK.
+    db.query(User.id).filter(User.id == current_user.id).with_for_update().first()
+    auth_session = db.query(AuthSession).filter(
+        AuthSession.id == session_id,
+        AuthSession.user_id == current_user.id,
+    ).populate_existing().with_for_update().first()
+    if auth_session is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    if auth_session.revoked_at is None:
+        auth_session.revoked_at = utc_now()
+        create_audit_log(
+            db, "session_revoked", current_user.id,
+            "auth_session", auth_session.id,
+        )
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/logout-all")
+def logout_all(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    from app.services.push_lifecycle import disable_user_push
+
+    revoked_count = revoke_user_sessions(db, current_user.id)
+    revoked_installations, cancelled_push = disable_user_push(
+        db, current_user.id, revoke=True
+    )
+    create_audit_log(
+        db, "logout_all", current_user.id, "user", current_user.id,
+        new_value={
+            "revoked_sessions": revoked_count,
+            "revoked_installations": revoked_installations,
+            "cancelled_push_deliveries": cancelled_push,
+        },
+    )
+    db.commit()
+    return {
+        "ok": True,
+        "revoked_sessions": revoked_count,
+        "revoked_installations": revoked_installations,
+        "cancelled_push_deliveries": cancelled_push,
+    }

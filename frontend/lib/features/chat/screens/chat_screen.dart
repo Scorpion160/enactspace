@@ -7,16 +7,23 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
-import '../../../core/realtime/realtime_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
-import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
-import '../../projects/services/projects_service.dart';
 import '../models/chat_models.dart';
+import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
+import '../widgets/chat_layout.dart';
+import '../widgets/chat_states.dart';
+import '../widgets/composer.dart';
+import '../widgets/conversation_header.dart';
+import '../widgets/conversation_list.dart';
+import '../widgets/media_ui.dart';
+import '../widgets/message_bubble.dart';
+import '../widgets/message_list.dart';
+import '../widgets/new_conversation_dialog.dart';
+import '../widgets/thread_info.dart';
 
 enum _LocalMessageStatus { sending, failed }
 
@@ -48,19 +55,16 @@ class _PendingMessageDraft {
 
 class ChatScreen extends StatefulWidget {
   final String? initialThreadId;
+  final ChatGateway? gateway;
 
-  const ChatScreen({super.key, this.initialThreadId});
+  const ChatScreen({super.key, this.initialThreadId, this.gateway});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ChatService _chatService = ChatService();
-  final AuthService _authService = AuthService();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
-  final RealtimeService _realtimeService = RealtimeService();
+  late final ChatGateway _gateway;
   final TextEditingController _messageController = TextEditingController();
 
   bool _loading = true;
@@ -100,12 +104,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiChatGateway();
     _pendingThreadId = _normalizeThreadId(widget.initialThreadId);
-    _realtimeSubscription = _realtimeService.events.listen(
-      _handleRealtimeEvent,
-    );
+    _realtimeSubscription = _gateway.events.listen(_handleRealtimeEvent);
     _messageController.addListener(_handleComposerChanged);
-    unawaited(_realtimeService.start());
+    unawaited(_gateway.startRealtime());
     _loadChat();
     _syncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (mounted && !_loading && !_messagesLoading && !_sending) {
@@ -134,7 +137,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _syncTimer?.cancel();
     unawaited(_realtimeSubscription?.cancel());
-    unawaited(_realtimeService.dispose());
+    unawaited(_gateway.disposeRealtime());
     _messageController.dispose();
     super.dispose();
   }
@@ -234,7 +237,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendReadReceipt(String threadId) {
-    _realtimeService.send({'type': 'read', 'thread_id': threadId});
+    _gateway.sendRealtime({'type': 'read', 'thread_id': threadId});
   }
 
   void _handleComposerChanged() {
@@ -255,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         _typingSent = true;
         _typingThreadId = threadId;
-        _realtimeService.send({
+        _gateway.sendRealtime({
           'type': 'typing',
           'thread_id': threadId,
           'is_typing': true,
@@ -281,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingSent = false;
     _typingThreadId = null;
     if (threadId != null) {
-      _realtimeService.send({
+      _gateway.sendRealtime({
         'type': 'typing',
         'thread_id': threadId,
         'is_typing': false,
@@ -326,22 +329,20 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final user = UserExperience.fromJson(await _authService.getCurrentUser());
-      final pinnedThreadIds = await _chatService.getPinnedThreadIds(
+      final user = await _gateway.getCurrentUser();
+      final pinnedThreadIds = await _gateway.getPinnedThreadIds(
         userId: user.id,
       );
-      final hiddenThreadIds = await _chatService.getHiddenThreadIds(
+      final hiddenThreadIds = await _gateway.getHiddenThreadIds(
         userId: user.id,
       );
-      final mediaCacheSettings = await _chatService.getMediaCacheSettings(
+      final mediaCacheSettings = await _gateway.getMediaCacheSettings(
         userId: user.id,
       );
-      final mediaCacheBytes = await _chatService.estimateLocalMediaCacheBytes(
+      final mediaCacheBytes = await _gateway.estimateLocalMediaCacheBytes(
         userId: user.id,
       );
-      final cachedThreads = await _chatService.getCachedThreads(
-        userId: user.id,
-      );
+      final cachedThreads = await _gateway.getCachedThreads(userId: user.id);
 
       if (mounted && cachedThreads.isNotEmpty) {
         setState(() {
@@ -361,8 +362,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _openPendingThread(cachedThreads);
       }
 
-      final threads = await _chatService.getThreads();
-      await _chatService.cacheThreads(userId: user.id, threads: threads);
+      final threads = await _gateway.getThreads();
+      await _gateway.cacheThreads(userId: user.id, threads: threads);
 
       if (!mounted) return;
 
@@ -520,18 +521,18 @@ class _ChatScreenState extends State<ChatScreen> {
       final userId = _user?.id;
       if (userId != null) {
         if (_hiddenThreadIds.contains(thread.id)) {
-          await _chatService.setThreadHidden(
+          await _gateway.setThreadHidden(
             userId: userId,
             threadId: thread.id,
             hidden: false,
           );
           _hiddenThreadIds.remove(thread.id);
         }
-        pinnedMessageIds = await _chatService.getPinnedMessageIds(
+        pinnedMessageIds = await _gateway.getPinnedMessageIds(
           userId: userId,
           threadId: thread.id,
         );
-        final cached = await _chatService.getCachedMessages(
+        final cached = await _gateway.getCachedMessages(
           userId: userId,
           threadId: thread.id,
         );
@@ -546,8 +547,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
-      final messages = await _chatService.getMessages(thread.id);
-      await _chatService.markThreadAsRead(thread.id);
+      final messages = await _gateway.getMessages(thread.id);
+      await _gateway.markThreadAsRead(thread.id);
       _sendReadReceipt(thread.id);
       if (!mounted) return;
       setState(() {
@@ -564,7 +565,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _markThreadLocallyRead(thread.id);
       });
       if (userId != null) {
-        await _chatService.cacheMessages(
+        await _gateway.cacheMessages(
           userId: userId,
           threadId: thread.id,
           messages: messages,
@@ -623,7 +624,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _replaceLocalMessage(localId, message);
       });
       if (_user != null) {
-        await _chatService.cacheMessages(
+        await _gateway.cacheMessages(
           userId: _user!.id,
           threadId: thread.id,
           messages: _cacheableMessages(_messages),
@@ -685,7 +686,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _replaceLocalMessage(localId, message);
       });
       if (_user != null) {
-        await _chatService.cacheMessages(
+        await _gateway.cacheMessages(
           userId: _user!.id,
           threadId: thread.id,
           messages: _cacheableMessages(_messages),
@@ -712,7 +713,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required ChatThreadModel thread,
     required _PendingMessageDraft draft,
   }) {
-    return _chatService.sendMessage(
+    return _gateway.sendMessage(
       threadId: thread.id,
       content: draft.content,
       messageType: draft.messageType,
@@ -744,7 +745,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _replaceLocalMessage(localMessage.id, message);
       });
       if (_user != null) {
-        await _chatService.cacheMessages(
+        await _gateway.cacheMessages(
           userId: _user!.id,
           threadId: thread.id,
           messages: _cacheableMessages(_messages),
@@ -773,7 +774,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final attachment = await showDialog<_OutgoingAttachment>(
       context: context,
       builder: (context) => _AttachmentMessageDialog(
-        chatService: _chatService,
+        chatService: _gateway,
         threadId: _selectedThread!.id,
       ),
     );
@@ -783,9 +784,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _refreshThreads() async {
-    final threads = await _chatService.getThreads();
+    final threads = await _gateway.getThreads();
     if (_user != null) {
-      await _chatService.cacheThreads(userId: _user!.id, threads: threads);
+      await _gateway.cacheThreads(userId: _user!.id, threads: threads);
     }
     if (!mounted) return;
     setState(() {
@@ -814,9 +815,9 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final threads = await _chatService.getThreads();
+      final threads = await _gateway.getThreads();
       if (user != null) {
-        await _chatService.cacheThreads(userId: user.id, threads: threads);
+        await _gateway.cacheThreads(userId: user.id, threads: threads);
       }
 
       final selectedThread = selectedId == null
@@ -825,14 +826,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
       List<ChatMessageModel>? messages;
       if (selectedThread != null) {
-        messages = await _chatService.getMessages(selectedThread.id);
+        messages = await _gateway.getMessages(selectedThread.id);
         if (user != null) {
-          await _chatService.cacheMessages(
+          await _gateway.cacheMessages(
             userId: user.id,
             threadId: selectedThread.id,
             messages: messages,
           );
-          await _chatService.markThreadAsRead(selectedThread.id);
+          await _gateway.markThreadAsRead(selectedThread.id);
           _sendReadReceipt(selectedThread.id);
         }
       }
@@ -898,11 +899,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _openNewThreadDialog() async {
     final created = await showDialog<ChatThreadModel>(
       context: context,
-      builder: (context) => NewChatThreadDialog(
-        chatService: _chatService,
-        polesService: _polesService,
-        projectsService: _projectsService,
-      ),
+      builder: (context) => NewChatThreadDialog(chatService: _gateway),
     );
 
     if (created == null) return;
@@ -918,15 +915,15 @@ class _ChatScreenState extends State<ChatScreen> {
     await showDialog<void>(
       context: context,
       builder: (context) => _MediaCacheControlsDialog(
-        chatService: _chatService,
+        chatService: _gateway,
         userId: user.id,
         initialSettings: _mediaCacheSettings,
         initialCacheBytes: _mediaCacheBytes,
       ),
     );
 
-    final settings = await _chatService.getMediaCacheSettings(userId: user.id);
-    final cacheBytes = await _chatService.estimateLocalMediaCacheBytes(
+    final settings = await _gateway.getMediaCacheSettings(userId: user.id);
+    final cacheBytes = await _gateway.estimateLocalMediaCacheBytes(
       userId: user.id,
     );
     if (!mounted) return;
@@ -942,7 +939,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (user == null || thread == null) return;
 
     final shouldPin = !_pinnedThreadIds.contains(thread.id);
-    await _chatService.setThreadPinned(
+    await _gateway.setThreadPinned(
       userId: user.id,
       threadId: thread.id,
       pinned: shouldPin,
@@ -969,7 +966,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (user == null || thread == null) return;
 
     final shouldPin = !_pinnedMessageIds.contains(message.id);
-    await _chatService.setMessagePinned(
+    await _gateway.setMessagePinned(
       userId: user.id,
       threadId: thread.id,
       messageId: message.id,
@@ -1027,12 +1024,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       if (shouldRemove) {
-        await _chatService.deleteMessageReaction(
+        await _gateway.deleteMessageReaction(
           threadId: thread.id,
           messageId: message.id,
         );
       } else {
-        await _chatService.reactToMessage(
+        await _gateway.reactToMessage(
           threadId: thread.id,
           messageId: message.id,
           reactionType: emoji,
@@ -1155,7 +1152,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _stopTyping();
     _clearTypingIndicators();
-    await _chatService.deleteThread(thread.id);
+    await _gateway.deleteThread(thread.id);
     if (!mounted) return;
     setState(() {
       _selectedThread = null;
@@ -1171,7 +1168,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _stopTyping();
     _clearTypingIndicators();
-    await _chatService.setThreadHidden(
+    await _gateway.setThreadHidden(
       userId: user.id,
       threadId: thread.id,
       hidden: true,
@@ -1193,7 +1190,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (context) => _ConversationInfoDialog(
         thread: thread,
-        chatService: _chatService,
+        chatService: _gateway,
         currentUserId: _user?.id,
         pinned: _pinnedThreadIds.contains(thread.id),
         onChanged: () async {
@@ -1210,7 +1207,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onLeave: () async {
           final user = _user;
           if (user == null) return;
-          await _chatService.removeParticipant(
+          await _gateway.removeParticipant(
             threadId: thread.id,
             userId: user.id,
           );
@@ -1233,14 +1230,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 final selectedIds = await showDialog<List<String>>(
                   context: context,
                   builder: (context) => _AddChatMembersDialog(
-                    chatService: _chatService,
+                    chatService: _gateway,
                     existingUserIds: thread.participantsPreview
                         .map((participant) => participant.userId)
                         .toSet(),
                   ),
                 );
                 if (selectedIds == null || selectedIds.isEmpty) return;
-                await _chatService.addParticipants(
+                await _gateway.addParticipants(
                   threadId: thread.id,
                   userIds: selectedIds,
                 );
@@ -1273,66 +1270,63 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 920;
-
-        if (!isWide) {
-          return _buildMobileChat();
-        }
-
-        return RefreshIndicator(
-          onRefresh: _loadChat,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
-                  child: Column(
-                    children: [
-                      _ChatHeader(
-                        onNewThread: _openNewThreadDialog,
-                        onMediaCache: _openMediaCacheControls,
-                        usingLocalCache: _usingLocalCache,
-                      ),
-                      const SizedBox(height: 16),
-                      if (_loading)
-                        const _LoadingCard()
-                      else if (_error != null)
-                        _ErrorCard(message: _error!, onRetry: _loadChat)
-                      else
-                        SizedBox(
-                          height: MediaQuery.sizeOf(context).height - 170,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(
-                                width: 360,
-                                child: _ThreadsPanel(
-                                  threads: _threads,
-                                  selectedThread: _selectedThread,
-                                  pinnedThreadIds: _pinnedThreadIds,
-                                  onlineUserIds: _onlineUserIds,
-                                  currentUserId: _user?.id,
-                                  onSelect: _selectThread,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(child: _conversationPanel()),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return ChatResponsiveLayout(
+      desktopBuilder: (_) => _buildDesktopChat(),
+      mobileBuilder: (_) => _buildMobileChat(),
     );
   }
+
+  Widget _buildDesktopChat() => RefreshIndicator(
+    onRefresh: _loadChat,
+    child: ListView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1280),
+            child: Column(
+              children: [
+                _ChatHeader(
+                  onNewThread: _openNewThreadDialog,
+                  onMediaCache: _openMediaCacheControls,
+                  usingLocalCache: _usingLocalCache,
+                ),
+                const SizedBox(height: 16),
+                if (_loading)
+                  const _LoadingCard()
+                else if (_error != null)
+                  _ErrorCard(message: _error!, onRetry: _loadChat)
+                else
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height - 170,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: 360,
+                          child: ConversationListRegion(
+                            child: _ThreadsPanel(
+                              threads: _threads,
+                              selectedThread: _selectedThread,
+                              pinnedThreadIds: _pinnedThreadIds,
+                              onlineUserIds: _onlineUserIds,
+                              currentUserId: _user?.id,
+                              onSelect: _selectThread,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(child: _conversationPanel()),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildMobileChat() {
     if (_loading) {
@@ -1364,15 +1358,17 @@ class _ChatScreenState extends State<ChatScreen> {
           onMediaCache: _openMediaCacheControls,
         ),
         Expanded(
-          child: _ThreadsPanel(
-            threads: _threads,
-            selectedThread: null,
-            pinnedThreadIds: _pinnedThreadIds,
-            onlineUserIds: _onlineUserIds,
-            currentUserId: _user?.id,
-            onSelect: _selectThread,
-            framed: false,
-            compact: true,
+          child: ConversationListRegion(
+            child: _ThreadsPanel(
+              threads: _threads,
+              selectedThread: null,
+              pinnedThreadIds: _pinnedThreadIds,
+              onlineUserIds: _onlineUserIds,
+              currentUserId: _user?.id,
+              onSelect: _selectThread,
+              framed: false,
+              compact: true,
+            ),
           ),
         ),
       ],
@@ -1382,59 +1378,65 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _conversationPanel({bool showBack = false, bool framed = true}) {
     final content = Column(
       children: [
-        _ConversationHeader(
-          thread: _selectedThread,
-          currentUserId: _user?.id,
-          online:
-              _selectedThread != null &&
-              _isDirectThreadOnline(
-                _selectedThread!,
-                _user?.id,
-                _onlineUserIds,
-              ),
-          showBack: showBack,
-          pinned: _selectedThread == null
-              ? false
-              : _pinnedThreadIds.contains(_selectedThread!.id),
-          syncing: _backgroundSyncing,
-          lastSyncedAt: _lastSyncedAt,
-          onBack: _leaveSelectedThread,
-          onInfo: _openConversationInfo,
-          onTogglePin: _toggleSelectedThreadPin,
+        ConversationHeaderRegion(
+          child: _ConversationHeader(
+            thread: _selectedThread,
+            currentUserId: _user?.id,
+            online:
+                _selectedThread != null &&
+                _isDirectThreadOnline(
+                  _selectedThread!,
+                  _user?.id,
+                  _onlineUserIds,
+                ),
+            showBack: showBack,
+            pinned: _selectedThread == null
+                ? false
+                : _pinnedThreadIds.contains(_selectedThread!.id),
+            syncing: _backgroundSyncing,
+            lastSyncedAt: _lastSyncedAt,
+            onBack: _leaveSelectedThread,
+            onInfo: _openConversationInfo,
+            onTogglePin: _toggleSelectedThreadPin,
+          ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: _messagesLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _selectedThread == null
-              ? const _EmptyConversation()
-              : _MessagesList(
-                  thread: _selectedThread!,
-                  messages: _messages
-                      .where(
-                        (message) => !_hiddenMessageIds.contains(message.id),
-                      )
-                      .toList(),
-                  currentUserId: _user?.id,
-                  pinnedMessageIds: _pinnedMessageIds,
-                  messageReactions: _messageReactions,
-                  removedServerReactionIds: _removedServerReactionIds,
-                  localMessageStatuses: _localMessageStatuses,
-                  onMessageLongPress: _openMessageActions,
-                  onRetryMessage: _retryMessage,
-                ),
+          child: MessageListRegion(
+            child: _messagesLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _selectedThread == null
+                ? const _EmptyConversation()
+                : _MessagesList(
+                    thread: _selectedThread!,
+                    messages: _messages
+                        .where(
+                          (message) => !_hiddenMessageIds.contains(message.id),
+                        )
+                        .toList(),
+                    currentUserId: _user?.id,
+                    pinnedMessageIds: _pinnedMessageIds,
+                    messageReactions: _messageReactions,
+                    removedServerReactionIds: _removedServerReactionIds,
+                    localMessageStatuses: _localMessageStatuses,
+                    onMessageLongPress: _openMessageActions,
+                    onRetryMessage: _retryMessage,
+                  ),
+          ),
         ),
         if (_selectedThread != null)
           if (_typingUsers.isNotEmpty)
             _TypingIndicator(names: _typingUsers.values.toList()),
         if (_selectedThread != null)
-          _MessageComposer(
-            controller: _messageController,
-            sending: _sending,
-            replyingTo: _replyingToMessage,
-            onClearReply: _clearReply,
-            onSend: _sendMessage,
-            onAttach: _openAttachmentDialog,
+          ChatComposerRegion(
+            child: _MessageComposer(
+              controller: _messageController,
+              sending: _sending,
+              replyingTo: _replyingToMessage,
+              onClearReply: _clearReply,
+              onSend: _sendMessage,
+              onAttach: _openAttachmentDialog,
+            ),
           ),
       ],
     );
@@ -1948,6 +1950,7 @@ class _ConversationHeader extends StatelessWidget {
           ? IconButton(
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: 'Retour',
             )
           : _ChatAvatar(
               title: title,
@@ -1974,6 +1977,7 @@ class _ConversationHeader extends StatelessWidget {
       trailing: thread == null
           ? null
           : PopupMenuButton<String>(
+              tooltip: 'Options',
               onSelected: (value) {
                 if (value == 'pin') onTogglePin();
                 if (value == 'info') onInfo();
@@ -2097,82 +2101,66 @@ class _MessagesList extends StatelessWidget {
         );
         final localStatus = mine ? localMessageStatuses[message.id] : null;
 
-        return Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: GestureDetector(
-            onLongPress: () => onMessageLongPress(message),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: mine ? AppTheme.enactusYellow : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomRight: mine ? const Radius.circular(4) : null,
-                  bottomLeft: mine ? null : const Radius.circular(4),
+        return ChatMessageBubble(
+          mine: mine,
+          pinned: pinned,
+          onLongPress: () => onMessageLongPress(message),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (pinned)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Icon(Icons.push_pin_rounded, size: 14),
                 ),
-                border: pinned
-                    ? Border.all(color: AppTheme.softBlack, width: 1.4)
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (pinned)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 4),
-                      child: Icon(Icons.push_pin_rounded, size: 14),
+              ChatMediaRegion(child: _MessageBody(message: message)),
+              if (reaction != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: mine
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
-                  _MessageBody(message: message),
-                  if (reaction != null) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: mine
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.black.withValues(alpha: 0.06),
-                          ),
-                        ),
-                        child: Text(reaction),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
                       ),
+                    ),
+                    child: Text(reaction),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm').format(message.createdAt),
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.48),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (mine) ...[
+                    const SizedBox(width: 5),
+                    _MessageStatusIndicator(
+                      status: localStatus,
+                      readByOthers: readByOthers,
+                      onRetry: localStatus == _LocalMessageStatus.failed
+                          ? () => onRetryMessage(message)
+                          : null,
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        DateFormat('HH:mm').format(message.createdAt),
-                        style: TextStyle(
-                          color: Colors.black.withValues(alpha: 0.48),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (mine) ...[
-                        const SizedBox(width: 5),
-                        _MessageStatusIndicator(
-                          status: localStatus,
-                          readByOthers: readByOthers,
-                          onRetry: localStatus == _LocalMessageStatus.failed
-                              ? () => onRetryMessage(message)
-                              : null,
-                        ),
-                      ],
-                    ],
-                  ),
                 ],
               ),
-            ),
+            ],
           ),
         );
       },
@@ -2607,6 +2595,7 @@ class _MessageComposer extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: onClearReply,
+                    tooltip: 'Annuler la réponse',
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
@@ -2632,7 +2621,7 @@ class _MessageComposer extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                tooltip: 'Joindre',
+                tooltip: 'Pièce jointe',
                 onPressed: sending ? null : onAttach,
                 icon: const Icon(Icons.attach_file_rounded),
               ),
@@ -2651,6 +2640,7 @@ class _MessageComposer extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               IconButton.filled(
+                tooltip: 'Envoyer',
                 onPressed: sending ? null : onSend,
                 icon: sending
                     ? const SizedBox(
@@ -2669,7 +2659,7 @@ class _MessageComposer extends StatelessWidget {
 }
 
 class _MediaCacheControlsDialog extends StatefulWidget {
-  final ChatService chatService;
+  final ChatGateway chatService;
   final String userId;
   final ChatMediaCacheSettings initialSettings;
   final int initialCacheBytes;
@@ -2813,7 +2803,7 @@ class _MediaCacheControlsDialogState extends State<_MediaCacheControlsDialog> {
 
 class _ConversationInfoDialog extends StatelessWidget {
   final ChatThreadModel thread;
-  final ChatService chatService;
+  final ChatGateway chatService;
   final String? currentUserId;
   final bool pinned;
   final Future<void> Function() onChanged;
@@ -2844,160 +2834,162 @@ class _ConversationInfoDialog extends StatelessWidget {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Infos'),
-      content: SizedBox(
-        width: (MediaQuery.sizeOf(context).width - 32)
-            .clamp(280.0, 520.0)
-            .toDouble(),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ChatAvatar(
-                title: title,
-                imageUrl: _threadAvatarUrl(thread, currentUserId),
-                selected: true,
-                icon: thread.threadType == 'direct'
-                    ? Icons.person_rounded
-                    : Icons.groups_rounded,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
+      content: ThreadInfoRegion(
+        child: SizedBox(
+          width: (MediaQuery.sizeOf(context).width - 32)
+              .clamp(280.0, 520.0)
+              .toDouble(),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ChatAvatar(
+                  title: title,
+                  imageUrl: _threadAvatarUrl(thread, currentUserId),
+                  selected: true,
+                  icon: thread.threadType == 'direct'
+                      ? Icons.person_rounded
+                      : Icons.groups_rounded,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _threadSubtitle(thread, currentUserId),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 16),
-              _ConversationInfoGrid(
-                children: [
-                  _ConversationInfoTile(
-                    icon: thread.threadType == 'direct'
-                        ? Icons.lock_person_rounded
-                        : Icons.groups_2_rounded,
-                    label: 'Type',
-                    value: _conversationTypeLabel(thread),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
                   ),
-                  if (directParticipant != null) ...[
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _threadSubtitle(thread, currentUserId),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 16),
+                _ConversationInfoGrid(
+                  children: [
                     _ConversationInfoTile(
-                      icon: Icons.alternate_email_rounded,
-                      label: 'Email',
-                      value: directParticipant.email.isEmpty
-                          ? 'Non renseigné'
-                          : directParticipant.email,
+                      icon: thread.threadType == 'direct'
+                          ? Icons.lock_person_rounded
+                          : Icons.groups_2_rounded,
+                      label: 'Type',
+                      value: _conversationTypeLabel(thread),
                     ),
-                    _ConversationInfoTile(
-                      icon: Icons.verified_user_rounded,
-                      label: 'Statut',
-                      value: _memberStatusLabel(directParticipant.status),
-                    ),
-                    _ConversationInfoTile(
-                      icon: Icons.badge_rounded,
-                      label: 'Rôle',
-                      value: _participantRoleLabel(
-                        directParticipant.participantRole,
+                    if (directParticipant != null) ...[
+                      _ConversationInfoTile(
+                        icon: Icons.alternate_email_rounded,
+                        label: 'Email',
+                        value: directParticipant.email.isEmpty
+                            ? 'Non renseigné'
+                            : directParticipant.email,
                       ),
-                    ),
-                  ] else ...[
-                    _ConversationInfoTile(
-                      icon: Icons.admin_panel_settings_rounded,
-                      label: 'Admins',
-                      value:
-                          '${thread.participantsPreview.where((participant) => participant.participantRole == 'owner' || participant.participantRole == 'admin').length}',
-                    ),
-                    _ConversationInfoTile(
-                      icon: Icons.hub_rounded,
-                      label: 'Portée',
-                      value: _conversationScopeLabel(thread),
-                    ),
-                    _ConversationInfoTile(
-                      icon: Icons.person_outline_rounded,
-                      label: 'Votre rôle',
-                      value: _participantRoleLabel(thread.currentUserRole),
-                    ),
+                      _ConversationInfoTile(
+                        icon: Icons.verified_user_rounded,
+                        label: 'Statut',
+                        value: _memberStatusLabel(directParticipant.status),
+                      ),
+                      _ConversationInfoTile(
+                        icon: Icons.badge_rounded,
+                        label: 'Rôle',
+                        value: _participantRoleLabel(
+                          directParticipant.participantRole,
+                        ),
+                      ),
+                    ] else ...[
+                      _ConversationInfoTile(
+                        icon: Icons.admin_panel_settings_rounded,
+                        label: 'Admins',
+                        value:
+                            '${thread.participantsPreview.where((participant) => participant.participantRole == 'owner' || participant.participantRole == 'admin').length}',
+                      ),
+                      _ConversationInfoTile(
+                        icon: Icons.hub_rounded,
+                        label: 'Portée',
+                        value: _conversationScopeLabel(thread),
+                      ),
+                      _ConversationInfoTile(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Votre rôle',
+                        value: _participantRoleLabel(thread.currentUserRole),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                alignment: WrapAlignment.center,
-                children: [
-                  _ConversationActionButton(
-                    onPressed: onTogglePin,
-                    icon: pinned
-                        ? Icons.push_pin_rounded
-                        : Icons.push_pin_outlined,
-                    label: pinned ? 'Désépingler' : 'Épingler',
-                  ),
-                  if (onAddMember != null)
-                    _ConversationActionButton(
-                      onPressed: onAddMember,
-                      icon: Icons.person_add_alt_1_rounded,
-                      label: 'Ajouter',
-                    ),
-                  if (thread.threadType != 'direct')
-                    _ConversationActionButton(
-                      onPressed: onLeave,
-                      icon: Icons.logout_rounded,
-                      label: 'Quitter',
-                    ),
-                  _ConversationActionButton(
-                    onPressed: onHideForMe,
-                    icon: Icons.delete_sweep_rounded,
-                    label: 'Supprimer pour moi',
-                  ),
-                  if (onDelete != null) ...[
-                    _ConversationActionButton(
-                      onPressed: onDelete,
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Supprimer pour tous',
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 18),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${thread.participantsCount} participant(s)',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
-              ),
-              const SizedBox(height: 8),
-              ...thread.participantsPreview.map((participant) {
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: _ChatAvatar(
-                    title: participant.displayName,
-                    imageUrl: _absoluteUrl(participant.photoUrl),
-                    selected: false,
-                    icon: Icons.person_rounded,
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _ConversationActionButton(
+                      onPressed: onTogglePin,
+                      icon: pinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
+                      label: pinned ? 'Désépingler' : 'Épingler',
+                    ),
+                    if (onAddMember != null)
+                      _ConversationActionButton(
+                        onPressed: onAddMember,
+                        icon: Icons.person_add_alt_1_rounded,
+                        label: 'Ajouter',
+                      ),
+                    if (thread.threadType != 'direct')
+                      _ConversationActionButton(
+                        onPressed: onLeave,
+                        icon: Icons.logout_rounded,
+                        label: 'Quitter',
+                      ),
+                    _ConversationActionButton(
+                      onPressed: onHideForMe,
+                      icon: Icons.delete_sweep_rounded,
+                      label: 'Supprimer pour moi',
+                    ),
+                    if (onDelete != null) ...[
+                      _ConversationActionButton(
+                        onPressed: onDelete,
+                        icon: Icons.delete_outline_rounded,
+                        label: 'Supprimer pour tous',
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${thread.participantsCount} participant(s)',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  title: Text(participant.displayName),
-                  subtitle: Text(
-                    _participantSubtitle(participant),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: _ParticipantManagementMenu(
-                    thread: thread,
-                    participant: participant,
-                    currentUserId: currentUserId,
-                    chatService: chatService,
-                    onChanged: onChanged,
-                  ),
-                );
-              }),
-            ],
+                ),
+                const SizedBox(height: 8),
+                ...thread.participantsPreview.map((participant) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: _ChatAvatar(
+                      title: participant.displayName,
+                      imageUrl: _absoluteUrl(participant.photoUrl),
+                      selected: false,
+                      icon: Icons.person_rounded,
+                    ),
+                    title: Text(participant.displayName),
+                    subtitle: Text(
+                      _participantSubtitle(participant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: _ParticipantManagementMenu(
+                      thread: thread,
+                      participant: participant,
+                      currentUserId: currentUserId,
+                      chatService: chatService,
+                      onChanged: onChanged,
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
       ),
@@ -3119,7 +3111,7 @@ class _ParticipantManagementMenu extends StatelessWidget {
   final ChatThreadModel thread;
   final ChatThreadMemberModel participant;
   final String? currentUserId;
-  final ChatService chatService;
+  final ChatGateway chatService;
   final Future<void> Function() onChanged;
 
   const _ParticipantManagementMenu({
@@ -3217,7 +3209,7 @@ class _ParticipantManagementMenu extends StatelessWidget {
 }
 
 class _AddChatMembersDialog extends StatefulWidget {
-  final ChatService chatService;
+  final ChatGateway chatService;
   final Set<String> existingUserIds;
 
   const _AddChatMembersDialog({
@@ -3300,6 +3292,7 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
                   onPressed: _loadContacts,
+                  tooltip: 'Rechercher des membres',
                   icon: const Icon(Icons.arrow_forward_rounded),
                 ),
               ),
@@ -3438,7 +3431,7 @@ class _PickedFilePreview extends StatelessWidget {
 }
 
 class _AttachmentMessageDialog extends StatefulWidget {
-  final ChatService chatService;
+  final ChatGateway chatService;
   final String threadId;
 
   const _AttachmentMessageDialog({
@@ -3836,16 +3829,9 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 }
 
 class NewChatThreadDialog extends StatefulWidget {
-  final ChatService chatService;
-  final PolesService polesService;
-  final ProjectsService projectsService;
+  final ChatGateway chatService;
 
-  const NewChatThreadDialog({
-    super.key,
-    required this.chatService,
-    required this.polesService,
-    required this.projectsService,
-  });
+  const NewChatThreadDialog({super.key, required this.chatService});
 
   @override
   State<NewChatThreadDialog> createState() => _NewChatThreadDialogState();
@@ -3886,8 +3872,8 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
     try {
       final results = await Future.wait<dynamic>([
         widget.chatService.getContacts(search: _searchController.text),
-        widget.polesService.getPoles(),
-        widget.projectsService.getProjects(),
+        widget.chatService.getPoles(),
+        widget.chatService.getProjects(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -3969,166 +3955,173 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Nouvelle conversation'),
-      content: SizedBox(
-        width: (MediaQuery.sizeOf(context).width - 32)
-            .clamp(280.0, 560.0)
-            .toDouble(),
-        height: (MediaQuery.sizeOf(context).height * 0.66)
-            .clamp(360.0, 620.0)
-            .toDouble(),
-        child: Column(
-          children: [
-            if (_error != null) _DialogError(message: _error!),
-            if (_threadType != 'direct') ...[
-              TextField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Nom de la conversation',
-                  prefixIcon: Icon(Icons.title_rounded),
+      content: NewConversationDialogRegion(
+        child: SizedBox(
+          width: (MediaQuery.sizeOf(context).width - 32)
+              .clamp(280.0, 560.0)
+              .toDouble(),
+          height: (MediaQuery.sizeOf(context).height * 0.66)
+              .clamp(360.0, 620.0)
+              .toDouble(),
+          child: Column(
+            children: [
+              if (_error != null) _DialogError(message: _error!),
+              if (_threadType != 'direct') ...[
+                TextField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom de la conversation',
+                    prefixIcon: Icon(Icons.title_rounded),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            DropdownButtonFormField<String>(
-              initialValue: _threadType,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Type de chat',
-                prefixIcon: Icon(Icons.forum_rounded),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'direct', child: Text('Privé')),
-                DropdownMenuItem(value: 'group', child: Text('Groupe libre')),
-                DropdownMenuItem(value: 'pole', child: Text('Chat de pôle')),
-                DropdownMenuItem(
-                  value: 'project',
-                  child: Text('Chat de projet'),
-                ),
-                DropdownMenuItem(value: 'enacchef', child: Text('Enacchef')),
+                const SizedBox(height: 12),
               ],
-              onChanged: _creating
-                  ? null
-                  : (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _threadType = value;
-                        _scopeId = null;
-                        if (value == 'direct') {
-                          _titleController.clear();
-                        }
-                        if (value == 'direct' && _selectedIds.length > 1) {
-                          final first = _selectedIds.first;
-                          _selectedIds
-                            ..clear()
-                            ..add(first);
-                        }
-                      });
-                    },
-            ),
-            if (_threadType == 'pole') ...[
-              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _scopeId,
+                initialValue: _threadType,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Pôle',
-                  prefixIcon: Icon(Icons.hub_rounded),
+                  labelText: 'Type de chat',
+                  prefixIcon: Icon(Icons.forum_rounded),
                 ),
-                items: _poles.map((pole) {
-                  return DropdownMenuItem(
-                    value: pole.id,
-                    child: Text(pole.name),
-                  );
-                }).toList(),
+                items: const [
+                  DropdownMenuItem(value: 'direct', child: Text('Privé')),
+                  DropdownMenuItem(value: 'group', child: Text('Groupe libre')),
+                  DropdownMenuItem(value: 'club', child: Text('Club Enactus')),
+                  DropdownMenuItem(value: 'pole', child: Text('Chat de pôle')),
+                  DropdownMenuItem(
+                    value: 'project',
+                    child: Text('Chat de projet'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'enacchef',
+                    child: Text('Responsables Enactus'),
+                  ),
+                ],
                 onChanged: _creating
                     ? null
-                    : (value) => setState(() => _scopeId = value),
-              ),
-            ],
-            if (_threadType == 'project') ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _scopeId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Projet',
-                  prefixIcon: Icon(Icons.rocket_launch_rounded),
-                ),
-                items: _projects.map((project) {
-                  return DropdownMenuItem(
-                    value: project.id,
-                    child: Text(project.name),
-                  );
-                }).toList(),
-                onChanged: _creating
-                    ? null
-                    : (value) => setState(() => _scopeId = value),
-              ),
-            ],
-            if (_threadType == 'pole' ||
-                _threadType == 'project' ||
-                _threadType == 'enacchef') ...[
-              const SizedBox(height: 10),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Les membres du périmètre seront ajoutés automatiquement. Tu peux ajouter d’autres participants si besoin.',
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: _threadType == 'direct'
-                    ? 'Rechercher une personne'
-                    : 'Ajouter des membres',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                  onPressed: _loadContacts,
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                ),
-              ),
-              onSubmitted: (_) => _loadContacts(),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      itemCount: _contacts.length,
-                      itemBuilder: (context, index) {
-                        final contact = _contacts[index];
-                        final selected = _selectedIds.contains(contact.id);
-
-                        return CheckboxListTile(
-                          value: selected,
-                          onChanged: (value) {
-                            setState(() {
-                              if (value == true) {
-                                if (_threadType == 'direct') {
-                                  _selectedIds.clear();
-                                }
-                                _selectedIds.add(contact.id);
-                              } else {
-                                _selectedIds.remove(contact.id);
-                              }
-                            });
-                          },
-                          title: Text(contact.displayName),
-                          subtitle: Text(contact.email),
-                          secondary: _ChatAvatar(
-                            title: contact.displayName,
-                            imageUrl: _absoluteUrl(contact.photoUrl),
-                            selected: selected,
-                            icon: Icons.person_rounded,
-                          ),
-                        );
+                    : (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _threadType = value;
+                          _scopeId = null;
+                          if (value == 'direct') {
+                            _titleController.clear();
+                          }
+                          if (value == 'direct' && _selectedIds.length > 1) {
+                            final first = _selectedIds.first;
+                            _selectedIds
+                              ..clear()
+                              ..add(first);
+                          }
+                        });
                       },
-                    ),
-            ),
-          ],
+              ),
+              if (_threadType == 'pole') ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _scopeId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Pôle',
+                    prefixIcon: Icon(Icons.hub_rounded),
+                  ),
+                  items: _poles.map((pole) {
+                    return DropdownMenuItem(
+                      value: pole.id,
+                      child: Text(pole.name),
+                    );
+                  }).toList(),
+                  onChanged: _creating
+                      ? null
+                      : (value) => setState(() => _scopeId = value),
+                ),
+              ],
+              if (_threadType == 'project') ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _scopeId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Projet',
+                    prefixIcon: Icon(Icons.rocket_launch_rounded),
+                  ),
+                  items: _projects.map((project) {
+                    return DropdownMenuItem(
+                      value: project.id,
+                      child: Text(project.name),
+                    );
+                  }).toList(),
+                  onChanged: _creating
+                      ? null
+                      : (value) => setState(() => _scopeId = value),
+                ),
+              ],
+              if (_threadType == 'pole' ||
+                  _threadType == 'project' ||
+                  _threadType == 'enacchef') ...[
+                const SizedBox(height: 10),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Les membres du périmètre seront ajoutés automatiquement. Tu peux ajouter d’autres participants si besoin.',
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: _threadType == 'direct'
+                      ? 'Rechercher une personne'
+                      : 'Ajouter des membres',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    onPressed: _loadContacts,
+                    tooltip: 'Rechercher des membres',
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                  ),
+                ),
+                onSubmitted: (_) => _loadContacts(),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        itemCount: _contacts.length,
+                        itemBuilder: (context, index) {
+                          final contact = _contacts[index];
+                          final selected = _selectedIds.contains(contact.id);
+
+                          return CheckboxListTile(
+                            value: selected,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  if (_threadType == 'direct') {
+                                    _selectedIds.clear();
+                                  }
+                                  _selectedIds.add(contact.id);
+                                } else {
+                                  _selectedIds.remove(contact.id);
+                                }
+                              });
+                            },
+                            title: Text(contact.displayName),
+                            subtitle: Text(contact.email),
+                            secondary: _ChatAvatar(
+                              title: contact.displayName,
+                              imageUrl: _absoluteUrl(contact.photoUrl),
+                              selected: selected,
+                              icon: Icons.person_rounded,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -4248,23 +4241,11 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(Icons.error_outline_rounded, color: Colors.red.shade700),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
-            ),
-          ],
-        ),
-      ),
+    return ChatStateCard(
+      icon: Icons.error_outline_rounded,
+      title: 'Messagerie indisponible',
+      message: message,
+      onRetry: onRetry,
     );
   }
 }
@@ -4349,7 +4330,7 @@ String _threadSubtitle(ChatThreadModel thread, String? currentUserId) {
   final directParticipant = _directParticipant(thread, currentUserId);
   if (directParticipant != null) {
     final email = directParticipant.email.trim();
-    final status = directParticipant.status.trim();
+    final status = _memberStatusLabel(directParticipant.status);
     if (email.isNotEmpty && status.isNotEmpty) return '$email · $status';
     if (email.isNotEmpty) return email;
     return 'Discussion privée';
@@ -4394,6 +4375,8 @@ String _conversationTypeLabel(ChatThreadModel thread) {
       return 'Discussion de pôle';
     case 'project':
       return 'Discussion de projet';
+    case 'enacchef':
+      return 'Discussion des responsables';
     default:
       return 'Groupe';
   }
@@ -4408,12 +4391,13 @@ String _conversationScopeLabel(ChatThreadModel thread) {
       return 'Pôle';
     case 'project':
       return 'Projet';
+    case 'enacchef':
     case 'enacchefs':
-      return 'Enacchefs';
+      return 'Responsables Enactus';
     case 'club':
       return 'Club';
     default:
-      return scope;
+      return 'Autre périmètre';
   }
 }
 
@@ -4426,7 +4410,7 @@ String _participantRoleLabel(String role) {
     case 'member':
       return 'Membre';
     default:
-      return role.trim().isEmpty ? 'Membre' : role;
+      return 'Membre';
   }
 }
 
@@ -4441,7 +4425,7 @@ String _memberStatusLabel(String status) {
     case 'alumni':
       return 'Alumni';
     default:
-      return status.trim().isEmpty ? 'Non renseigné' : status;
+      return 'Non renseigné';
   }
 }
 

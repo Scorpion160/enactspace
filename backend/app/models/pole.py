@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, DateTime, Date, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Index, String, Text, DateTime, Date, Boolean, ForeignKey, UniqueConstraint, text
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -63,4 +63,18 @@ class PoleMember(Base):
 
     __table_args__ = (
         UniqueConstraint("pole_id", "user_id", name="uq_pole_user"),
+        Index(
+            "ux_pole_members_active_leadership_position",
+            "pole_id",
+            "position",
+            unique=True,
+            sqlite_where=text(
+                "is_active = 1 AND left_at IS NULL "
+                "AND position IN ('chef_pole', 'adjoint_chef_pole')"
+            ),
+            postgresql_where=text(
+                "is_active = true AND left_at IS NULL "
+                "AND position IN ('chef_pole', 'adjoint_chef_pole')"
+            ),
+        ),
     )

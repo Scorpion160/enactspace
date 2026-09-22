@@ -1,3 +1,25 @@
+String academyCategoryLabel(String value) => switch (value.toLowerCase()) {
+  'culture_enactus' => 'Culture Enactus',
+  'impact' => 'Impact',
+  'business_principles' => 'Principes entrepreneuriaux',
+  'competition' => 'Compétition',
+  'leadership' => 'Leadership',
+  _ => value.replaceAll('_', ' '),
+};
+
+String academyRoleLabel(String value) => switch (value.toLowerCase()) {
+  'admin' || 'administrateur' => 'Administrateur',
+  'team_leader' => 'Team Leader',
+  'secretaire_generale' || 'secretaire_general' => 'Secrétariat général',
+  'chef_pole' || 'chef_de_pole' => 'Chef de pôle',
+  'adjoint_chef_pole' || 'adjoint_chef_de_pole' => 'Adjoint chef de pôle',
+  'chef_projet' || 'chef_de_projet' => 'Chef de projet',
+  'adjoint_chef_projet' || 'adjoint_chef_de_projet' => 'Adjoint chef de projet',
+  'enacteur' => 'Enacteur/Enactrice',
+  'alumni' => 'Alumni',
+  _ => value.replaceAll('_', ' '),
+};
+
 class AcademyCourseModel {
   final String id;
   final String title;
@@ -7,6 +29,10 @@ class AcademyCourseModel {
   final int durationMinutes;
   final int points;
   final bool isRequired;
+  final List<String> targetRoles;
+  final bool isPublished;
+  final String? poleId;
+  final String? projectId;
   final List<AcademyLessonModel> lessons;
   final AcademyQuizModel quiz;
 
@@ -19,6 +45,10 @@ class AcademyCourseModel {
     required this.durationMinutes,
     required this.points,
     required this.isRequired,
+    this.targetRoles = const [],
+    this.isPublished = true,
+    this.poleId,
+    this.projectId,
     required this.lessons,
     required this.quiz,
   });
@@ -33,6 +63,19 @@ class AcademyCourseModel {
     if (lessonCount == 0) return 0;
     return completedLessonCount / lessonCount;
   }
+
+  String get levelLabel => switch (level.toLowerCase()) {
+    'debutant' || 'débutant' => 'Débutant',
+    'intermediaire' || 'intermédiaire' => 'Intermédiaire',
+    'avance' || 'avancé' => 'Avancé',
+    'responsable' => 'Responsable',
+    _ => level,
+  };
+
+  String get categoryLabel => academyCategoryLabel(category);
+  String get targetRolesLabel => targetRoles.isEmpty
+      ? 'Tous'
+      : targetRoles.map(academyRoleLabel).join(', ');
 }
 
 class AcademyLessonModel {
@@ -41,6 +84,13 @@ class AcademyLessonModel {
   final String summary;
   final int durationMinutes;
   final bool completed;
+  final String lessonType;
+  final String? content;
+  final String? resourceFileId;
+  final String? externalUrl;
+  final bool started;
+  final int orderIndex;
+  final bool isPublished;
 
   const AcademyLessonModel({
     required this.id,
@@ -48,7 +98,28 @@ class AcademyLessonModel {
     required this.summary,
     required this.durationMinutes,
     required this.completed,
+    this.lessonType = 'texte',
+    this.content,
+    this.resourceFileId,
+    this.externalUrl,
+    this.started = false,
+    this.orderIndex = 0,
+    this.isPublished = true,
   });
+
+  String get typeLabel => switch (lessonType) {
+    'video' => 'Vidéo',
+    'document' => 'Document',
+    'quiz' => 'Quiz',
+    'activite' => 'Activité',
+    _ => 'Texte',
+  };
+
+  String get statusLabel => completed
+      ? 'Terminé'
+      : started
+      ? 'En cours'
+      : 'À commencer';
 }
 
 class AcademyQuizModel {
@@ -198,5 +269,37 @@ class AcademyRewardResult {
     required this.points,
     required this.label,
     required this.syncedWithGamification,
+  });
+}
+
+class AcademyQuizResult {
+  final double score;
+  final bool passed;
+  final int? correctAnswers;
+  final int total;
+  final int points;
+  final int? attemptNumber;
+
+  const AcademyQuizResult({
+    required this.score,
+    required this.passed,
+    required this.correctAnswers,
+    required this.total,
+    required this.points,
+    required this.attemptNumber,
+  });
+}
+
+class AcademyAdminSummary {
+  final int courses;
+  final int publishedCourses;
+  final int learners;
+  final int completions;
+
+  const AcademyAdminSummary({
+    required this.courses,
+    required this.publishedCourses,
+    required this.learners,
+    required this.completions,
   });
 }

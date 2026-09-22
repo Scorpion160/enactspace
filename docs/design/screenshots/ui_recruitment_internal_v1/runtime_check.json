@@ -1,0 +1,41 @@
+{
+  "environment": "ui_audit",
+  "api_origin": "http://127.0.0.1:18002",
+  "identity": "audit.admin",
+  "checked_at": "2026-08-22",
+  "list": {
+    "method": "GET",
+    "path": "/api/recruitment/applications",
+    "http_status": 200,
+    "application_count": 37
+  },
+  "complete_application": {
+    "reference": "AUDIT-REC-COMPLETE-001",
+    "detail_http_status": 200,
+    "status": "under_review",
+    "answers_present": true,
+    "documents_present": true,
+    "reviews_http_status": 200,
+    "review_count": 2,
+    "average_score_out_of_20": 16.5
+  },
+  "interview_application": {
+    "reference": "AUDIT-REC-INTERVIEW-001",
+    "status": "interview_scheduled",
+    "interview_at": "2026-08-10T14:30:00",
+    "interview_location": "Salle Audit Synthétique A1"
+  },
+  "post_capture_verification": {
+    "method": "GET",
+    "checked_at": "2026-08-22",
+    "application_count": 37,
+    "complete_status": "under_review",
+    "complete_document_count": 3,
+    "complete_review_count": 2,
+    "complete_average_score_out_of_20": 16.5,
+    "interview_status": "interview_scheduled",
+    "interview_at": "2026-08-10T14:30:00",
+    "interview_location": "Salle Audit Synthétique A1"
+  },
+  "mutation_performed": false
+}

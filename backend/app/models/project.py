@@ -1,9 +1,9 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, DateTime, Date, Boolean, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, String, Text, DateTime, Date, Boolean, ForeignKey, Numeric, UniqueConstraint, text
 from app.db.types import GUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.db.database import Base
 
@@ -40,6 +40,17 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    @validates("status")
+    def normalize_status(self, _key, value):
+        return "termine" if value in {"completed", "done"} else value
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('idee','etude','prototype','test','deploiement','termine','suspendu')",
+            name="ck_projects_status",
+        ),
+    )
+
 
 class ProjectMember(Base):
     __tablename__ = "project_members"
@@ -70,6 +81,20 @@ class ProjectMember(Base):
 
     __table_args__ = (
         UniqueConstraint("project_id", "user_id", name="uq_project_user"),
+        Index(
+            "ux_project_members_active_leadership_position",
+            "project_id",
+            "position",
+            unique=True,
+            sqlite_where=text(
+                "is_active = 1 AND left_at IS NULL "
+                "AND position IN ('chef_projet', 'adjoint_chef_projet')"
+            ),
+            postgresql_where=text(
+                "is_active = true AND left_at IS NULL "
+                "AND position IN ('chef_projet', 'adjoint_chef_projet')"
+            ),
+        ),
     )
 
 

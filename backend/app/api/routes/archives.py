@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     get_current_active_validated_user,
     get_user_role_names,
-    require_enacchef_or_admin,
+    require_memory_curator,
 )
-from app.core.roles import SECRETARIAT_ROLES
+from app.api.routes.files import ensure_file_access
+from app.core.roles import MEMORY_CURATOR_ROLES, SECRETARIAT_ROLES
 from app.db.database import get_db
 from app.models.archive import (
     ArchiveItem,
@@ -24,6 +25,7 @@ from app.models.archive import (
     HistoricalImpactStatistic,
     MediaArchive,
 )
+from app.models.institutional_memory import InstitutionalSource
 from app.models.stored_file import StoredFile
 from app.schemas.archive import (
     ArchivedProjectCreate,
@@ -53,6 +55,7 @@ from app.schemas.archive import (
     MediaArchiveUpdate,
 )
 from app.services.notification_service import notify_user
+from app.services.audit_service import create_audit_log
 
 
 router = APIRouter(prefix="/archives", tags=["Archives"])
@@ -103,31 +106,6 @@ VALID_ARCHIVE_CATEGORIES = {
     "Ancien membre / Alumni",
     "Événement",
     "Autre",
-}
-
-
-DEFAULT_HISTORICAL_IMPACT_SUMMARY = {
-    "created_projects": 5,
-    "developing_projects": 4,
-    "developed_products": 14,
-    "touched_sdgs": 11,
-    "created_jobs": 227,
-    "saved_lives": 206,
-    "planted_trees": 1425,
-    "cumulative_fcfa_gains": 27468761.10,
-    "impacted_lives": 15900,
-}
-
-HISTORICAL_STAT_LABELS = {
-    "created_projects": ("Projets créés", "projets"),
-    "developing_projects": ("Projets en développement", "projets"),
-    "developed_products": ("Produits développés", "produits"),
-    "touched_sdgs": ("ODD touchés", "ODD"),
-    "created_jobs": ("Emplois créés", "emplois"),
-    "saved_lives": ("Vies sauvées", "vies"),
-    "planted_trees": ("Arbres plantés", "arbres"),
-    "cumulative_fcfa_gains": ("Gains cumulés", "FCFA"),
-    "impacted_lives": ("Vies impactées", "vies"),
 }
 
 
@@ -555,50 +533,83 @@ def _competition_payload(competition: CompetitionRecord) -> dict:
     return CompetitionRecordRead.model_validate(competition).model_dump()
 
 
-def _file_payload(stored_file: StoredFile | None) -> dict | None:
+def _file_payload(
+    db: Session,
+    current_user,
+    stored_file: StoredFile | None,
+) -> dict | None:
     if stored_file is None:
         return None
+    try:
+        ensure_file_access(db, stored_file, current_user)
+    except HTTPException:
+        return {
+            "id": stored_file.id,
+            "name": stored_file.original_filename,
+            "download_url": None,
+            "preview_url": None,
+            "size_bytes": stored_file.file_size,
+            "accessible": False,
+        }
     return {
         "id": stored_file.id,
         "name": stored_file.original_filename,
         "download_url": f"/api/files/{stored_file.id}/download",
         "preview_url": f"/api/files/{stored_file.id}/preview",
         "size_bytes": stored_file.file_size,
+        "accessible": True,
     }
 
 
-def _media_payload(db: Session, media: MediaArchive) -> dict:
+def _media_payload(db: Session, current_user, media: MediaArchive) -> dict:
     data = MediaArchiveRead.model_validate(media).model_dump()
     stored_file = None
     if media.file_id:
         stored_file = db.query(StoredFile).filter(StoredFile.id == media.file_id).first()
-    data["file"] = _file_payload(stored_file)
+    data["file"] = _file_payload(db, current_user, stored_file)
     return data
 
 
 def _historical_document_payload(
     db: Session,
+    current_user,
     document: HistoricalDocument,
 ) -> dict:
     data = HistoricalDocumentRead.model_validate(document).model_dump()
     stored_file = None
     if document.file_id:
         stored_file = db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
-    data["file"] = _file_payload(stored_file)
+    data["file"] = _file_payload(db, current_user, stored_file)
     return data
 
 
-def _hall_of_fame_payload(db: Session, entry: HallOfFameEntry) -> dict:
+def _hall_of_fame_payload(db: Session, current_user, entry: HallOfFameEntry) -> dict:
     data = HallOfFameEntryRead.model_validate(entry).model_dump()
     stored_file = None
     if entry.file_id:
         stored_file = db.query(StoredFile).filter(StoredFile.id == entry.file_id).first()
-    data["file"] = _file_payload(stored_file)
+    data["file"] = _file_payload(db, current_user, stored_file)
     return data
 
 
+def _historical_statistic_has_provenance(
+    statistic: HistoricalImpactStatistic,
+) -> bool:
+    return bool(
+        statistic.source_file_id is not None
+        or (statistic.source_label or "").strip()
+    )
+
+
 def _historical_statistic_payload(statistic: HistoricalImpactStatistic) -> dict:
-    return HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
+    data = HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
+    provenance_ready = _historical_statistic_has_provenance(statistic)
+    data["provenance_ready"] = provenance_ready
+    if data["status"] == "validated" and not provenance_ready:
+        data["status"] = "submitted"
+        data["validated_by_id"] = None
+        data["validated_at"] = None
+    return data
 
 
 def _archive_item_payload(item: ArchiveItem) -> dict:
@@ -607,6 +618,90 @@ def _archive_item_payload(item: ArchiveItem) -> dict:
 
 def _can_validate_archives(db: Session, user) -> bool:
     return bool(get_user_role_names(db, user.id).intersection(SECRETARIAT_ROLES))
+
+
+def _is_memory_curator(db: Session, user) -> bool:
+    return bool(get_user_role_names(db, user.id).intersection(MEMORY_CURATOR_ROLES))
+
+
+def _static_compatibility_payload(row: dict) -> dict:
+    return {**row, "legacy": True, "verified": False, "trust": "legacy_unverified"}
+
+
+def _require_static_compatibility(db: Session, user, include_static: bool) -> None:
+    if include_static and not _is_memory_curator(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Les archives statiques heritees sont reservees aux curateurs",
+        )
+
+
+def _parent_archive_item(db: Session, child) -> ArchiveItem | None:
+    archive_item_id = getattr(child, "archive_item_id", None)
+    if archive_item_id is None:
+        return None
+    return db.query(ArchiveItem).filter(ArchiveItem.id == archive_item_id).first()
+
+
+def _can_view_parentless_legacy_visibility(db: Session, user, visibility) -> bool:
+    normalized = str(visibility or "").strip().lower()
+    roles = get_user_role_names(db, user.id)
+    if normalized == "interne":
+        return user.status in {"active", "alumni"}
+    if normalized == "alumni":
+        return user.status == "alumni" or "alumni" in roles
+    if normalized == "enacchefs":
+        return bool(roles.intersection(SECRETARIAT_ROLES))
+    if normalized in {"privé", "prive", "private"}:
+        return False
+    return False
+
+
+def _can_view_legacy_child(db: Session, user, child) -> bool:
+    if _is_memory_curator(db, user):
+        return True
+    parent = _parent_archive_item(db, child)
+    if parent is not None and not _can_view_archive_item(db, user, parent):
+        return False
+    if parent is None and hasattr(child, "visibility"):
+        if not _can_view_parentless_legacy_visibility(
+            db,
+            user,
+            getattr(child, "visibility", None),
+        ):
+            return False
+    validation_status = getattr(child, "validation_status", None)
+    if parent is None and validation_status is not None and validation_status != "VERIFIED":
+        return False
+    source_id = getattr(child, "source_id", None)
+    if source_id is not None:
+        source = (
+            db.query(InstitutionalSource)
+            .filter(InstitutionalSource.id == source_id)
+            .first()
+        )
+        if source is None or source.visibility == "private":
+            return False
+    return True
+
+
+def _require_visible_legacy_child(db: Session, user, child, label: str) -> None:
+    if not _can_view_legacy_child(db, user, child):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{label} introuvable")
+
+
+def _ensure_legacy_child_editable(db: Session, child) -> None:
+    if getattr(child, "validation_status", None) in {"VERIFIED", "REJECTED", "SUPERSEDED"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un fait finalise ne peut pas etre modifie via les archives heritees",
+        )
+    parent = _parent_archive_item(db, child)
+    if parent is not None and parent.status in {"validated", "archived"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Le contenu d'une archive finalisee est immuable",
+        )
 
 
 def _can_view_archive_item(db: Session, user, item: ArchiveItem) -> bool:
@@ -850,7 +945,7 @@ def _create_archive_item_for_hall_entry(
     return archive_item
 
 
-def _mark_file_as_archive(db: Session, file_id, visibility: str = "internal") -> None:
+def _mark_file_as_archive(db: Session, file_id) -> None:
     if file_id is None:
         return
     stored_file = db.query(StoredFile).filter(StoredFile.id == file_id).first()
@@ -860,7 +955,6 @@ def _mark_file_as_archive(db: Session, file_id, visibility: str = "internal") ->
             detail="Fichier d'archive introuvable",
         )
     stored_file.storage_scope = "archive"
-    stored_file.visibility = visibility
     stored_file.is_temporary = False
     stored_file.expires_at = None
 
@@ -926,7 +1020,7 @@ def list_archive_items(
 def create_archive_item(
     payload: ArchiveItemCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     _ensure_archive_values(
         category=payload.category,
@@ -969,9 +1063,14 @@ def update_archive_item(
     archive_id: str,
     payload: ArchiveItemUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     archive_item = _archive_item_or_404(db, archive_id)
+    if archive_item.status in {"validated", "archived"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une archive finalisee ne peut pas etre modifiee directement",
+        )
     data = payload.model_dump(exclude_unset=True)
     _ensure_archive_values(
         category=data.get("category"),
@@ -999,9 +1098,11 @@ def update_archive_item(
 def submit_archive_item(
     archive_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     archive_item = _archive_item_or_404(db, archive_id)
+    if archive_item.status in {"validated", "archived"}:
+        raise HTTPException(status_code=409, detail="Une archive finalisee est immuable")
     archive_item.status = "submitted"
     archive_item.rejected_by_id = None
     archive_item.rejected_at = None
@@ -1016,7 +1117,7 @@ def submit_archive_item(
 def validate_archive_item(
     archive_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_validated_user),
+    current_user=Depends(require_memory_curator),
 ):
     if not _can_validate_archives(db, current_user):
         raise HTTPException(
@@ -1024,6 +1125,8 @@ def validate_archive_item(
             detail="Validation d'archive réservée au SG, Team Leader ou Admin",
         )
     archive_item = _archive_item_or_404(db, archive_id)
+    if archive_item.status in {"validated", "archived"}:
+        raise HTTPException(status_code=409, detail="Une archive finalisee est immuable")
     archive_item.status = "validated"
     archive_item.validated_by_id = current_user.id
     archive_item.validated_at = datetime.utcnow()
@@ -1031,6 +1134,13 @@ def validate_archive_item(
     archive_item.rejected_at = None
     archive_item.rejection_reason = None
     archive_item.updated_at = datetime.utcnow()
+    create_audit_log(
+        db,
+        "legacy_archive_validated",
+        current_user.id,
+        "archive_item",
+        archive_item.id,
+    )
     db.commit()
     db.refresh(archive_item)
     if archive_item.created_by_id:
@@ -1053,7 +1163,7 @@ def reject_archive_item(
     archive_id: str,
     payload: ArchiveValidationRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_validated_user),
+    current_user=Depends(require_memory_curator),
 ):
     if not _can_validate_archives(db, current_user):
         raise HTTPException(
@@ -1066,11 +1176,21 @@ def reject_archive_item(
             detail="Le motif de refus est obligatoire",
         )
     archive_item = _archive_item_or_404(db, archive_id)
+    if archive_item.status in {"validated", "archived"}:
+        raise HTTPException(status_code=409, detail="Une archive finalisee est immuable")
     archive_item.status = "rejected"
     archive_item.rejected_by_id = current_user.id
     archive_item.rejected_at = datetime.utcnow()
     archive_item.rejection_reason = payload.reason.strip()
     archive_item.updated_at = datetime.utcnow()
+    create_audit_log(
+        db,
+        "legacy_archive_rejected",
+        current_user.id,
+        "archive_item",
+        archive_item.id,
+        new_value={"reason": payload.reason.strip()},
+    )
     db.commit()
     db.refresh(archive_item)
     if archive_item.created_by_id:
@@ -1092,7 +1212,7 @@ def reject_archive_item(
 def archive_archive_item(
     archive_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_validated_user),
+    current_user=Depends(require_memory_curator),
 ):
     if not _can_validate_archives(db, current_user):
         raise HTTPException(
@@ -1100,8 +1220,19 @@ def archive_archive_item(
             detail="Archivage réservé au SG, Team Leader ou Admin",
         )
     archive_item = _archive_item_or_404(db, archive_id)
+    if archive_item.status == "archived":
+        return archive_item
+    if archive_item.status != "validated":
+        raise HTTPException(status_code=409, detail="Seule une archive validee peut etre archivee")
     archive_item.status = "archived"
     archive_item.updated_at = datetime.utcnow()
+    create_audit_log(
+        db,
+        "legacy_archive_archived",
+        current_user.id,
+        "archive_item",
+        archive_item.id,
+    )
     db.commit()
     db.refresh(archive_item)
     return archive_item
@@ -1155,10 +1286,11 @@ def list_historical_projects(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
-    include_static: bool = Query(default=True),
+    include_static: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    _require_static_compatibility(db, current_user, include_static)
     query = db.query(ArchivedProject)
     if search:
         pattern = f"%{search}%"
@@ -1182,11 +1314,12 @@ def list_historical_projects(
             ArchivedProject.year.desc().nullslast(),
             ArchivedProject.name.asc(),
         ).all()
+        if _can_view_legacy_child(db, current_user, project)
     ]
     static_projects = []
     if include_static:
         static_projects = [
-            project
+            _static_compatibility_payload(project)
             for project in INITIAL_HISTORICAL_PROJECTS
             if _matches_static_project(
                 project,
@@ -1202,7 +1335,7 @@ def list_historical_projects(
 def create_historical_project(
     payload: ArchivedProjectCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     if payload.status not in VALID_ARCHIVED_PROJECT_STATUSES:
         raise HTTPException(
@@ -1234,8 +1367,11 @@ def get_historical_project(
 ):
     for project in INITIAL_HISTORICAL_PROJECTS:
         if project["id"] == project_id:
-            return project
-    return _project_payload(_get_archived_project_or_404(db, project_id))
+            _require_static_compatibility(db, current_user, True)
+            return _static_compatibility_payload(project)
+    persisted = _get_archived_project_or_404(db, project_id)
+    _require_visible_legacy_child(db, current_user, persisted, "Projet historique")
+    return _project_payload(persisted)
 
 
 @router.patch("/historical-projects/{project_id}", response_model=ArchivedProjectRead)
@@ -1243,9 +1379,10 @@ def update_historical_project(
     project_id: str,
     payload: ArchivedProjectUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     project = _get_archived_project_or_404(db, project_id)
+    _ensure_legacy_child_editable(db, project)
     data = payload.model_dump(exclude_unset=True)
     if "status" in data and data["status"] not in VALID_ARCHIVED_PROJECT_STATUSES:
         raise HTTPException(
@@ -1265,10 +1402,11 @@ def list_awards(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=True),
+    include_static: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    _require_static_compatibility(db, current_user, include_static)
     query = db.query(Award)
     if search:
         pattern = f"%{search}%"
@@ -1292,11 +1430,12 @@ def list_awards(
             Award.is_featured.desc(),
             Award.title.asc(),
         ).all()
+        if _can_view_legacy_child(db, current_user, award)
     ]
     static_awards = []
     if include_static:
         static_awards = [
-            award
+            _static_compatibility_payload(award)
             for award in INITIAL_AWARDS
             if (year is None or award["year"] == year)
             and (featured is None or award["is_featured"] is featured)
@@ -1316,7 +1455,7 @@ def list_awards(
 def create_award(
     payload: AwardCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     archive_item_id = payload.archive_item_id
     if archive_item_id is None:
@@ -1343,13 +1482,15 @@ def get_award(
 ):
     for award in INITIAL_AWARDS:
         if award["id"] == award_id:
-            return award
+            _require_static_compatibility(db, current_user, True)
+            return _static_compatibility_payload(award)
     award = db.query(Award).filter(Award.id == award_id).first()
     if not award:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Prix ou distinction introuvable",
         )
+    _require_visible_legacy_child(db, current_user, award, "Prix ou distinction")
     return _award_payload(award)
 
 
@@ -1358,7 +1499,7 @@ def update_award(
     award_id: str,
     payload: AwardUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     award = db.query(Award).filter(Award.id == award_id).first()
     if not award:
@@ -1366,6 +1507,7 @@ def update_award(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Prix ou distinction introuvable",
         )
+    _ensure_legacy_child_editable(db, award)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(award, field, value)
     award.updated_at = datetime.utcnow()
@@ -1379,10 +1521,11 @@ def list_competitions(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=True),
+    include_static: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    _require_static_compatibility(db, current_user, include_static)
     query = db.query(CompetitionRecord)
     if search:
         pattern = f"%{search}%"
@@ -1406,11 +1549,12 @@ def list_competitions(
             CompetitionRecord.is_featured.desc(),
             CompetitionRecord.name.asc(),
         ).all()
+        if _can_view_legacy_child(db, current_user, competition)
     ]
     static_competitions = []
     if include_static:
         static_competitions = [
-            competition
+            _static_compatibility_payload(competition)
             for competition in INITIAL_COMPETITIONS
             if (year is None or competition["year"] == year)
             and (featured is None or competition["is_featured"] is featured)
@@ -1430,7 +1574,7 @@ def list_competitions(
 def create_competition(
     payload: CompetitionRecordCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     archive_item_id = payload.archive_item_id
     if archive_item_id is None:
@@ -1457,7 +1601,8 @@ def get_competition(
 ):
     for competition in INITIAL_COMPETITIONS:
         if competition["id"] == competition_id:
-            return competition
+            _require_static_compatibility(db, current_user, True)
+            return _static_compatibility_payload(competition)
     competition = (
         db.query(CompetitionRecord)
         .filter(CompetitionRecord.id == competition_id)
@@ -1468,6 +1613,7 @@ def get_competition(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Compétition introuvable",
         )
+    _require_visible_legacy_child(db, current_user, competition, "Competition")
     return _competition_payload(competition)
 
 
@@ -1476,7 +1622,7 @@ def update_competition(
     competition_id: str,
     payload: CompetitionRecordUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     competition = (
         db.query(CompetitionRecord)
@@ -1488,6 +1634,7 @@ def update_competition(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Compétition introuvable",
         )
+    _ensure_legacy_child_editable(db, competition)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(competition, field, value)
     competition.updated_at = datetime.utcnow()
@@ -1526,14 +1673,20 @@ def list_archive_media(
         MediaArchive.is_featured.desc(),
         MediaArchive.created_at.desc(),
     ).all()
-    return {"media": [_media_payload(db, item) for item in media]}
+    return {
+        "media": [
+            _media_payload(db, current_user, item)
+            for item in media
+            if _can_view_legacy_child(db, current_user, item)
+        ]
+    }
 
 
 @router.post("/media")
 def create_archive_media(
     payload: MediaArchiveCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     if payload.media_type not in VALID_ARCHIVE_MEDIA_TYPES:
         raise HTTPException(
@@ -1555,7 +1708,7 @@ def create_archive_media(
     db.add(media)
     db.commit()
     db.refresh(media)
-    return _media_payload(db, media)
+    return _media_payload(db, current_user, media)
 
 
 @router.patch("/media/{media_id}")
@@ -1563,7 +1716,7 @@ def update_archive_media(
     media_id: str,
     payload: MediaArchiveUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     media = db.query(MediaArchive).filter(MediaArchive.id == media_id).first()
     if not media:
@@ -1571,6 +1724,7 @@ def update_archive_media(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Média d'archive introuvable",
         )
+    _ensure_legacy_child_editable(db, media)
     data = payload.model_dump(exclude_unset=True)
     if "media_type" in data and data["media_type"] not in VALID_ARCHIVE_MEDIA_TYPES:
         raise HTTPException(
@@ -1584,7 +1738,7 @@ def update_archive_media(
     media.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(media)
-    return _media_payload(db, media)
+    return _media_payload(db, current_user, media)
 
 
 @router.get("/documents")
@@ -1617,14 +1771,20 @@ def list_historical_documents(
         HistoricalDocument.is_featured.desc(),
         HistoricalDocument.created_at.desc(),
     ).all()
-    return {"documents": [_historical_document_payload(db, item) for item in documents]}
+    return {
+        "documents": [
+            _historical_document_payload(db, current_user, item)
+            for item in documents
+            if _can_view_legacy_child(db, current_user, item)
+        ]
+    }
 
 
 @router.post("/documents")
 def create_historical_document(
     payload: HistoricalDocumentCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     if payload.document_type not in VALID_HISTORICAL_DOCUMENT_TYPES:
         raise HTTPException(
@@ -1646,7 +1806,7 @@ def create_historical_document(
     db.add(document)
     db.commit()
     db.refresh(document)
-    return _historical_document_payload(db, document)
+    return _historical_document_payload(db, current_user, document)
 
 
 @router.patch("/documents/{document_id}")
@@ -1654,7 +1814,7 @@ def update_historical_document(
     document_id: str,
     payload: HistoricalDocumentUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     document = (
         db.query(HistoricalDocument).filter(HistoricalDocument.id == document_id).first()
@@ -1664,6 +1824,7 @@ def update_historical_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document historique introuvable",
         )
+    _ensure_legacy_child_editable(db, document)
     data = payload.model_dump(exclude_unset=True)
     if (
         "document_type" in data
@@ -1680,7 +1841,7 @@ def update_historical_document(
     document.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(document)
-    return _historical_document_payload(db, document)
+    return _historical_document_payload(db, current_user, document)
 
 
 @router.get("/hall-of-fame")
@@ -1688,10 +1849,11 @@ def list_hall_of_fame(
     year: int | None = Query(default=None),
     entry_type: str | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=True),
+    include_static: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    _require_static_compatibility(db, current_user, include_static)
     query = db.query(HallOfFameEntry)
     if year is not None:
         query = query.filter(HallOfFameEntry.year == year)
@@ -1700,17 +1862,18 @@ def list_hall_of_fame(
     if featured is not None:
         query = query.filter(HallOfFameEntry.is_featured.is_(featured))
     entries = [
-        _hall_of_fame_payload(db, entry)
+        _hall_of_fame_payload(db, current_user, entry)
         for entry in query.order_by(
             HallOfFameEntry.order_index.asc(),
             HallOfFameEntry.year.desc().nullslast(),
             HallOfFameEntry.created_at.desc(),
         ).all()
+        if _can_view_legacy_child(db, current_user, entry)
     ]
     static_entries = []
     if include_static:
         static_entries = [
-            entry
+            _static_compatibility_payload(entry)
             for entry in INITIAL_HALL_OF_FAME
             if (year is None or entry["year"] == year)
             and (entry_type is None or entry["entry_type"] == entry_type)
@@ -1723,7 +1886,7 @@ def list_hall_of_fame(
 def create_hall_of_fame_entry(
     payload: HallOfFameEntryCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     _mark_file_as_archive(db, payload.file_id)
     archive_item_id = payload.archive_item_id
@@ -1740,7 +1903,7 @@ def create_hall_of_fame_entry(
     db.add(entry)
     db.commit()
     db.refresh(entry)
-    return _hall_of_fame_payload(db, entry)
+    return _hall_of_fame_payload(db, current_user, entry)
 
 
 @router.patch("/hall-of-fame/{entry_id}")
@@ -1748,7 +1911,7 @@ def update_hall_of_fame_entry(
     entry_id: str,
     payload: HallOfFameEntryUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     entry = db.query(HallOfFameEntry).filter(HallOfFameEntry.id == entry_id).first()
     if not entry:
@@ -1756,6 +1919,7 @@ def update_hall_of_fame_entry(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Entrée Hall of Fame introuvable",
         )
+    _ensure_legacy_child_editable(db, entry)
     data = payload.model_dump(exclude_unset=True)
     if "file_id" in data:
         _mark_file_as_archive(db, data["file_id"])
@@ -1764,7 +1928,7 @@ def update_hall_of_fame_entry(
     entry.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(entry)
-    return _hall_of_fame_payload(db, entry)
+    return _hall_of_fame_payload(db, current_user, entry)
 
 
 @router.get("/historical-impact/summary")
@@ -1772,14 +1936,19 @@ def get_historical_impact_summary(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
-    summary = dict(DEFAULT_HISTORICAL_IMPACT_SUMMARY)
+    summary = {}
     statistics = (
         db.query(HistoricalImpactStatistic)
         .filter(HistoricalImpactStatistic.status == "validated")
         .all()
     )
+    statistics = [
+        statistic
+        for statistic in statistics
+        if _historical_statistic_has_provenance(statistic)
+    ]
     for statistic in statistics:
-        summary[statistic.metric_key] = float(statistic.value or 0)
+        summary[statistic.metric_key] = float(statistic.value)
     summary["statistics"] = [
         _historical_statistic_payload(statistic) for statistic in statistics
     ]
@@ -1801,28 +1970,9 @@ def list_historical_impact_statistics(
         )
         .all()
     }
-    if include_defaults:
-        for key, value in DEFAULT_HISTORICAL_IMPACT_SUMMARY.items():
-            if key in db_statistics:
-                continue
-            label, unit = HISTORICAL_STAT_LABELS.get(key, (key, None))
-            db_statistics[key] = {
-                "id": key,
-                "metric_key": key,
-                "label": label,
-                "value": value,
-                "unit": unit,
-                "description": "Chiffre historique à confirmer avec les sources disponibles.",
-                "source_label": "Présentation Enactus ESP",
-                "source_file_id": None,
-                "status": "validated",
-                "is_featured": True,
-                "updated_by_id": None,
-                "validated_by_id": None,
-                "validated_at": None,
-                "created_at": None,
-                "updated_at": None,
-            }
+    # Kept as a compatible query parameter; anonymous default figures are no
+    # longer emitted. Historical statistics must be explicitly persisted.
+    _ = include_defaults
     return {"statistics": list(db_statistics.values())}
 
 
@@ -1830,12 +1980,19 @@ def list_historical_impact_statistics(
 def create_historical_impact_statistic(
     payload: HistoricalImpactStatisticCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     if payload.status not in VALID_HISTORICAL_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut de statistique historique invalide",
+        )
+    if payload.status == "validated" and not (
+        payload.source_file_id is not None or (payload.source_label or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une source est requise pour valider une statistique historique",
         )
     existing = (
         db.query(HistoricalImpactStatistic)
@@ -1866,7 +2023,7 @@ def update_historical_impact_statistic(
     statistic_id: str,
     payload: HistoricalImpactStatisticUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_enacchef_or_admin),
+    current_user=Depends(require_memory_curator),
 ):
     statistic = (
         db.query(HistoricalImpactStatistic)
@@ -1884,6 +2041,11 @@ def update_historical_impact_statistic(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Statistique historique introuvable",
         )
+    if statistic.status == "validated":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une statistique historique validee est immuable",
+        )
     data = payload.model_dump(exclude_unset=True)
     if "status" in data and data["status"] not in VALID_HISTORICAL_STATUSES:
         raise HTTPException(
@@ -1892,6 +2054,20 @@ def update_historical_impact_statistic(
         )
     if "source_file_id" in data:
         _mark_file_as_archive(db, data["source_file_id"])
+    resulting_status = data.get("status", statistic.status)
+    resulting_source_file_id = data.get(
+        "source_file_id",
+        statistic.source_file_id,
+    )
+    resulting_source_label = data.get("source_label", statistic.source_label)
+    if resulting_status == "validated" and not (
+        resulting_source_file_id is not None
+        or (resulting_source_label or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une source est requise pour valider une statistique historique",
+        )
     for field, value in data.items():
         setattr(statistic, field, value)
     statistic.updated_by_id = current_user.id

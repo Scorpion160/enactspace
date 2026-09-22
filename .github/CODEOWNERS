@@ -1,0 +1,8 @@
+# Current fallback ownership. Replace or augment with the formally supplied
+# Pôle IT GitHub team/handles during the administrative handoff.
+* @Scorpion160
+
+/.github/ @Scorpion160
+/backend/ @Scorpion160
+/frontend/ @Scorpion160
+/docs/ @Scorpion160

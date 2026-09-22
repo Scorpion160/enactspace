@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -461,12 +462,17 @@ def ensure_roles(db: Session, role_names: list[str], report: ImportReport, row_n
 
 
 def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_existing: bool) -> User | None:
-    existing = db.query(User).filter(User.email == member.email).first()
+    existing = db.query(User).filter(
+        func.lower(User.email) == member.email.strip().lower()
+    ).first()
     phone_owner = None
     if member.phone:
         phone_owner = (
             db.query(User)
-            .filter(User.phone == member.phone, User.email != member.email)
+            .filter(
+                User.phone == member.phone,
+                func.lower(User.email) != member.email.strip().lower(),
+            )
             .first()
         )
     if phone_owner:
@@ -506,7 +512,7 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
     user = User(
         first_name=member.first_name,
         last_name=member.last_name,
-        email=member.email,
+        email=member.email.strip().lower(),
         phone=member.phone,
         gender=member.gender,
         profile_type=profile_type,

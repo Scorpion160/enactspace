@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin_or_team_leader, require_enacchef_or_admin
+from app.api.routes.files import ensure_file_access, get_file_or_404
 from app.core.roles import ENACCHEF_ROLES
 from app.db.database import get_db
 from app.models.document import Document
@@ -27,46 +28,58 @@ from app.schemas.impact import (
     ImpactProjectUpdate,
     ImpactValidationRequest,
 )
+from app.services.audit_service import create_audit_log
 from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
 
 
-HISTORICAL_IMPACT = {
-    "created_projects": 5,
-    "developing_projects": 4,
-    "developed_products": 14,
-    "touched_sdgs": 11,
-    "created_jobs": 227,
-    "saved_lives": 206,
-    "planted_trees": 1425,
-    "cumulative_usd_gains": 46236.7,
-    "cumulative_fcfa_gains": 27468761,
-    "impacted_lives": 15900,
-    "emblematic_projects": [
-        "DIMBALI",
-        "DECONAANE",
-        "JAVELISEL",
-        "MOBIGEL",
-        "MEUNE NAGN",
-        "SOUKHALI",
-    ],
-    "distinctions": [
-        "Champion National 2017",
-        "Champion National 2018",
-        "Demi-finaliste compétition internationale 2018",
-        "Premier Prix d’Excellence Fondation Sonatel",
-    ],
+CLAIM_TYPES = {"MEASURED", "ESTIMATE", "PROJECTION", "HISTORICAL_CLAIM"}
+VALIDATION_STATUSES = {
+    "DRAFT",
+    "EVIDENCE_PENDING",
+    "EVIDENCE_ATTACHED",
+    "UNDER_REVIEW",
+    "VERIFIED",
+    "REJECTED",
+    "SUPERSEDED",
 }
-
-VALID_IMPACT_STATUSES = {
-    "draft",
-    "submitted",
-    "under_review",
-    "validated",
-    "rejected",
-    "archived",
+ACTIVE_REPLACEMENT_STATUSES = (
+    "DRAFT",
+    "EVIDENCE_PENDING",
+    "EVIDENCE_ATTACHED",
+    "UNDER_REVIEW",
+    "VERIFIED",
+)
+LEGACY_STATUS_MAP = {
+    "draft": "DRAFT",
+    "submitted": "EVIDENCE_PENDING",
+    "under_review": "UNDER_REVIEW",
+    "validated": "VERIFIED",
+    "rejected": "REJECTED",
+    "archived": "SUPERSEDED",
+}
+EVIDENCE_LEGACY_STATUS_MAP = {
+    **LEGACY_STATUS_MAP,
+    "submitted": "EVIDENCE_ATTACHED",
+}
+LEGACY_STATUS_BY_VALIDATION = {
+    value: key for key, value in LEGACY_STATUS_MAP.items()
+}
+LEGACY_STATUS_BY_VALIDATION["EVIDENCE_ATTACHED"] = "submitted"
+REALIZED_FIELDS = {
+    "direct_impact": "direct_beneficiaries",
+    "indirect_impact": "indirect_beneficiaries",
+    "reach": "reach",
+    "revenue": "revenue_generated",
+    "surplus": "profit_or_surplus",
+    "jobs_created": "jobs_created",
+    "lives_impacted": "lives_impacted",
+    "trees_planted": "trees_planted",
+    "waste_reduced": "waste_reduced",
+    "water_saved": "water_saved",
+    "co2_reduced": "co2_reduced",
 }
 VALID_METRIC_CATEGORIES = {
     "social",
@@ -122,14 +135,69 @@ def _get_impact_project_or_404(db: Session, impact_project_id) -> ImpactProject:
     return impact_project
 
 
-def _validate_impact_status(value: str) -> str:
-    status_value = (value or "draft").strip().lower()
-    if status_value not in VALID_IMPACT_STATUSES:
+def _validation_status(
+    value: str | None,
+    legacy: str | None = None,
+    *,
+    legacy_map: dict[str, str] = LEGACY_STATUS_MAP,
+) -> str:
+    status_value = (value or "").strip().upper()
+    legacy_value = (legacy or "").strip().lower()
+    if not status_value and legacy_value:
+        status_value = legacy_map.get(legacy_value, "")
+    if status_value not in VALIDATION_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut impact invalide",
         )
     return status_value
+
+
+def _sync_validation(
+    data: dict,
+    *,
+    default: str,
+    legacy_map: dict[str, str] = LEGACY_STATUS_MAP,
+) -> None:
+    explicit_validation = "validation_status" in data
+    value = data.get("validation_status") if explicit_validation else None
+    if not explicit_validation and "status" not in data:
+        value = default
+    canonical = _validation_status(
+        value,
+        data.get("status"),
+        legacy_map=legacy_map,
+    )
+    data["validation_status"] = canonical
+    data["status"] = LEGACY_STATUS_BY_VALIDATION[canonical]
+
+
+def _ensure_pending_validation(data: dict) -> None:
+    if data["validation_status"] in {"VERIFIED", "REJECTED", "SUPERSEDED"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Utilisez l'action de validation, rejet ou remplacement dediee",
+        )
+
+
+def _claim_type(value: str | None) -> str:
+    claim_type = (value or "").strip().upper()
+    if claim_type not in CLAIM_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Type de declaration impact invalide",
+        )
+    return claim_type
+
+
+def _semantic_key(value: str) -> str:
+    semantic_key = value.strip().lower()
+    if not semantic_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cle semantique impact requise",
+        )
+    return semantic_key
 
 
 def _validate_metric_payload(payload: ImpactMetricCreate) -> None:
@@ -142,6 +210,11 @@ def _validate_metric_payload(payload: ImpactMetricCreate) -> None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unite d'indicateur invalide",
+        )
+    if payload.period_start and payload.period_end and payload.period_end < payload.period_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La fin de periode doit suivre son debut",
         )
 
 
@@ -194,7 +267,7 @@ def _notify_impact_author(
     )
 
 
-def _status_progress(status: str | None) -> float:
+def _operational_progress(status: str | None) -> float:
     normalized = (status or "").strip().lower()
     if normalized in {"termine", "terminé", "done", "completed"}:
         return 100
@@ -253,8 +326,68 @@ def _project_leaders(db: Session, project_id) -> tuple[str, str]:
     return _display_name(lead), _display_name(deputy)
 
 
-def _is_terrasen(project: Project) -> bool:
-    return "terrasen" in (project.name or "").strip().lower()
+def _claim_payload(metric: ImpactMetric, evidence_count: int = 0) -> dict:
+    return {
+        "id": str(metric.id),
+        "semantic_key": metric.semantic_key,
+        "title": metric.title,
+        "category": metric.category,
+        "value": float(metric.value) if metric.value is not None else None,
+        "unit": metric.unit,
+        "claim_type": metric.claim_type,
+        "validation_status": metric.validation_status,
+        "period_start": metric.period_start,
+        "period_end": metric.period_end,
+        "population_scope": metric.population_scope,
+        "source": metric.source,
+        "source_reference": metric.source_reference,
+        "methodology": metric.methodology_note,
+        "notes_limitations": metric.notes_limitations,
+        "evidence_count": evidence_count,
+        "created_by": str(metric.created_by_id) if metric.created_by_id else None,
+        "created_at": metric.created_at,
+        "validated_by": str(metric.validated_by_id) if metric.validated_by_id else None,
+        "validated_at": metric.validated_at,
+        "supersedes_metric_id": (
+            str(metric.supersedes_metric_id) if metric.supersedes_metric_id else None
+        ),
+    }
+
+
+def _canonical_realized_claims(metrics: list[ImpactMetric]) -> list[ImpactMetric]:
+    # One canonical claim per project and semantic indicator is safer than
+    # summing potentially overlapping periods or populations.
+    current: dict[str, ImpactMetric] = {}
+    for metric in metrics:
+        if (
+            metric.value is None
+            or metric.claim_type != "MEASURED"
+            or metric.validation_status != "VERIFIED"
+        ):
+            continue
+        key = metric.semantic_key
+        candidate_order = (metric.validated_at or metric.created_at, str(metric.id))
+        previous = current.get(key)
+        previous_order = (
+            (previous.validated_at or previous.created_at, str(previous.id))
+            if previous is not None
+            else None
+        )
+        if previous_order is None or candidate_order > previous_order:
+            current[key] = metric
+    return list(current.values())
+
+
+def _realized_value(metrics: list[ImpactMetric], semantic_key: str):
+    values = [
+        metric.value for metric in metrics if metric.semantic_key == semantic_key
+    ]
+    return sum(values) if values else None
+
+
+def _sum_known(items: list[dict], key: str):
+    values = [item[key] for item in items if item.get(key) is not None]
+    return sum(values) if values else None
 
 
 def _project_payload(db: Session, project: Project) -> dict:
@@ -279,29 +412,48 @@ def _project_payload(db: Session, project: Project) -> dict:
         .scalar()
         or 0
     )
-    evidence_count = (
-        db.query(func.count(Document.id))
-        .filter(Document.project_id == project.id, Document.is_official.is_(True))
-        .scalar()
-        or 0
-    )
     impact_profile = (
         db.query(ImpactProject).filter(ImpactProject.project_id == project.id).first()
     )
+    metrics = []
+    evidence_counts = {}
     impact_evidence_count = 0
+    verified_evidence_count = 0
     if impact_profile:
+        metrics = (
+            db.query(ImpactMetric)
+            .filter(ImpactMetric.impact_project_id == impact_profile.id)
+            .order_by(ImpactMetric.created_at.asc(), ImpactMetric.id.asc())
+            .all()
+        )
         impact_evidence_count = (
             db.query(func.count(ImpactEvidence.id))
             .filter(ImpactEvidence.impact_project_id == impact_profile.id)
             .scalar()
             or 0
         )
+        verified_evidence_count = (
+            db.query(func.count(ImpactEvidence.id))
+            .filter(
+                ImpactEvidence.impact_project_id == impact_profile.id,
+                ImpactEvidence.validation_status == "VERIFIED",
+            )
+            .scalar()
+            or 0
+        )
+        evidence_counts = dict(
+            db.query(ImpactEvidence.metric_id, func.count(ImpactEvidence.id))
+            .filter(
+                ImpactEvidence.impact_project_id == impact_profile.id,
+                ImpactEvidence.metric_id.is_not(None),
+            )
+            .group_by(ImpactEvidence.metric_id)
+            .all()
+        )
+    realized_claims = _canonical_realized_claims(metrics)
     lead, deputy = _project_leaders(db, project.id)
     budget = float(project.budget_estimated or 0)
-    progress = _status_progress(project.status)
-    direct_impact = max(0, int(progress * 2))
-    indirect_impact = direct_impact * 4
-    reach = direct_impact + indirect_impact + documents_count * 25
+    progress = _operational_progress(project.status)
 
     payload = {
         "id": str(project.id),
@@ -314,43 +466,32 @@ def _project_payload(db: Session, project: Project) -> dict:
         "problem": project.problem_statement or project.description or "Problème à documenter",
         "solution": project.solution or "Solution à documenter",
         "target_beneficiaries": project.expected_impact or "Bénéficiaires à préciser",
-        "direct_impact": direct_impact,
-        "indirect_impact": indirect_impact,
-        "reach": reach,
-        "revenue": 0,
-        "surplus": 0,
-        "jobs_created": 0,
-        "lives_impacted": direct_impact,
-        "trees_planted": 0,
-        "waste_reduced": 0,
-        "water_saved": 0,
-        "co2_reduced": 0,
-        "planet_impact": 0,
-        "evidence_count": int(evidence_count),
-        "methodology": "À préciser dans le module Impact",
-        "assumptions": project.objectives or "Hypothèses à documenter",
+        **{
+            field: float(value) if value is not None else None
+            for field, semantic_key in REALIZED_FIELDS.items()
+            for value in [_realized_value(realized_claims, semantic_key)]
+        },
+        "planet_impact": None,
+        "evidence_count": int(impact_evidence_count),
+        "verified_evidence_count": int(verified_evidence_count),
+        "methodology": None,
+        "assumptions": None,
         "budget_used": budget,
         "progress": progress,
         "completed_tasks": int(completed_tasks),
         "late_tasks": int(late_tasks),
         "documents_count": int(documents_count),
-        "innovation_score": min(100, 45 + documents_count * 4),
-        "business_viability_score": 50 if budget else 35,
-        "scalability_score": min(100, 42 + completed_tasks * 3),
-        "competition_readiness_score": min(100, 30 + evidence_count * 10 + documents_count * 2),
+        "innovation_score": None,
+        "business_viability_score": None,
+        "scalability_score": None,
+        "competition_readiness_score": None,
+        "claims": [
+            _claim_payload(metric, int(evidence_counts.get(metric.id, 0)))
+            for metric in metrics
+        ],
     }
 
     if impact_profile:
-        direct_impact = int(impact_profile.direct_beneficiaries or 0)
-        indirect_impact = int(impact_profile.indirect_beneficiaries or 0)
-        reach = int(impact_profile.reach or direct_impact + indirect_impact)
-        planet_score = min(
-            100,
-            int(impact_profile.trees_planted or 0) * 0.04
-            + float(impact_profile.waste_reduced or 0) * 0.05
-            + float(impact_profile.water_saved or 0) * 0.001
-            + float(impact_profile.co2_reduced or 0) * 0.08,
-        )
         payload.update(
             {
                 "sdgs": impact_profile.sdgs or [],
@@ -360,65 +501,10 @@ def _project_payload(db: Session, project: Project) -> dict:
                     impact_profile.target_population
                     or payload["target_beneficiaries"]
                 ),
-                "direct_impact": direct_impact,
-                "indirect_impact": indirect_impact,
-                "reach": reach,
-                "revenue": float(impact_profile.revenue_generated or 0),
-                "surplus": float(impact_profile.profit_or_surplus or 0),
-                "jobs_created": int(impact_profile.jobs_created or 0),
-                "lives_impacted": int(impact_profile.lives_impacted or 0),
-                "trees_planted": int(impact_profile.trees_planted or 0),
-                "waste_reduced": float(impact_profile.waste_reduced or 0),
-                "water_saved": float(impact_profile.water_saved or 0),
-                "co2_reduced": float(impact_profile.co2_reduced or 0),
-                "planet_impact": planet_score,
-                "evidence_count": max(int(evidence_count), int(impact_evidence_count)),
-                "methodology": impact_profile.methodology or payload["methodology"],
+                "methodology": impact_profile.methodology,
                 "assumptions": (
                     impact_profile.projection_next_12_months
                     or impact_profile.evidence_notes
-                    or payload["assumptions"]
-                ),
-                "business_viability_score": min(
-                    100,
-                    45
-                    + float(impact_profile.revenue_generated or 0) / 100000
-                    + float(impact_profile.profit_or_surplus or 0) / 150000,
-                ),
-            }
-        )
-
-    if _is_terrasen(project):
-        payload.update(
-            {
-                "sdgs": ["ODD 8", "ODD 11", "ODD 12", "ODD 13", "ODD 15"],
-                "target_beneficiaries": (
-                    "GIE de Yeumbeul, GIE Waar wi à Passy, Khaffe, "
-                    "Ngayenne Sabakh, vendeuses de légumes, personnels COUD "
-                    "et étudiants UCAD."
-                ),
-                "direct_impact": max(direct_impact, 50),
-                "indirect_impact": max(indirect_impact, 250),
-                "reach": max(reach, 500),
-                "planet_impact": max(65, payload["planet_impact"]),
-                "evidence_count": max(int(evidence_count), 6),
-                "methodology": (
-                    "Transferts de technologie, immersions terrain, recettes "
-                    "produits, budgétisation des équipements et suivi des "
-                    "bénéficiaires documentés dans le dossier TERRASEN."
-                ),
-                "assumptions": (
-                    "Impact consolidé à partir des cibles et réalisations "
-                    "documentées: micro-jardinage, irrigation, ESP32, "
-                    "transformation, conservation et distribution."
-                ),
-                "innovation_score": max(payload["innovation_score"], 86),
-                "business_viability_score": max(
-                    payload["business_viability_score"], 72
-                ),
-                "scalability_score": max(payload["scalability_score"], 84),
-                "competition_readiness_score": max(
-                    payload["competition_readiness_score"], 76
                 ),
             }
         )
@@ -453,12 +539,17 @@ def create_impact_record(
         )
 
     data = payload.model_dump()
-    data["status"] = _validate_impact_status(payload.status)
+    if "validation_status" not in payload.model_fields_set:
+        data.pop("validation_status", None)
+    if "status" not in payload.model_fields_set:
+        data.pop("status", None)
+    _sync_validation(data, default="DRAFT")
+    _ensure_pending_validation(data)
     impact_project = ImpactProject(**data, created_by_id=current_user.id)
     db.add(impact_project)
     db.flush()
 
-    if impact_project.status in {"submitted", "under_review"}:
+    if impact_project.validation_status in {"EVIDENCE_PENDING", "UNDER_REVIEW"}:
         notify_users(
             db,
             user_ids=[
@@ -487,13 +578,14 @@ def update_impact_record(
 ):
     impact_project = _get_impact_project_or_404(db, impact_project_id)
     data = payload.model_dump(exclude_unset=True)
-    if "status" in data:
-        data["status"] = _validate_impact_status(data["status"])
+    if "status" in data or "validation_status" in data:
+        _sync_validation(data, default=impact_project.validation_status)
+        _ensure_pending_validation(data)
     for field, value in data.items():
         setattr(impact_project, field, value)
     impact_project.updated_at = datetime.utcnow()
 
-    if impact_project.status in {"submitted", "under_review"}:
+    if impact_project.validation_status in {"EVIDENCE_PENDING", "UNDER_REVIEW"}:
         notify_users(
             db,
             user_ids=[
@@ -520,11 +612,16 @@ def validate_impact_record(
     current_user=Depends(require_admin_or_team_leader),
 ):
     impact_project = _get_impact_project_or_404(db, impact_project_id)
+    impact_project.validation_status = "VERIFIED"
     impact_project.status = "validated"
     impact_project.validated_by_id = current_user.id
     impact_project.validated_at = datetime.utcnow()
     impact_project.rejection_reason = None
     impact_project.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_record_verified", current_user.id,
+        "impact_project", impact_project.id,
+    )
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
@@ -548,11 +645,17 @@ def reject_impact_record(
 ):
     impact_project = _get_impact_project_or_404(db, impact_project_id)
     reason = _require_rejection_reason(payload)
+    impact_project.validation_status = "REJECTED"
     impact_project.status = "rejected"
     impact_project.validated_by_id = current_user.id
     impact_project.validated_at = datetime.utcnow()
     impact_project.rejection_reason = reason
     impact_project.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_record_rejected", current_user.id,
+        "impact_project", impact_project.id,
+        new_value={"reason": reason},
+    )
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
@@ -598,7 +701,46 @@ def create_impact_metric(
     impact_project = _get_impact_project_or_404(db, impact_project_id)
     _validate_metric_payload(payload)
     data = payload.model_dump()
-    data["status"] = _validate_impact_status(payload.status)
+    if "validation_status" not in payload.model_fields_set:
+        data.pop("validation_status", None)
+    if "status" not in payload.model_fields_set:
+        data.pop("status", None)
+    data["claim_type"] = _claim_type(payload.claim_type)
+    data["semantic_key"] = _semantic_key(payload.semantic_key)
+    _sync_validation(data, default="DRAFT")
+    _ensure_pending_validation(data)
+    if payload.evidence_file_id:
+        stored_file = get_file_or_404(db, str(payload.evidence_file_id))
+        ensure_file_access(db, stored_file, current_user, manage=True)
+    if payload.supersedes_metric_id:
+        replaced = (
+            db.query(ImpactMetric)
+            .filter(
+                ImpactMetric.id == payload.supersedes_metric_id,
+                ImpactMetric.impact_project_id == impact_project.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if replaced is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Declaration remplacee invalide pour cette fiche impact",
+            )
+        if replaced.validation_status == "SUPERSEDED":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Une declaration deja remplacee ne peut pas recevoir un concurrent",
+            )
+        existing_replacement = db.query(ImpactMetric.id).filter(
+            ImpactMetric.supersedes_metric_id == replaced.id,
+            ImpactMetric.validation_status.in_(ACTIVE_REPLACEMENT_STATUSES),
+        ).first()
+        if existing_replacement:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cette declaration a deja ete remplacee",
+            )
     metric = ImpactMetric(
         impact_project_id=impact_project.id,
         **data,
@@ -606,8 +748,7 @@ def create_impact_metric(
     )
     db.add(metric)
     db.flush()
-
-    if metric.status in {"submitted", "under_review"}:
+    if metric.validation_status in {"EVIDENCE_PENDING", "UNDER_REVIEW"}:
         notify_users(
             db,
             user_ids=[
@@ -633,17 +774,78 @@ def validate_impact_metric(
     db: Session = Depends(get_db),
     current_user=Depends(require_admin_or_team_leader),
 ):
-    metric = db.query(ImpactMetric).filter(ImpactMetric.id == metric_id).first()
+    metric = (
+        db.query(ImpactMetric)
+        .filter(ImpactMetric.id == metric_id)
+        .with_for_update()
+        .first()
+    )
     if not metric:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Indicateur impact introuvable",
         )
+    if metric.validation_status in {"REJECTED", "SUPERSEDED"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une declaration rejetee ou remplacee ne peut pas etre validee",
+        )
+    has_linked_evidence = (
+        db.query(ImpactEvidence.id)
+        .filter(
+            ImpactEvidence.metric_id == metric.id,
+            ImpactEvidence.impact_project_id == metric.impact_project_id,
+        )
+        .first()
+        is not None
+    )
+    if not (
+        (metric.source_reference or "").strip()
+        or metric.evidence_file_id is not None
+        or has_linked_evidence
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une reference source ou une preuve rattachee est requise",
+        )
+    predecessor = None
+    if metric.supersedes_metric_id is not None:
+        predecessor = (
+            db.query(ImpactMetric)
+            .filter(
+                ImpactMetric.id == metric.supersedes_metric_id,
+                ImpactMetric.impact_project_id == metric.impact_project_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if predecessor is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La declaration remplacee est introuvable",
+            )
+        predecessor.validation_status = "SUPERSEDED"
+        predecessor.status = "archived"
+        predecessor.updated_at = datetime.utcnow()
+        create_audit_log(
+            db,
+            "impact_claim_superseded",
+            current_user.id,
+            "impact_metric",
+            predecessor.id,
+            new_value={"replacement_metric_id": str(metric.id)},
+        )
+    metric.validation_status = "VERIFIED"
     metric.status = "validated"
     metric.validated_by_id = current_user.id
     metric.validated_at = datetime.utcnow()
     metric.rejection_reason = None
     metric.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_claim_verified", current_user.id,
+        "impact_metric", metric.id,
+        new_value={"claim_type": metric.claim_type, "semantic_key": metric.semantic_key},
+    )
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
@@ -665,18 +867,34 @@ def reject_impact_metric(
     db: Session = Depends(get_db),
     current_user=Depends(require_admin_or_team_leader),
 ):
-    metric = db.query(ImpactMetric).filter(ImpactMetric.id == metric_id).first()
+    metric = (
+        db.query(ImpactMetric)
+        .filter(ImpactMetric.id == metric_id)
+        .with_for_update()
+        .first()
+    )
     if not metric:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Indicateur impact introuvable",
         )
+    if metric.validation_status in {"VERIFIED", "SUPERSEDED"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une declaration validee ou remplacee ne peut pas etre rejetee",
+        )
     reason = _require_rejection_reason(payload)
+    metric.validation_status = "REJECTED"
     metric.status = "rejected"
     metric.validated_by_id = current_user.id
     metric.validated_at = datetime.utcnow()
     metric.rejection_reason = reason
     metric.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_claim_rejected", current_user.id,
+        "impact_metric", metric.id,
+        new_value={"reason": reason},
+    )
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
@@ -721,8 +939,20 @@ def create_impact_evidence(
 ):
     impact_project = _get_impact_project_or_404(db, impact_project_id)
     _validate_linked_metric(db, impact_project.id, payload.metric_id)
+    if payload.file_id:
+        stored_file = get_file_or_404(db, str(payload.file_id))
+        ensure_file_access(db, stored_file, current_user, manage=True)
     data = payload.model_dump()
-    data["status"] = _validate_impact_status(payload.status)
+    if "validation_status" not in payload.model_fields_set:
+        data.pop("validation_status", None)
+    if "status" not in payload.model_fields_set:
+        data.pop("status", None)
+    _sync_validation(
+        data,
+        default="EVIDENCE_ATTACHED",
+        legacy_map=EVIDENCE_LEGACY_STATUS_MAP,
+    )
+    _ensure_pending_validation(data)
     evidence = ImpactEvidence(
         impact_project_id=impact_project.id,
         **data,
@@ -764,11 +994,16 @@ def validate_impact_evidence(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Preuve impact introuvable",
         )
+    evidence.validation_status = "VERIFIED"
     evidence.status = "validated"
     evidence.validated_by_id = current_user.id
     evidence.validated_at = datetime.utcnow()
     evidence.rejection_reason = None
     evidence.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_evidence_verified", current_user.id,
+        "impact_evidence", evidence.id,
+    )
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
@@ -799,11 +1034,17 @@ def reject_impact_evidence(
             detail="Preuve impact introuvable",
         )
     reason = _require_rejection_reason(payload)
+    evidence.validation_status = "REJECTED"
     evidence.status = "rejected"
     evidence.validated_by_id = current_user.id
     evidence.validated_at = datetime.utcnow()
     evidence.rejection_reason = reason
     evidence.updated_at = datetime.utcnow()
+    create_audit_log(
+        db, "impact_evidence_rejected", current_user.id,
+        "impact_evidence", evidence.id,
+        new_value={"reason": reason},
+    )
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
@@ -837,32 +1078,31 @@ def get_impact_summary(
     completed_tasks = sum(project["completed_tasks"] for project in projects)
     late_tasks = sum(project["late_tasks"] for project in projects)
     documents = sum(project["documents_count"] for project in projects)
-    direct_impact = sum(project["direct_impact"] for project in projects)
-    indirect_impact = sum(project["indirect_impact"] for project in projects)
-    reach = sum(project["reach"] for project in projects)
-    jobs_created = sum(project.get("jobs_created", 0) for project in projects)
-    lives_impacted = sum(project.get("lives_impacted", 0) for project in projects)
-    trees_planted = sum(project.get("trees_planted", 0) for project in projects)
-    touched_sdgs = len(
-        {
-            sdg
-            for project in projects
-            for sdg in project.get("sdgs", [])
-            if str(sdg).strip()
-        }
-    )
+    direct_impact = _sum_known(projects, "direct_impact")
+    indirect_impact = _sum_known(projects, "indirect_impact")
+    reach = _sum_known(projects, "reach")
+    jobs_created = _sum_known(projects, "jobs_created")
+    lives_impacted = _sum_known(projects, "lives_impacted")
+    trees_planted = _sum_known(projects, "trees_planted")
     validated_evidence = (
         db.query(func.count(ImpactEvidence.id))
-        .filter(ImpactEvidence.status == "validated")
+        .filter(ImpactEvidence.validation_status == "VERIFIED")
         .scalar()
         or 0
     )
-    readiness = (
-        sum(project["competition_readiness_score"] for project in projects)
-        / active_projects
-        if active_projects
-        else 0
-    )
+    claims = [claim for project in projects for claim in project["claims"]]
+    claim_overview = {
+        "by_claim_type": {
+            claim_type: sum(claim["claim_type"] == claim_type for claim in claims)
+            for claim_type in sorted(CLAIM_TYPES)
+        },
+        "by_validation_status": {
+            validation_status: sum(
+                claim["validation_status"] == validation_status for claim in claims
+            )
+            for validation_status in sorted(VALIDATION_STATUSES)
+        },
+    }
 
     return {
         "organization": {
@@ -882,16 +1122,18 @@ def get_impact_summary(
             "lives_impacted_total": lives_impacted,
             "trees_planted_total": trees_planted,
             "validated_evidence_count": int(validated_evidence),
-            "touched_sdgs": touched_sdgs,
-            "revenue_total": sum(project["revenue"] for project in projects),
-            "surplus_total": sum(project["surplus"] for project in projects),
+            # A union cannot be inferred from unvalidated project metadata.
+            "touched_sdgs": None,
+            "revenue_total": _sum_known(projects, "revenue"),
+            "surplus_total": _sum_known(projects, "surplus"),
             "official_documents": documents,
-            "competition_readiness": readiness,
-            "academy_participation": 0,
-            "communication_engagement": 0,
-            "financial_health": 0,
+            "competition_readiness": None,
+            "academy_participation": None,
+            "communication_engagement": None,
+            "financial_health": None,
         },
-        "historical_impact": HISTORICAL_IMPACT,
+        "claim_overview": claim_overview,
+        "historical_impact": None,
     }
 
 
@@ -910,46 +1152,50 @@ def _impact_export_rows(projects: list[dict]) -> list[list]:
     rows = [
         [
             "Projet",
-            "Statut",
+            "Statut projet",
             "Pole",
             "Chef projet",
-            "Beneficiaires directs",
-            "Beneficiaires indirects",
-            "Reach",
-            "Vies impactees",
-            "Revenus generes",
-            "Surplus",
-            "Emplois crees",
-            "Arbres plantes",
-            "Impact environnemental",
-            "ODD touches",
-            "Preuves",
+            "Cle semantique",
+            "Indicateur",
+            "Valeur",
+            "Unite",
+            "Type de declaration",
+            "Statut de validation",
+            "Debut periode",
+            "Fin periode",
+            "Perimetre population",
+            "Source",
+            "Reference source",
             "Methodologie",
-            "Projection 12 mois",
+            "Notes et limites",
+            "Nombre de preuves",
         ]
     ]
     for project in projects:
-        rows.append(
-            [
-                project["project_name"],
-                project["status"],
-                project["pole_name"],
-                project["project_lead"],
-                project["direct_impact"],
-                project["indirect_impact"],
-                project["reach"],
-                project.get("lives_impacted", 0),
-                project["revenue"],
-                project["surplus"],
-                project.get("jobs_created", 0),
-                project.get("trees_planted", 0),
-                project["planet_impact"],
-                ", ".join(project.get("sdgs", [])),
-                project["evidence_count"],
-                project["methodology"],
-                project["assumptions"],
-            ]
-        )
+        claims = project["claims"] or [None]
+        for claim in claims:
+            rows.append(
+                [
+                    project["project_name"],
+                    project["status"],
+                    project["pole_name"],
+                    project["project_lead"],
+                    claim["semantic_key"] if claim else None,
+                    claim["title"] if claim else None,
+                    claim["value"] if claim else None,
+                    claim["unit"] if claim else None,
+                    claim["claim_type"] if claim else None,
+                    claim["validation_status"] if claim else None,
+                    claim["period_start"] if claim else None,
+                    claim["period_end"] if claim else None,
+                    claim["population_scope"] if claim else None,
+                    claim["source"] if claim else None,
+                    claim["source_reference"] if claim else None,
+                    claim["methodology"] if claim else None,
+                    claim["notes_limitations"] if claim else None,
+                    claim["evidence_count"] if claim else 0,
+                ]
+            )
     return rows
 
 
@@ -1009,16 +1255,18 @@ def get_impact_report_summary(
                     "reach": project["reach"],
                     "revenue": project["revenue"],
                     "surplus": project["surplus"],
-                    "jobs_created": project.get("jobs_created", 0),
+                    "jobs_created": project["jobs_created"],
                     "evidence": project["evidence_count"],
+                    "verified_evidence": project["verified_evidence_count"],
                 },
+                "claims": project["claims"],
                 "sdgs": project.get("sdgs", []),
                 "methodology": project["methodology"],
                 "projection": project["assumptions"],
                 "improvement_points": [
                     *(
                         ["Ajouter des preuves validees"]
-                        if project["evidence_count"] < 2
+                        if project["verified_evidence_count"] < 2
                         else []
                     ),
                     *(["Renseigner les ODD"] if not project.get("sdgs") else []),

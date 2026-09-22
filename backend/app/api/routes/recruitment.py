@@ -3,10 +3,11 @@ import csv
 from io import StringIO
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.db.database import get_db
 from app.models.recruitment import (
@@ -43,15 +44,14 @@ from app.api.deps import (
 from app.core.config import settings
 from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES
 from app.services.notification_service import notify_user, notify_users
+from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.operational_integrity import lock_row, to_naive_utc
 
 
 router = APIRouter(prefix="/recruitment", tags=["Recrutement"])
 
 
 VALID_APPLICATION_STATUSES = {
-    "received",
-    "preselected",
-    "interview",
     "submitted",
     "under_review",
     "interview_scheduled",
@@ -59,6 +59,15 @@ VALID_APPLICATION_STATUSES = {
     "rejected",
     "waiting_list",
     "cancelled",
+}
+APPLICATION_STATUS_TRANSITIONS = {
+    "submitted": {"under_review", "cancelled"},
+    "under_review": {"interview_scheduled", "waiting_list", "accepted", "rejected", "cancelled"},
+    "interview_scheduled": {"under_review", "waiting_list", "accepted", "rejected", "cancelled"},
+    "waiting_list": {"interview_scheduled", "accepted", "rejected", "cancelled"},
+    "accepted": set(),
+    "rejected": set(),
+    "cancelled": set(),
 }
 
 APPLICATION_STATUS_ALIASES = {
@@ -112,6 +121,26 @@ REVIEW_ADMIN_ROLES = {"administrateur", "team_leader"}
 def normalize_application_status(value: str) -> str:
     status_value = value.strip().lower()
     return APPLICATION_STATUS_ALIASES.get(status_value, status_value)
+
+
+def apply_application_status(application: Application, value: str) -> bool:
+    next_status = normalize_application_status(value)
+    current_status = normalize_application_status(application.status)
+    if next_status not in VALID_APPLICATION_STATUSES:
+        raise HTTPException(status_code=400, detail="Statut de candidature invalide")
+    if application.converted_user_id and next_status != "accepted":
+        raise HTTPException(status_code=409, detail="Une candidature convertie reste acceptée")
+    if next_status == current_status:
+        application.status = current_status
+        return False
+    if next_status not in APPLICATION_STATUS_TRANSITIONS.get(current_status, set()):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Transition de candidature interdite : {current_status} -> {next_status}",
+        )
+    application.status = next_status
+    application.updated_at = datetime.utcnow()
+    return True
 
 
 def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
@@ -335,7 +364,22 @@ def delete_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    campaign = get_campaign_or_404(db, campaign_id)
+    campaign = lock_row(db, RecruitmentCampaign, campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campagne introuvable")
+
+    applications = (
+        db.query(Application)
+        .filter(Application.campaign_id == campaign.id)
+        .order_by(Application.id.asc())
+        .with_for_update()
+        .all()
+    )
+    if any(application.converted_user_id for application in applications):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une campagne avec des candidatures converties doit être clôturée, pas supprimée",
+        )
 
     db.delete(campaign)
     db.commit()
@@ -401,7 +445,14 @@ def submit_application(
     )
 
     db.add(application)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une candidature existe déjà pour cet email",
+        ) from exc
     ensure_tracking_code(db, application)
     notify_recruitment_responsibles(db, application, campaign)
     candidate_email_ready()
@@ -483,7 +534,13 @@ def profile_type_from_application(
     requested_profile_type: str | None,
 ) -> str:
     if requested_profile_type and requested_profile_type.strip():
-        return requested_profile_type.strip().lower()
+        profile_type = requested_profile_type.strip().lower()
+        if profile_type not in {BASE_ACTIVE_ROLE, "enactrice"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Type de profil membre invalide",
+            )
+        return profile_type
 
     gender = (application.gender or "").strip().lower()
     if gender.startswith("f") or "femme" in gender:
@@ -803,19 +860,35 @@ def get_application(
 def schedule_application_interview(
     application_id: str,
     payload: ApplicationInterviewSchedule,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    application = get_application_or_404(db, application_id)
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
 
-    application.interview_at = payload.interview_at
+    old_status = normalize_application_status(application.status)
+    changed = apply_application_status(application, "interview_scheduled")
+
+    application.interview_at = to_naive_utc(payload.interview_at)
     application.interview_location = payload.interview_location
     application.interview_link = payload.interview_link
     application.interview_jury = payload.interview_jury
     application.interview_note = payload.interview_note
-    application.status = "interview_scheduled"
     application.updated_at = datetime.utcnow()
-    notify_application_status_if_linked(db, application)
+    if changed:
+        notify_application_status_if_linked(db, application)
+        create_audit_log(
+            db=db,
+            action="changement_statut_candidature",
+            user_id=current_user.id,
+            entity_type="application",
+            entity_id=application.id,
+            old_value={"status": old_status},
+            new_value={"status": application.status, "interview_scheduled": True},
+            ip_address=get_client_ip(request),
+        )
 
     db.commit()
     db.refresh(application)
@@ -827,20 +900,23 @@ def schedule_application_interview(
 def update_application(
     application_id: str,
     payload: ApplicationUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    application = get_application_or_404(db, application_id)
-    old_status = application.status
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    if application.converted_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une candidature convertie est immuable",
+        )
+    old_status = normalize_application_status(application.status)
+    status_changed = False
 
     if payload.status is not None:
-        next_status = normalize_application_status(payload.status)
-        if next_status not in VALID_APPLICATION_STATUSES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Statut de candidature invalide",
-            )
-        application.status = next_status
+        status_changed = apply_application_status(application, payload.status)
 
     fields = [
         "gender",
@@ -871,8 +947,18 @@ def update_application(
             setattr(application, field, value)
 
     application.updated_at = datetime.utcnow()
-    if payload.status is not None and application.status != old_status:
+    if status_changed:
         notify_application_status_if_linked(db, application)
+        create_audit_log(
+            db=db,
+            action="changement_statut_candidature",
+            user_id=current_user.id,
+            entity_type="application",
+            entity_id=application.id,
+            old_value={"status": old_status},
+            new_value={"status": application.status},
+            ip_address=get_client_ip(request),
+        )
 
     db.commit()
     db.refresh(application)
@@ -884,21 +970,27 @@ def update_application(
 def change_application_status(
     application_id: str,
     payload: ApplicationStatusChange,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    application = get_application_or_404(db, application_id)
-
-    next_status = normalize_application_status(payload.status)
-    if next_status not in VALID_APPLICATION_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Statut de candidature invalide",
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    old_status = normalize_application_status(application.status)
+    changed = apply_application_status(application, payload.status)
+    if changed:
+        notify_application_status_if_linked(db, application)
+        create_audit_log(
+            db=db,
+            action="changement_statut_candidature",
+            user_id=current_user.id,
+            entity_type="application",
+            entity_id=application.id,
+            old_value={"status": old_status},
+            new_value={"status": application.status},
+            ip_address=get_client_ip(request),
         )
-
-    application.status = next_status
-    application.updated_at = datetime.utcnow()
-    notify_application_status_if_linked(db, application)
 
     db.commit()
     db.refresh(application)
@@ -912,7 +1004,15 @@ def delete_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    application = get_application_or_404(db, application_id)
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+
+    if application.converted_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Une candidature convertie ne peut pas être supprimée",
+        )
 
     db.delete(application)
     db.commit()
@@ -1079,14 +1179,25 @@ def delete_review(
 def convert_application_to_user(
     application_id: str,
     payload: ConvertApplicationToUserRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
-    application = get_application_or_404(db, application_id)
+    campaign_id = db.query(Application.campaign_id).filter(
+        Application.id == application_id
+    ).scalar()
+    if campaign_id is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    campaign = lock_row(db, RecruitmentCampaign, campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campagne introuvable")
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
 
     if application.status != "accepted":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="La candidature doit être acceptée avant création du compte",
         )
     if len(payload.password.strip()) < 8:
@@ -1094,6 +1205,10 @@ def convert_application_to_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le mot de passe initial doit contenir au moins 8 caractères",
         )
+    requested_profile_type = profile_type_from_application(
+        application,
+        payload.profile_type,
+    )
 
     if application.converted_user_id:
         return {
@@ -1102,29 +1217,31 @@ def convert_application_to_user(
             "user_id": str(application.converted_user_id),
         }
 
-    existing_user = db.query(User).filter(
-        func.lower(User.email) == application.email.lower()
-    ).first()
+    existing_user = (
+        db.query(User)
+        .filter(func.lower(User.email) == application.email.lower())
+        .with_for_update()
+        .first()
+    )
 
     if existing_user:
+        if (
+            existing_user.status != "active"
+            or not existing_user.is_active
+            or existing_user.profile_type not in {BASE_ACTIVE_ROLE, "enactrice"}
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Un compte existe avec un cycle de vie incompatible; "
+                    "un administrateur doit le résoudre avant la conversion"
+                ),
+            )
         application.converted_user_id = existing_user.id
         existing_user.gender = existing_user.gender or application.gender
-        existing_user.profile_type = profile_type_from_application(
-            application,
-            payload.profile_type,
-        )
         existing_user.department = existing_user.department or application.department
         existing_user.study_level = existing_user.study_level or application.study_level
         existing_user.promotion = existing_user.promotion or application.class_name
-        existing_user.status = "active"
-        existing_user.is_active = True
-        ensure_user_role(db, existing_user, BASE_ACTIVE_ROLE)
-        if payload.core_pole_id:
-            ensure_pole_membership(db, existing_user, payload.core_pole_id)
-        for pole_id in payload.support_pole_ids:
-            ensure_pole_membership(db, existing_user, pole_id)
-        if payload.project_id:
-            ensure_project_membership(db, existing_user, payload.project_id)
         application.updated_at = datetime.utcnow()
         notify_user(
             db,
@@ -1136,6 +1253,16 @@ def convert_application_to_user(
             related_id=application.id,
             dedupe=True,
         )
+        create_audit_log(
+            db=db,
+            action="conversion_candidature",
+            user_id=current_user.id,
+            entity_type="application",
+            entity_id=application.id,
+            old_value={"converted_user_id": None},
+            new_value={"converted_user_id": str(existing_user.id), "existing_user": True},
+            ip_address=get_client_ip(request),
+        )
         db.commit()
 
         return {
@@ -1143,17 +1270,17 @@ def convert_application_to_user(
             "message": "Un compte existait déjà avec cet email",
             "user_id": str(existing_user.id),
             "profile_type": existing_user.profile_type,
-            "core_pole_id": str(payload.core_pole_id) if payload.core_pole_id else None,
-            "project_id": str(payload.project_id) if payload.project_id else None,
+            "core_pole_id": None,
+            "project_id": None,
         }
 
     user = User(
         first_name=application.first_name,
         last_name=application.last_name,
-        email=application.email,
+        email=application.email.strip().lower(),
         phone=application.phone,
         gender=application.gender,
-        profile_type=profile_type_from_application(application, payload.profile_type),
+        profile_type=requested_profile_type,
         password_hash=hash_password(payload.password.strip()),
         department=application.department,
         study_level=application.study_level,
@@ -1164,7 +1291,69 @@ def convert_application_to_user(
     )
 
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        campaign = lock_row(db, RecruitmentCampaign, campaign_id)
+        application = lock_row(db, Application, application_id)
+        if campaign is None or application is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La candidature n'est plus disponible pour conversion",
+            ) from exc
+        if application.converted_user_id:
+            return {
+                "ok": True,
+                "message": "Un compte existe déjà pour cette candidature",
+                "user_id": str(application.converted_user_id),
+            }
+        existing_user = (
+            db.query(User)
+            .filter(func.lower(User.email) == application.email.lower())
+            .with_for_update()
+            .first()
+        )
+        if existing_user is None or (
+            existing_user.status != "active"
+            or not existing_user.is_active
+            or existing_user.profile_type not in {BASE_ACTIVE_ROLE, "enactrice"}
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un compte existe déjà avec cet email",
+            ) from exc
+        application.converted_user_id = existing_user.id
+        application.updated_at = datetime.utcnow()
+        notify_user(
+            db,
+            user_id=existing_user.id,
+            title="Candidature liee a votre compte",
+            message="Votre candidature Enactus ESP est maintenant liee a votre compte.",
+            notification_type="recruitment_update",
+            related_type="application",
+            related_id=application.id,
+            dedupe=True,
+        )
+        create_audit_log(
+            db=db,
+            action="conversion_candidature",
+            user_id=current_user.id,
+            entity_type="application",
+            entity_id=application.id,
+            old_value={"converted_user_id": None},
+            new_value={"converted_user_id": str(existing_user.id), "existing_user": True},
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        return {
+            "ok": True,
+            "message": "Un compte existait déjà avec cet email",
+            "user_id": str(existing_user.id),
+            "profile_type": existing_user.profile_type,
+            "core_pole_id": None,
+            "project_id": None,
+        }
     ensure_user_role(db, user, BASE_ACTIVE_ROLE)
     if payload.core_pole_id:
         ensure_pole_membership(db, user, payload.core_pole_id)
@@ -1179,11 +1368,22 @@ def convert_application_to_user(
         db,
         user_id=user.id,
         title="Compte EnactSpace cree",
-        message="Votre compte candidat a ete cree et attend validation.",
+        message="Votre compte membre EnactSpace est actif.",
         notification_type="recruitment_update",
         related_type="application",
         related_id=application.id,
         dedupe=True,
+    )
+
+    create_audit_log(
+        db=db,
+        action="conversion_candidature",
+        user_id=current_user.id,
+        entity_type="application",
+        entity_id=application.id,
+        old_value={"converted_user_id": None},
+        new_value={"converted_user_id": str(user.id), "existing_user": False},
+        ip_address=get_client_ip(request),
     )
 
     db.commit()

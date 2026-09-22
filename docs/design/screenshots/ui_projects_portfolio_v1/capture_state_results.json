@@ -1,0 +1,111 @@
+{
+  "success": true,
+  "runtime_verified": true,
+  "projects_count": 9,
+  "canonical_statuses_count": 7,
+  "impact_aggregates_count": 9,
+  "mutation_performed": false,
+  "captures": [
+    {
+      "filename": "01_projects_portfolio_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "route": "/projects",
+      "target_project": null,
+      "expected_markers": ["Portefeuille Projets", "Progression opérationnelle", "Prochaine action", "Alertes", "Ouvrir le projet"],
+      "reached_markers": ["Audit Projet Sans Équipe", "Audit Rivage", "Audit Passage", "Audit Horizon", "Idée", "Étude", "Prototype", "Progression opérationnelle", "AUDIT-PROJECT-NEXT-ACTION-001", "Ouvrir le projet"],
+      "source": "impact_projects",
+      "screenshot_sha256": "0cbeefff0108ecbf8f68baf6e86e0aba4904235d9932e72c69979ffb2e699651",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_projects_filters_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route": "/projects",
+      "target_project": "Audit Canopée",
+      "expected_markers": ["Rechercher un projet", "Statut", "Responsable", "Alerte", "Avec blocage", "En retard", "Sans prochaine action", "Données incomplètes", "Réinitialiser"],
+      "reached_markers": ["Avec blocage", "En retard", "Sans prochaine action", "Données incomplètes", "Audit Canopée", "1 tâche bloquée", "Réinitialiser"],
+      "source": "impact_projects",
+      "screenshot_sha256": "c56eb7ff7752ff5fad371c7ee01dd398c214cb18753db6dee1dbefc02a5aec46",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_projects_portfolio_mobile_390x844.png",
+      "viewport": "390x844",
+      "route": "/projects",
+      "target_project": null,
+      "expected_markers": ["Filtres et recherche", "Aucune équipe affectée", "Progression opérationnelle", "Prochaine action", "Alertes"],
+      "reached_markers": ["Audit Projet Sans Équipe", "Idée", "Aucune équipe affectée", "Progression opérationnelle", "Aucune prochaine action planifiée", "Aucune alerte", "Audit Rivage"],
+      "source": "impact_projects",
+      "screenshot_sha256": "72f38bd63d760b22fb89e53077427d7575f4ee189c025f0ed3d789503f3330d5",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_project_summary_team_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route": "/projects/b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+      "target_project": "Audit Horizon",
+      "expected_markers": ["Audit Horizon", "Résumé", "Équipe", "Chef de projet", "Adjoint chef de projet", "Membres"],
+      "reached_markers": ["Audit Horizon", "Idée", "Résumé", "Progression opérationnelle", "Problème", "Solution", "Objectifs", "Équipe", "Audit ProjectLead", "Audit Active03", "Membres"],
+      "source": "impact_projects",
+      "screenshot_sha256": "e04c39073b77778dded46ef0186c32036135393370dd66e0ec06e6965713f55b",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_project_work_blockage_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route": "/projects/c97f7262-fe5c-5e3f-824d-63dff7f31e0e",
+      "target_project": "Audit Canopée",
+      "expected_markers": ["Travail", "Bloqué", "Urgente", "Tâche audit 35", "15/09/2026", "Audit Admin", "Audit Member"],
+      "reached_markers": ["Audit Canopée", "Suspendu", "Travail", "Bloqué", "Tâche audit 35", "Bloqué · Urgente", "15/09/2026 · Audit Admin, Audit Member"],
+      "source": "impact_projects",
+      "canonical_blockage_visible": true,
+      "screenshot_sha256": "92790c9f850141ec4642805e226f9f95c3be7e977de1a4fbe07f18b2b030f6d0",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_project_activity_documents_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route": "/projects/b4a02bf4-f948-5aab-b2d9-7f57bc97b1b0",
+      "target_project": "Audit Horizon",
+      "expected_markers": ["Activité", "AUDIT-PROJECT-EVENT-FUTURE-001", "20/03/2027", "Documents", "Consulter"],
+      "reached_markers": ["Activité", "AUDIT-PROJECT-EVENT-FUTURE-001", "20/03/2027 à 10:00", "Salle Audit Projet A1", "Documents", "Document audit 1", "Valide", "15/06/2026", "Consulter"],
+      "source": "impact_projects",
+      "screenshot_sha256": "66744e4f4b8dea6cf28a05905960c539d26c0fa71a9a5e918a735d1f2025e660",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_project_incomplete_impact_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route": "/projects/:audit-sans-impact-id",
+      "target_project": "Audit Sans Impact",
+      "expected_markers": ["Impact", "Progression opérationnelle", "Informations d’impact à compléter"],
+      "reached_markers": ["Audit Sans Impact", "Impact", "Progression opérationnelle", "40 %", "Bénéficiaires directs", "80", "Bénéficiaires indirects", "320", "Portée", "475", "Vies impactées", "Informations d’impact à compléter", "Certaines informations de contexte du projet ne sont pas encore renseignées.", "Méthodologie"],
+      "source": "impact_projects",
+      "impact_metrics_visible": true,
+      "incomplete_impact_state_visible": true,
+      "partial_impact_data": true,
+      "screenshot_sha256": "1f26b91858e8cef37abedc2756aa9813337684801004ffb09e01eac362d6680e",
+      "mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_project_no_team_tablet_768x1024.png",
+      "viewport": "768x1024",
+      "route": "/projects/9e0eea52-7d05-5d73-95b9-aea188c6fa6e",
+      "target_project": "Audit Projet Sans Équipe",
+      "expected_markers": ["Audit Projet Sans Équipe", "Équipe", "Aucune équipe affectée"],
+      "reached_markers": ["Audit Projet Sans Équipe", "Idée", "Équipe", "Aucune équipe affectée", "Ce projet ne possède actuellement aucune affectation active."],
+      "source": "impact_projects",
+      "empty_team_state_visible": true,
+      "screenshot_sha256": "7aace57b428c6505803895c16391636902bd46884d6dc3598fc31ef8bf6164e0",
+      "mutation_performed": false,
+      "success": true
+    }
+  ]
+}

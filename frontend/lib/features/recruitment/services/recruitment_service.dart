@@ -42,6 +42,7 @@ class RecruitmentService {
   }
 
   Future<RecruitmentCampaignModel> createCampaign({
+    String? seasonId,
     required String title,
     String? description,
     DateTime? startDate,
@@ -55,7 +56,7 @@ class RecruitmentService {
       '/recruitment/campaigns',
       token: token,
       data: {
-        'season_id': null,
+        'season_id': _nullIfEmpty(seasonId),
         'title': title.trim(),
         'description': description?.trim(),
         'start_date': _formatDate(startDate),
@@ -69,6 +70,40 @@ class RecruitmentService {
     }
 
     throw Exception('Réponse invalide lors de la création de la campagne.');
+  }
+
+  Future<RecruitmentCampaignModel> updateCampaign({
+    required String campaignId,
+    String? title,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isActive,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final data = <String, dynamic>{};
+    if (title != null) data['title'] = title.trim();
+    if (description != null) data['description'] = description.trim();
+    if (startDate != null) data['start_date'] = _formatDate(startDate);
+    if (endDate != null) data['end_date'] = _formatDate(endDate);
+    if (isActive != null) data['is_active'] = isActive;
+    final response = await _apiClient.patchJson(
+      '/recruitment/campaigns/$campaignId',
+      token: token,
+      data: data,
+    );
+    if (response is Map<String, dynamic>) {
+      return RecruitmentCampaignModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la modification de la campagne.');
+  }
+
+  Future<void> deleteCampaign(String campaignId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+    await _apiClient.delete('/recruitment/campaigns/$campaignId', token: token);
   }
 
   Future<List<ApplicationModel>> getApplications({
@@ -141,6 +176,40 @@ class RecruitmentService {
     return rawList
         .whereType<Map<String, dynamic>>()
         .map(ApplicationModel.fromJson)
+        .toList();
+  }
+
+  Future<ApplicationModel> getApplication(String applicationId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get(
+      '/recruitment/applications/$applicationId',
+      token: token,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ApplicationModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du chargement du dossier.');
+  }
+
+  Future<List<ApplicationReviewModel>> getApplicationReviews(
+    String applicationId,
+  ) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get(
+      '/recruitment/applications/$applicationId/reviews',
+      token: token,
+    );
+
+    final rawList = _extractList(response);
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(ApplicationReviewModel.fromJson)
         .toList();
   }
 
@@ -350,7 +419,7 @@ class RecruitmentService {
     required String userId,
   }) async {
     final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connectÃ©.');
+    if (token == null) throw Exception('Utilisateur non connecté.');
 
     try {
       await _apiClient.postJson(

@@ -79,6 +79,23 @@ class NotificationsService {
     throw Exception('Réponse invalide lors du marquage comme lu.');
   }
 
+  Future<NotificationModel> markAsUnread(String notificationId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.postJson(
+      '/notifications/$notificationId/unread',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return NotificationModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du marquage comme non lue.');
+  }
+
   Future<int> markAllAsRead() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

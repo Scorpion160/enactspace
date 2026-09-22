@@ -6,12 +6,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token_payload
+from app.models.account import AuthSession
+from app.services.session_service import session_seconds_remaining
 from app.core.roles import (
     ENACCHEF_ROLES,
     FINANCE_MANAGEMENT_ROLES,
     GLOBAL_MANAGEMENT_ROLES,
     JOIN_REQUEST_REVIEWER_ROLES,
+    MEMORY_CURATOR_ROLES,
     RECRUITMENT_ACCESS_ROLES,
     SECRETARIAT_ROLES,
     normalize_role_name,
@@ -28,7 +31,8 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    user_id = decode_access_token(token)
+    payload = decode_access_token_payload(token)
+    user_id = payload.get("sub") if payload else None
 
     if not user_id:
         raise HTTPException(
@@ -49,6 +53,22 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Compte désactivé",
         )
+
+    session_id = payload.get("sid") if payload else None
+    if session_id:
+        auth_session = db.query(AuthSession).filter(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user.id,
+        ).first()
+        if (
+            auth_session is None
+            or auth_session.revoked_at is not None
+            or session_seconds_remaining(auth_session) <= 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session révoquée ou expirée",
+            )
 
     return user
 
@@ -142,6 +162,19 @@ def require_sg_or_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Action réservée à la Secrétaire Générale, au Team Leader ou à l'administrateur",
+        )
+
+    return current_user
+
+
+def require_memory_curator(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+) -> User:
+    if not user_has_any_role(db, current_user.id, MEMORY_CURATOR_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action reservee aux curateurs de la memoire institutionnelle",
         )
 
     return current_user

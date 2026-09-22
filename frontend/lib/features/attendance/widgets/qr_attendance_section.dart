@@ -87,6 +87,16 @@ class QrAttendanceSection extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
+                if (token != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Renouvellement automatique a ${_formatShortTime(token!.expiresAt)}.',
+                    style: const TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
@@ -104,7 +114,7 @@ class QrAttendanceSection extends StatelessWidget {
                   children: [
                     _QrMetric(label: 'Scannes', value: scanned),
                     _QrMetric(
-                      label: 'Presents',
+                      label: 'Présents',
                       value: status?.presentCount ?? 0,
                     ),
                     _QrMetric(label: 'Retards', value: status?.lateCount ?? 0),

@@ -1,3 +1,5 @@
+import 'project_status_presentation.dart';
+
 class ProjectModel {
   final String id;
   final String? seasonId;
@@ -50,41 +52,5 @@ class ProjectModel {
     );
   }
 
-  String get statusLabel {
-    switch (status) {
-      case 'etude':
-        return 'Étude';
-      case 'prototype':
-        return 'Prototype';
-      case 'test':
-        return 'Test';
-      case 'deploiement':
-        return 'Déploiement';
-      case 'termine':
-        return 'Terminé';
-      case 'suspendu':
-        return 'Suspendu';
-      default:
-        return 'Idée';
-    }
-  }
-
-  int get progress {
-    switch (status) {
-      case 'etude':
-        return 18;
-      case 'prototype':
-        return 38;
-      case 'test':
-        return 58;
-      case 'deploiement':
-        return 78;
-      case 'termine':
-        return 100;
-      case 'suspendu':
-        return 28;
-      default:
-        return 8;
-    }
-  }
+  String get statusLabel => ProjectStatusPresentation.label(status);
 }

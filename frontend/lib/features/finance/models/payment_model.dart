@@ -59,9 +59,29 @@ class PaymentModel {
       case 'cancelled':
         return 'Annulé';
       case 'rejected':
-        return 'Rejete';
+        return 'Rejeté';
       default:
         return status;
+    }
+  }
+
+  bool get hasProof => proofUrl != null && proofUrl!.trim().isNotEmpty;
+
+  String get proofLabel =>
+      hasProof ? 'Preuve disponible' : 'Aucune preuve fournie';
+
+  String get statusDescription {
+    switch (status) {
+      case 'pending':
+        return 'À vérifier par le responsable financier.';
+      case 'validated':
+        return 'Paiement confirmé et tracé.';
+      case 'rejected':
+        return 'Une correction ou une nouvelle preuve est nécessaire.';
+      case 'cancelled':
+        return 'Déclaration annulée, sans encaissement.';
+      default:
+        return 'Statut transmis par le service financier.';
     }
   }
 

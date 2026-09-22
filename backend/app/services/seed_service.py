@@ -1,4 +1,5 @@
 from datetime import date
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.role import Role, UserRole
@@ -312,7 +313,9 @@ def seed_admin_user(
     email: str,
     password: str,
 ) -> tuple[User, bool]:
-    existing = db.query(User).filter(User.email == email).first()
+    existing = db.query(User).filter(
+        func.lower(User.email) == email.strip().lower()
+    ).first()
 
     if existing:
         return existing, False
@@ -320,7 +323,7 @@ def seed_admin_user(
     user = User(
         first_name=first_name,
         last_name=last_name,
-        email=email,
+        email=email.strip().lower(),
         password_hash=hash_password(password),
         status="active",
         email_verified=True,
@@ -470,12 +473,14 @@ def seed_v1_test_users(db: Session, password: str) -> tuple[int, int]:
     password_hash = hash_password(password)
 
     for item in V1_TEST_USERS:
-        user = db.query(User).filter(User.email == item["email"]).first()
+        user = db.query(User).filter(
+            func.lower(User.email) == item["email"].strip().lower()
+        ).first()
         if not user:
             user = User(
                 first_name=item["first_name"],
                 last_name=item["last_name"],
-                email=item["email"],
+                email=item["email"].strip().lower(),
                 password_hash=password_hash,
                 status=item["status"],
                 profile_type=item["profile_type"],
@@ -514,7 +519,6 @@ def run_v1_demo_seed(db: Session, password: str) -> dict:
         "badges_created": badges_created,
         "test_users_created": users_created,
         "role_links_created": role_links_created,
-        "test_password": password,
     }
 
 

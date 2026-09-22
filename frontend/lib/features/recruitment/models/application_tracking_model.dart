@@ -1,3 +1,5 @@
+import 'application_status_presentation.dart';
+
 class ApplicationTrackingModel {
   final String applicationId;
   final String trackingCode;
@@ -62,31 +64,8 @@ class ApplicationTrackingModel {
     );
   }
 
-  String get statusLabel {
-    switch (status) {
-      case 'submitted':
-      case 'received':
-        return 'Candidature reçue';
-      case 'under_review':
-        return 'En cours d’étude';
-      case 'interview_scheduled':
-        return 'Entretien programmé';
-      case 'preselected':
-        return 'Présélectionnée';
-      case 'interview':
-        return 'Entretien';
-      case 'accepted':
-        return 'Acceptée';
-      case 'rejected':
-        return 'Non retenue';
-      case 'waiting_list':
-        return 'Liste d’attente';
-      case 'cancelled':
-        return 'Clôturée';
-      default:
-        return status;
-    }
-  }
+  String get statusLabel =>
+      ApplicationStatusPresentation.fromStatus(status).title;
 
   String get candidateName {
     final parts = [

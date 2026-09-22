@@ -2,6 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import (
     get_current_active_validated_user,
@@ -42,6 +43,11 @@ from app.services.attendance_nfc_service import (
     nfc_tag_read_payload,
 )
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.operational_integrity import (
+    assert_active_operational_member,
+    lock_row,
+    to_naive_utc,
+)
 
 
 router = APIRouter(prefix="/attendance/nfc", tags=["Presences NFC"])
@@ -171,11 +177,7 @@ def _member_or_404(db: Session, member_id: str) -> User:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Membre introuvable",
         )
-    if member.status != "active" or member.profile_type == "candidate":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Badge NFC reserve aux membres actifs",
-        )
+    assert_active_operational_member(member)
     return member
 
 
@@ -285,11 +287,7 @@ def nfc_check_in(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    session = (
-        db.query(AttendanceSession)
-        .filter(AttendanceSession.id == payload.session_id)
-        .first()
-    )
+    session = lock_row(db, AttendanceSession, payload.session_id)
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -355,12 +353,28 @@ def nfc_check_in(
         db.commit()
         return _nfc_scan_result("revoked_tag", member=member)
 
+    if member is None:
+        return _nfc_scan_result("unknown_tag")
+    try:
+        assert_active_operational_member(member)
+    except HTTPException:
+        _audit_nfc_check_in(
+            db,
+            request=request,
+            current_user=current_user,
+            result="not_eligible",
+            session=session,
+            tag=tag,
+        )
+        db.commit()
+        return _nfc_scan_result("not_eligible", member=member)
+
     now = datetime.utcnow()
     if (
         session.is_closed
         or session.status != "open"
-        or (session.checkin_start and now < session.checkin_start)
-        or (session.checkin_end and now > session.checkin_end)
+        or (session.checkin_start and now < to_naive_utc(session.checkin_start))
+        or (session.checkin_end and now > to_naive_utc(session.checkin_end))
     ):
         _audit_nfc_check_in(
             db,
@@ -461,7 +475,10 @@ def enroll_nfc_tag(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     _require_nfc_manager(db, current_user)
-    member = _member_or_404(db, str(payload.member_id))
+    member = lock_row(db, User, payload.member_id)
+    if member is None:
+        raise HTTPException(status_code=404, detail="Membre introuvable")
+    assert_active_operational_member(member)
     existing_tag = _active_tag_for_member(db, member.id)
     if existing_tag and not payload.replace_existing:
         raise HTTPException(
@@ -496,7 +513,11 @@ def enroll_nfc_tag(
         },
         ip_address=get_client_ip(request),
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflit d'attribution du badge NFC") from exc
     db.refresh(tag)
     return nfc_tag_read_payload(tag)
 
@@ -527,7 +548,11 @@ def revoke_nfc_tag(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut NFC invalide",
         )
-    tag = _tag_or_404(db, tag_id)
+    tag = lock_row(db, AttendanceNfcTag, tag_id)
+    if tag is None:
+        raise HTTPException(status_code=404, detail="Badge NFC introuvable")
+    if tag.status != ACTIVE_NFC_TAG_STATUS:
+        return nfc_tag_read_payload(tag)
     _revoke_tag(tag, current_user=current_user, new_status=payload.status)
     create_audit_log(
         db,
@@ -556,7 +581,11 @@ def replace_nfc_tag(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     _require_nfc_manager(db, current_user)
-    old_tag = _tag_or_404(db, tag_id)
+    old_tag = lock_row(db, AttendanceNfcTag, tag_id)
+    if old_tag is None:
+        raise HTTPException(status_code=404, detail="Badge NFC introuvable")
+    if old_tag.status != ACTIVE_NFC_TAG_STATUS:
+        raise HTTPException(status_code=409, detail="Seul un badge actif peut être remplacé")
     _member_or_404(db, str(old_tag.member_id))
     _revoke_tag(old_tag, current_user=current_user, new_status="replaced")
     db.flush()
@@ -579,7 +608,11 @@ def replace_nfc_tag(
         },
         ip_address=get_client_ip(request),
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflit de remplacement du badge NFC") from exc
     db.refresh(new_tag)
     return nfc_tag_read_payload(new_tag)
 

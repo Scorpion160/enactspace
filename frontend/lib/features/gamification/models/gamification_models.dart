@@ -42,6 +42,19 @@ class EngagementPointModel {
           DateTime.now(),
     );
   }
+
+  String get sourceLabel => switch (sourceType) {
+    'task_validated' => 'Tâche validée',
+    'attendance_present' => 'Présence',
+    'attendance_late' => 'Retard',
+    'event_participation' => 'Participation événement',
+    'training_completed' => 'Formation terminée',
+    'document_shared' => 'Document partagé',
+    'project_progress' => 'Progression projet',
+    'mentorship' => 'Mentorat',
+    'leader_rating' => 'Évaluation leadership',
+    _ => 'Attribution manuelle',
+  };
 }
 
 class BadgeModel {

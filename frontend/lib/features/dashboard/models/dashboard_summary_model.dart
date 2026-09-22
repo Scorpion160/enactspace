@@ -84,10 +84,15 @@ class DashboardCountsModel {
   }
 
   int integer(String key) {
+    return nullableInteger(key) ?? 0;
+  }
+
+  int? nullableInteger(String key) {
     final value = values[key];
+    if (value == null) return null;
     if (value is int) return value;
     if (value is num) return value.toInt();
-    return int.tryParse(value?.toString() ?? '') ?? 0;
+    return int.tryParse(value.toString());
   }
 
   double decimal(String key) {
@@ -97,6 +102,8 @@ class DashboardCountsModel {
   }
 
   bool hasValue(String key) => values[key] != null;
+
+  String integerLabel(String key) => nullableInteger(key)?.toString() ?? '—';
 }
 
 class DashboardActivityModel {

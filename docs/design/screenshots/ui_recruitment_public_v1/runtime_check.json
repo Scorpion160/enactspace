@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-08-21",
+  "environment": "ui_audit",
+  "frontend_url": "http://127.0.0.1:18080",
+  "backend_url": "http://127.0.0.1:18002",
+  "runtime_available": true,
+  "campaign": {
+    "endpoint": "GET /api/recruitment/campaigns/public",
+    "http_status": 200,
+    "expected_reference": "AUDIT-REC-CAMPAIGN-OPEN",
+    "observed_id": "b60b5c4c-c6e7-5106-a83a-14b485de3e79",
+    "observed_reference": "AUDIT-REC-CAMPAIGN-OPEN",
+    "verified": true
+  },
+  "tracking": [
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-TRACK-001", "email": "audit.rec.track001@example.com", "expected_status": "submitted", "before_http_status": 200, "before_status": "submitted", "after_http_status": 200, "after_status": "submitted", "verified": true},
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-INTERVIEW-001", "email": "audit.rec.interview001@example.com", "expected_status": "interview_scheduled", "before_http_status": 200, "before_status": "interview_scheduled", "after_http_status": 200, "after_status": "interview_scheduled", "verified": true},
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-ACCEPTED-001", "email": "audit.rec.accepted001@example.com", "expected_status": "accepted", "before_http_status": 200, "before_status": "accepted", "after_http_status": 200, "after_status": "accepted", "verified": true},
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-REJECTED-001", "email": "audit.rec.rejected001@example.com", "expected_status": "rejected", "before_http_status": 200, "before_status": "rejected", "after_http_status": 200, "after_status": "rejected", "verified": true},
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-WAITING-001", "email": "audit.rec.waiting001@example.com", "expected_status": "waiting_list", "before_http_status": 200, "before_status": "waiting_list", "after_http_status": 200, "after_status": "waiting_list", "verified": true},
+    {"endpoint": "POST /api/recruitment/applications/track", "reference": "AUDIT-REC-CANCELLED-001", "email": "audit.rec.cancelled001@example.com", "expected_status": "cancelled", "before_http_status": 200, "before_status": "cancelled", "after_http_status": 200, "after_status": "cancelled", "verified": true}
+  ],
+  "real_submission_performed": false,
+  "mutation_performed": false,
+  "success": true
+}

@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.user import User
 from app.services.notification_channels import dispatch_notification_channels
@@ -40,6 +41,13 @@ def create_notification(
     if normalized_message is None:
         normalized_message = ""
 
+    preference = db.query(UserPreference).filter(
+        UserPreference.user_id == recipient
+    ).first()
+    in_app_suppressed = bool(
+        preference is not None and not preference.notification_in_app_enabled
+    )
+
     if dedupe:
         query = db.query(Notification).filter(
             Notification.user_id == recipient,
@@ -47,6 +55,7 @@ def create_notification(
             Notification.type == normalized_type,
             Notification.related_type == normalized_related_type,
             Notification.related_id == normalized_related_id,
+            Notification.in_app_suppressed.is_(in_app_suppressed),
         )
         if normalized_related_id is None:
             query = query.filter(Notification.title == title)
@@ -61,10 +70,11 @@ def create_notification(
         type=normalized_type,
         related_type=normalized_related_type,
         related_id=normalized_related_id,
+        in_app_suppressed=in_app_suppressed,
     )
     db.add(notification)
     recipient_user = db.query(User).filter(User.id == recipient).first()
-    dispatch_notification_channels(notification, recipient_user)
+    dispatch_notification_channels(db, notification, recipient_user, preference)
     return notification
 
 
@@ -138,6 +148,7 @@ def mark_all_read(db: Session, *, user_id) -> int:
     notifications = db.query(Notification).filter(
         Notification.user_id == user_id,
         Notification.is_read.is_(False),
+        Notification.in_app_suppressed.is_(False),
     ).all()
     now = datetime.utcnow()
     for notification in notifications:
@@ -152,6 +163,7 @@ def unread_count(db: Session, *, user_id) -> int:
         .filter(
             Notification.user_id == user_id,
             Notification.is_read.is_(False),
+            Notification.in_app_suppressed.is_(False),
         )
         .scalar()
         or 0

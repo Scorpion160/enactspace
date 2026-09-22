@@ -1,33 +1,29 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
-import '../../members/services/members_service.dart';
 import '../../poles/models/pole_model.dart';
-import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
-import '../../projects/services/projects_service.dart';
 import '../models/alumni_profile_model.dart';
 import '../models/mentorship_model.dart';
-import '../services/alumni_service.dart';
+import '../services/alumni_gateway.dart';
 
 class AlumniScreen extends StatefulWidget {
-  const AlumniScreen({super.key});
+  final AlumniGateway? gateway;
+  const AlumniScreen({super.key, this.gateway});
 
   @override
   State<AlumniScreen> createState() => _AlumniScreenState();
 }
 
 class _AlumniScreenState extends State<AlumniScreen> {
-  final AlumniService _alumniService = AlumniService();
-  final AuthService _authService = AuthService();
-  final MembersService _membersService = MembersService();
-  final ProjectsService _projectsService = ProjectsService();
-  final PolesService _polesService = PolesService();
+  late final AlumniGateway _gateway;
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -46,6 +42,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiAlumniGateway();
     _loadAlumni();
   }
 
@@ -62,34 +59,21 @@ class _AlumniScreenState extends State<AlumniScreen> {
     });
 
     try {
-      final user = UserExperience.fromJson(await _authService.getCurrentUser());
-      final profiles = await _alumniService.getProfiles(
+      final data = await _gateway.loadCenter(
         search: _searchController.text,
-        availableForMentoring: _mentorsOnly ? true : null,
+        mentorsOnly: _mentorsOnly,
+        mentorshipStatus: _mentorshipStatus,
       );
-      final mentorships = await _alumniService.getMentorships(
-        status: _mentorshipStatus,
-      );
-
-      final members = user.canViewMembersDirectory
-          ? await _safe(() => _membersService.getMembers())
-          : <MemberModel>[];
-      final projects = user.canViewOperations
-          ? await _safe(() => _projectsService.getProjects())
-          : <ProjectModel>[];
-      final poles = user.canViewOperations
-          ? await _safe(() => _polesService.getPoles())
-          : <PoleModel>[];
 
       if (!mounted) return;
 
       setState(() {
-        _userExperience = user;
-        _profiles = profiles;
-        _mentorships = mentorships;
-        _members = members;
-        _projects = projects;
-        _poles = poles;
+        _userExperience = data.user;
+        _profiles = data.profiles;
+        _mentorships = data.mentorships;
+        _members = data.members;
+        _projects = data.projects;
+        _poles = data.poles;
       });
     } catch (e) {
       if (!mounted) return;
@@ -101,14 +85,6 @@ class _AlumniScreenState extends State<AlumniScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
-    }
-  }
-
-  Future<List<T>> _safe<T>(Future<List<T>> Function() load) async {
-    try {
-      return await load();
-    } catch (_) {
-      return [];
     }
   }
 
@@ -131,7 +107,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
       showDragHandle: true,
       builder: (context) {
         return _CreateProfileSheet(
-          service: _alumniService,
+          gateway: _gateway,
           members: _members,
           existingProfiles: _profiles,
           currentUserId: _userExperience?.id,
@@ -166,7 +142,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
       showDragHandle: true,
       builder: (context) {
         return _CreateMentorshipSheet(
-          service: _alumniService,
+          gateway: _gateway,
           profiles: _profiles,
           membersById: _membersById,
           projects: _projects,
@@ -176,6 +152,53 @@ class _AlumniScreenState extends State<AlumniScreen> {
     );
 
     if (created == true) await _loadAlumni();
+  }
+
+  Future<void> _manageMentorship(
+    MentorshipModel mentorship,
+    String action,
+  ) async {
+    try {
+      if (action == 'complete') {
+        await _gateway.completeMentorship(mentorship.id);
+      } else if (action == 'delete') {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Supprimer le mentorat ?'),
+            content: const Text(
+              'La suppression sera contrôlée par le backend.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Supprimer'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        await _gateway.deleteMentorship(mentorship.id);
+      } else {
+        await _gateway.updateMentorship(
+          mentorship.id,
+          status: action == 'pause' ? 'paused' : 'active',
+        );
+      }
+      await _loadAlumni();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -265,6 +288,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
                           _ProfilesGrid(
                             profiles: _profiles,
                             membersById: _membersById,
+                            gateway: _gateway,
                           )
                         else
                           _MentorshipsGrid(
@@ -273,6 +297,8 @@ class _AlumniScreenState extends State<AlumniScreen> {
                             profiles: _profiles,
                             projectsById: _projectsById,
                             polesById: _polesById,
+                            canManage: _canCreateMentorship,
+                            onAction: _manageMentorship,
                           ),
                       ],
                     ),
@@ -631,8 +657,13 @@ class _AlumniToolbar extends StatelessWidget {
 class _ProfilesGrid extends StatelessWidget {
   final List<AlumniProfileModel> profiles;
   final Map<String, MemberModel> membersById;
+  final AlumniGateway gateway;
 
-  const _ProfilesGrid({required this.profiles, required this.membersById});
+  const _ProfilesGrid({
+    required this.profiles,
+    required this.membersById,
+    required this.gateway,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -662,6 +693,7 @@ class _ProfilesGrid extends StatelessWidget {
                 child: _ProfileCard(
                   profile: profile,
                   member: membersById[profile.userId],
+                  gateway: gateway,
                 ),
               ),
           ],
@@ -674,8 +706,13 @@ class _ProfilesGrid extends StatelessWidget {
 class _ProfileCard extends StatelessWidget {
   final AlumniProfileModel profile;
   final MemberModel? member;
+  final AlumniGateway gateway;
 
-  const _ProfileCard({required this.profile, required this.member});
+  const _ProfileCard({
+    required this.profile,
+    required this.member,
+    required this.gateway,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -685,7 +722,7 @@ class _ProfileCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        onTap: () => _showAlumniDetails(context, profile, name, photoUrl),
+        onTap: () => context.go('/alumni/${profile.id}', extra: gateway),
         borderRadius: BorderRadius.circular(18),
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -808,6 +845,8 @@ class _MentorshipsGrid extends StatelessWidget {
   final List<AlumniProfileModel> profiles;
   final Map<String, ProjectModel> projectsById;
   final Map<String, PoleModel> polesById;
+  final bool canManage;
+  final void Function(MentorshipModel, String) onAction;
 
   const _MentorshipsGrid({
     required this.mentorships,
@@ -815,6 +854,8 @@ class _MentorshipsGrid extends StatelessWidget {
     required this.profiles,
     required this.projectsById,
     required this.polesById,
+    required this.canManage,
+    required this.onAction,
   });
 
   @override
@@ -846,6 +887,8 @@ class _MentorshipsGrid extends StatelessWidget {
                   mentorship: mentorship,
                   alumniName: _alumniName(mentorship.alumniId),
                   target: _targetName(mentorship, projectsById, polesById),
+                  canManage: canManage,
+                  onAction: onAction,
                 ),
               ),
           ],
@@ -885,11 +928,15 @@ class _MentorshipCard extends StatelessWidget {
   final MentorshipModel mentorship;
   final String alumniName;
   final String target;
+  final bool canManage;
+  final void Function(MentorshipModel, String) onAction;
 
   const _MentorshipCard({
     required this.mentorship,
     required this.alumniName,
     required this.target,
+    required this.canManage,
+    required this.onAction,
   });
 
   @override
@@ -937,6 +984,31 @@ class _MentorshipCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (canManage)
+                  PopupMenuButton<String>(
+                    tooltip: 'Gérer le mentorat',
+                    onSelected: (value) => onAction(mentorship, value),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: mentorship.status == 'paused'
+                            ? 'resume'
+                            : 'pause',
+                        child: Text(
+                          mentorship.status == 'paused'
+                              ? 'Reprendre'
+                              : 'Mettre en pause',
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'complete',
+                        child: Text('Terminer'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Supprimer'),
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -967,14 +1039,14 @@ class _MentorshipCard extends StatelessWidget {
 }
 
 class _CreateProfileSheet extends StatefulWidget {
-  final AlumniService service;
+  final AlumniGateway gateway;
   final List<MemberModel> members;
   final List<AlumniProfileModel> existingProfiles;
   final String? currentUserId;
   final bool canSelectUser;
 
   const _CreateProfileSheet({
-    required this.service,
+    required this.gateway,
     required this.members,
     required this.existingProfiles,
     required this.currentUserId,
@@ -1039,7 +1111,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
     setState(() => _saving = true);
 
     try {
-      await widget.service.createProfile(
+      await widget.gateway.createProfile(
         userId: _userId!,
         graduationYear: int.tryParse(_yearController.text.trim()),
         currentCompany: _companyController.text,
@@ -1167,9 +1239,12 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.visibility_rounded),
               ),
               items: const [
-                DropdownMenuItem(value: 'internal', child: Text('Interne')),
+                DropdownMenuItem(value: 'internal', child: Text('Membres')),
                 DropdownMenuItem(value: 'alumni_only', child: Text('Alumni')),
-                DropdownMenuItem(value: 'enacchef_only', child: Text('Bureau')),
+                DropdownMenuItem(
+                  value: 'enacchef_only',
+                  child: Text('Responsables'),
+                ),
                 DropdownMenuItem(value: 'private', child: Text('Privé')),
               ],
               onChanged: (value) {
@@ -1204,14 +1279,14 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
 }
 
 class _CreateMentorshipSheet extends StatefulWidget {
-  final AlumniService service;
+  final AlumniGateway gateway;
   final List<AlumniProfileModel> profiles;
   final Map<String, MemberModel> membersById;
   final List<ProjectModel> projects;
   final List<PoleModel> poles;
 
   const _CreateMentorshipSheet({
-    required this.service,
+    required this.gateway,
     required this.profiles,
     required this.membersById,
     required this.projects,
@@ -1245,7 +1320,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
     setState(() => _saving = true);
 
     try {
-      await widget.service.createMentorship(
+      await widget.gateway.createMentorship(
         alumniId: _alumniId!,
         projectId: _projectId,
         poleId: _poleId,

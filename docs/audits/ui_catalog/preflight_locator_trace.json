@@ -1,0 +1,251 @@
+[
+  {
+    "preflight_id": "PF01",
+    "locators": [
+      {
+        "label": "Email",
+        "role": "textbox",
+        "x": 199.0,
+        "y": 782.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Mot de passe",
+        "role": "textbox",
+        "x": 199.0,
+        "y": 834.5,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF02",
+    "locators": [
+      {
+        "label": "Email",
+        "role": "textbox",
+        "x": 1124.0,
+        "y": 394.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Mot de passe",
+        "role": "button",
+        "x": 1177.9468994140625,
+        "y": 501.0,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF03",
+    "locators": [
+      {
+        "label": "Email",
+        "role": "textbox",
+        "x": 199.0,
+        "y": 782.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Mot de passe",
+        "role": "textbox",
+        "x": 199.0,
+        "y": 834.5,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF04",
+    "locators": []
+  },
+  {
+    "preflight_id": "PF05",
+    "locators": []
+  },
+  {
+    "preflight_id": "PF06",
+    "locators": [
+      {
+        "label": "Cartes adaptées à ton rôle",
+        "role": null,
+        "scroll_steps": 12,
+        "found": false
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF07",
+    "locators": []
+  },
+  {
+    "preflight_id": "PF08",
+    "locators": [
+      {
+        "label": "Rechercher un membre",
+        "role": "textbox",
+        "x": 388.0,
+        "y": 261.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Voir",
+        "role": "button",
+        "x": 64.0,
+        "y": 629.0,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF09",
+    "locators": [
+      {
+        "label": "Gestion",
+        "role": "button",
+        "x": 398.4479217529297,
+        "y": 112.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Rechercher une session",
+        "role": "textbox",
+        "x": 658.0,
+        "y": 196.7501220703125,
+        "scroll_steps": 2,
+        "found": true
+      },
+      {
+        "found": true,
+        "label": "Session audit 2",
+        "text_role": "group",
+        "text_backendDOMNodeId": 193,
+        "text_box": {
+          "x": 654.0,
+          "y": 473.25
+        },
+        "ancestor_role": "rendered_card_hit_target",
+        "ancestor_backendDOMNodeId": null,
+        "ancestor_rect": {
+          "x": 308,
+          "y": 345.75,
+          "width": 692,
+          "height": 255.0
+        },
+        "clicked_box": {
+          "x": 654.0,
+          "y": 409.5
+        },
+        "fallback_reason": "semantic_action_not_exposed_by_flutter",
+        "hit_test": {
+          "tag": "FLT-SEMANTICS",
+          "role": "group",
+          "aria": "Session audit 2\nSession audit 2\nSession deterministe pour QR NFC et justificatifs."
+        },
+        "scroll_steps": 0
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF10",
+    "locators": [
+      {
+        "label": "Rechercher membre, frais, référence",
+        "role": "textbox",
+        "x": 829.0,
+        "y": 478.1678466796875,
+        "scroll_steps": 1,
+        "found": true
+      },
+      {
+        "label": "Actions du paiement",
+        "role": "button",
+        "x": 1276.0,
+        "y": 690.0,
+        "scroll_steps": 1,
+        "found": true
+      },
+      {
+        "label": "Rejeter",
+        "role": "menuitem",
+        "x": 1212.0,
+        "y": 680.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "label": "Retour",
+        "role": "button",
+        "x": 822.4969482421875,
+        "y": 466.0,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF11",
+    "locators": [
+      {
+        "label": "Écrire un message",
+        "role": "textbox",
+        "x": 196.6666774749756,
+        "y": 728.6666870117188,
+        "scroll_steps": 0,
+        "found": true
+      }
+    ]
+  },
+  {
+    "preflight_id": "PF12",
+    "locators": [
+      {
+        "label": "Rechercher projet, impact, prix",
+        "role": "textbox",
+        "x": 866.0,
+        "y": 614.0,
+        "scroll_steps": 0,
+        "found": true
+      },
+      {
+        "found": true,
+        "label": "DIMBALI",
+        "text_role": "group",
+        "text_backendDOMNodeId": 172,
+        "text_box": {
+          "x": 581.5,
+          "y": 566.5000305175781
+        },
+        "ancestor_role": "rendered_card_hit_target",
+        "ancestor_backendDOMNodeId": null,
+        "ancestor_rect": {
+          "x": 308,
+          "y": 397.00006103515625,
+          "width": 547,
+          "height": 338.99993896484375
+        },
+        "clicked_box": {
+          "x": 581.5,
+          "y": 481.7500457763672
+        },
+        "fallback_reason": "semantic_action_not_exposed_by_flutter",
+        "hit_test": {
+          "tag": "FLT-SEMANTICS",
+          "role": "group",
+          "aria": "DIMBALI\nProjet lancé à Ngayène Sabakh pour combattre la malnutrition et renforcer durablement les revenus des femmes."
+        },
+        "scroll_steps": 1
+      }
+    ]
+  }
+]

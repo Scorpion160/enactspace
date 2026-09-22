@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -13,14 +13,21 @@ router = APIRouter(prefix="/seed", tags=["Initialisation"])
 
 
 class SeedRequest(BaseModel):
-    admin_first_name: str = "Cheikh Tidiane"
-    admin_last_name: str = "DIOP"
+    admin_first_name: str
+    admin_last_name: str
     admin_email: EmailStr
     admin_password: str
 
 
 class V1DemoSeedRequest(BaseModel):
-    password: str = "EnactSpaceV1!"
+    password: str
+
+
+def register_seed_routes(app: FastAPI, *, app_settings=settings) -> bool:
+    if not app_settings.seed_routes_enabled:
+        return False
+    app.include_router(router, prefix="/api")
+    return True
 
 
 @router.post("/initial")

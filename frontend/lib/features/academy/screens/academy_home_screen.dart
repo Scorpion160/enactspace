@@ -1,18 +1,22 @@
+// ignore_for_file: curly_braces_in_flow_control_structures, use_build_context_synchronously
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/academy_models.dart';
-import '../services/academy_service.dart';
+import '../services/academy_gateway.dart';
 
 class AcademyHomeScreen extends StatefulWidget {
-  const AcademyHomeScreen({super.key});
+  final AcademyGateway? gateway;
+  const AcademyHomeScreen({super.key, this.gateway});
 
   @override
   State<AcademyHomeScreen> createState() => _AcademyHomeScreenState();
 }
 
 class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
-  final AcademyService _service = AcademyService();
+  late final AcademyGateway _gateway;
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -26,6 +30,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _gateway = widget.gateway ?? ApiAcademyGateway();
     _loadAcademy();
   }
 
@@ -42,7 +47,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     });
 
     try {
-      final data = await _service.getHome();
+      final data = await _gateway.loadHome();
       if (!mounted) return;
       setState(() => _data = data);
     } catch (e) {
@@ -72,11 +77,8 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     final actionId = 'lesson-${course.id}';
     setState(() => _rewardingActionId = actionId);
 
-    final result = await _service.completeLesson(
-      course: course,
-      lesson: lesson,
-    );
-    final data = await _service.getHome();
+    final result = await _gateway.completeLesson(lesson.id);
+    final data = await _gateway.loadHome();
 
     if (!mounted) return;
     setState(() {
@@ -93,40 +95,68 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     final actionId = 'quiz-${course.id}';
     setState(() => _rewardingActionId = actionId);
 
-    final result = await _service.passQuiz(course: course, answers: answers);
-    final data = await _service.getHome();
+    final result = await _gateway.submitQuiz(
+      course.quiz.id,
+      answers ?? const [],
+    );
+    final data = await _gateway.loadHome();
 
     if (!mounted) return;
     setState(() {
       _data = data;
       _rewardingActionId = null;
     });
-    _showRewardSnack(result);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${result.passed ? 'Quiz réussi' : 'Quiz à reprendre'} · score ${result.score.toStringAsFixed(0)} · ${result.points} point(s)${result.attemptNumber == null ? '' : ' · tentative ${result.attemptNumber}'}',
+        ),
+      ),
+    );
   }
 
   Future<void> _openQuiz(AcademyCourseModel course) async {
+    AcademyQuizModel quiz;
+    try {
+      quiz = await _gateway.getQuiz(course.quiz.id);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
+      return;
+    }
+    final backendCourse = AcademyCourseModel(
+      id: course.id,
+      title: course.title,
+      category: course.category,
+      level: course.level,
+      description: course.description,
+      durationMinutes: course.durationMinutes,
+      points: course.points,
+      isRequired: course.isRequired,
+      targetRoles: course.targetRoles,
+      isPublished: course.isPublished,
+      poleId: course.poleId,
+      projectId: course.projectId,
+      lessons: course.lessons,
+      quiz: quiz,
+    );
     final attempt = await showDialog<_AcademyQuizAttemptResult>(
       context: context,
-      builder: (context) => _AcademyQuizDialog(course: course),
+      builder: (context) => _AcademyQuizDialog(course: backendCourse),
     );
 
     if (!mounted || attempt == null) return;
-    if (attempt.passed) {
-      await _passQuiz(course, answers: attempt.answers);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Quiz a reprendre. Tu peux retenter quand tu veux.'),
-      ),
-    );
+    await _passQuiz(backendCourse, answers: attempt.answers);
   }
 
   void _showRewardSnack(AcademyRewardResult result) {
     final suffix = result.syncedWithGamification
         ? 'Synchronisé avec Gamification.'
-        : 'Progression locale enregistrée, synchro Gamification à réessayer.';
+        : 'Résultat enregistré par Academy.';
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -831,7 +861,7 @@ class _CourseCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text(course.level)),
+                Chip(label: Text(course.levelLabel)),
                 Chip(label: Text(course.category)),
                 if (course.isRequired) const Chip(label: Text('Obligatoire')),
               ],
@@ -870,6 +900,15 @@ class _CourseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: () => context.go('/academy/courses/${course.id}'),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Ouvrir la formation'),
+              ),
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -994,7 +1033,7 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
 
   void _submit() {
     if (_answers.length < widget.course.quiz.questions.length) return;
-    setState(() => _submitted = true);
+    Navigator.of(context).pop(_result());
   }
 
   void _retry() {
@@ -1010,7 +1049,7 @@ class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
         _answers[index] ?? -1,
     ];
 
-    return _AcademyQuizAttemptResult(passed: _passed, answers: answers);
+    return _AcademyQuizAttemptResult(passed: true, answers: answers);
   }
 
   @override

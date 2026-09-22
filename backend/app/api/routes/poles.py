@@ -2,6 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db.database import get_db
 from app.models.pole import Pole, PoleMember
@@ -22,6 +23,7 @@ from app.models.role import Role, UserRole
 from app.models.user import User
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
+from app.services.operational_integrity import assert_active_operational_member, lock_row
 
 
 router = APIRouter(prefix="/poles", tags=["Pôles"])
@@ -221,8 +223,12 @@ def assign_pole_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    pole = get_pole_or_404(db, pole_id)
-    target_user = get_user_or_404(db, str(payload.user_id))
+    pole = lock_row(db, Pole, pole_id)
+    if pole is None:
+        raise HTTPException(status_code=404, detail="Pôle introuvable")
+    target_user = lock_row(db, User, payload.user_id)
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     is_global_manager = require_pole_manager(db, current_user, pole_id)
 
     if payload.position not in VALID_POLE_POSITIONS:
@@ -235,15 +241,12 @@ def assign_pole_member(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls Admin, Team Leader ou SG nomment les responsables",
         )
-    if target_user.status != "active" or not target_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le membre sélectionné n'est pas actif",
-        )
+    assert_active_operational_member(target_user)
 
     membership = (
         db.query(PoleMember)
         .filter(PoleMember.pole_id == pole_id, PoleMember.user_id == payload.user_id)
+        .with_for_update()
         .first()
     )
     previous_position = None
@@ -281,9 +284,12 @@ def assign_pole_member(
                 PoleMember.position == payload.position,
                 PoleMember.is_active.is_(True),
             )
+            .order_by(PoleMember.id.asc())
+            .with_for_update()
             .all()
         )
         for existing_leader in existing_leaders:
+            previous_leader_position = existing_leader.position
             existing_leader.position = "membre"
             sync_pole_responsibility_role(
                 db,
@@ -298,6 +304,24 @@ def assign_pole_member(
                 notification_type="role_assigned",
                 related_type="pole",
                 related_id=pole.id,
+            )
+            create_audit_log(
+                db=db,
+                action="remplacement_responsable_pole",
+                user_id=current_user.id,
+                entity_type="user",
+                entity_id=existing_leader.user_id,
+                old_value={
+                    "pole_id": str(pole.id),
+                    "pole_name": pole.name,
+                    "position": previous_leader_position,
+                },
+                new_value={
+                    "pole_id": str(pole.id),
+                    "pole_name": pole.name,
+                    "position": "membre",
+                },
+                ip_address=get_client_ip(request),
             )
 
     if previous_position in POLE_LEADERSHIP_POSITIONS:
@@ -332,7 +356,14 @@ def assign_pole_member(
         ip_address=get_client_ip(request),
     )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette responsabilité de pôle vient d'être attribuée",
+        ) from exc
     db.refresh(membership)
 
     return membership

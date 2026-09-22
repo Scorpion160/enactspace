@@ -6,21 +6,23 @@ class Settings(BaseSettings):
     APP_NAME: str = "EnactSpace"
     APP_ENV: str = "development"
     APP_DEBUG: bool = True
-    APP_VERSION: str = "1.1-dev"
+    APP_VERSION: str = "1.0.0"
 
     DATABASE_URL: str
 
     SECRET_KEY: str
     JWT_SECRET_KEY: str | None = None
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_TOKEN_HMAC_KEY: str | None = None
 
     CORS_ORIGINS: str = ""
     PUBLIC_API_BASE_URL: str | None = None
     FILE_STORAGE_PATH: str = "uploads"
     AUTO_CREATE_TABLES: bool | None = None
 
-    ENABLE_SEED: bool = True
+    ENABLE_SEED: bool = False
 
     EMAIL_ENABLED: bool | None = None
     NOTIFICATION_EMAIL_ENABLED: bool = False
@@ -34,6 +36,8 @@ class Settings(BaseSettings):
     PUSH_ENABLED: bool | None = None
     NOTIFICATION_PUSH_ENABLED: bool = False
     FCM_SERVER_KEY: str | None = None
+    FIREBASE_PROJECT_ID: str | None = None
+    PUSH_TOKEN_ENCRYPTION_KEY: str | None = None
 
     PAYMENT_PROVIDER_ENABLED: bool = False
     PAYMENT_PROVIDER: str = "manual_proof"
@@ -76,6 +80,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_attendance_qr_settings(self):
+        if self.ALGORITHM != "HS256":
+            raise ValueError("ALGORITHM must be HS256")
         if self.ATTENDANCE_QR_TTL_SECONDS < 15:
             raise ValueError("ATTENDANCE_QR_TTL_SECONDS must be at least 15")
         if self.ATTENDANCE_QR_ROTATION_SECONDS < 10:
@@ -88,6 +94,25 @@ class Settings(BaseSettings):
             raise ValueError("PAYMENT_TRANSACTION_TTL_MINUTES must be positive")
         if self.PAYDUNYA_TIMEOUT_SECONDS < 1:
             raise ValueError("PAYDUNYA_TIMEOUT_SECONDS must be positive")
+        if self.REFRESH_TOKEN_EXPIRE_DAYS < 1:
+            raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS must be positive")
+        if self.APP_ENV == "production":
+            if not self.REFRESH_TOKEN_HMAC_KEY:
+                raise ValueError("REFRESH_TOKEN_HMAC_KEY is required in production")
+            if self.REFRESH_TOKEN_HMAC_KEY == self.signing_secret:
+                raise ValueError("REFRESH_TOKEN_HMAC_KEY must differ from JWT secret")
+            if self.push_enabled:
+                if not self.FIREBASE_PROJECT_ID:
+                    raise ValueError("FIREBASE_PROJECT_ID is required when push is enabled")
+                if not self.PUSH_TOKEN_ENCRYPTION_KEY:
+                    raise ValueError("PUSH_TOKEN_ENCRYPTION_KEY is required when push is enabled")
+                auth_secrets = {
+                    self.SECRET_KEY,
+                    self.JWT_SECRET_KEY,
+                    self.REFRESH_TOKEN_HMAC_KEY,
+                }
+                if self.PUSH_TOKEN_ENCRYPTION_KEY in auth_secrets:
+                    raise ValueError("PUSH_TOKEN_ENCRYPTION_KEY must differ from auth secrets")
         if self.PAYDUNYA_MODE not in {"test", "live"}:
             raise ValueError("PAYDUNYA_MODE must be test or live")
         if self.MOBILE_MONEY_PROVIDER not in {
@@ -156,6 +181,10 @@ class Settings(BaseSettings):
         return self.JWT_SECRET_KEY or self.SECRET_KEY
 
     @property
+    def refresh_token_hmac_key(self) -> str:
+        return self.REFRESH_TOKEN_HMAC_KEY or self.signing_secret
+
+    @property
     def attendance_qr_secret(self) -> str:
         return self.ATTENDANCE_QR_SECRET or self.signing_secret
 
@@ -190,6 +219,13 @@ class Settings(BaseSettings):
         if self.AUTO_CREATE_TABLES is not None:
             return self.AUTO_CREATE_TABLES
         return self.APP_ENV != "production"
+
+    @property
+    def seed_routes_enabled(self) -> bool:
+        return self.ENABLE_SEED and self.APP_ENV.lower() in {
+            "development",
+            "test",
+        }
 
 
 settings = Settings()

@@ -57,6 +57,7 @@ def get_dashboard_summary(
                 db.query(Notification.id).filter(
                     Notification.user_id == current_user.id,
                     Notification.is_read.is_(False),
+                    Notification.in_app_suppressed.is_(False),
                 )
             ),
             "tasks_assigned": _assigned_tasks_query(db, current_user.id).count(),
@@ -102,7 +103,9 @@ def get_dashboard_summary(
 
     if flags["is_enacchef"]:
         summary["counts"]["projects_active"] = _count(
-            db.query(Project.id).filter(Project.status.notin_(["termine", "suspendu"]))
+            db.query(Project.id).filter(
+                Project.status.in_(["idee", "etude", "prototype", "test", "deploiement"])
+            )
         )
         summary["counts"]["poles"] = _count(db.query(Pole.id))
 
@@ -113,10 +116,12 @@ def get_dashboard_summary(
                 AttendanceRecord.user_id == current_user.id
             )
         summary["counts"]["absences_recent"] = _count(
-            attendance_query.filter(AttendanceRecord.status == "absent")
+            attendance_query.filter(
+                AttendanceRecord.status.in_(["absent", "absence", "absent_non_justifie", "absence_non_justifiee"])
+            )
         )
         summary["counts"]["late_attendance_recent"] = _count(
-            attendance_query.filter(AttendanceRecord.status == "late")
+            attendance_query.filter(AttendanceRecord.status.in_(["late", "retard"]))
         )
 
     if flags["can_view_finance"]:
@@ -133,7 +138,10 @@ def get_dashboard_summary(
     if flags["can_view_recruitment"]:
         summary["counts"]["applications_pending"] = _count(
             db.query(Application.id).filter(
-                Application.status.in_(["received", "shortlisted", "interview"])
+                Application.status.in_([
+                    "submitted", "under_review", "interview_scheduled", "waiting_list",
+                    "received", "preselected", "interview",
+                ])
             )
         )
 
@@ -194,7 +202,7 @@ def _assigned_tasks_query(db: Session, user_id):
 
 def _late_tasks_query(db: Session, user_id):
     return _assigned_tasks_query(db, user_id).filter(
-        Task.status.notin_(["termine", "valide", "done"]),
+        Task.status.in_(["a_faire", "en_cours", "bloque"]),
         Task.due_date.isnot(None),
         Task.due_date < datetime.utcnow(),
     )
@@ -202,7 +210,7 @@ def _late_tasks_query(db: Session, user_id):
 
 def _done_tasks_query(db: Session, user_id):
     return _assigned_tasks_query(db, user_id).filter(
-        Task.status.in_(["termine", "valide", "done"])
+        Task.status.in_(["termine", "valide", "done", "completed"])
     )
 
 
@@ -286,7 +294,10 @@ def _recent_activity(db: Session, current_user: User, flags: dict, scope: dict) 
 
     notifications = (
         db.query(Notification)
-        .filter(Notification.user_id == current_user.id)
+        .filter(
+            Notification.user_id == current_user.id,
+            Notification.in_app_suppressed.is_(False),
+        )
         .order_by(Notification.created_at.desc())
         .limit(4)
         .all()

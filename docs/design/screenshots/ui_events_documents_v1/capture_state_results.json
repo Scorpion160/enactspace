@@ -1,0 +1,118 @@
+{
+  "capture_method": "temporary_flutter_widget_harness",
+  "integrated_browser_used": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "poppins_verified": true,
+  "icon_font_verified": true,
+  "missing_icon_glyphs_detected": false,
+  "real_event_create_requests": 0,
+  "real_event_patch_requests": 0,
+  "real_event_delete_requests": 0,
+  "real_event_register_requests": 0,
+  "real_event_unregister_requests": 0,
+  "real_document_upload_requests": 0,
+  "real_document_create_requests": 0,
+  "real_document_patch_requests": 0,
+  "real_document_submit_requests": 0,
+  "real_document_validate_requests": 0,
+  "real_document_unvalidate_requests": 0,
+  "real_document_reject_requests": 0,
+  "real_document_archive_requests": 0,
+  "real_document_delete_requests": 0,
+  "application_mutation_performed": false,
+  "visual_controls": {
+    "captures_verified": "8/8",
+    "poppins_rendered": true,
+    "raw_enums_detected": false,
+    "overflow_detected": false,
+    "blocked_loader_detected": false,
+    "generic_material_interface_dominant": false,
+    "color_6750A4_dominant": false,
+    "color_FEF7FF_dominant": false,
+    "color_ECE6F0_dominant": false
+  },
+  "captures": [
+    {
+      "filename": "01_events_center_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "route/scenario": "/events — centre desktop, responsable local autorisé",
+      "expected_markers": ["Événements", "Rechercher un événement", "À venir", "Passés", "Tous", "Tous les types", "Créer un événement", "Atelier solaire communautaire", "Inscrit", "Ouvrir"],
+      "reached_markers": ["Événements", "Rechercher un événement", "À venir", "Passés", "Tous", "Tous les types", "Créer un événement", "Atelier solaire communautaire", "Inscrit", "Ouvrir"],
+      "screenshot_sha256": "e073a57393700745de4269faa454f8d5bd2be79eab2e2bd12247104b5b090471",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "02_event_detail_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/events/event-solar — fiche avec can_manage=true et utilisateur non inscrit",
+      "expected_markers": ["Atelier solaire communautaire", "Résumé", "Formation", "FabLab ESP", "Pôle Technique", "Projet SunuTech", "125000 FCFA", "18 / 30", "Inscription", "S’inscrire", "Présence activée", "Gestion"],
+      "reached_markers": ["Atelier solaire communautaire", "Résumé", "Formation", "FabLab ESP", "Pôle Technique", "Projet SunuTech", "125000 FCFA", "18 / 30", "Inscription", "S’inscrire", "Présence activée", "Gestion"],
+      "screenshot_sha256": "05b65ed3726345da2eb6f43f958d1abf28c00290d30a7f673bac8e1714cc71de",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "03_event_management_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/events/event-solar — édition préremplie autorisée, non soumise",
+      "expected_markers": ["Modifier l’événement", "Titre", "Description", "Type", "Lieu", "Début", "Fin", "Pôle Technique", "Projet SunuTech", "Budget", "Capacité", "Inscription requise", "Présence activée", "Lien du rapport", "Enregistrer"],
+      "reached_markers": ["Modifier l’événement", "Titre", "Description", "Type", "Lieu", "Début", "Fin", "Pôle Technique", "Projet SunuTech", "Budget", "Capacité", "Inscription requise", "Présence activée", "Lien du rapport", "Enregistrer"],
+      "screenshot_sha256": "792a9076f5c5f8ede8bcece6feb0f7f906544b81fb67c51a60fab254d03b23ab",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "04_events_mobile_390x844.png",
+      "viewport": "390x844",
+      "route/scenario": "/events — centre mobile en cartes verticales",
+      "expected_markers": ["Événements", "Rechercher un événement", "À venir", "Passés", "Tous", "Tous les types", "Atelier solaire communautaire", "05/09/2026 · 09:30", "Inscription requise", "Ouvrir"],
+      "reached_markers": ["Événements", "Rechercher un événement", "À venir", "Passés", "Tous", "Tous les types", "Atelier solaire communautaire", "05/09/2026 · 09:30", "Inscription requise", "Ouvrir"],
+      "screenshot_sha256": "9aa0cc899ad9005fce7848fd691650e848cb6fe2fdd13685348add566275a38e",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "05_documents_center_desktop_1440x900.png",
+      "viewport": "1440x900",
+      "route/scenario": "/documents — centre desktop multi-statuts",
+      "expected_markers": ["Documents", "Rechercher un document", "Catégorie", "Statut", "Visibilité", "Pôle", "Projet", "Événement", "Modèles", "Officiels", "En attente de validation", "Validé", "Rejeté", "Archivé", "Officiel", "Modèle", "Ouvrir"],
+      "reached_markers": ["Documents", "Rechercher un document", "Catégorie", "Statut", "Visibilité", "Pôle", "Projet", "Événement", "Modèles", "Officiels", "En attente de validation", "Validé", "Rejeté", "Archivé", "Officiel", "Modèle", "Ouvrir"],
+      "screenshot_sha256": "5eeffd5b0a10c6b735aff8110bc9840cce84cff4c66b2acfe91cd365a0572a05",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "06_document_detail_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/documents/doc-validated — fiche avec can_manage=true et can_validate=true",
+      "expected_markers": ["Rapport annuel 2025–2026", "Résumé", "Fichier", "Périmètre", "Validation", "Métadonnées", "Validé", "Tout le club", "Officiel", "Permanent", "Fatou Diop", "Expiration", "Retirer la validation", "Rejeter", "Archiver"],
+      "reached_markers": ["Rapport annuel 2025–2026", "Résumé", "Fichier", "Périmètre", "Validation", "Métadonnées", "Validé", "Tout le club", "Officiel", "Permanent", "Fatou Diop", "Expiration", "Retirer la validation", "Rejeter", "Archiver"],
+      "screenshot_sha256": "3d1a9efacea8147c897a55063f662dd738e28ec773a5a4e79f6d0a32acf37b4f",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "07_document_form_desktop_1366x768.png",
+      "viewport": "1366x768",
+      "route/scenario": "/documents/doc-validated — édition préremplie, fichier conservé, non soumise",
+      "expected_markers": ["Modifier le document", "Le fichier actuel sera conservé", "Titre", "Description", "Fichier actuel", "Lien du fichier", "Catégorie", "Visibilité", "Pôle", "Projet", "Événement", "Utiliser comme modèle", "Enregistrer"],
+      "reached_markers": ["Modifier le document", "Le fichier actuel sera conservé", "Titre", "Description", "Fichier actuel", "Lien du fichier", "Catégorie", "Visibilité", "Pôle", "Projet", "Événement", "Utiliser comme modèle", "Enregistrer"],
+      "screenshot_sha256": "131d2a351d4ebe74caf85f657459937b7b2b8a7e03a45f16d9c4bf5cef7bc41a",
+      "icons_rendered_correctly": true,
+      "success": true
+    },
+    {
+      "filename": "08_document_workflow_mobile_390x844.png",
+      "viewport": "390x844",
+      "route/scenario": "/documents/doc-draft — fiche mobile avec can_manage=true et can_validate=true",
+      "expected_markers": ["Documents", "Brouillon", "Projet sélectionné", "Synthèse impact SunuTech", "Fichier", "Soumettre", "Valider", "Rejeter", "Archiver", "Modifier", "Supprimer"],
+      "reached_markers": ["Documents", "Brouillon", "Projet sélectionné", "Synthèse impact SunuTech", "Fichier", "Soumettre", "Valider", "Rejeter", "Archiver", "Modifier", "Supprimer"],
+      "screenshot_sha256": "446f0e3698bf531f8f6fc241e63f785da41bc99930715839e3ce8956db373418",
+      "icons_rendered_correctly": true,
+      "success": true
+    }
+  ]
+}

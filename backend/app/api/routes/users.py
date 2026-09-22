@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -43,6 +45,14 @@ from app.api.deps import (
 )
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
+from app.services.operational_integrity import (
+    assert_active_operational_member,
+    assert_can_make_alumni,
+    assert_suspendable_lifecycle,
+    lock_exclusive_role,
+    lock_user,
+    reconcile_user_lifecycle,
+)
 
 
 router = APIRouter(prefix="/users", tags=["Utilisateurs"])
@@ -173,7 +183,8 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
-    existing = db.query(User).filter(User.email == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    existing = db.query(User).filter(func.lower(User.email) == normalized_email).first()
 
     if existing:
         raise HTTPException(
@@ -194,7 +205,7 @@ def create_user(
     user = User(
         first_name=payload.first_name,
         last_name=payload.last_name,
-        email=payload.email,
+        email=normalized_email,
         phone=payload.phone,
         gender=payload.gender,
         profile_type=payload.profile_type,
@@ -212,7 +223,14 @@ def create_user(
     )
 
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte existe déjà avec cet email",
+        ) from exc
     db.refresh(user)
 
     return user
@@ -315,7 +333,19 @@ def admin_update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
+
+    forbidden_lifecycle_fields = {"status", "is_active"}.intersection(
+        payload.model_fields_set
+    )
+    if forbidden_lifecycle_fields:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Le cycle de vie se modifie uniquement avec les actions "
+                "d'approbation, rejet, suspension, réactivation ou Alumni"
+            ),
+        )
 
     old_value = {
         "status": user.status,
@@ -326,19 +356,8 @@ def admin_update_user(
         "promotion": user.promotion,
     }
 
-    if payload.status is not None:
-        if payload.status not in VALID_USER_STATUSES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Statut utilisateur invalide",
-            )
-        user.status = payload.status
-
     if payload.email_verified is not None:
         user.email_verified = payload.email_verified
-
-    if payload.is_active is not None:
-        user.is_active = payload.is_active
 
     if payload.department is not None:
         user.department = payload.department
@@ -397,7 +416,7 @@ def approve_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_join_request_reviewer),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     if user.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -410,24 +429,8 @@ def approve_user(
     }
 
     is_alumni = user.profile_type == ALUMNI_ROLE
-    user.status = ALUMNI_ROLE if is_alumni else "active"
+    reconcile_user_lifecycle(db, user, ALUMNI_ROLE if is_alumni else "active")
     user.email_verified = True
-    user.is_active = True
-    user.updated_at = datetime.utcnow()
-
-    role_name = ALUMNI_ROLE if is_alumni else BASE_ACTIVE_ROLE
-    role = db.query(Role).filter(Role.name == role_name).first()
-    if not role:
-        role = Role(name=role_name, description=f"Rôle de base {role_name}")
-        db.add(role)
-        db.flush()
-
-    existing_role = db.query(UserRole).filter(
-        UserRole.user_id == user.id,
-        UserRole.role_id == role.id,
-    ).first()
-    if not existing_role:
-        db.add(UserRole(user_id=user.id, role_id=role.id))
 
     notification_title = (
         "Compte Alumni EnactSpace validé"
@@ -478,7 +481,7 @@ def reject_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_join_request_reviewer),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     if user.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -489,8 +492,7 @@ def reject_user(
         "status": user.status,
     }
 
-    user.status = "rejected"
-    user.updated_at = datetime.utcnow()
+    reconcile_user_lifecycle(db, user, "rejected")
 
     is_alumni = user.profile_type == ALUMNI_ROLE
     notify_user(
@@ -535,7 +537,7 @@ def suspend_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     current_roles = get_user_role_names(db, current_user.id)
     target_roles = get_user_role_names(db, user.id)
 
@@ -554,15 +556,14 @@ def suspend_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ce compte est déjà suspendu",
         )
+    assert_suspendable_lifecycle(user)
 
     old_value = {
         "status": user.status,
         "is_active": user.is_active,
     }
 
-    user.status = "suspended"
-    user.is_active = False
-    user.updated_at = datetime.utcnow()
+    reconcile_user_lifecycle(db, user, "suspended")
 
     create_audit_log(
         db=db,
@@ -591,7 +592,7 @@ def reactivate_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     if user.status not in {"suspended", "inactive"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -599,23 +600,8 @@ def reactivate_user(
         )
 
     old_value = {"status": user.status, "is_active": user.is_active}
-    role_name = ALUMNI_ROLE if user.profile_type == ALUMNI_ROLE else BASE_ACTIVE_ROLE
-    role = db.query(Role).filter(Role.name == role_name).first()
-    if role is None:
-        role = Role(name=role_name, description=f"Rôle de base {role_name}")
-        db.add(role)
-        db.flush()
-
-    user.status = ALUMNI_ROLE if user.profile_type == ALUMNI_ROLE else "active"
-    user.is_active = True
-    user.updated_at = datetime.utcnow()
-
-    assignment = db.query(UserRole).filter(
-        UserRole.user_id == user.id,
-        UserRole.role_id == role.id,
-    ).first()
-    if assignment is None:
-        db.add(UserRole(user_id=user.id, role_id=role.id))
+    lifecycle = ALUMNI_ROLE if user.profile_type == ALUMNI_ROLE else "active"
+    reconcile_user_lifecycle(db, user, lifecycle)
 
     notify_user(
         db,
@@ -648,7 +634,7 @@ def make_user_alumni(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     target_roles = get_user_role_names(db, user.id)
 
     if user.id == current_user.id:
@@ -666,48 +652,13 @@ def make_user_alumni(
             status_code=status.HTTP_409_CONFLICT,
             detail="Retirez d'abord le rôle administrateur de ce membre",
         )
+    assert_can_make_alumni(user)
 
     old_value = {
         "status": user.status,
     }
 
-    user.status = ALUMNI_ROLE
-    user.profile_type = ALUMNI_ROLE
-    user.updated_at = datetime.utcnow()
-
-    alumni_role = db.query(Role).filter(Role.name == ALUMNI_ROLE).first()
-    if not alumni_role:
-        alumni_role = Role(name=ALUMNI_ROLE, description="Ancien membre Enactus")
-        db.add(alumni_role)
-        db.flush()
-
-    current_links = db.query(UserRole).filter(UserRole.user_id == user.id).all()
-    for link in current_links:
-        if link.role and (
-            link.role.name == BASE_ACTIVE_ROLE
-            or normalize_role_name(link.role.name) in RESPONSIBILITY_ROLES
-        ):
-            db.delete(link)
-
-    has_alumni_role = any(
-        link.role_id == alumni_role.id for link in current_links
-    )
-    if not has_alumni_role:
-        db.add(UserRole(user_id=user.id, role_id=alumni_role.id))
-
-    for membership in db.query(PoleMember).filter(
-        PoleMember.user_id == user.id,
-        PoleMember.is_active.is_(True),
-    ).all():
-        membership.is_active = False
-        membership.left_at = date.today()
-
-    for membership in db.query(ProjectMember).filter(
-        ProjectMember.user_id == user.id,
-        ProjectMember.is_active.is_(True),
-    ).all():
-        membership.is_active = False
-        membership.left_at = date.today()
+    reconcile_user_lifecycle(db, user, ALUMNI_ROLE)
 
     notify_user(
         db,
@@ -744,7 +695,7 @@ def assign_roles_to_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
 
     requested_role_names = normalize_role_names(payload.role_names)
     scoped_roles = requested_role_names.intersection(SCOPED_RESPONSIBILITY_ROLES)
@@ -756,11 +707,7 @@ def assign_roles_to_user(
                 "le module concerné"
             ),
         )
-    if user.status != "active" or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Les responsabilités sont réservées aux membres actifs",
-        )
+    assert_active_operational_member(user)
     managed_roles = ensure_role_authority(db, current_user, requested_role_names)
     current_role_names = get_user_role_names(db, user.id)
     old_roles = sorted(list(current_role_names))
@@ -779,9 +726,7 @@ def assign_roles_to_user(
         {TEAM_LEADER_ROLE, SECRETARY_ROLE}
     )
     for exclusive_role_name in exclusive_roles:
-        exclusive_role = next(
-            role for role in roles if role.name == exclusive_role_name
-        )
+        exclusive_role = lock_exclusive_role(db, exclusive_role_name)
         previous_links = (
             db.query(UserRole)
             .filter(
@@ -793,6 +738,16 @@ def assign_roles_to_user(
         for previous_link in previous_links:
             previous_user_id = previous_link.user_id
             db.delete(previous_link)
+            create_audit_log(
+                db=db,
+                action="remplacement_role_exclusif",
+                user_id=current_user.id,
+                entity_type="user",
+                entity_id=previous_user_id,
+                old_value={"role": exclusive_role_name},
+                new_value={"role": None, "replacement_user_id": str(user.id)},
+                ip_address=get_client_ip(request),
+            )
             notify_user(
                 db,
                 user_id=previous_user_id,
@@ -886,7 +841,7 @@ def remove_role_from_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    user = get_user_or_404(db, user_id)
+    user = lock_user(db, user_id)
     role_name = normalize_role_name(role_name)
     ensure_role_authority(db, current_user, {role_name})
 
@@ -899,6 +854,19 @@ def remove_role_from_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rôle introuvable",
         )
+
+    if role_name == ADMIN_ROLE:
+        admin_links = (
+            db.query(UserRole)
+            .filter(UserRole.role_id == role.id)
+            .with_for_update()
+            .all()
+        )
+        if len(admin_links) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Le dernier administrateur ne peut pas être retiré",
+            )
 
     link = db.query(UserRole).filter(
         UserRole.user_id == user.id,

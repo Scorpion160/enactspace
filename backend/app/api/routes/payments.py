@@ -24,6 +24,7 @@ from app.api.routes.finance import (
     normalize_mobile_money_currency,
     update_fee_status,
 )
+from app.services.operational_integrity import lock_row
 
 router = APIRouter(prefix="/payments", tags=["Paiements"])
 
@@ -291,6 +292,12 @@ async def paydunya_ipn(
         provider_token=provider_result.provider_token,
         internal_transaction_id=internal_transaction_id,
     )
+    if transaction is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction Mobile Money introuvable",
+        )
+    transaction = lock_row(db, MobileMoneyTransaction, transaction.id)
     if transaction is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

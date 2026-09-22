@@ -1,0 +1,22 @@
+data_id,famille,quantite_minimale,cas_nominal,cas_vide,cas_dense,cas_long,cas_erreur,relations_necessaires
+TD01,utilisateurs_roles,11,un compte par role et un multi-role,compte sans role,10 roles visibles,nom email et role tres longs,session desactivee,roles et permissions UserExperience
+TD02,membres,30,actif avec photo,aucun membre,200 membres,nom 120 caracteres,photo ou email absent,poles projets taches finances presences
+TD03,alumni,8,profil complet et mentor,aucun alumni,50 alumni,bio et parcours longs,profil incomplet,mentorat opportunites evenements
+TD04,poles,6,pole avec chef adjoint et membres,pole vide,20 poles,nom objectif longs,sans responsable,membres projets documents posts
+TD05,projets,8,projet actif avec equipe,pas de projet,30 projets,titre description livrables longs,sans equipe impact,budget taches documents pole
+TD06,taches,24,tous statuts et priorites,aucune tache,300 taches,titre commentaire longs,assignation invalide,membre pole projet piece jointe
+TD07,presences,8,sessions planifiee ouverte fermee,pas de session,100 sessions,description longue,conflit ou QR expire,membres justificatifs QR NFC
+TD08,justificatifs,6,en attente valide refuse,aucun justificatif,80 justificatifs,motif long,fichier absent ou invalide,absence membre session
+TD09,finances,20,cotisation amende paiement preuve,aucune operation,500 operations,montant commentaire longs,preuve illisible ou doublon,membre comptes frais paiements
+TD10,campagnes,3,brouillon ouverte fermee,aucune campagne,10 campagnes,titre criteres longs,date invalide,besoins candidatures evaluations
+TD11,candidatures,18,en attente accepte refuse liste attente,aucune candidature,300 candidatures,motivation longue,doublon ou piece absente,campagne evaluateurs suivi public
+TD12,publications,18,texte media officielle pole projet,fil vide,200 publications,contenu commentaires longs,media casse,auteur reactions commentaires
+TD13,conversations,10,privee groupe pole projet enacchef,aucune conversation,100 conversations,nom groupe long,participant retire,membres messages roles
+TD14,messages,40,texte image fichier reponse reaction,conversation vide,1000 messages,texte et fichier longs,echec envoi,message conversation lecture cache
+TD15,notifications,20,lue non lue par domaine,centre vide,300 alertes,titre message longs,cible supprimee,route cible utilisateur
+TD16,documents,15,pdf image office lien prive public,aucun document,500 documents,nom description longs,format taille permission,dossier pole projet utilisateur
+TD17,evenements,6,futur passe complet annule,aucun evenement,50 evenements,titre rapport longs,inscription refusee,participants budget documents presence
+TD18,academy,12,cours cas ressource progression,aucun cours,100 contenus,titre texte longs,contenu indisponible,auteur categorie favoris progression
+TD19,impact,12,indicateur preuve beneficiaire resultat,pas de donnees,200 points,titre preuve longs,valeur partielle,projet periode membre pole
+TD20,archives_hall_of_fame,15,annee bureau projet prix recit,archive vide,100 archives,recit long,image manquante,annee personnes projets distinctions
+TD21,assets_media,12,avatar photo prix logo document,aucune image,galerie 100 medias,dimensions extremes,url invalide,toutes vues media

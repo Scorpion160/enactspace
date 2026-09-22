@@ -1,14 +1,38 @@
-from pydantic import BaseModel, EmailStr
+from datetime import datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+    platform: Literal["web", "android", "ios", "api", "unknown"] | None = None
 
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
+    expires_in: int | None = None
+    refresh_expires_in: int | None = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class AuthSessionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+    expires_at: datetime
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+    user_agent: str | None
+    platform: str | None
 
 
 class PasswordResetRequest(BaseModel):

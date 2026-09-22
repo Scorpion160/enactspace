@@ -54,6 +54,8 @@ const Set<String> _recruitmentRoles = {
 };
 
 class UserExperience {
+  static const Set<String> authenticatedUtilityRoutes = {'/settings', '/help'};
+
   final String id;
   final String email;
   final String displayName;
@@ -112,6 +114,7 @@ class UserExperience {
   bool get isFinance => hasAnyRole(_financeRoles);
 
   bool get isAlumni => status == 'alumni' || hasRole('alumni');
+  bool get isActiveMember => status == 'active' && !isAlumni;
   String get normalizedGender => gender?.trim().toLowerCase() ?? '';
   bool get isEnactrice =>
       {'femme', 'feminin', 'féminin', 'female'}.contains(normalizedGender);
@@ -142,7 +145,13 @@ class UserExperience {
   }
 
   bool get canManageMembers => isAdmin || isTeamLeader || isSecretary;
-  bool get canViewFinance => isAdmin || isTeamLeader || isFinance;
+
+  /// Active members can only reach their own Finance endpoints. Management
+  /// capabilities remain reserved for the financial leadership roles below.
+  bool get canAccessPersonalFinance => isActiveMember;
+  bool get canViewFinance =>
+      canAccessPersonalFinance ||
+      (isActiveMember && (isAdmin || isTeamLeader || isFinance));
   bool get canManageFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
       isAdmin || isTeamLeader || isSecretary || isRecruitmentLead || isEnacchef;
@@ -152,6 +161,7 @@ class UserExperience {
       isAdmin || isTeamLeader || isSecretary || isProjectOrPoleLead;
   bool get canManageAttendance => isAdmin || isTeamLeader || isSecretary;
   bool get canManageGamification => isAdmin || isTeamLeader || isSecretary;
+  bool get canManageAcademy => isAdmin;
   bool get canViewMembersDirectory => canManageMembers || isProjectOrPoleLead;
   bool get canViewOperations => !isAlumni;
 
@@ -233,7 +243,9 @@ class UserExperience {
       routes.add('/finance');
     }
 
-    if (user.canManageAttendance || user.isProjectOrPoleLead) {
+    // Every active Enacteur can consult their own attendance history. The
+    // attendance screen keeps management actions restricted to their roles.
+    if (!user.isAlumni) {
       routes.add('/attendance');
     }
 
@@ -259,6 +271,43 @@ class UserExperience {
     }
 
     return routes.toList();
+  }
+
+  static bool canAccessPath(UserExperience? user, String path) {
+    if (user == null) return false;
+
+    final normalizedPath = path.split('?').first;
+    if (authenticatedUtilityRoutes.any(
+      (route) =>
+          normalizedPath == route || normalizedPath.startsWith('$route/'),
+    )) {
+      return true;
+    }
+    final canAccessAttendance = user.status == 'active' && !user.isAlumni;
+
+    if (normalizedPath == '/academy/admin' ||
+        normalizedPath.startsWith('/academy/admin/')) {
+      return user.canManageAcademy;
+    }
+
+    if (normalizedPath == '/attendance' ||
+        normalizedPath == '/attendance/scan') {
+      return canAccessAttendance;
+    }
+
+    if (normalizedPath == '/attendance/nfc' ||
+        normalizedPath.startsWith('/attendance/nfc/')) {
+      return canAccessAttendance && user.canManageAttendance;
+    }
+
+    if (normalizedPath.startsWith('/attendance/')) {
+      return false;
+    }
+
+    return visibleRoutesFor(user).any(
+      (route) =>
+          normalizedPath == route || normalizedPath.startsWith('$route/'),
+    );
   }
 }
 

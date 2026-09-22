@@ -2,6 +2,8 @@ class TaskModel {
   final String id;
   final String title;
   final String? description;
+  final String? creatorId;
+  final String? assignedBy;
   final String priority;
   final String status;
   final String? dueDate;
@@ -10,6 +12,8 @@ class TaskModel {
   final String? createdAt;
   final String? completedAt;
   final String? validatedAt;
+  final String? validatedBy;
+  final String? updatedAt;
   final String? poleId;
   final String? projectId;
   final bool canManage;
@@ -19,6 +23,8 @@ class TaskModel {
     required this.id,
     required this.title,
     this.description,
+    this.creatorId,
+    this.assignedBy,
     required this.priority,
     required this.status,
     this.dueDate,
@@ -27,6 +33,8 @@ class TaskModel {
     this.createdAt,
     this.completedAt,
     this.validatedAt,
+    this.validatedBy,
+    this.updatedAt,
     this.poleId,
     this.projectId,
     required this.canManage,
@@ -38,6 +46,8 @@ class TaskModel {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Tâche sans titre',
       description: json['description']?.toString(),
+      creatorId: json['creator_id']?.toString(),
+      assignedBy: json['assigned_by']?.toString(),
       priority: json['priority']?.toString() ?? 'normale',
       status: json['status']?.toString() ?? 'a_faire',
       dueDate: json['due_date']?.toString(),
@@ -46,6 +56,8 @@ class TaskModel {
       createdAt: json['created_at']?.toString(),
       completedAt: json['completed_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
+      validatedBy: json['validated_by']?.toString(),
+      updatedAt: json['updated_at']?.toString(),
       poleId: json['pole_id']?.toString(),
       projectId: json['project_id']?.toString(),
       canManage: json['can_manage'] == true,
@@ -98,5 +110,30 @@ class TaskModel {
     final year = date.year.toString();
 
     return '$day/$month/$year';
+  }
+
+  DateTime? get dueAt => DateTime.tryParse(dueDate ?? '');
+
+  bool get isTerminal => const {'termine', 'valide', 'annule'}.contains(status);
+
+  List<String> get allowedStatusTransitions {
+    final base = <String, List<String>>{
+      'a_faire': ['en_cours', 'bloque'],
+      'en_cours': ['bloque', 'termine'],
+      'bloque': ['en_cours', 'termine'],
+      'termine': canManage ? ['en_cours', 'valide'] : const [],
+      'valide': const [],
+      'annule': const [],
+    };
+    final values = [...?base[status]];
+    if (canManage && const {'a_faire', 'en_cours', 'bloque'}.contains(status)) {
+      values.add('annule');
+    }
+    return values;
+  }
+
+  bool isLateAt(DateTime now) {
+    final due = dueAt;
+    return due != null && due.isBefore(now) && !isTerminal;
   }
 }

@@ -1,0 +1,257 @@
+{
+  "capture_method": "temporary_flutter_widget_harness",
+  "integrated_browser_used": false,
+  "runtime_reference_available": true,
+  "runtime_recheck_available": false,
+  "runtime_reference_from_validated_fixture_trace": true,
+  "runtime_reference_files": [
+    "docs/design/screenshots/ui_poles_v1/poles_fixture_results.json",
+    "docs/design/screenshots/ui_poles_v1/poles_runtime_check.json"
+  ],
+  "poles_count": 8,
+  "legacy_positions_present": false,
+  "application_mutation_performed": false,
+  "theme_verified": true,
+  "enactspace_theme_used": true,
+  "material_default_theme_used": false,
+  "icon_font_verified": true,
+  "missing_icon_glyphs_detected": false,
+  "material_default_primary_dominant": false,
+  "material_default_background_dominant": false,
+  "material_default_surface_dominant": false,
+  "captures": [
+    {
+      "filename": "01_poles_portfolio_desktop_1440x900.png",
+      "viewport": { "width": 1440, "height": 900 },
+      "target_pole": null,
+      "active_section": "portfolio",
+      "expected_markers": [
+        "Technique",
+        "Pôle cœur",
+        "Chef de pôle : Awa Ndiaye",
+        "Adjoint du pôle : Moussa Diop",
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "Ouvrir le pôle"
+      ],
+      "reached_markers": [
+        "Technique",
+        "Pôle cœur",
+        "Chef de pôle : Awa Ndiaye",
+        "Adjoint du pôle : Moussa Diop",
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "Ouvrir le pôle"
+      ],
+      "screenshot_sha256": "533836f33f0a9180343f879e0bf38589ec58eb54f379038e37f6d3184b1b7591",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "02_poles_filters_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "target_pole": "Audit Pôle Sans Équipe",
+      "active_section": "portfolio_filters",
+      "expected_markers": [
+        "Rechercher un pôle",
+        "Type",
+        "Responsable",
+        "Avec blocage",
+        "En retard",
+        "Sans prochaine action",
+        "Sans chef",
+        "Sans adjoint",
+        "Sans équipe",
+        "Réinitialiser",
+        "Audit Pôle Sans Équipe"
+      ],
+      "reached_markers": [
+        "Rechercher un pôle",
+        "Type",
+        "Responsable",
+        "Avec blocage",
+        "En retard",
+        "Sans prochaine action",
+        "Sans chef",
+        "Sans adjoint",
+        "Sans équipe",
+        "Réinitialiser",
+        "Audit Pôle Sans Équipe"
+      ],
+      "screenshot_sha256": "3379dd913ca874be13c620e1bd3652f3bd72995cf79082cc42c06cf6aaee1787",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "03_poles_portfolio_mobile_390x844.png",
+      "viewport": { "width": 390, "height": 844 },
+      "target_pole": null,
+      "active_section": "portfolio_mobile",
+      "expected_markers": [
+        "Filtres et recherche",
+        "Technique",
+        "Audit Pôle Sans Équipe",
+        "1 tâche bloquée",
+        "AUDIT-POLE-NEXT-ACTION-001"
+      ],
+      "reached_markers": [
+        "Filtres et recherche",
+        "Technique",
+        "Audit Pôle Sans Équipe",
+        "1 tâche bloquée",
+        "AUDIT-POLE-NEXT-ACTION-001"
+      ],
+      "screenshot_sha256": "8861de3e994cf6ad091146780b29d36bff0e9f6c1c032a999989fb2e02eb4e34",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "04_pole_summary_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "target_pole": "Technique",
+      "active_section": "Résumé",
+      "expected_markers": [
+        "TECH",
+        "Pôle cœur",
+        "Description",
+        "Objectifs",
+        "Chef de pôle",
+        "Adjoint du pôle",
+        "8 membres actifs",
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "1 tâche bloquée",
+        "2 tâches en retard"
+      ],
+      "reached_markers": [
+        "TECH",
+        "Pôle cœur",
+        "Description",
+        "Objectifs",
+        "Chef de pôle",
+        "Adjoint du pôle",
+        "8 membres actifs",
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "1 tâche bloquée",
+        "2 tâches en retard"
+      ],
+      "canonical_leadership_visible": true,
+      "screenshot_sha256": "641e6f6f9bf5f621160c3a84276d67a2c41a028ba30aafa527f33276f0e77cea",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "05_pole_team_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "target_pole": "Technique",
+      "active_section": "Équipe",
+      "expected_markers": [
+        "Chef de pôle",
+        "Awa Ndiaye",
+        "Adjoint du pôle",
+        "Moussa Diop",
+        "Membres",
+        "Fatou Sarr"
+      ],
+      "reached_markers": [
+        "Chef de pôle",
+        "Awa Ndiaye",
+        "Adjoint du pôle",
+        "Moussa Diop",
+        "Membres",
+        "Fatou Sarr"
+      ],
+      "screenshot_sha256": "02f60ccdebbf0e47962064c697dcedee0a5f38b068c792c5d2ef70d828c58aaf",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "06_pole_work_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "target_pole": "Technique",
+      "active_section": "Travail",
+      "expected_markers": [
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "À faire",
+        "Haute",
+        "15/04/2027",
+        "Fatou Sarr",
+        "Bloqué",
+        "Urgente",
+        "Ibrahima Fall",
+        "En retard",
+        "Aminata Ba"
+      ],
+      "reached_markers": [
+        "AUDIT-POLE-NEXT-ACTION-001",
+        "À faire",
+        "Haute",
+        "15/04/2027",
+        "Fatou Sarr",
+        "Bloqué",
+        "Urgente",
+        "Ibrahima Fall",
+        "En retard",
+        "Aminata Ba"
+      ],
+      "real_task_alerts_visible": true,
+      "screenshot_sha256": "a2fe738a302698217f41afd8a0bf976331bece93d1088dcc794f73256def229b",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "07_pole_activity_documents_desktop_1366x768.png",
+      "viewport": { "width": 1366, "height": 768 },
+      "target_pole": "Technique",
+      "active_section": "Activité et Documents",
+      "expected_markers": [
+        "AUDIT-POLE-EVENT-FUTURE-001",
+        "20/04/2027",
+        "Salle Audit Pôle A1",
+        "Point officiel du pôle Technique",
+        "Document audit 1",
+        "Consulter"
+      ],
+      "reached_markers": [
+        "AUDIT-POLE-EVENT-FUTURE-001",
+        "20/04/2027",
+        "Salle Audit Pôle A1",
+        "Point officiel du pôle Technique",
+        "Document audit 1",
+        "Consulter"
+      ],
+      "real_activity_visible": true,
+      "pole_filtered_documents_visible": true,
+      "screenshot_sha256": "bbbf5bbefe7b2a3788b08538796bf800b911d920ff040b926d790d33088d2b80",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    },
+    {
+      "filename": "08_pole_empty_team_tablet_768x1024.png",
+      "viewport": { "width": 768, "height": 1024 },
+      "target_pole": "Audit Pôle Sans Équipe",
+      "active_section": "Équipe",
+      "expected_markers": [
+        "Non renseigné",
+        "Aucun chef de pôle affecté",
+        "Aucun adjoint affecté",
+        "Aucune équipe affectée"
+      ],
+      "reached_markers": [
+        "Non renseigné",
+        "Aucun chef de pôle affecté",
+        "Aucun adjoint affecté",
+        "Aucune équipe affectée"
+      ],
+      "empty_team_state_visible": true,
+      "screenshot_sha256": "a00ab84c39d906eb94d85aeb81b6c9b6f4b821d705c481c9271b92a6e99bf1b5",
+      "icons_rendered_correctly": true,
+      "application_mutation_performed": false,
+      "success": true
+    }
+  ]
+}

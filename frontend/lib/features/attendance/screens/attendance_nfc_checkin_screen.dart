@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-// ignore: implementation_imports
-import 'package:nfc_manager/src/nfc_manager_android/tags/tag.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../models/attendance_nfc_model.dart';
 import '../models/attendance_qr_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
+import '../services/nfc_tag_payload.dart';
 
 class AttendanceNfcCheckInScreen extends StatefulWidget {
   final AttendanceSessionModel session;
@@ -19,6 +19,17 @@ class AttendanceNfcCheckInScreen extends StatefulWidget {
   @override
   State<AttendanceNfcCheckInScreen> createState() =>
       _AttendanceNfcCheckInScreenState();
+}
+
+String _nfcFailureMessage(Object error) {
+  final message = error.toString().replaceAll('Exception: ', '');
+  final normalized = message.toLowerCase();
+  if (normalized.contains('not supported') ||
+      normalized.contains('windows') ||
+      normalized.contains('unavailable')) {
+    return 'NFC indisponible sur cet appareil. Utilisez un téléphone compatible pour pointer les présences.';
+  }
+  return message;
 }
 
 class _AttendanceNfcCheckInScreenState
@@ -69,7 +80,7 @@ class _AttendanceNfcCheckInScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = _nfcFailureMessage(e);
       });
     }
   }
@@ -81,20 +92,31 @@ class _AttendanceNfcCheckInScreenState
       _error = null;
     });
     await NfcManager.instance.startSession(
-      pollingOptions: const {
-        NfcPollingOption.iso14443,
-        NfcPollingOption.iso15693,
-        NfcPollingOption.iso18092,
-      },
+      pollingOptions: supportedAttendanceNfcPollingOptions,
       onDiscovered: (tag) async {
         if (_processing) return;
         await NfcManager.instance.stopSession();
         if (!mounted) return;
+        String payload;
+        try {
+          payload = attendanceNfcTagPayload(tag);
+        } on UnsupportedAttendanceNfcTag catch (error) {
+          setState(() {
+            _listening = false;
+            _error = error.toString();
+          });
+          if (!_paused && widget.session.status == 'open') {
+            Timer(const Duration(milliseconds: 900), () {
+              if (mounted) unawaited(_startListening());
+            });
+          }
+          return;
+        }
         setState(() {
           _listening = false;
           _processing = true;
         });
-        await _submitTag(_tagPayload(tag));
+        await _submitTag(payload);
       },
     );
   }
@@ -121,7 +143,7 @@ class _AttendanceNfcCheckInScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = _nfcFailureMessage(e);
       });
     } finally {
       if (mounted) {
@@ -229,12 +251,8 @@ class _NfcReaderHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppDataCard(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final content = Row(
@@ -258,7 +276,7 @@ class _NfcReaderHeader extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.darkText,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
@@ -271,7 +289,7 @@ class _NfcReaderHeader extends StatelessWidget {
                         paused: paused,
                         processing: processing,
                       ),
-                      style: const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: AppTheme.secondaryText),
                     ),
                   ],
                 ),
@@ -325,7 +343,7 @@ class _NfcCounters extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       ('Scannes', status?.scannedCount ?? 0, Icons.fact_check_rounded),
-      ('Presents', status?.presentCount ?? 0, Icons.check_circle_rounded),
+      ('Présents', status?.presentCount ?? 0, Icons.check_circle_rounded),
       ('Retards', status?.lateCount ?? 0, Icons.schedule_rounded),
       ('Restants', status?.remainingCount ?? 0, Icons.pending_actions_rounded),
     ];
@@ -469,16 +487,6 @@ class _NfcResultPanel extends StatelessWidget {
       ),
     );
   }
-}
-
-String _tagPayload(NfcTag tag) {
-  final androidTag = NfcTagAndroid.from(tag);
-  if (androidTag != null) {
-    return androidTag.id
-        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-        .join();
-  }
-  return tag.hashCode.toString();
 }
 
 String _readerStatusLabel({

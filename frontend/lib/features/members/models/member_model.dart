@@ -161,15 +161,17 @@ class MemberModel {
 
     if (safeRoles.isEmpty) return memberLabel;
 
-    return safeRoles
-        .map((role) => role == 'enacteur' ? memberLabel : role)
-        .join(', ');
+    return safeRoles.map(_roleLabel).toSet().join(', ');
   }
 
   String get primaryRoleLabel {
-    if (roles.any((role) => role == 'administrateur')) return 'Admin';
+    if (roles.any((role) => role == 'administrateur')) {
+      return 'Administrateur';
+    }
     if (roles.any((role) => role == 'team_leader')) return 'Team Leader';
-    if (roles.any((role) => role == 'secretaire_generale')) return 'SG';
+    if (roles.any((role) => role == 'secretaire_generale')) {
+      return 'Secrétaire générale';
+    }
     if (roles.any((role) => role == 'financier')) return 'Financier';
     if (roles.any((role) => role == 'chef_pole')) return 'Chef de pôle';
     if (roles.any((role) => role == 'adjoint_chef_pole')) {
@@ -180,6 +182,33 @@ class MemberModel {
       return 'Adjoint de projet';
     }
     return memberLabel;
+  }
+
+  String _roleLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'administrateur':
+        return 'Administrateur';
+      case 'team_leader':
+        return 'Team Leader';
+      case 'secretaire_generale':
+        return 'Secrétaire générale';
+      case 'financier':
+        return 'Financier';
+      case 'chef_pole':
+        return 'Chef de pôle';
+      case 'adjoint_chef_pole':
+        return 'Adjoint de pôle';
+      case 'chef_projet':
+        return 'Chef de projet';
+      case 'adjoint_chef_projet':
+        return 'Adjoint de projet';
+      case 'alumni':
+        return 'Alumni';
+      case 'enacteur':
+        return memberLabel;
+      default:
+        return value;
+    }
   }
 
   String get phoneLabel => _labelOrFallback(phone);

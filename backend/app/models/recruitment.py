@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean, Numeric, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, String, Text, Date, DateTime, ForeignKey, Boolean, Numeric, UniqueConstraint, func
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -89,7 +89,7 @@ class Application(Base):
     motivation_letter_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     attachment_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    status: Mapped[str] = mapped_column(String(50), default="received")
+    status: Mapped[str] = mapped_column(String(50), default="submitted")
     tracking_code: Mapped[str | None] = mapped_column(
         String(32),
         nullable=True,
@@ -106,6 +106,20 @@ class Application(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('submitted', 'under_review', 'interview_scheduled', "
+            "'waiting_list', 'accepted', 'rejected', 'cancelled')",
+            name="ck_applications_status",
+        ),
+        Index(
+            "ux_applications_campaign_lower_email",
+            "campaign_id",
+            func.lower(email),
+            unique=True,
+        ),
+    )
 
 
 class ApplicationReview(Base):

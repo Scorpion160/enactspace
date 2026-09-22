@@ -1,0 +1,79 @@
+{
+  "environment": "ui_audit",
+  "checked_at": "2026-08-23",
+  "mode": "read_only",
+  "source_trace": "../ui_projects_v1/projects_runtime_check.json",
+  "projects": {
+    "before": 9,
+    "after": 9,
+    "unchanged": true,
+    "projects_count": 9
+  },
+  "statuses_before": [
+    "idee",
+    "etude",
+    "prototype",
+    "test",
+    "deploiement",
+    "termine",
+    "suspendu"
+  ],
+  "statuses_after_unchanged": true,
+  "target_statuses": {
+    "Audit Horizon": {
+      "before": "idee",
+      "after": "idee"
+    },
+    "Audit Canopée": {
+      "before": "suspendu",
+      "after": "suspendu"
+    },
+    "Audit Solstice": {
+      "before": "termine",
+      "after": "termine"
+    }
+  },
+  "actions_visible": {
+    "global_administrator": [
+      "Nouveau projet"
+    ],
+    "audit_horizon": [
+      "Gestion du projet",
+      "Modifier le projet",
+      "Changer le statut"
+    ]
+  },
+  "forms_opened": {
+    "create_project": true,
+    "edit_audit_horizon": true,
+    "status_audit_horizon": true,
+    "suspension_summary": true
+  },
+  "prefill_verified": {
+    "project": "Audit Horizon",
+    "status_before": "idee",
+    "status_after": "idee",
+    "name": true,
+    "description": true,
+    "problem_statement": true,
+    "solution": true,
+    "objectives": true,
+    "expected_impact": true,
+    "budget": true,
+    "season": true
+  },
+  "final_actions_clicked": {
+    "create_project": false,
+    "save_changes": false,
+    "confirm_status": false,
+    "mark_completed": false,
+    "suspend_project": false
+  },
+  "requests_sent": {
+    "post_projects": 0,
+    "patch_project": 0
+  },
+  "ended_at_runtime_mutation": false,
+  "mutation_performed": false,
+  "contains_token_or_password": false
+}

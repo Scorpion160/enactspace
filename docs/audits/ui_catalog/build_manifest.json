@@ -1,0 +1,17 @@
+{
+  "status": "built_not_captured",
+  "reference_commit": "7f0a9fd5ade92c1fbe88e9316016fab299c0005a",
+  "api_url": "http://127.0.0.1:18002",
+  "output_directory": "frontend/build/ui_audit_web",
+  "service_worker_policy": "disable_when_supported_and_clear_per_target",
+  "build_timestamp_utc": "2026-08-02T12:10:52Z",
+  "flutter_framework": "3.47.0-0.3.pre",
+  "dart_sdk": "3.13.0-103.1.beta",
+  "command": "flutter build web --output build/ui_audit_web --pwa-strategy=none --no-web-resources-cdn --dart-define=ENACTSPACE_API_URL=http://127.0.0.1:18002",
+  "artifacts": [
+    {
+      "path": "frontend/build/ui_audit_web/main.dart.js",
+      "sha256": "FBDFD7E496163918A9032BE0A1012F2F41DC9A3DD2C4374F4FC0BC6D0002A7E6"
+    }
+  ]
+}

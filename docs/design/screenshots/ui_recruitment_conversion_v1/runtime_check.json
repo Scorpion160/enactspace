@@ -1,0 +1,40 @@
+{
+  "environment": "ui_audit",
+  "frontend_origin": "http://127.0.0.1:18080",
+  "api_origin": "http://127.0.0.1:18002",
+  "checked_at": "2026-08-23",
+  "target_application": {
+    "reference": "AUDIT-REC-ACCEPTED-001",
+    "id": "e83222d3-7c38-5a76-acd1-e586624589ef",
+    "status_before": "accepted",
+    "status_after": "accepted",
+    "converted_before": false,
+    "converted_after": false
+  },
+  "authorized_runtime": {
+    "identity": "audit.admin",
+    "backend_can_convert": true,
+    "integration_action_visible": true,
+    "dialog_opened": true,
+    "candidate_summary_visible": true,
+    "assignments_step_opened": true,
+    "review_step_opened": true,
+    "poles_loaded": true,
+    "poles_count": 7,
+    "projects_loaded": true,
+    "projects_count": 8,
+    "confirmation_checked": false,
+    "final_action_enabled": false,
+    "final_action_triggered": false
+  },
+  "unauthorized_runtime": {
+    "identity": "audit.finance",
+    "backend_can_convert": false,
+    "integration_section_visible": true,
+    "integration_action_visible": false
+  },
+  "applications_count_before": 37,
+  "applications_count_after": 37,
+  "conversion_request_sent": false,
+  "mutation_performed": false
+}

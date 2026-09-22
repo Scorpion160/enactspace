@@ -1,0 +1,40 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{enactus_esp}
+\input{config/institution.tex}
+\input{data/pv_enacchef_data.tex}
+\begin{document}
+\MakeMeetingHeader{RÉUNION ENAC'CHEFS}{Gouvernance et suivi}
+\SubtleBox{\textbf{Diffusion restreinte :} Enac'chefs, Secrétariat Général et personnes expressément autorisées.}
+\MeetingMeta{\MeetingDate}{\MeetingLocation}{\StartTime{} -- \EndTime}{\MeetingSecretary}{\ApprovalText}
+\Label{Présidence de séance :} \MeetingChair
+
+\InfoBand{PARTICIPANTS ET ORDRE DU JOUR}
+\Label{Participants :} \Attendees\par
+\Label{Absents / excusés :} \Absentees\par
+\Agenda
+
+\InfoBand{BILAN DES PROJETS / PÔLES / GOUVERNANCE}
+\ProjectPoleFollowUp
+
+\InfoBand{POINTS STRATÉGIQUES / DÉCISIONS / ARBITRAGES}
+{\small\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{@{}p{42mm}p{116mm}@{}}
+\toprule\textbf{Sujet} & \textbf{Détails / décision / niveau de diffusion}\\\midrule\endhead
+\DiscussionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{ROADMAP / PLAN D'ACTIONS}
+{\small\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{@{}p{54mm}p{31mm}p{25mm}p{28mm}@{}}
+\toprule\textbf{Action / arbitrage} & \textbf{Responsable} & \textbf{Échéance} & \textbf{Diffusion}\\\midrule\endhead
+\ActionRows
+\bottomrule
+\end{longtable}}
+
+\InfoBand{NOTES À CONFIDENTIALITÉ RENFORCÉE}
+\ConfidentialNotes
+\Label{Prochaine réunion :} \NextMeeting
+
+\MeetingSignaturePair{PRÉSIDENT(E) DE SÉANCE}{\MeetingChair}{Team Leader / Enac'chef}{SECRÉTAIRE DE SÉANCE}{\MeetingSecretary}{Secrétariat Général}
+\end{document}

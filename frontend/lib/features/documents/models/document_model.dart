@@ -23,6 +23,7 @@ class DocumentModel {
   final String? rejectedAt;
   final String? rejectionReason;
   final bool isPermanent;
+  final String? expiresAt;
   final String? createdAt;
   final String? updatedAt;
 
@@ -51,6 +52,7 @@ class DocumentModel {
     this.rejectedAt,
     this.rejectionReason,
     required this.isPermanent,
+    this.expiresAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -147,6 +149,7 @@ class DocumentModel {
       rejectedAt: json['rejected_at']?.toString(),
       rejectionReason: json['rejection_reason']?.toString(),
       isPermanent: json['is_permanent'] == true,
+      expiresAt: json['expires_at']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
     );
@@ -166,15 +169,15 @@ class DocumentModel {
   String get visibilityLabel {
     switch (visibility) {
       case 'public_club':
-        return 'Club';
+        return 'Tout le club';
       case 'internal':
-        return 'Interne';
+        return 'Membres';
       case 'pole_only':
-        return 'Pôle uniquement';
+        return 'Pôle sélectionné';
       case 'project_only':
-        return 'Projet uniquement';
+        return 'Projet sélectionné';
       case 'enacchef_only':
-        return 'Bureau uniquement';
+        return 'Responsables';
       case 'private':
         return 'Privé';
       default:
@@ -195,16 +198,26 @@ class DocumentModel {
 
   String get statusLabel {
     switch (status) {
+      case 'draft':
+        return 'Brouillon';
+      case 'submitted':
+        return 'Soumis';
       case 'pending_validation':
-        return 'En attente';
+        return 'En attente de validation';
       case 'rejected':
-        return 'Rejete';
+        return 'Rejeté';
       case 'archived':
-        return 'Archive';
+        return 'Archivé';
       case 'validated':
-        return 'Valide';
+        return 'Validé';
+      case 'expired':
+        return 'Expiré';
       default:
-        return status;
+        return status
+            .split('_')
+            .where((part) => part.isNotEmpty)
+            .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+            .join(' ');
     }
   }
 

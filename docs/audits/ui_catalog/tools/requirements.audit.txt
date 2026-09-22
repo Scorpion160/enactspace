@@ -1,0 +1,2 @@
+# Isolated local audit runner only. Do not add these packages to backend requirements.
+websockets==16.1.1

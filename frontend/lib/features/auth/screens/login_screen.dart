@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../recruitment/models/application_model.dart';
-import '../../recruitment/screens/recruitment_screen.dart';
-import '../../recruitment/services/recruitment_service.dart';
+import '../../../shared/ui/app_components.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,14 +59,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 920;
+    final isWide = MediaQuery.sizeOf(context).width >= 980;
 
     return Scaffold(
       body: Row(
         children: [
-          if (isWide) const Expanded(flex: 5, child: _BrandPanel()),
+          if (isWide) const Expanded(flex: 4, child: _BrandPanel()),
           Expanded(
-            flex: 4,
+            flex: 5,
             child: _LoginPanel(
               emailController: _emailController,
               passwordController: _passwordController,
@@ -99,8 +97,8 @@ class _BrandPanel extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxHeight < 720;
-            final padding = compact ? 34.0 : 52.0;
-            final logoSize = compact ? 126.0 : 164.0;
+            final padding = compact ? 32.0 : 42.0;
+            final logoSize = compact ? 112.0 : 142.0;
             final minPanelHeight = (constraints.maxHeight - (padding * 2))
                 .clamp(0.0, double.infinity)
                 .toDouble();
@@ -117,12 +115,12 @@ class _BrandPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _BrandMark(size: logoSize, onDark: true),
-                        SizedBox(height: compact ? 24 : 34),
+                        SizedBox(height: compact ? 20 : 28),
                         const Text(
                           'Enactus ESP',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 48,
+                            fontSize: 42,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -135,18 +133,18 @@ class _BrandPanel extends StatelessWidget {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         const Text(
                           'Le QG numérique des Enacteurs: annonces, tâches, '
                           'présences, documents, finance, projets et vie de '
                           'communauté.',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 18,
+                            fontSize: 17,
                             height: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 24),
                         const Wrap(
                           spacing: 10,
                           runSpacing: 10,
@@ -169,10 +167,12 @@ class _BrandPanel extends StatelessWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 28),
+                        const _BrandGeometry(),
                       ],
                     ),
                     Padding(
-                      padding: EdgeInsets.only(top: compact ? 28 : 44),
+                      padding: EdgeInsets.only(top: compact ? 24 : 34),
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -251,95 +251,6 @@ class _LoginPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _openRecruitmentApplication(BuildContext context) async {
-    final service = RecruitmentService();
-
-    try {
-      final campaigns = await service.getPublicCampaigns();
-      if (!context.mounted) return;
-
-      if (campaigns.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Aucune campagne active pour le moment. Envoie une demande d\'adhesion.',
-            ),
-          ),
-        );
-        _showJoinRequestSheet(context, profileType: 'enacteur');
-        return;
-      }
-
-      final application = await showDialog<ApplicationModel>(
-        context: context,
-        builder: (_) =>
-            CreateApplicationDialog(service: service, campaigns: campaigns),
-      );
-
-      if (!context.mounted || application == null) return;
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Candidature envoyée'),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Conservez ce code avec votre email pour suivre le dossier.',
-                ),
-                const SizedBox(height: 14),
-                SelectableText(
-                  application.publicTrackingCode,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.softBlack,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Fermer'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.go('/application-tracking');
-              },
-              icon: const Icon(Icons.route_rounded),
-              label: const Text('Suivre le dossier'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Campagnes indisponibles: ${e.toString().replaceAll('Exception: ', '')}',
-          ),
-        ),
-      );
-      _showJoinRequestSheet(context, profileType: 'enacteur');
-    }
-  }
-
-  void _showRecruitmentDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => _RecruitmentAccessDialog(
-        onStart: () => _openRecruitmentApplication(context),
-      ),
-    );
-  }
-
   void _showGuideDialog(BuildContext context) {
     showDialog(context: context, builder: (_) => const _BeginnerGuideDialog());
   }
@@ -353,139 +264,145 @@ class _LoginPanel extends StatelessWidget {
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            MediaQuery.sizeOf(context).width >= 600 ? 20 : 16,
+            20,
+            28,
+          ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width >= 600 ? 620 : 500,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (showMobileBrand) ...[
                   const _MobileBrandHeader(),
-                  const SizedBox(height: 22),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).width >= 600 ? 18 : 14,
+                  ),
                 ],
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(
-                      MediaQuery.sizeOf(context).width < 420 ? 20 : 28,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Connexion des comptes validés',
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                          ),
+                AppDataCard(
+                  padding: EdgeInsets.all(
+                    MediaQuery.sizeOf(context).width < 420 ? 16 : 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Connexion des comptes validés',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Accède à ton espace Enactus ESP avec ton compte validé.',
-                          style: TextStyle(color: Colors.black54, height: 1.4),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Accède à ton espace Enactus ESP avec ton compte validé.',
+                        style: TextStyle(color: Colors.black54, height: 1.4),
+                      ),
+                      const SizedBox(height: 10),
+                      const _ValidatedAccountHint(),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        const SizedBox(height: 12),
-                        const _ValidatedAccountHint(),
-                        const SizedBox(height: 28),
-                        TextField(
-                          controller: emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: passwordController,
-                          obscureText: obscurePassword,
-                          onSubmitted: (_) => loading ? null : onLogin(),
-                          decoration: InputDecoration(
-                            labelText: 'Mot de passe',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              onPressed: onTogglePassword,
-                              icon: Icon(
-                                obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: obscurePassword,
+                        onSubmitted: (_) => loading ? null : onLogin(),
+                        decoration: InputDecoration(
+                          labelText: 'Mot de passe',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            onPressed: onTogglePassword,
+                            tooltip: obscurePassword
+                                ? 'Afficher le mot de passe'
+                                : 'Masquer le mot de passe',
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: loading
-                                ? null
-                                : () => _showForgotPasswordDialog(context),
-                            child: const Text('Mot de passe oublié ?'),
-                          ),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: loading
+                              ? null
+                              : () => _showForgotPasswordDialog(context),
+                          child: const Text('Mot de passe oublié ?'),
                         ),
-                        const SizedBox(height: 18),
-                        if (error != null) ...[
-                          _ErrorBanner(message: error!),
-                          const SizedBox(height: 14),
-                        ],
-                        ElevatedButton.icon(
-                          onPressed: loading ? null : onLogin,
-                          icon: loading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.login_rounded),
-                          label: const Text('Se connecter'),
-                        ),
-                        const SizedBox(height: 20),
-                        const _LoginSectionLabel(
-                          'Créer un compte en attente de validation',
-                        ),
-                        const SizedBox(height: 10),
-                        _AccountRequestActions(
-                          loading: loading,
-                          onCreateMemberAccount: () =>
-                              _showJoinRequestSheet(context),
-                          onCreateAlumniAccount: () => _showJoinRequestSheet(
-                            context,
-                            profileType: 'alumni',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(height: 1),
-                        const SizedBox(height: 12),
-                        const _LoginSectionLabel('Candidature Enactus ESP'),
-                        const SizedBox(height: 8),
-                        _LoginSupportActions(
-                          onRecruitment: () => _showRecruitmentDialog(context),
-                          onTracking: () => context.go('/application-tracking'),
-                          onGuide: () => _showGuideDialog(context),
-                          onBiometric: () => _showBiometricDialog(context),
-                        ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.enactusYellow.withValues(
-                              alpha: 0.16,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Text(
-                            'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (error != null) ...[
+                        _ErrorBanner(message: error!),
+                        const SizedBox(height: 14),
                       ],
-                    ),
+                      ElevatedButton.icon(
+                        onPressed: loading ? null : onLogin,
+                        icon: loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.login_rounded),
+                        label: const Text('Se connecter'),
+                      ),
+                      const SizedBox(height: 12),
+                      const _LoginSectionLabel('Autres accès'),
+                      const SizedBox(height: 6),
+                      _AccountRequestActions(
+                        loading: loading,
+                        onCreateMemberAccount: () =>
+                            _showJoinRequestSheet(context),
+                        onCreateAlumniAccount: () => _showJoinRequestSheet(
+                          context,
+                          profileType: 'alumni',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
+                      const _LoginSectionLabel('Candidature Enactus ESP'),
+                      const SizedBox(height: 8),
+                      _LoginSupportActions(
+                        onRecruitment: () => context.go('/recruitment/apply'),
+                        onTracking: () => context.go('/application-tracking'),
+                        onGuide: () => _showGuideDialog(context),
+                        onBiometric: () => _showBiometricDialog(context),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.enactusYellow.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Text(
+                          'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -775,6 +692,9 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
+                      tooltip: _obscurePassword
+                          ? 'Afficher le mot de passe'
+                          : 'Masquer le mot de passe',
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_outlined
@@ -1132,6 +1052,9 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                               () => _obscurePassword = !_obscurePassword,
                             );
                           },
+                          tooltip: _obscurePassword
+                              ? 'Afficher le mot de passe'
+                              : 'Masquer le mot de passe',
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_outlined
@@ -1238,103 +1161,6 @@ class _JoinField extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       ),
-    );
-  }
-}
-
-class _RecruitmentAccessDialog extends StatelessWidget {
-  final VoidCallback onStart;
-
-  const _RecruitmentAccessDialog({required this.onStart});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Candidature recrutement'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ce parcours permettra aux candidats de postuler sans compte quand une campagne est active.',
-                style: TextStyle(color: Colors.black54, height: 1.4),
-              ),
-              SizedBox(height: 14),
-              _RecruitmentStep(
-                icon: Icons.campaign_rounded,
-                title: 'Campagne active',
-                body: 'Le pôle Veille publie les besoins RH validés.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.assignment_ind_rounded,
-                title: 'Formulaire candidat',
-                body:
-                    'Identité, niveau, motivation, compétences et disponibilité.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.visibility_off_rounded,
-                title: 'Anonymisation possible',
-                body:
-                    'Les évaluateurs peuvent travailler avec des codes candidat.',
-              ),
-              _RecruitmentStep(
-                icon: Icons.mark_email_read_rounded,
-                title: 'Suivi et emails',
-                body:
-                    'Statut, entretien, acceptation ou refus seront notifiés.',
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.of(context).pop();
-            onStart();
-          },
-          icon: const Icon(Icons.how_to_reg_rounded),
-          label: const Text('Démarrer'),
-        ),
-      ],
-    );
-  }
-}
-
-class _RecruitmentStep extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _RecruitmentStep({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.2),
-        foregroundColor: AppTheme.softBlack,
-        child: Icon(icon),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w900),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(body, maxLines: 3, overflow: TextOverflow.ellipsis),
     );
   }
 }
@@ -1456,12 +1282,12 @@ class _MobileBrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        _BrandMark(size: 112),
-        SizedBox(height: 14),
+        _BrandMark(size: 92),
+        SizedBox(height: 10),
         Text(
           'Enactus ESP',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
         ),
         SizedBox(height: 4),
         Text(
@@ -1469,15 +1295,9 @@ class _MobileBrandHeader extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppTheme.softBlack,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'Espace interne des Enacteurs',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.black54),
         ),
       ],
     );
@@ -1561,6 +1381,44 @@ class _BrandPill extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BrandGeometry extends StatelessWidget {
+  const _BrandGeometry();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 96,
+      height: 34,
+      child: Stack(
+        children: [
+          _tile(left: 0, top: 8, color: Colors.white24),
+          _tile(left: 26, top: 0, color: AppTheme.enactusYellow),
+          _tile(left: 52, top: 8, color: Colors.white24),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile({
+    required double left,
+    required double top,
+    required Color color,
+  }) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: Transform.rotate(
+        angle: 0.78,
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(border: Border.all(color: color, width: 2)),
+        ),
       ),
     );
   }
