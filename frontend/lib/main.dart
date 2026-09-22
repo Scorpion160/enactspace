@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'app/app_router.dart';
 import 'core/theme/appearance_controller.dart';
@@ -8,6 +9,10 @@ import 'core/push/push_lifecycle_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  MobileScannerPlatform.instance.setBarcodeLibraryScriptUrl(
+    'vendor/zxing-wasm/index.js',
+  );
   await initializeDateFormatting('fr_FR');
   await AppearanceController.instance.loadCached();
   await PushLifecycleController.instance.initialize();
