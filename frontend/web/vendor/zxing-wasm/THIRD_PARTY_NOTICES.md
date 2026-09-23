@@ -12,10 +12,14 @@ EnactSpace redistributes the reader-only Web artifacts from
 - Upstream version/tag: `3.1.3` / `v3.1.3`
 - Upstream repository: <https://github.com/Sec-ant/zxing-wasm>
 - Embedded ZXing-C++ commit: `a17fd9dc65d6aa0dd2f660fdfca7a6a6613d938f`
-- Local `index.js` SHA-256:
-  `52EC728D1F71D93E5B004DC73D4A81FAC73EBAEDC1FD1A09209292A87A72CBAF`
+- Local `index.js` (repository LF form) SHA-256:
+  `AD5E64FAD6ECB81F0526C6B101EE0FE6C2428B68078A24FBFAFC48EA57863986`
 - `zxing_reader.wasm` SHA-256:
   `2EBDA08A93EEA3EFCD8399CDA6B276E6A0B1DE4FEC60B4D8988A047DE4C6D1BA`
+
+The repository `.gitattributes` file enforces LF for the vendored `index.js`
+and treats the WASM payload as binary so these integrity values remain stable
+across supported checkout platforms.
 
 The vendored IIFE script was modified so its `locateFile` override loads
 `zxing_reader.wasm` from the same local EnactSpace vendor directory instead

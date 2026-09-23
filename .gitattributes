@@ -1,0 +1,3 @@
+# Keep vendored ZXing artifacts byte-stable across platforms.
+frontend/web/vendor/zxing-wasm/index.js text eol=lf
+frontend/web/vendor/zxing-wasm/*.wasm binary
