@@ -36,7 +36,7 @@ Access evidence should identify the role and successful authorized check, never 
 - [ ] Local backend setup completed from canonical requirements.
 - [ ] Isolated PostgreSQL 16 full backend suite passes without skips.
 - [ ] Flutter 3.44.9 lock, analysis, full tests, web build, and Android debug build pass.
-- [ ] A maintainer can explain current Alembic head `20260910_0008` and migration rules.
+- [ ] A maintainer can explain current Alembic head `20260913_0009` and migration rules.
 
 Evidence/date/maintainer/reviewer:
 

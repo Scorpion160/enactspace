@@ -1,6 +1,6 @@
 # EnactSpace V1.1 - Migrations base de donnees
 
-> **HISTORIQUE / NON AUTORITATIF.** Ce document décrit l'introduction d'Alembic. La procédure actuelle est dans [Operations runbook](OPERATIONS_RUNBOOK.md). Le head courant unique est `20260910_0008`; ne jamais utiliser l'ancien baseline comme head courant ni exécuter un `stamp` sans preuve de schéma, backup et plan approuvés.
+> **HISTORIQUE / NON AUTORITATIF.** Ce document décrit l'introduction d'Alembic. La procédure actuelle est dans [Operations runbook](OPERATIONS_RUNBOOK.md). Le head courant unique est `20260913_0009`; ne jamais utiliser l'ancien baseline comme head courant ni exécuter un `stamp` sans preuve de schéma, backup et plan approuvés.
 
 ## Objectif
 

@@ -1,6 +1,6 @@
 # EnactSpace V1.1 - Deploiement backend VPS
 
-> **HISTORIQUE / NON AUTORITATIF.** Ne pas exécuter ce guide comme procédure actuelle. Utiliser [Operations runbook](OPERATIONS_RUNBOOK.md), [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) et [Release checklist](RELEASE_CHECKLIST.md). PostgreSQL 16 et Alembic jusqu'au head unique `20260910_0008` sont les références actuelles.
+> **HISTORIQUE / NON AUTORITATIF.** Ne pas exécuter ce guide comme procédure actuelle. Utiliser [Operations runbook](OPERATIONS_RUNBOOK.md), [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md) et [Release checklist](RELEASE_CHECKLIST.md). PostgreSQL 16 et Alembic jusqu'au head unique `20260913_0009` sont les références actuelles.
 
 Objectif: deployer le backend FastAPI sur un VPS propre, securise et pret pour les tests V1.1.
 
