@@ -19,7 +19,7 @@ RPO and RTO are **to be approved by Enactus ESP**. Until approved, do not promis
 3. Quiesce writes if the migration/release plan requires it.
 4. Create and verify backups before any migration.
 5. Validate environment names with the repository validator without printing values.
-6. From `backend/`, confirm `python -m alembic heads` returns only `20260910_0008 (head)`.
+6. From `backend/`, confirm `python -m alembic heads` returns only `20260913_0009 (head)`.
 7. Apply `python -m alembic upgrade head` before starting the new application. Keep `AUTO_CREATE_TABLES=false`.
 8. Deploy the approved backend and client artifacts. The public API must use HTTPS; bind the application service to a private/loopback interface behind the proxy.
 9. Run health, authentication, authorization, file-access, and representative domain smoke checks with dedicated non-production-like operator identities.
