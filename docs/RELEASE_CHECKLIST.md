@@ -1,6 +1,6 @@
 # V1.0.0 release checklist
 
-This checklist is for PR-8/release execution. PR-7 does not create a tag, release, signed artifact, deployment, or merge to `main`.
+This checklist governs EnactSpace V1.0.0 release execution. It does not by itself create a tag, GitHub Release, signed artifact, deployment, or merge.
 
 Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md). Store preparation uses [store release metadata](STORE_RELEASE_METADATA.md), the [privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md), and [artifact provenance](ARTIFACT_PROVENANCE.md). These records do not close a gate by themselves.
 
@@ -17,7 +17,7 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 
 - [ ] Backend compile, OpenAPI import, and full tests pass without PostgreSQL suite skips.
 - [ ] PostgreSQL 16 migration/reversal/concurrency evidence is current.
-- [ ] Exactly one Alembic head: `20260910_0008`.
+- [ ] Exactly one Alembic head: `20260913_0009`.
 - [ ] Flutter lock file is unchanged; analysis and full tests pass.
 - [ ] Web release and Android debug compile checks pass.
 - [ ] Backup is complete and restore rehearsal evidence is accepted.
@@ -26,6 +26,7 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 ## Security, privacy, and operations
 
 - [ ] No credentials, private keys, signing/provider files, real environment files, private URLs, or member data are present in source or artifacts.
+- [ ] Vendored third-party components have documented provenance and all required license/notices are included in source and distributed artifacts.
 - [ ] Production secrets are independently generated, stored, access-reviewed, and rotation-ready.
 - [ ] Privacy/legal content and account-deletion behavior are approved.
 - [ ] Monitoring, logging, incident contacts, escalation, and change window are ready.

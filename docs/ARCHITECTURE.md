@@ -16,7 +16,7 @@ Authentication uses short-lived access tokens and rotating, single-use refresh s
 
 ## Data and migrations
 
-PostgreSQL 16 is the production database and the authority for concurrency-sensitive behavior. SQLite is used only for safe application-engine unit tests where supported. Alembic owns production schema evolution. The current single head is `20260910_0008`; production starts with `AUTO_CREATE_TABLES=false`, and migrations run before application rollout.
+PostgreSQL 16 is the production database and the authority for concurrency-sensitive behavior. SQLite is used only for safe application-engine unit tests where supported. Alembic owns production schema evolution. The current single head is `20260913_0009`; production starts with `AUTO_CREATE_TABLES=false`, and migrations run before application rollout.
 
 The migration chain covers account/privacy/legal controls, impact truth and provenance, institutional memory, product services, push lifecycle, operational integrity, and memory/heritage operational capture. Do not infer data provenance or verification from presentation-layer values.
 

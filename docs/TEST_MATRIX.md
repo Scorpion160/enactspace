@@ -17,7 +17,7 @@ CI and release evidence are based on behavior families, not fixed test counts.
 
 ## Shared backend gate
 
-Run backend compilation, OpenAPI generation, assert the single Alembic head `20260910_0008`, and run `python -m unittest discover -v` with the safe split configuration: SQLite application engine plus an isolated PostgreSQL 16 `TEST_DATABASE_URL`. PostgreSQL-dependent suites must not skip because the test URL is absent or invalid.
+Run backend compilation, OpenAPI generation, assert the single Alembic head `20260913_0009`, and run `python -m unittest discover -v` with the safe split configuration: SQLite application engine plus an isolated PostgreSQL 16 `TEST_DATABASE_URL`. PostgreSQL-dependent suites must not skip because the test URL is absent or invalid.
 
 ## Shared Flutter gate
 

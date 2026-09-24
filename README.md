@@ -9,7 +9,7 @@ The current release target is **V1.0.0** (`1.0.0+1` for the Flutter application)
 - Flutter `3.44.9` / Dart `3.12.2` for Android, iOS, and web clients.
 - FastAPI on Python 3.12 for the API and background operations.
 - PostgreSQL 16 for production and concurrency-sensitive validation.
-- Alembic migrations through `20260910_0008`.
+- Alembic migrations through `20260913_0009`.
 
 Android and iOS are the primary mobile targets; web is a supported build target. Production URLs, push providers, mobile signing, and store distribution are external environment/release concerns and are never embedded in the repository.
 

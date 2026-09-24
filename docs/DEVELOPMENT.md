@@ -22,7 +22,7 @@ Copy `backend/.env.production.example` only as a field-name reference. For devel
 
 Use `DATABASE_URL=sqlite://` for the supported unit-test application engine. Use `TEST_DATABASE_URL` only for an isolated, disposable PostgreSQL 16 database whose name satisfies the repository's test guards. Keep `APP_ENV=test` and `AUTO_CREATE_TABLES=false` during the full validation suite.
 
-Before starting the API, inspect `python -m alembic heads`; the expected single head is `20260910_0008`. Production-like PostgreSQL schemas are created with `python -m alembic upgrade head`, never by postponing migrations until after application startup.
+Before starting the API, inspect `python -m alembic heads`; the expected single head is `20260913_0009`. Production-like PostgreSQL schemas are created with `python -m alembic upgrade head`, never by postponing migrations until after application startup.
 
 ## Flutter setup
 
