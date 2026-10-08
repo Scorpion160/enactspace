@@ -7,7 +7,9 @@ def crypt(value,phrase,root,*,decrypt=False):
     if not phrase or len(phrase)<20 or any(c in phrase for c in "\r\n\0"):
         raise ValueError("Use a single-line recovery passphrase of at least twenty characters")
     work=root/("private-escrow-work-"+secrets.token_hex(6))
-    work.mkdir(mode=0o700,exist_ok=False)
+    # On Windows, Python 3.12 mode 0700 adds an explicit Administrators
+    # rule. Inherit the already-private parent, then verify user/SYSTEM ACLs.
+    work.mkdir(mode=0o777 if os.name=="nt" else 0o700,exist_ok=False)
     try:
         windows.private_directory(work)
         home=work/"gpg";windows.private_directory(home)
