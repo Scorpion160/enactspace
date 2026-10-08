@@ -4,21 +4,30 @@ from pathlib import Path
 import prelaunch_offsite_recovery as windows
 GPG=Path(r"C:\Program Files\Git\usr\bin\gpg.exe")
 def crypt(value,phrase,root,*,decrypt=False):
-    if not phrase or len(phrase)<20:raise ValueError("Use a recovery passphrase of at least twenty characters")
-    work=root/("private-escrow-work-"+secrets.token_hex(6));windows.private_directory(work)
+    if not phrase or len(phrase)<20 or any(c in phrase for c in "\r\n\0"):
+        raise ValueError("Use a single-line recovery passphrase of at least twenty characters")
+    work=root/("private-escrow-work-"+secrets.token_hex(6))
+    work.mkdir(mode=0o700,exist_ok=False)
     try:
+        windows.private_directory(work)
         home=work/"gpg";windows.private_directory(home)
         passfile=work/"passphrase";passfile.write_bytes(phrase.encode("utf-8"))
-        args=[str(GPG),"--homedir","/"+home.drive[0].lower()+home.as_posix()[2:],"--batch","--yes","--no-symkey-cache","--pinentry-mode","loopback",
-            "--passphrase-file","/"+passfile.drive[0].lower()+passfile.as_posix()[2:],"--output","-"]
+        # Windows diagnostic verified this mode. Resolve both paths in the same
+        # owned workspace instead of converting Windows drive letters to MSYS.
+        args=[str(GPG),"--no-options","--homedir","gpg","--batch","--yes","--no-tty",
+            "--no-symkey-cache","--pinentry-mode","loopback","--passphrase-file","passphrase","--output","-"]
         args+=["--decrypt"] if decrypt else ["--cipher-algo","AES256","--symmetric"]
-        output=windows.run(args,input=value,label="portable_key_encryption")
-        return output
+        result=subprocess.run(args,input=value,cwd=work,capture_output=True,timeout=60)
+        if result.returncode:raise RuntimeError("portable_key_decryption_failed" if decrypt else "portable_key_encryption_failed")
+        return result.stdout
     finally:
-        # All plaintext passphrase material is within the private owned work folder.
+        # Stop only the agent associated with this owned home directory.
         configuration=GPG.with_name("gpgconf.exe")
-        if configuration.is_file():subprocess.run([str(configuration),"--homedir","/"+work.drive[0].lower()+(work/"gpg").as_posix()[2:],"--kill","all"],capture_output=True,timeout=10)
-        shutil.rmtree(work)
+        try:
+            if configuration.is_file() and (work/"gpg").is_dir():
+                subprocess.run([str(configuration),"--homedir","gpg","--kill","all"],cwd=work,capture_output=True,timeout=10)
+        finally:
+            shutil.rmtree(work)
 def validate_payload(raw,identity):
     value=json.loads(raw)
     if value.get("version")!=1 or value.get("backup_id")!=identity or not re.fullmatch(r"[0-9a-f]{64}",value.get("key","")):

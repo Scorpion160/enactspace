@@ -30,4 +30,12 @@ Preuves : [lot 26](releases/20261008-prelaunch-lot26-backup-restore.md).
 
 ## État du secours portable
 
-Outil préparé : tools/prelaunch_key_escrow.py, option --execute-key-escrow et --backup-id. La phrase est saisie de façon masquée et confirmée pour l’export. Un import avec --import-file doit créer une nouvelle clé DPAPI sans écraser celle d’un profil existant. Ne jamais partager la phrase dans la conversation. Aucun export de clé réelle ni remise à un second détenteur n’a été effectué. Test synthétique actuel : False.
+Outil préparé : tools/prelaunch_key_escrow.py, option --execute-key-escrow et --backup-id. La phrase est saisie de façon masquée et confirmée pour l’export. Un import avec --import-file doit créer une nouvelle clé DPAPI sans écraser celle d’un profil existant. Ne jamais partager la phrase dans la conversation. Aucun export de clé réelle ni remise à un second détenteur n’a été effectué. Le premier prototype avait échoué au test synthétique. Le diagnostic Windows et le correctif ci-dessous précisent la suite de cette vérification.
+
+## Diagnostic Windows du 8 octobre 2026 et correctif des chemins
+
+Le diagnostic synthétique a réussi avec les chemins MSYS absolus et avec les chemins relatifs au dossier privé de travail. Le mode utilisant les chemins Windows absolus a échoué au démarrage ou à la connexion de l'agent GnuPG. Les trois dossiers temporaires ont été supprimés ; aucune clé réelle n'a été lue et aucun export n'a été produit.
+
+Le correctif de `tools/prelaunch_key_escrow.py` utilise désormais les chemins relatifs `gpg` et `passphrase`, avec le dossier privé comme répertoire du processus. Il masque les erreurs GnuPG, borne la durée du processus et nettoie le dossier même si l'arrêt de l'agent échoue. Les phrases contenant un saut de ligne ou un caractère nul sont refusées avant toute création de fichier.
+
+Cinq tests de protection du correctif ont réussi dans l'environnement isolé. Le sixième teste GnuPG et les permissions Windows avec des données fictives ; il doit être exécuté sur le PC avant l'export réel. La remise sur un support indépendant et à un second détenteur reste à faire. Aucun export réel n'est autorisé automatiquement par les tests.
