@@ -25,7 +25,7 @@ Run the focused and regression suites from `backend`:
 $env:APP_ENV = 'test'
 $env:AUTO_CREATE_TABLES = 'false'
 $env:DATABASE_URL = 'sqlite://'
-$env:SECRET_KEY = 'replace-with-an-ephemeral-test-secret-at-least-32-characters'
+$env:SECRET_KEY = (& python -c "import secrets; print(secrets.token_hex(48))")
 python -m unittest test_product_services test_product_services_migration -v
 python -m unittest test_security_mobile_foundation test_account_privacy_legal test_auth_sessions test_impact_truth test_impact_truth_sqlite_migration test_institutional_memory test_institutional_memory_migration test_product_services -v
 python -m alembic heads

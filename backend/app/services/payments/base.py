@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Any, Protocol
 
 
+MAX_MOBILE_MONEY_AMOUNT = 2_147_483_647
+
 PaymentProviderStatus = str
 
 

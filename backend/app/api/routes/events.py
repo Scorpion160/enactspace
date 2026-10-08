@@ -1,6 +1,7 @@
+from app.core.time import utc_now
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -278,7 +279,7 @@ def update_event(
         if field in {"start_time", "end_time"}:
             value = to_naive_utc(value)
         setattr(event, field, value)
-    event.updated_at = datetime.utcnow()
+    event.updated_at = utc_now()
     create_audit_log(
         db=db,
         action="modification_evenement",
@@ -390,7 +391,7 @@ def register_for_event(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cet evenement ne necessite pas d'inscription",
         )
-    if to_naive_utc(event.start_time) <= datetime.utcnow():
+    if to_naive_utc(event.start_time) <= utc_now():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Les inscriptions sont closes",
@@ -451,7 +452,7 @@ def unregister_from_event(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     event = get_event_or_404(db, event_id)
-    if to_naive_utc(event.start_time) <= datetime.utcnow():
+    if to_naive_utc(event.start_time) <= utc_now():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Impossible de quitter un evenement deja commence",
@@ -468,3 +469,26 @@ def unregister_from_event(
         db.delete(participant)
         db.commit()
     return event_payload(db, event, current_user)
+
+
+@router.post("/{event_id}/report-file", response_model=EventRead)
+async def attach_event_report(event_id: str, file: UploadFile=File(...), db:Session=Depends(get_db), current_user:User=Depends(get_current_active_validated_user)):
+    item=lock_row(db,Event,event_id)
+    if item is None: raise HTTPException(404,"Événement introuvable")
+    require_event_manager(db,current_user,item)
+    if current_user.status != "active": raise HTTPException(403,"Action réservée aux membres actifs.")
+    from app.services.attachment_service import read_attachment
+    from app.services.file_storage_service import store_bytes,delete_physical_file
+    name,data=await read_attachment(file)
+    stored=None
+    try:
+        stored=store_bytes(db,data=data,original_filename=name,uploaded_by=current_user,storage_scope="document",visibility="private",entity_type="event",entity_id=item.id,is_temporary=False)
+        item.report_url=f"/api/files/{stored.id}/download"
+        item.updated_at=utc_now()
+        db.commit()
+    except Exception:
+        db.rollback()
+        if stored: delete_physical_file(stored)
+        raise
+    db.refresh(item)
+    return event_payload(db,item,current_user)

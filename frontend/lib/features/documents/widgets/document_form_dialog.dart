@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_form_dialog.dart';
+
 import '../models/document_center_models.dart';
 import '../models/document_model.dart';
 import '../services/documents_gateway.dart';
@@ -173,9 +175,11 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        editing ? 'Modifier le document' : 'Nouveau document',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                      child: AppFormHeader(
+                        icon: Icons.description_rounded,
+                        title: Text(
+                          editing ? 'Modifier le document' : 'Nouveau document',
+                        ),
                       ),
                     ),
                     IconButton(
@@ -232,18 +236,6 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                                 onPressed: _submitting ? null : _pickFile,
                                 icon: const Icon(Icons.upload_file_rounded),
                                 label: Text(_fileName ?? 'Choisir un fichier'),
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: Text('ou'),
-                              ),
-                              TextFormField(
-                                key: const Key('document-link'),
-                                controller: _link,
-                                onChanged: (_) => setState(() {}),
-                                decoration: const InputDecoration(
-                                  labelText: 'Lien du fichier',
-                                ),
                               ),
                             ],
                           ),
@@ -328,9 +320,9 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                       if (widget.references.seasons.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         _RefSelect(
-                          label: 'Saison',
+                          label: 'Année',
                           value: _seasonId,
-                          none: 'Aucune saison',
+                          none: 'Aucune année',
                           items: widget.references.seasons.map(
                             (item) => MapEntry(item.id, item.name),
                           ),

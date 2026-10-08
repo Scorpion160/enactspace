@@ -23,6 +23,11 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
         SECRET_KEY="unit-test-secret-not-for-production",
         REFRESH_TOKEN_HMAC_KEY="unit-test-refresh-hmac-key-distinct",
         ENABLE_SEED=enable_seed,
+        MEET_SERVER_URL="https://meet.enactspace.test",
+        MEET_REQUIRE_JWT=True,
+        MEET_JWT_APP_ID="enactspace-unit-test",
+        MEET_JWT_SECRET="unit-test-meet-secret-distinct",
+        MEET_JWT_SUBJECT="meet.enactspace.test",
         ATTENDANCE_QR_ENABLED=False,
         ATTENDANCE_NFC_ENABLED=False,
     )

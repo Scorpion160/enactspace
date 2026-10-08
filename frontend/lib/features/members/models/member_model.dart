@@ -14,9 +14,15 @@ class MemberModel {
   final String? profileType;
   final List<String> roles;
   final String? department;
+  final String? cursus;
   final String? studyLevel;
+  final String? specialty;
   final String? promotion;
+  final int? enactusJoinYear;
   final String? bio;
+  final String? linkedinUrl;
+  final String? githubUrl;
+  final String? portfolioUrl;
   final String? createdAt;
   final String? photoUrl;
 
@@ -36,9 +42,15 @@ class MemberModel {
     this.profileType,
     this.roles = const [],
     this.department,
+    this.cursus,
     this.studyLevel,
+    this.specialty,
     this.promotion,
+    this.enactusJoinYear,
     this.bio,
+    this.linkedinUrl,
+    this.githubUrl,
+    this.portfolioUrl,
     this.createdAt,
     this.photoUrl,
   });
@@ -65,9 +77,17 @@ class MemberModel {
       profileType: json['profile_type']?.toString(),
       roles: _parseRoles(json['roles']),
       department: json['department']?.toString(),
+      cursus: json['cursus']?.toString(),
       studyLevel: json['study_level']?.toString(),
+      specialty: json['specialty']?.toString(),
       promotion: json['promotion']?.toString(),
+      enactusJoinYear: json['enactus_join_year'] is num
+          ? (json['enactus_join_year'] as num).toInt()
+          : int.tryParse(json['enactus_join_year']?.toString() ?? ''),
       bio: json['bio']?.toString(),
+      linkedinUrl: json['linkedin_url']?.toString(),
+      githubUrl: json['github_url']?.toString(),
+      portfolioUrl: json['portfolio_url']?.toString(),
       createdAt: json['created_at']?.toString(),
       photoUrl:
           json['photo_url']?.toString() ??
@@ -173,6 +193,7 @@ class MemberModel {
       return 'Secrétaire générale';
     }
     if (roles.any((role) => role == 'financier')) return 'Financier';
+    if (roles.contains('pole_veille')) return 'Pôle Veille';
     if (roles.any((role) => role == 'chef_pole')) return 'Chef de pôle';
     if (roles.any((role) => role == 'adjoint_chef_pole')) {
       return 'Adjoint de pôle';
@@ -194,6 +215,8 @@ class MemberModel {
         return 'Secrétaire générale';
       case 'financier':
         return 'Financier';
+      case 'pole_veille':
+        return 'Pôle Veille';
       case 'chef_pole':
         return 'Chef de pôle';
       case 'adjoint_chef_pole':
@@ -212,8 +235,13 @@ class MemberModel {
   }
 
   String get phoneLabel => _labelOrFallback(phone);
+  String get cursusLabel => _labelOrFallback(cursus);
   String get studyLevelLabel => _labelOrFallback(studyLevel);
+  String get specialtyLabel => _labelOrFallback(specialty);
   String get promotionLabel => _labelOrFallback(promotion);
+  String get polePositionLabel => _formatPolePosition(polePosition);
+  String get enactusJoinYearLabel =>
+      enactusJoinYear?.toString() ?? 'Non renseigné';
   String get bioLabel => _labelOrFallback(bio);
   String get joinedAtLabel {
     final parsed = DateTime.tryParse(createdAt ?? '');
@@ -226,6 +254,137 @@ class MemberModel {
 
   String get departmentLabel {
     return _labelOrFallback(department);
+  }
+
+  static int compareAlphabetically(MemberModel left, MemberModel right) {
+    final leftLast = _alphabeticKey(
+      left.lastName?.trim().isNotEmpty == true
+          ? left.lastName!
+          : _fallbackLastName(left.displayName),
+    );
+    final rightLast = _alphabeticKey(
+      right.lastName?.trim().isNotEmpty == true
+          ? right.lastName!
+          : _fallbackLastName(right.displayName),
+    );
+    final lastCompare = leftLast.compareTo(rightLast);
+    if (lastCompare != 0) return lastCompare;
+
+    final leftFirst = _alphabeticKey(
+      left.firstName?.trim().isNotEmpty == true
+          ? left.firstName!
+          : _fallbackFirstName(left.displayName),
+    );
+    final rightFirst = _alphabeticKey(
+      right.firstName?.trim().isNotEmpty == true
+          ? right.firstName!
+          : _fallbackFirstName(right.displayName),
+    );
+    final firstCompare = leftFirst.compareTo(rightFirst);
+    if (firstCompare != 0) return firstCompare;
+
+    final displayCompare = _alphabeticKey(
+      left.displayName,
+    ).compareTo(_alphabeticKey(right.displayName));
+    if (displayCompare != 0) return displayCompare;
+
+    return left.email.toLowerCase().compareTo(right.email.toLowerCase());
+  }
+
+  static String _fallbackLastName(String displayName) {
+    final parts = displayName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '';
+    return parts.last;
+  }
+
+  static String _fallbackFirstName(String displayName) {
+    final parts = displayName.trim().split(RegExp(r'\s+'));
+    if (parts.length <= 1) return displayName.trim();
+    return parts.sublist(0, parts.length - 1).join(' ');
+  }
+
+  static String _alphabeticKey(String value) {
+    var result = value.trim().toLowerCase();
+    const replacements = <String, String>{
+      'à': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'á': 'a',
+      'ã': 'a',
+      'ç': 'c',
+      'é': 'e',
+      'è': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'î': 'i',
+      'ï': 'i',
+      'í': 'i',
+      'ô': 'o',
+      'ö': 'o',
+      'ó': 'o',
+      'õ': 'o',
+      'ù': 'u',
+      'û': 'u',
+      'ü': 'u',
+      'ú': 'u',
+      'ÿ': 'y',
+      'œ': 'oe',
+    };
+    replacements.forEach((source, target) {
+      result = result.replaceAll(source, target);
+    });
+    return result.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  static String _formatPolePosition(String? value) {
+    final raw = value?.trim();
+    if (raw == null || raw.isEmpty) return 'Non renseigné';
+
+    final normalized = raw
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(RegExp(r'\s+'), '_');
+
+    String suffixLabel(String prefix) {
+      final suffix = normalized.substring(prefix.length);
+      if (suffix.isEmpty) return '';
+      return suffix
+          .split('_')
+          .where((part) => part.isNotEmpty)
+          .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+          .join(' ');
+    }
+
+    for (final prefix in const ['chef_de_pole_', 'chef_pole_']) {
+      if (normalized.startsWith(prefix)) {
+        final pole = suffixLabel(prefix);
+        return pole.isEmpty ? 'Chef de pôle' : 'Chef du pôle $pole';
+      }
+    }
+    if (normalized == 'chef_pole' || normalized == 'chef_de_pole') {
+      return 'Chef de pôle';
+    }
+
+    for (final prefix in const [
+      'adjoint_chef_de_pole_',
+      'adjoint_chef_pole_',
+    ]) {
+      if (normalized.startsWith(prefix)) {
+        final pole = suffixLabel(prefix);
+        return pole.isEmpty ? 'Adjoint du pôle' : 'Adjoint du pôle $pole';
+      }
+    }
+    if (normalized == 'adjoint_chef_pole' ||
+        normalized == 'adjoint_chef_de_pole') {
+      return 'Adjoint du pôle';
+    }
+    if (normalized == 'membre' || normalized == 'membre_pole') {
+      return 'Membre du pôle';
+    }
+
+    final words = raw.replaceAll(RegExp(r'[_-]+'), ' ').trim();
+    if (words.isEmpty) return 'Non renseigné';
+    return '${words[0].toUpperCase()}${words.substring(1)}';
   }
 
   static String _labelOrFallback(String? value) {

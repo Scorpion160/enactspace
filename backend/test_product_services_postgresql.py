@@ -1,5 +1,6 @@
 """PR-3 acceptance tests against isolated local PostgreSQL 16."""
 
+from app.core.time import utc_now
 import os
 import secrets
 import unittest
@@ -59,7 +60,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
         cls.addClassCleanup(cls.engine.dispose)
         cls.config = Config("alembic.ini")
         cls.heads = ScriptDirectory.from_config(cls.config).get_heads()
-        if cls.heads != ["20260913_0009"]:
+        if len(cls.heads) != 1:
             raise AssertionError(f"Expected current Alembic head, got {cls.heads}")
 
     @classmethod
@@ -98,7 +99,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
             {
                 "id": user_id,
                 "email": f"{secrets.token_hex(8)}@example.test",
-                "now": datetime.utcnow(),
+                "now": utc_now(),
             },
         )
 
@@ -114,7 +115,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
             )
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                "20260913_0009",
+                self.heads[0],
             )
             self.assertEqual(
                 connection.execute(text("SELECT count(*) FROM app_releases")).scalar_one(),
@@ -137,7 +138,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     ) VALUES (:id, 'fr', 'dark', true, false, :now, :now)
                     """
                 ),
-                {"id": existing_user, "now": datetime.utcnow()},
+                {"id": existing_user, "now": utc_now()},
             )
             connection.execute(
                 text(
@@ -147,7 +148,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     ) VALUES (:id, :user_id, 'Existing', 'Preserved', 'general', false, :now)
                     """
                 ),
-                {"id": notification_id, "user_id": existing_user, "now": datetime.utcnow()},
+                {"id": notification_id, "user_id": existing_user, "now": utc_now()},
             )
         self._upgrade("head")
         with self.engine.connect() as connection:
@@ -194,7 +195,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                         ),
                         {
                             "id": uuid.uuid4(), "user_id": user_id,
-                            "key": installation_key, "now": datetime.utcnow(),
+                            "key": installation_key, "now": utc_now(),
                         },
                     )
                 return True
@@ -232,7 +233,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     )
                     """
                 ),
-                {"id": release_id, "now": datetime.utcnow()},
+                {"id": release_id, "now": utc_now()},
             )
             connection.execute(
                 text(
@@ -245,7 +246,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     )
                     """
                 ),
-                {"id": ios_release_id, "now": datetime.utcnow()},
+                {"id": ios_release_id, "now": utc_now()},
             )
         invalid_statements = (
             (
@@ -257,7 +258,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     :id, 'android', '1.0.1', 100, 'published', :now, :now, :now
                 )
                 """,
-                {"id": uuid.uuid4(), "now": datetime.utcnow()},
+                {"id": uuid.uuid4(), "now": utc_now()},
             ),
             (
                 """
@@ -268,7 +269,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     :id, 'android', false, true, :now, :now, :now
                 )
                 """,
-                {"id": uuid.uuid4(), "now": datetime.utcnow()},
+                {"id": uuid.uuid4(), "now": utc_now()},
             ),
         )
         for statement, parameters in invalid_statements:
@@ -293,7 +294,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                 {
                     "id": uuid.uuid4(),
                     "release_id": release_id,
-                    "now": datetime.utcnow(),
+                    "now": utc_now(),
                 },
             )
             connection.execute(
@@ -320,7 +321,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                         {
                             "id": uuid.uuid4(),
                             "release_id": ios_release_id,
-                            "now": datetime.utcnow(),
+                            "now": utc_now(),
                         },
                     )
 
@@ -337,7 +338,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                     )
                     """
                 ),
-                {"id": race_release_id, "now": datetime.utcnow()},
+                {"id": race_release_id, "now": utc_now()},
             )
         Session = sessionmaker(bind=self.engine, autoflush=False)
         barrier = Barrier(2)
@@ -406,7 +407,7 @@ class PostgreSQLProductServicesTests(unittest.TestCase):
                 ),
                 {
                     "id": uuid.uuid4(), "user_id": cascade_user,
-                    "key": uuid.uuid4(), "now": datetime.utcnow(),
+                    "key": uuid.uuid4(), "now": utc_now(),
                 },
             )
             connection.execute(text("DELETE FROM users WHERE id = :id"), {"id": cascade_user})

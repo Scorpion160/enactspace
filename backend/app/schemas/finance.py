@@ -11,7 +11,7 @@ class FeeCreate(BaseModel):
     category: Optional[str] = None
     label: str
     description: Optional[str] = None
-    amount: float
+    amount: float = Field(ge=0.01, le=9999999999.99, multiple_of=0.01, allow_inf_nan=False)
     currency: str = "FCFA"
     due_date: Optional[date] = None
     source_type: Optional[str] = None
@@ -29,7 +29,7 @@ class FeeBulkCreate(BaseModel):
     category: Optional[str] = None
     label: str
     description: Optional[str] = None
-    amount: float
+    amount: float = Field(ge=0.01, le=9999999999.99, multiple_of=0.01, allow_inf_nan=False)
     currency: str = "FCFA"
     due_date: Optional[date] = None
 
@@ -80,12 +80,14 @@ class FinancialAccountRead(BaseModel):
 
 class PaymentCreate(BaseModel):
     user_id: UUID
-    amount: float
+    amount: float = Field(ge=0.01, le=9999999999.99, multiple_of=0.01, allow_inf_nan=False)
     currency: str = "FCFA"
     method: str
     reference: Optional[str] = None
     proof_url: Optional[str] = None
     proof_file_id: Optional[UUID] = None
+    fee_ids: list[UUID] = Field(default_factory=list)
+    receipt_text: Optional[str] = Field(default=None, max_length=8000)
 
 
 class PaymentRead(BaseModel):
@@ -98,6 +100,11 @@ class PaymentRead(BaseModel):
     reference: Optional[str]
     proof_url: Optional[str]
     proof_file_id: Optional[UUID]
+    proof_file_name: Optional[str] = None
+    proof_mime_type: Optional[str] = None
+    allocation_plan: Optional[list] = None
+    receipt_details: Optional[dict] = None
+    unallocated_amount: float = 0
     validated_by: Optional[UUID]
     validated_at: Optional[datetime]
     rejected_at: Optional[datetime]
@@ -130,7 +137,7 @@ class ClubTransactionCreate(BaseModel):
     category: Optional[str] = None
     label: str
     description: Optional[str] = None
-    amount: float
+    amount: float = Field(ge=0.01, le=9999999999.99, multiple_of=0.01, allow_inf_nan=False)
     currency: str = "FCFA"
     project_id: Optional[UUID] = None
     pole_id: Optional[UUID] = None

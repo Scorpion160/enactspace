@@ -1,0 +1,354 @@
+{
+  "lot": 25,
+  "generated_at": "2026-10-07T23:14:21.531951+00:00",
+  "source_branch": "recovery/final-20260927",
+  "source_base_commit": "90f1e33cc18737203a35baae9279eefa788839a3",
+  "source_alembic_head": "20261007_0031",
+  "production_alembic_revision": "20261006_0025",
+  "production_changed": false,
+  "build_performed": false,
+  "git_push_performed": false,
+  "deployment_performed": false,
+  "real_emails_sent": 0,
+  "real_push_sent": 0,
+  "real_payments": 0,
+  "test_email_redirection_preserved": true,
+  "sqlite": {
+    "tests_passed": 88,
+    "seconds": 62.718
+  },
+  "postgresql": {
+    "tests_passed": 32,
+    "seconds": 96.837
+  },
+  "postgresql_new_race_scenarios": 5,
+  "flutter": {
+    "widget_and_regression_tests_passed": 101,
+    "gateway_contract_tests_passed": 4,
+    "total_tests_passed": 105,
+    "targeted_analysis_passed": true,
+    "format_passed": true
+  },
+  "migration_rehearsal": {
+    "account_creation_on_real_schema": true,
+    "baseline_tables_checked": 110,
+    "case_insensitive_username_collision_refused": true,
+    "completed_onboarding_survives_rollback_and_replay": true,
+    "downgrade_preserves_baseline_data": true,
+    "existing_account_activation_backfill": true,
+    "failed_transaction_rolls_back": true,
+    "fresh_install_exit": 0,
+    "help_client_request_uniqueness_enforced": 3,
+    "help_followup_reads_writes_and_privacy_fields": true,
+    "help_followup_survives_replay": true,
+    "help_followup_survives_rollback": true,
+    "join_year_saved_and_preserved_for_alumni": true,
+    "new_constraints_enforced": 3,
+    "new_security_fields_reset_after_downgrade": true,
+    "orm_reads_and_writes_new_fields": true,
+    "repeat_upgrade_noop": true,
+    "reupgrade_preserves_baseline_data": true,
+    "upgrade_preserves_all_baseline_tables": true
+  },
+  "production_personal_rows_exported": false,
+  "owned_lot25_containers_and_networks_remaining": 0,
+  "unattributed_volume_cleanup_performed": false,
+  "manual_line_review_complete": false,
+  "lot25_reviewed_source_files": [
+    {
+      "file": "backend/app/services/help_service.py",
+      "lines": 247,
+      "sha256": "88932876082df8cbb3ac43fa2dbbb3575d2f41c8dea1226b77fb235618e5d16b",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/alembic/versions/20261007_0031_help_followup.py",
+      "lines": 34,
+      "sha256": "f2f4c3fa04922018a11fed49c6f384b106c31abd5937eaba7d2a660a504a5c8d",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_help_boundaries.py",
+      "lines": 204,
+      "sha256": "e32edf471d004727f4ad80ed91cd56b64416d7b42d607aeb445dcac5d6ad3d93",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_help_boundaries_postgresql.py",
+      "lines": 92,
+      "sha256": "9f8ece8e5fdd204b2b79e6151f2dded888841bcd0eb79fdb2c00dc7373c94593",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/models/help_models.dart",
+      "lines": 155,
+      "sha256": "b5cc0a48841e7ada05962b46b113c95bdc0130e8f192a4436362af563576bb26",
+      "manual_review": "REVIEWED_LOT25",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "9f71972cc38211dfec0f7be989fbc8c6764a74eb9c51f15ef9b07735ab45af3f"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/models/managed_help_models.dart",
+      "lines": 12,
+      "sha256": "5295fd0a48144d77bc2319fa71bb6e2eeddd9a55003bc3485ae84dae4aad87d8",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/services/help_gateway.dart",
+      "lines": 261,
+      "sha256": "828166a2a00e02880568f7aadfa4996c44dc160037816d71f80dfef624deef11",
+      "manual_review": "REVIEWED_LOT25",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "36a2b0e749f141d773895199842abc684d36fdeb4e76186fe270d41dc7596bd3"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/screens/help_screen.dart",
+      "lines": 981,
+      "sha256": "11135c06838a28d2fc01b174cc677ffb5aff207e0b11b50e6b2e250e540424d7",
+      "manual_review": "REVIEWED_LOT25",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "404f4e2dd564c19b248bc7d6b0120f40a566e6cda686cc5308f355e806aba1ec"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/screens/help_management_screen.dart",
+      "lines": 731,
+      "sha256": "b4d9af3a5177476c00f41b5d9a10f31cd2d7c14246451613ec25492e7372c686",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/screens/help_guide_screen.dart",
+      "lines": 39,
+      "sha256": "1b79fa5e03b099cb8c1cbb87f4f003e2a275c28cbe1a6d5ec627636bf0b4109d",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/help/widgets/help_guide_panel.dart",
+      "lines": 208,
+      "sha256": "5835ebda77df59dc3768b1a049ed9a0d9ccee8c6967fa67fd3c7247263598d5a",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/test/help_operational_test.dart",
+      "lines": 503,
+      "sha256": "d56a5e587e7074400466b681a77d161cd3b5d11a1636fb0dd21f2d7c601826a1",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/test/help_gateway_test.dart",
+      "lines": 209,
+      "sha256": "f5b786efa1fba7c2ff2b83949eaf2adb0afccc1088bd10390705e3798a5f37a6",
+      "manual_review": "REVIEWED_LOT25",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/app/models/product_services.py",
+      "lines": 346,
+      "sha256": "e02cafb35b82cc7edc07e9e669b6c61cb08f03525d3ca0613db4426e153f3abe",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "b2eca8dc9196e0a2b3b200afc6de744a68e98f2361b09f65de187fe0f1af2692"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/app/schemas/product_services.py",
+      "lines": 378,
+      "sha256": "5b3139272a7b9e9e25e23143c187732f98469b96b6072031a5c208d7fb266f55",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "e57e296c3bb5c2c133139a855fa0f679bd437a4760e0361b6939138b3a57f95a"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/app/api/routes/product_services.py",
+      "lines": 762,
+      "sha256": "90b4b023bcecc2265b014b5a7032854c3b8d3e00208d75e11d7c88a347add046",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "0e5e4757a2bbf0cf06ba14ab629bec159f74d753cd59fde333953efbdabe22a3"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/app/services/first_access.py",
+      "lines": 168,
+      "sha256": "5cd8d0485215ab232b81393d8af1a2485aad3507323cdd0ed3296879665e7e96",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "REVIEWED_LOT24",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "450de46907668c74bdc567eee604d9642c1553c7fbae41db7bb7c6f80b05f9fc"
+        }
+      ]
+    },
+    {
+      "file": "backend/app/services/account_service.py",
+      "lines": 219,
+      "sha256": "a96e941b03318453ccb5e7bfa63fd9b616d98a10376d0685413ef7757fe6dec1",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "44f1db07d4e8846d9282898ec558fd3a89eb6f9f8005562b9f2f9c104c2baf80"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_migration_rehearsal.py",
+      "lines": 209,
+      "sha256": "6c57867c1bbc34bb7eb2fe2ea1ad99ab864d077ce6f7d06921c73615791c17d4",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT22",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "LOT24_CHANGED_SECTIONS_REVIEWED",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "2e9a3bc5a317e22b4e8683af285a6a5987ab92069b9d4fd24d77e9abe36ded16"
+        }
+      ]
+    },
+    {
+      "file": "frontend/lib/app/app_router.dart",
+      "lines": 718,
+      "sha256": "1da52a5a612bce0badad0e574fc786bb6b35cf23ed82eaf985f4825bc95dc71b",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "LOT24_CHANGED_SECTIONS_REVIEWED",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "4b64e3fcf5f05d0ce00611b5fdf6c64d37f6fbf82cd59d14a01e90bf83ceda36"
+        }
+      ]
+    },
+    {
+      "file": "frontend/lib/core/auth/user_experience.dart",
+      "lines": 366,
+      "sha256": "31ff5787c8889b5c941a4ab9243823a36fca413dc6d2728341474a03aea05280",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "LOT24_CHANGED_SECTIONS_REVIEWED",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "a2258e58ce0b4e38966fa4ce55d08bb2fc85ff9e208ec360cb563242e9a5e1eb"
+        }
+      ]
+    },
+    {
+      "file": "frontend/lib/core/push/push_navigation_resolver.dart",
+      "lines": 87,
+      "sha256": "e7337337af7005fd841665494c267012c34b6242d445bfcba0ce23bc3c9637b2",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "9e16c932e55422237755eb579da8f6efa73b66f25df28496105c1e21c95b38d4"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    },
+    {
+      "file": "frontend/lib/features/auth/screens/login_screen.dart",
+      "lines": 1345,
+      "sha256": "6be4dc63062c72c0672f62731d641f5f2b41572489ae4bd204c76def02250d39",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "LOT24_CHANGED_SECTIONS_REVIEWED",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "381c3a6d400c546f7943ef70d2f9d10b272fbb4e6a59a24fd1ae50012a6ddd65"
+        }
+      ]
+    },
+    {
+      "file": "frontend/lib/features/first_access/screens/first_access_gate.dart",
+      "lines": 481,
+      "sha256": "7b44f870d7729df96003060742121073df7e270a5f50ff8be69452b6fe62eccd",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00",
+      "review_history": [
+        {
+          "status": "REVIEWED_LOT24",
+          "reviewed_at": "2026-10-07T21:17:53.983863+00:00",
+          "sha256": "2fe95f34d2692b9eb568c9cebf29cfcdc5de7bfa7b2393ae067ab267f344b523"
+        }
+      ]
+    },
+    {
+      "file": "frontend/test/settings_help_legal_about_test.dart",
+      "lines": 1316,
+      "sha256": "645e2e9f19f6bbba6b7f4e66284ae70852256c91de4cbf4e77d4cbefaee3c5d1",
+      "manual_review": "LOT25_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "PENDING",
+          "reviewed_at": null,
+          "sha256": "02cb224852b007ba13362406e711ae3d55d188ad30520a6a9a4b738b0f33ba01"
+        }
+      ],
+      "reviewed_at": "2026-10-07T23:14:21.531951+00:00"
+    }
+  ],
+  "protected_untracked_backup_preserved": true,
+  "known_remaining": [
+    "Full manual repository review and remaining audits",
+    "Full backup restoration rehearsal",
+    "Final Android and web device acceptance",
+    "Real delivery checks while mail is redirected",
+    "Mobile Money sandbox validation",
+    "Provenance-based recruitment test cleanup",
+    "Individual contact verification before invitations",
+    "Approved final mail cutover and coherent release"
+  ]
+}

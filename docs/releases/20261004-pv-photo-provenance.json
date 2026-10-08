@@ -1,0 +1,149 @@
+[
+  {
+    "asset": "assets/heritage/award-mobigel-2020.jpg",
+    "original": "photos\\Best_team_Initiative_Award_2020_Powered_by Citibank.jpg",
+    "original_sha256": "06a8eb2440f23abf2099c86e94821970772c0f306deee1cdb5a90d161865395f",
+    "asset_sha256": "5ce875392f3995e9a50aa861f80d8e8209308d09abf1494da89cf7cb96fcadde",
+    "bytes": 42978
+  },
+  {
+    "asset": "assets/heritage/award-team-leader-2020.jpg",
+    "original": "photos\\Best_team_Leader_2020.jpg",
+    "original_sha256": "9a54ac05e35cacb60039b8ff959b9a4c01948c7db5a0f51a1ac3c2bc40719093",
+    "asset_sha256": "b6e8adb424fdd525b582b307fbc060841205f8ddb7d4efefdd296371a7e6c226",
+    "bytes": 36459
+  },
+  {
+    "asset": "assets/heritage/award-team-spirit-2020.jpg",
+    "original": "photos\\Best_team_Spirit_Award_2020.jpg",
+    "original_sha256": "f94e1d9e613dec7c23d798bbee6de79bfffc242ef3eb39b3932c588921131c8c",
+    "asset_sha256": "343d1cec50d617054cce5077d68c9e12df193ac74d2f4fb10348a29986f99ee7",
+    "bytes": 48648
+  },
+  {
+    "asset": "assets/heritage/world-cup-2018-delegation.jpg",
+    "original": "photos\\champion du Sénégal de l'entrepreneuriat social et de l'innovation et représentant du Sénégal à la WORLD CUP du 9 au 11 octobre 2018 à San José (Californie, USA).jpg",
+    "original_sha256": "91fc93562f409b948f4c1ea02610528b9e0420bfd4370e93580bcb02c6f5aec5",
+    "asset_sha256": "1e32489506f550233fb10e8d56fb38fe73fb420429a84e8dc77ec3ac221836c0",
+    "bytes": 58238
+  },
+  {
+    "asset": "assets/heritage/dimbali-gie-favec.jpg",
+    "original": "photos\\FB2M_pkXEAQmihD.jpg",
+    "original_sha256": "3ab58e4c1ae084212ac25d1b92bbc3d771944ad5fcc8ce809436e517868e2a6d",
+    "asset_sha256": "3c5d12a68d3efb227d98d447de1a17aa610f53036d2f2591654a5388584837f7",
+    "bytes": 92892
+  },
+  {
+    "asset": "assets/heritage/deconaane-filtre.jpg",
+    "original": "photos\\filtre realise par deconaane.jpg",
+    "original_sha256": "f3aae1ae56bfa1380de6ef441459583ae80c22cf587aa8b97e8d4d08dc456cb6",
+    "asset_sha256": "5f9179816cdcddc9293effc70e90f35bd2bd164a8c5cb669701399ddbe35218d",
+    "bytes": 78871
+  },
+  {
+    "asset": "assets/heritage/minute-betty-kane.jpg",
+    "original": "photos\\Minute Betty KANE.jpg",
+    "original_sha256": "6baf90470320273dd228359f5239dc09cb69a701b3a5162579e4a740892de086",
+    "asset_sha256": "33bb0aa3d5bb9ede3b0562c9ce78d26840b45c961baed163ecf30049f905fd87",
+    "bytes": 134129
+  },
+  {
+    "asset": "assets/heritage/minute-ibrahima-cisse.jpg",
+    "original": "photos\\Minute Ibrahima CISSE.jpg",
+    "original_sha256": "60eae59ebe447783f1d29e5dad1ef40894d38a35c34475f75030cb7107bb48d2",
+    "asset_sha256": "f8adf19d43edec07c3853a613aa9d0b50a6fb1f11202933cdf60228b0e13cc5b",
+    "bytes": 155795
+  },
+  {
+    "asset": "assets/heritage/minute-moustapha-mbaye.jpg",
+    "original": "photos\\Minute Mouhamadou Moustapha MBAYE.jpg",
+    "original_sha256": "cda85edd3ede2e8fc356678e9bb6e29636cbaf300b6786177f0dc9e87afbaa08",
+    "asset_sha256": "e4958441d3f664e6ae9d52e49c40792188646a2f09e243ad10c8465f9cbdac11",
+    "bytes": 137719
+  },
+  {
+    "asset": "assets/heritage/minute-papa-idrissa-wade.jpg",
+    "original": "photos\\Minute Papa Idrissa WADE.jpg",
+    "original_sha256": "f4144c7fdab3af6341de29c5b9cfe1748de643b8c49116bb35df122fd633b8fa",
+    "asset_sha256": "f2e7fb1d78f4b2d8a5f0c6d42f564412fb6b0c62ec4d0120e16f3438c2598e90",
+    "bytes": 95268
+  },
+  {
+    "asset": "assets/heritage/mobigel-prototypes.jpg",
+    "original": "photos\\mobigel.jpg",
+    "original_sha256": "d5ed959f8e4ff86f1b246262f4fcf784140a7bd64e3b7679f6ac67b021fcf5f4",
+    "asset_sha256": "42964dab7af1fe9861a8f9fed3dc53741025bcf37f5f584a3fc3048698fd9618",
+    "bytes": 128555
+  },
+  {
+    "asset": "assets/heritage/professeur-ndiaga-ndiaye.jpg",
+    "original": "photos\\Pr. Ndiaga NDIAYE.jpg",
+    "original_sha256": "0b3060495cdc3e823f2d784f82d687eb18c60f7e31fb1ced3a790abb2ccb4d9a",
+    "asset_sha256": "9e07f059a3962284f340141ef53e611ec4196a3a5b32a10234d563d8f76eab8b",
+    "bytes": 35366
+  },
+  {
+    "asset": "assets/heritage/world-cup-2022-emotion.jpg",
+    "original": "photos\\world cup porto rico3.jpg",
+    "original_sha256": "718c38ad4150a04099e8c0396dd2fac8bf756eb5c86702f9c94be618528b8d56",
+    "asset_sha256": "58b40f65317cebf99ebb2cd5d960c7f03089957ae59bd502e1818d20cdc76dc3",
+    "bytes": 291139
+  },
+  {
+    "asset": "assets/heritage/world-cup-2022-delegation.jpg",
+    "original": "photos\\world cup porto rico6.jpg",
+    "original_sha256": "dbc62501def64ecd54aa9bff69d957deaca1ce4371b738fa943501941d52232d",
+    "asset_sha256": "c92086f7f5840e7cf3e8810d2ae7870647ddb51bf3d24b136c44d9350eff3391",
+    "bytes": 426001
+  },
+  {
+    "asset": "assets/heritage/haffe-2025-ecoute.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Haffe\\IMG_4728.HEIC",
+    "original_sha256": "03bdfda9acbbf52d9aa4f480a692b85fac7f6f467b9ad2e3fe4f176ca831fe04",
+    "asset_sha256": "8d58ac61466ef5c62be959c5efcc358a4268f6f42e1d69e6e3f776e918cd0edd",
+    "bytes": 340493
+  },
+  {
+    "asset": "assets/heritage/haffe-2025-rencontre.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Haffe\\IMG_4756.HEIC",
+    "original_sha256": "cfa27562c0c8e41d1fec72ba6fae476517587e755b86dd240f9043bc299537bc",
+    "asset_sha256": "3247ad665a387e2274515aec5599c4fd9dc9b913c679ac45b673d0be7f6b8fe7",
+    "bytes": 327057
+  },
+  {
+    "asset": "assets/heritage/haffe-2025-parcelles.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Haffe\\IMG_5286.heic",
+    "original_sha256": "616beae11dcd12e3374e37a44a03fab8c8c3d3efea12469b53fa6e985c425fa7",
+    "asset_sha256": "154f5e2ffcd0074fed000740ae7f56416ff3ec58676b79927bc4c15444eb9d73",
+    "bytes": 498226
+  },
+  {
+    "asset": "assets/heritage/niaguiss-2025-dialogue.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Ziguinchor - Niaguiss\\IMG_4272.HEIC",
+    "original_sha256": "90d19f97ec3e5fa3fe9f45348b897e7cfddfb86509777feea8d6ce2bca722ee8",
+    "asset_sha256": "344dcef76d2d1e1a715a94b816699a9fabb3ea768dcd891147524fc6cf33f5f3",
+    "bytes": 372342
+  },
+  {
+    "asset": "assets/heritage/niaguiss-2025-produits.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Ziguinchor - Niaguiss\\IMG_4324.HEIC",
+    "original_sha256": "1ecebe7a5ce261b945dde549a70039e630026849d52464944911c92f03b855c2",
+    "asset_sha256": "63b6570603cc9c5e26706deffc0b3756076ec4a15383adff8e3df59efa1a5f6e",
+    "bytes": 617072
+  },
+  {
+    "asset": "assets/heritage/niaguiss-2025-demonstration.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Ziguinchor - Niaguiss\\IMG_4744.HEIC",
+    "original_sha256": "b48a8ed795da397e1e0dc576c0e05ef1e177ddaf427eb9e34c40352887f0f240",
+    "asset_sha256": "b094f42f5d524a6dfd3fa2471594e3c8bcf8f2f2da7c4bfc47dde0ced8ebb797",
+    "bytes": 611720
+  },
+  {
+    "asset": "assets/heritage/niaguiss-2025-equipe.jpg",
+    "original": "Images voyage 14-18 Mars-2025\\Images voyage 14-18 Mars2025\\Ziguinchor - Niaguiss\\IMG_4793.HEIC",
+    "original_sha256": "846f8960f5d7bb95056a6e31da73b23d91ad7bc76473432d953b1ea569ad0831",
+    "asset_sha256": "86a5c5fd6e22643c49fa337717aff29b92e7c4a14b66f904aeb92b2d0c912ddc",
+    "bytes": 870227
+  }
+]

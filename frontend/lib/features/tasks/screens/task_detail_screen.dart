@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../models/task_center_models.dart';
 import '../models/task_model.dart';
 import '../services/tasks_gateway.dart';
@@ -11,7 +11,7 @@ String _taskStatusLabel(String value) => switch (value) {
   'a_faire' => 'À faire',
   'en_cours' => 'En cours',
   'bloque' => 'Bloqué',
-  'termine' => 'Terminé',
+  'termine' => 'Terminé · à valider',
   'valide' => 'Validé',
   'annule' => 'Annulé',
   _ => value,
@@ -126,34 +126,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _proof(TaskModel task) async {
-    final controller = TextEditingController(text: task.proofUrl ?? '');
-    final value = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Soumettre une preuve'),
-        content: TextField(
-          key: const Key('task-proof-url'),
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Lien de preuve'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Enregistrer'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value?.isNotEmpty == true) {
-      await _run(
-        () => _gateway.submitProof(task.id, value!),
-        'Preuve enregistrée.',
-      );
+    try {
+      final file = await pickAttachment();
+      if (file == null || !mounted) return;
+      await _run(() async {
+        final response = await AttachmentService().upload(
+          '/tasks/${task.id}/proof-file',
+          file,
+        );
+        _gateway.invalidate();
+        return TaskModel.fromJson(response);
+      }, 'Pièce jointe enregistrée.');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
+      }
     }
   }
 
@@ -267,18 +256,15 @@ class _TaskDetailBody extends StatelessWidget {
               children: [
                 Text(
                   task.title,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   task.description?.trim().isNotEmpty == true
                       ? task.description!
                       : 'Aucune description.',
-                  style: const TextStyle(
-                    color: AppTheme.secondaryText,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.4,
                   ),
                 ),
@@ -309,11 +295,11 @@ class _TaskDetailBody extends StatelessWidget {
                           icon: const Icon(Icons.swap_horiz_rounded),
                           label: const Text('Changer le statut'),
                         ),
-                      if (!const {'valide', 'annule'}.contains(task.status))
+                      if (!task.isTerminal)
                         OutlinedButton.icon(
                           onPressed: submitting ? null : () => onProof(task),
-                          icon: const Icon(Icons.link_rounded),
-                          label: const Text('Preuve'),
+                          icon: const Icon(Icons.attach_file_rounded),
+                          label: const Text('Joindre un justificatif'),
                         ),
                       if (task.canManage)
                         OutlinedButton.icon(
@@ -321,7 +307,7 @@ class _TaskDetailBody extends StatelessWidget {
                           icon: const Icon(Icons.edit_rounded),
                           label: const Text('Modifier'),
                         ),
-                      if (task.canManage)
+                      if (task.canReview)
                         FilledButton.icon(
                           onPressed: submitting || task.status != 'termine'
                               ? null
@@ -366,15 +352,18 @@ class _TaskDetailBody extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _Section(
-          title: 'Preuve',
-          icon: Icons.link_rounded,
-          child: Text(
-            task.proofUrl?.trim().isNotEmpty == true
-                ? task.proofUrl!
-                : (task.proofRequired
-                      ? 'Preuve requise, non fournie.'
-                      : 'Aucune preuve requise.'),
-          ),
+          title: 'Justificatif du livrable',
+          icon: Icons.attach_file_rounded,
+          child: task.proofUrl?.trim().isNotEmpty == true
+              ? StoredAttachmentButton(
+                  url: task.proofUrl!,
+                  fileName: task.proofFilename,
+                )
+              : Text(
+                  task.proofRequired
+                      ? 'Un fichier est attendu avant la remise du travail.'
+                      : 'Aucun justificatif demandé.',
+                ),
         ),
         if (technicalDates.isNotEmpty) ...[
           const SizedBox(height: 14),
@@ -415,10 +404,7 @@ class _Section extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
             ],
           ),

@@ -63,6 +63,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
   Map<String, MemberModel> _membersById = {};
   Map<String, PostStatsModel> _statsByPostId = {};
   final Map<String, List<PostCommentModel>> _commentsByPostId = {};
+  final Map<String, GlobalKey> _postKeys = {};
   final Set<String> _expandedPosts = {};
   final Set<String> _loadingComments = {};
 
@@ -473,17 +474,17 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer la publication'),
+        title: Text('Supprimer la publication'),
         content: Text('Supprimer "${post.displayTitle}" ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+            child: Text('Annuler'),
           ),
           ElevatedButton.icon(
             onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Supprimer'),
+            icon: Icon(Icons.delete_outline_rounded),
+            label: Text('Supprimer'),
           ),
         ],
       ),
@@ -570,6 +571,41 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(backgroundColor: Colors.red.shade700, content: Text(message)),
+    );
+  }
+
+  List<PostModel> get _highlightPosts {
+    final promoted =
+        _posts.where((post) => post.isOfficial || post.isPinned).toList()
+          ..sort((a, b) {
+            final pinCompare = (b.isPinned ? 1 : 0).compareTo(
+              a.isPinned ? 1 : 0,
+            );
+            if (pinCompare != 0) return pinCompare;
+            final officialCompare = (b.isOfficial ? 1 : 0).compareTo(
+              a.isOfficial ? 1 : 0,
+            );
+            if (officialCompare != 0) return officialCompare;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+    if (promoted.length >= 8) return promoted.take(10).toList();
+
+    final ids = promoted.map((post) => post.id).toSet();
+    final recent = _posts
+        .where((post) => !ids.contains(post.id))
+        .take(10 - promoted.length);
+    return [...promoted, ...recent];
+  }
+
+  Future<void> _scrollToPost(PostModel post) async {
+    final key = _postKeys.putIfAbsent(post.id, GlobalKey.new);
+    final targetContext = key.currentContext;
+    if (targetContext == null) return;
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
     );
   }
 
@@ -760,39 +796,212 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
 
     return Column(
       children: [
+        if (_highlightPosts.isNotEmpty) ...[
+          _CommunicationHighlights(
+            posts: _highlightPosts,
+            authorName: _authorName,
+            authorPhotoUrl: _authorPhotoUrl,
+            onSelected: _scrollToPost,
+          ),
+          const SizedBox(height: 16),
+        ],
         quickFilters,
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         for (final post in _posts)
           Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: _PostCard(
-              post: post,
-              gateway: _gateway,
-              authorName: _authorName(post),
-              authorRole: _authorRoleLabel(post),
-              authorSubtitle: _authorSubtitle(post),
-              authorPhotoUrl: _authorPhotoUrl(post),
-              stats: _statsByPostId[post.id],
-              comments: _commentsByPostId[post.id] ?? const [],
-              membersById: _membersById,
-              commentsExpanded: _expandedPosts.contains(post.id),
-              commentsLoading: _loadingComments.contains(post.id),
-              commentController: _commentControllerFor(post.id),
-              onToggleComments: () => _toggleComments(post),
-              onCreateComment: () => _createComment(post),
-              onReact: () => _react(post),
-              onReactionSelected: (reactionType) =>
-                  _reactWith(post, reactionType),
-              canPin: canPinPosts,
-              canEdit: _canEditPost(post, _user),
-              canDelete:
-                  (_user?.isEnacchef ?? false) || post.authorId == _user?.id,
-              onTogglePin: () => _togglePostPin(post),
-              onEdit: () => _editPost(post),
-              onDelete: () => _deletePost(post),
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              key: _postKeys.putIfAbsent(post.id, GlobalKey.new),
+              child: _PostCard(
+                post: post,
+                gateway: _gateway,
+                authorName: _authorName(post),
+                authorRole: _authorRoleLabel(post),
+                authorSubtitle: _authorSubtitle(post),
+                authorPhotoUrl: _authorPhotoUrl(post),
+                stats: _statsByPostId[post.id],
+                comments: _commentsByPostId[post.id] ?? const [],
+                membersById: _membersById,
+                commentsExpanded: _expandedPosts.contains(post.id),
+                commentsLoading: _loadingComments.contains(post.id),
+                commentController: _commentControllerFor(post.id),
+                onToggleComments: () => _toggleComments(post),
+                onCreateComment: () => _createComment(post),
+                onReact: () => _react(post),
+                onReactionSelected: (reactionType) =>
+                    _reactWith(post, reactionType),
+                canPin: canPinPosts,
+                canEdit: _canEditPost(post, _user),
+                canDelete:
+                    (_user?.isEnacchef ?? false) || post.authorId == _user?.id,
+                onTogglePin: () => _togglePostPin(post),
+                onEdit: () => _editPost(post),
+                onDelete: () => _deletePost(post),
+              ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CommunicationHighlights extends StatelessWidget {
+  final List<PostModel> posts;
+  final String Function(PostModel post) authorName;
+  final String? Function(PostModel post) authorPhotoUrl;
+  final ValueChanged<PostModel> onSelected;
+
+  const _CommunicationHighlights({
+    required this.posts,
+    required this.authorName,
+    required this.authorPhotoUrl,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 560;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'À la une',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                ),
+                if (!compact) ...[
+                  const Spacer(),
+                  Text(
+                    'À ne pas manquer',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (compact) ...[
+              const SizedBox(height: 2),
+              Text(
+                'À ne pas manquer',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 104,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: posts.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 14),
+                itemBuilder: (context, index) {
+                  final post = posts[index];
+                  final name = authorName(post);
+                  final photo = authorPhotoUrl(post);
+                  return InkWell(
+                    onTap: () => onSelected(post),
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: 76,
+                      child: Column(
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 66,
+                                height: 66,
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: post.isOfficial
+                                        ? AppTheme.enactusYellow
+                                        : AppTheme.softBlack,
+                                    width: 2.4,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  backgroundColor: AppTheme.enactusYellow
+                                      .withValues(alpha: 0.22),
+                                  backgroundImage:
+                                      photo != null && photo.isNotEmpty
+                                      ? NetworkImage(photo)
+                                      : null,
+                                  child: photo == null || photo.isEmpty
+                                      ? Text(
+                                          _initials(name),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.softBlack,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              if (post.isOfficial || post.isPinned)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -1,
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.enactusYellow,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      post.isPinned
+                                          ? Icons.push_pin_rounded
+                                          : Icons.verified_rounded,
+                                      size: 12,
+                                      color: AppTheme.softBlack,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            name.split(' ').first,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -812,74 +1021,63 @@ class _PostsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 760;
-    final compact = MediaQuery.of(context).size.width < 560;
-
-    final content = [
-      const _HeaderIcon(),
-      SizedBox(width: compact ? 12 : 18),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Communication',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: compact ? 24 : 28,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Fil d’actualité, annonces, commentaires et réactions.',
-              style: TextStyle(color: Colors.white70, height: 1.4),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _HeaderChip(label: '$total publication(s)'),
-                _HeaderChip(label: '$official officielle(s)'),
-                _HeaderChip(label: '$pinned épinglée(s)'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ];
+    final compact = MediaQuery.sizeOf(context).width < 560;
 
     return Container(
-      padding: EdgeInsets.all(compact ? 18 : 26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 4,
+        vertical: compact ? 6 : 8,
       ),
-      child: isWide
-          ? Row(
-              children: [
-                ...content,
-                const SizedBox(width: 18),
-                OutlinedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Actualiser'),
-                ),
-              ],
-            )
-          : Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const _HeaderIcon(),
+          SizedBox(width: compact ? 12 : 16),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: content),
-                const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Actualiser'),
+                Text(
+                  'Communication',
+                  style: TextStyle(
+                    fontSize: compact ? 25 : 30,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'La vie d’Enactus ESP, en un coup d’œil.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    _HeaderChip(label: '$total publications'),
+                    if (official > 0)
+                      _HeaderChip(
+                        label: '$official officielles',
+                        highlighted: true,
+                      ),
+                    if (pinned > 0) _HeaderChip(label: '$pinned épinglées'),
+                  ],
                 ),
               ],
             ),
+          ),
+          const SizedBox(width: 10),
+          IconButton.filledTonal(
+            onPressed: onRefresh,
+            tooltip: 'Actualiser le fil',
+            icon: Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -892,14 +1090,15 @@ class _HeaderIcon extends StatelessWidget {
     return Container(
       width: 58,
       height: 58,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
+        shape: BoxShape.circle,
+        border: Border.all(color: AppTheme.enactusYellow, width: 2.5),
       ),
-      child: const Icon(
-        Icons.forum_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
+      child: CircleAvatar(
+        backgroundColor: AppTheme.softBlack,
+        foregroundColor: AppTheme.enactusYellow,
+        child: Icon(Icons.forum_rounded, size: 28),
       ),
     );
   }
@@ -907,16 +1106,29 @@ class _HeaderIcon extends StatelessWidget {
 
 class _HeaderChip extends StatelessWidget {
   final String label;
+  final bool highlighted;
 
-  const _HeaderChip({required this.label});
+  const _HeaderChip({required this.label, this.highlighted = false});
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      backgroundColor: Colors.white.withValues(alpha: 0.10),
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
-      labelStyle: const TextStyle(color: Colors.white),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? AppTheme.enactusYellow.withValues(alpha: 0.28)
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: highlighted
+              ? AppTheme.enactusYellow.withValues(alpha: 0.70)
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      ),
     );
   }
 }
@@ -941,22 +1153,25 @@ class _CommunityPulseCard extends StatelessWidget {
                 color: AppTheme.enactusYellow,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.auto_awesome_rounded,
                 color: AppTheme.softBlack,
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Vie de communauté',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Les annonces, idées, opportunités et retours terrain vivent ici. '
               'Un fil clair aide les Enacteurs à rester alignés sans fouiller '
               'dans plusieurs groupes.',
-              style: TextStyle(color: Colors.black54, height: 1.45),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -1067,42 +1282,82 @@ class _PostComposer extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 560;
 
     return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: Padding(
-        padding: EdgeInsets.all(compact ? 14 : 20),
+        padding: EdgeInsets.all(compact ? 14 : 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(Icons.edit_note_rounded),
-                const SizedBox(width: 10),
+                CircleAvatar(
+                  radius: 21,
+                  backgroundColor: AppTheme.softBlack,
+                  foregroundColor: AppTheme.enactusYellow,
+                  child: Icon(Icons.add_rounded),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Nouvelle publication',
-                    style: TextStyle(
-                      fontSize: compact ? 18 : 20,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Créer une publication',
+                        style: TextStyle(
+                          fontSize: compact ? 17 : 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Partage une idée, une annonce ou un moment.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const Divider(height: 26),
+            const SizedBox(height: 14),
+            TextField(
+              key: const Key('post-composer-content'),
+              controller: contentController,
+              minLines: 2,
+              maxLines: 6,
+              decoration: InputDecoration(
+                hintText: 'Partage quelque chose avec la communauté…',
+                filled: true,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.035),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide(
+                    color: AppTheme.enactusYellow,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
-                labelText: 'Titre optionnel',
+                hintText: 'Ajouter un titre (optionnel)',
                 prefixIcon: Icon(Icons.title_rounded),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: contentController,
-              minLines: 3,
-              maxLines: 6,
-              decoration: const InputDecoration(
-                labelText: 'Contenu',
-                prefixIcon: Icon(Icons.notes_rounded),
+                isDense: true,
               ),
             ),
             const SizedBox(height: 12),
@@ -1112,18 +1367,22 @@ class _PostComposer extends StatelessWidget {
               onPick: onPickMedia,
               onRemove: onRemoveMedia,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Wrap(
-              spacing: 12,
-              runSpacing: 12,
+              spacing: 10,
+              runSpacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 SizedBox(
-                  width: _responsiveControlWidth(context, 240),
+                  width: _responsiveControlWidth(context, 220),
                   child: DropdownButtonFormField<String>(
                     initialValue: postType,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Type'),
+                    decoration: const InputDecoration(
+                      labelText: 'Type',
+                      prefixIcon: Icon(Icons.category_outlined),
+                      isDense: true,
+                    ),
                     items: _postTypeItems(includeAll: false),
                     onChanged: (value) {
                       if (value != null) onPostTypeChanged(value);
@@ -1131,11 +1390,15 @@ class _PostComposer extends StatelessWidget {
                   ),
                 ),
                 SizedBox(
-                  width: _responsiveControlWidth(context, 240),
+                  width: _responsiveControlWidth(context, 220),
                   child: DropdownButtonFormField<String>(
                     initialValue: visibility,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Visibilité'),
+                    decoration: const InputDecoration(
+                      labelText: 'Audience',
+                      prefixIcon: Icon(Icons.people_alt_outlined),
+                      isDense: true,
+                    ),
                     items: _visibilityItems(includeAll: false),
                     onChanged: (value) {
                       if (value != null) onVisibilityChanged(value);
@@ -1144,11 +1407,14 @@ class _PostComposer extends StatelessWidget {
                 ),
                 if (visibility == 'pole_only')
                   SizedBox(
-                    width: _responsiveControlWidth(context, 240),
+                    width: _responsiveControlWidth(context, 220),
                     child: DropdownButtonFormField<String>(
                       initialValue: selectedPoleId,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Pôle'),
+                      decoration: const InputDecoration(
+                        labelText: 'Pôle',
+                        isDense: true,
+                      ),
                       items: poles
                           .map(
                             (pole) => DropdownMenuItem(
@@ -1165,11 +1431,14 @@ class _PostComposer extends StatelessWidget {
                   ),
                 if (visibility == 'project_only')
                   SizedBox(
-                    width: _responsiveControlWidth(context, 240),
+                    width: _responsiveControlWidth(context, 220),
                     child: DropdownButtonFormField<String>(
                       initialValue: selectedProjectId,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Projet'),
+                      decoration: const InputDecoration(
+                        labelText: 'Projet',
+                        isDense: true,
+                      ),
                       items: projects
                           .map(
                             (project) => DropdownMenuItem(
@@ -1188,17 +1457,34 @@ class _PostComposer extends StatelessWidget {
                   FilterChip(
                     selected: isOfficial,
                     onSelected: onOfficialChanged,
-                    avatar: const Icon(Icons.verified_rounded),
-                    label: const Text('Officielle'),
+                    avatar: Icon(Icons.verified_rounded, size: 18),
+                    label: Text('Publication officielle'),
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: compact ? Alignment.center : Alignment.centerRight,
-              child: SizedBox(
-                width: compact ? double.infinity : null,
-                child: ElevatedButton.icon(
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Icon(
+                  Icons.public_rounded,
+                  size: 17,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    visibility == 'internal'
+                        ? 'Visible par la communauté Enactus ESP'
+                        : 'Audience personnalisée',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                FilledButton.icon(
+                  key: const Key('post-composer-submit'),
                   onPressed: creating ? null : onSubmit,
                   icon: creating
                       ? const SizedBox(
@@ -1209,10 +1495,10 @@ class _PostComposer extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.send_rounded),
-                  label: const Text('Publier'),
+                      : Icon(Icons.send_rounded),
+                  label: Text('Publier'),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -1239,48 +1525,39 @@ class _ComposerMediaPicker extends StatelessWidget {
     final media = selectedMedia;
     final compact = MediaQuery.sizeOf(context).width < 560;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.35),
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: compact ? double.infinity : null,
+          child: TextButton.icon(
+            onPressed: uploading ? null : onPick,
+            icon: uploading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(Icons.photo_library_outlined),
+            label: Text(uploading ? 'Upload…' : 'Photo / vidéo / fichier'),
+          ),
         ),
-      ),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: compact ? double.infinity : null,
-            child: OutlinedButton.icon(
-              onPressed: uploading ? null : onPick,
-              icon: uploading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.attach_file_rounded),
-              label: Text(uploading ? 'Upload...' : 'Joindre un media'),
+        if (media != null)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: compact ? 360 : 520),
+            child: InputChip(
+              backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.18),
+              avatar: Icon(_mediaIcon(media.contentType), size: 18),
+              label: Text(
+                '${media.fileName} · ${_formatBytes(media.sizeBytes)}',
+                overflow: TextOverflow.ellipsis,
+              ),
+              onDeleted: uploading ? null : onRemove,
             ),
           ),
-          if (media != null)
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: compact ? 360 : 520),
-              child: InputChip(
-                avatar: Icon(_mediaIcon(media.contentType), size: 18),
-                label: Text(
-                  '${media.fileName} · ${_formatBytes(media.sizeBytes)}',
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onDeleted: uploading ? null : onRemove,
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -1318,98 +1595,112 @@ class _PostFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 560;
 
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 14 : 18),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: _responsiveControlWidth(context, 320),
-              child: TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                  labelText: 'Rechercher',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    onPressed: onSearch,
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                  ),
-                ),
-                onSubmitted: (_) => onSearch(),
+    final controls = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: _responsiveControlWidth(context, 320),
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Rechercher dans le fil…',
+              prefixIcon: Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                onPressed: onSearch,
+                icon: Icon(Icons.arrow_forward_rounded),
               ),
             ),
-            if (visibility == 'pole_only')
-              SizedBox(
-                width: _responsiveControlWidth(context, 220),
-                child: DropdownButtonFormField<String>(
-                  initialValue: selectedPoleId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Pôle'),
-                  items: poles
-                      .map(
-                        (pole) => DropdownMenuItem(
-                          value: pole.id,
-                          child: Text(
-                            pole.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: onPoleChanged,
-                ),
-              ),
-            if (visibility == 'project_only')
-              SizedBox(
-                width: _responsiveControlWidth(context, 220),
-                child: DropdownButtonFormField<String>(
-                  initialValue: selectedProjectId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Projet'),
-                  items: projects
-                      .map(
-                        (project) => DropdownMenuItem(
-                          value: project.id,
-                          child: Text(
-                            project.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: onProjectChanged,
-                ),
-              ),
-            SizedBox(
-              width: _responsiveControlWidth(context, 220),
-              child: DropdownButtonFormField<String>(
-                initialValue: postType,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Type'),
-                items: _postTypeItems(),
-                onChanged: (value) {
-                  if (value != null) onPostTypeChanged(value);
-                },
-              ),
-            ),
-            SizedBox(
-              width: _responsiveControlWidth(context, 220),
-              child: DropdownButtonFormField<String>(
-                initialValue: visibility,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Visibilité'),
-                items: _visibilityItems(),
-                onChanged: (value) {
-                  if (value != null) onVisibilityChanged(value);
-                },
-              ),
-            ),
-          ],
+            onSubmitted: (_) => onSearch(),
+          ),
         ),
-      ),
+        if (visibility == 'pole_only')
+          SizedBox(
+            width: _responsiveControlWidth(context, 220),
+            child: DropdownButtonFormField<String>(
+              initialValue: selectedPoleId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Pôle'),
+              items: poles
+                  .map(
+                    (pole) => DropdownMenuItem(
+                      value: pole.id,
+                      child: Text(pole.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: onPoleChanged,
+            ),
+          ),
+        if (visibility == 'project_only')
+          SizedBox(
+            width: _responsiveControlWidth(context, 220),
+            child: DropdownButtonFormField<String>(
+              initialValue: selectedProjectId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Projet'),
+              items: projects
+                  .map(
+                    (project) => DropdownMenuItem(
+                      value: project.id,
+                      child: Text(
+                        project.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: onProjectChanged,
+            ),
+          ),
+        SizedBox(
+          width: _responsiveControlWidth(context, 220),
+          child: DropdownButtonFormField<String>(
+            initialValue: postType,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Type'),
+            items: _postTypeItems(),
+            onChanged: (value) {
+              if (value != null) onPostTypeChanged(value);
+            },
+          ),
+        ),
+        SizedBox(
+          width: _responsiveControlWidth(context, 220),
+          child: DropdownButtonFormField<String>(
+            initialValue: visibility,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Audience'),
+            items: _visibilityItems(),
+            onChanged: (value) {
+              if (value != null) onVisibilityChanged(value);
+            },
+          ),
+        ),
+      ],
+    );
+
+    if (compact) {
+      return Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: ExpansionTile(
+          leading: Icon(Icons.tune_rounded),
+          title: Text(
+            'Rechercher et filtrer',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          children: [controls],
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(padding: const EdgeInsets.all(18), child: controls),
     );
   }
 }
@@ -1595,7 +1886,7 @@ class _EditPostDialogState extends State<_EditPostDialog> {
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Modifier la publication'),
+      title: Text('Modifier la publication'),
       content: SizedBox(
         width: 620,
         child: SingleChildScrollView(
@@ -1646,8 +1937,8 @@ class _EditPostDialogState extends State<_EditPostDialog> {
                 const SizedBox(height: 10),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.groups_rounded),
-                  title: const Text('Pôle conservé'),
+                  leading: Icon(Icons.groups_rounded),
+                  title: Text('Pôle conservé'),
                   subtitle: Text(_poleName(widget.post.poleId!)),
                 ),
               ],
@@ -1655,15 +1946,15 @@ class _EditPostDialogState extends State<_EditPostDialog> {
                 const SizedBox(height: 10),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.workspaces_rounded),
-                  title: const Text('Projet conservé'),
+                  leading: Icon(Icons.workspaces_rounded),
+                  title: Text('Projet conservé'),
                   subtitle: Text(_projectName(widget.post.projectId!)),
                 ),
               ],
               if (widget.canEditOfficial)
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Publication officielle'),
+                  title: Text('Publication officielle'),
                   value: _isOfficial,
                   onChanged: _submitting
                       ? null
@@ -1690,7 +1981,7 @@ class _EditPostDialogState extends State<_EditPostDialog> {
                         '${widget.post.mediaName ?? 'Fichier joint'}',
                       )
                     else
-                      const Text('Aucun média joint'),
+                      Text('Aucun média joint'),
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: _uploadingMedia || _submitting
@@ -1701,7 +1992,7 @@ class _EditPostDialogState extends State<_EditPostDialog> {
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.attach_file_rounded),
+                          : Icon(Icons.attach_file_rounded),
                       label: Text(
                         hasExistingMedia || _replacementMedia != null
                             ? 'Remplacer le média'
@@ -1729,7 +2020,7 @@ class _EditPostDialogState extends State<_EditPostDialog> {
       actions: [
         TextButton(
           onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           key: const Key('edit-post-submit'),
@@ -1742,8 +2033,8 @@ class _EditPostDialogState extends State<_EditPostDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_outlined),
-          label: const Text('Enregistrer'),
+              : Icon(Icons.save_outlined),
+          label: Text('Enregistrer'),
         ),
       ],
     );
@@ -1803,24 +2094,26 @@ class _PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 560;
     final date = DateFormat('dd/MM/yyyy HH:mm').format(post.createdAt);
-    final commentsLabel = stats == null
-        ? 'Commentaires'
-        : '${stats!.commentsCount} commentaire(s)';
     final reactionsLabel = stats == null
         ? 'Réagir'
         : '${stats!.reactionsCount} réaction(s)';
 
     return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       color: post.isOfficial
-          ? AppTheme.enactusYellow.withValues(alpha: 0.08)
-          : null,
+          ? AppTheme.enactusYellow.withValues(alpha: 0.055)
+          : Theme.of(context).colorScheme.surface,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(22),
         side: BorderSide(
           color: post.isPinned || post.isOfficial
               ? AppTheme.enactusYellow.withValues(alpha: 0.72)
-              : Colors.transparent,
-          width: post.isPinned || post.isOfficial ? 1.2 : 0,
+              : Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.075),
+          width: post.isPinned || post.isOfficial ? 1.3 : 1,
         ),
       ),
       child: Padding(
@@ -1850,7 +2143,7 @@ class _PostCard extends StatelessWidget {
               const SizedBox(height: 14),
             ],
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _PostAuthorAvatar(
                   authorName: authorName,
@@ -1863,97 +2156,122 @@ class _PostCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(
+                          Flexible(
                             child: Text(
-                              post.displayTitle,
+                              authorName,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 18,
+                              style: TextStyle(
+                                fontSize: 15,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
-                          if (post.isPinned)
-                            const Icon(Icons.push_pin_rounded, size: 18),
-                          if (canPin || canEdit || canDelete)
-                            PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'pin') onTogglePin();
-                                if (value == 'edit') onEdit();
-                                if (value == 'delete') onDelete();
-                              },
-                              itemBuilder: (context) => [
-                                if (canPin)
-                                  PopupMenuItem(
-                                    value: 'pin',
-                                    child: ListTile(
-                                      leading: Icon(
-                                        post.isPinned
-                                            ? Icons.push_pin_rounded
-                                            : Icons.push_pin_outlined,
-                                      ),
-                                      title: Text(
-                                        post.isPinned
-                                            ? 'Désépingler'
-                                            : 'Épingler',
-                                      ),
-                                    ),
-                                  ),
-                                if (canEdit)
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: ListTile(
-                                      leading: Icon(Icons.edit_outlined),
-                                      title: Text('Modifier'),
-                                    ),
-                                  ),
-                                if (canDelete)
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: ListTile(
-                                      leading: Icon(
-                                        Icons.delete_outline_rounded,
-                                      ),
-                                      title: Text('Supprimer'),
-                                    ),
-                                  ),
-                              ],
+                          if (post.isOfficial) ...[
+                            const SizedBox(width: 5),
+                            Icon(
+                              Icons.verified_rounded,
+                              size: 16,
+                              color: AppTheme.enactusYellow,
                             ),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        '$authorName · $date',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
-                      ),
-                      const SizedBox(height: 6),
-                      _RolePill(label: authorRole),
-                      const SizedBox(height: 5),
-                      Text(
-                        authorSubtitle,
+                        '$authorRole · $date',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.black.withValues(alpha: 0.46),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (authorSubtitle.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          authorSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.42),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
+                if (canPin || canEdit || canDelete)
+                  PopupMenuButton<String>(
+                    tooltip: 'Options de la publication',
+                    onSelected: (value) {
+                      if (value == 'pin') onTogglePin();
+                      if (value == 'edit') onEdit();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (context) => [
+                      if (canPin)
+                        PopupMenuItem(
+                          value: 'pin',
+                          child: ListTile(
+                            leading: Icon(
+                              post.isPinned
+                                  ? Icons.push_pin_rounded
+                                  : Icons.push_pin_outlined,
+                            ),
+                            title: Text(
+                              post.isPinned ? 'Désépingler' : 'Épingler',
+                            ),
+                          ),
+                        ),
+                      if (canEdit)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Modifier'),
+                          ),
+                        ),
+                      if (canDelete)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete_outline_rounded),
+                            title: Text('Supprimer'),
+                          ),
+                        ),
+                    ],
+                  ),
               ],
             ),
-            const SizedBox(height: 14),
+            if (post.title != null && post.title!.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                post.title!.trim(),
+                style: TextStyle(
+                  fontSize: compact ? 18 : 20,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
             _MentionText(
               text: post.content,
               maxLines: compact ? 8 : 12,
-              style: const TextStyle(height: 1.45),
+              style: TextStyle(height: 1.45),
             ),
             if (post.hasMedia) ...[
               const SizedBox(height: 12),
-              _PostMediaPreview(post: post, gateway: gateway),
+              _PostMediaPreview(
+                post: post,
+                gateway: gateway,
+                onDoubleTap: onReact,
+              ),
             ],
             const SizedBox(height: 14),
             Wrap(
@@ -1976,41 +2294,68 @@ class _PostCard extends StatelessWidget {
                   ),
               ],
             ),
-            const Divider(height: 28),
+            const SizedBox(height: 6),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: 2,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                TextButton.icon(
+                IconButton(
+                  tooltip: 'J’aime',
                   onPressed: onReact,
-                  icon: const Icon(Icons.thumb_up_alt_outlined),
-                  label: Text(reactionsLabel),
+                  icon: Icon(Icons.favorite_border_rounded),
                 ),
-                _ReactionPicker(onSelected: onReactionSelected),
-                TextButton.icon(
+                if (stats != null && stats!.reactionsCount > 0)
+                  Text(
+                    '${stats!.reactionsCount}',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                _ReactionPicker(
+                  compact: compact,
+                  onSelected: onReactionSelected,
+                ),
+                IconButton(
+                  tooltip: 'Commentaires',
                   onPressed: onToggleComments,
                   icon: Icon(
                     commentsExpanded
                         ? Icons.mode_comment_rounded
                         : Icons.mode_comment_outlined,
                   ),
-                  label: Text(commentsLabel),
                 ),
+                if (stats != null && stats!.commentsCount > 0)
+                  Text(
+                    '${stats!.commentsCount}',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                if (!compact)
+                  Tooltip(
+                    message: post.hasMedia
+                        ? 'Double-tape la photo pour réagir'
+                        : reactionsLabel,
+                    child: Icon(
+                      Icons.auto_awesome_outlined,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
             if (commentsExpanded) ...[
               const Divider(height: 24),
               if (commentsLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(16),
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (comments.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(bottom: 12),
                   child: Text(
                     'Aucun commentaire pour le moment.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 )
               else
@@ -2039,15 +2384,35 @@ class _PostCard extends StatelessWidget {
                     controller: commentController,
                     minLines: 1,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Ajouter un commentaire',
-                      prefixIcon: Icon(Icons.reply_rounded),
+                    decoration: InputDecoration(
+                      hintText: 'Ajouter un commentaire…',
+                      filled: true,
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.035),
+                      prefixIcon: Icon(Icons.account_circle_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: AppTheme.enactusYellow),
+                      ),
                     ),
                   );
 
                   final sendButton = IconButton.filled(
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.softBlack,
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: onCreateComment,
-                    icon: const Icon(Icons.send_rounded),
+                    icon: Icon(Icons.send_rounded),
                   );
 
                   if (constraints.maxWidth < 340) {
@@ -2084,8 +2449,13 @@ class _PostCard extends StatelessWidget {
 class _PostMediaPreview extends StatelessWidget {
   final PostModel post;
   final PostsGateway gateway;
+  final VoidCallback onDoubleTap;
 
-  const _PostMediaPreview({required this.post, required this.gateway});
+  const _PostMediaPreview({
+    required this.post,
+    required this.gateway,
+    required this.onDoubleTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2097,11 +2467,14 @@ class _PostMediaPreview extends StatelessWidget {
     if (url == null) return const SizedBox.shrink();
 
     if (post.mediaIsImage) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: AspectRatio(
-          aspectRatio: 16 / 10,
-          child: _AuthenticatedPostImage(url: url, gateway: gateway),
+      return GestureDetector(
+        onDoubleTap: onDoubleTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: _AuthenticatedPostImage(url: url, gateway: gateway),
+          ),
         ),
       );
     }
@@ -2109,9 +2482,13 @@ class _PostMediaPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.08),
+        ),
       ),
       child: Row(
         children: [
@@ -2129,12 +2506,15 @@ class _PostMediaPreview extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _formatBytes(post.mediaSizeBytes),
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -2187,13 +2567,17 @@ class _AuthenticatedPostImageState extends State<_AuthenticatedPostImage> {
         }
         if (snapshot.hasError) {
           return Container(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.05),
             alignment: Alignment.center,
-            child: const Icon(Icons.broken_image_outlined, size: 38),
+            child: Icon(Icons.broken_image_outlined, size: 38),
           );
         }
         return Container(
-          color: Colors.black.withValues(alpha: 0.04),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.04),
           alignment: Alignment.center,
           child: const CircularProgressIndicator(),
         );
@@ -2214,7 +2598,7 @@ class _PostAuthorAvatar extends StatelessWidget {
     if (url != null && url.isNotEmpty) {
       return CircleAvatar(
         radius: 23,
-        backgroundColor: Colors.black12,
+        backgroundColor: Theme.of(context).colorScheme.outlineVariant,
         backgroundImage: NetworkImage(url),
       );
     }
@@ -2225,33 +2609,7 @@ class _PostAuthorAvatar extends StatelessWidget {
       foregroundColor: AppTheme.softBlack,
       child: Text(
         _initials(authorName),
-        style: const TextStyle(fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class _RolePill extends StatelessWidget {
-  final String label;
-
-  const _RolePill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
-        ),
+        style: TextStyle(fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -2302,28 +2660,36 @@ class _MentionText extends StatelessWidget {
 }
 
 class _ReactionPicker extends StatelessWidget {
+  final bool compact;
   final ValueChanged<String> onSelected;
 
-  const _ReactionPicker({required this.onSelected});
+  const _ReactionPicker({required this.compact, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       tooltip: 'Réagir',
+      icon: compact ? Icon(Icons.add_reaction_outlined) : null,
       onSelected: onSelected,
       itemBuilder: (context) => const [
         PopupMenuItem(value: 'bravo', child: Text('👏 Bravo')),
         PopupMenuItem(value: 'idee', child: Text('💡 Idée')),
-        PopupMenuItem(value: 'important', child: Text('⭐ Important')),
+        PopupMenuItem(value: 'important', child: Text('❗ Important')),
         PopupMenuItem(value: 'merci', child: Text('🙏 Merci')),
-        PopupMenuItem(value: 'soutien', child: Text('💛 Soutien')),
+        PopupMenuItem(value: 'soutien', child: Text('🤝 Soutien')),
       ],
-      child: Chip(
-        avatar: const Icon(Icons.add_reaction_outlined, size: 16),
-        label: const Text('Réagir'),
-        backgroundColor: Colors.white,
-        side: BorderSide(color: AppTheme.enactusYellow.withValues(alpha: 0.52)),
-      ),
+      child: compact
+          ? null
+          : Chip(
+              avatar: Icon(Icons.add_reaction_outlined, size: 16),
+              label: Text('Réagir'),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+              side: BorderSide(
+                color: AppTheme.enactusYellow.withValues(alpha: 0.52),
+              ),
+            ),
     );
   }
 }
@@ -2348,7 +2714,7 @@ class _MetaChip extends StatelessWidget {
           ? AppTheme.enactusYellow
           : AppTheme.enactusYellow.withValues(alpha: 0.14),
       side: BorderSide(color: AppTheme.enactusYellow.withValues(alpha: 0.34)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -2367,7 +2733,7 @@ class _CommentTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F0),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -2386,12 +2752,15 @@ class _CommentTile extends StatelessWidget {
                   member?.displayName ?? 'Membre Enactus',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   date,
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(height: 5),
                 _MentionText(text: comment.content, maxLines: 4),
@@ -2423,7 +2792,7 @@ class _ErrorCard extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Erreur de chargement des publications',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
@@ -2432,8 +2801,8 @@ class _ErrorCard extends StatelessWidget {
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

@@ -1,6 +1,9 @@
+import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/application_model.dart';
+import '../../models/recruitment_question_model.dart';
+import '../../widgets/internal/questionnaire_editor.dart';
 import '../../models/campaign_state_presentation.dart';
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/internal_recruitment_gateway.dart';
@@ -84,6 +87,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
         title: 'Créer une campagne',
         submitLabel: 'Créer la campagne',
         onSubmit: (value) => widget.gateway.createCampaign(
+          applicationQuestions: value.applicationQuestions,
           title: value.title,
           description: value.description,
           startDate: value.startDate,
@@ -107,6 +111,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
         campaign: campaign,
         onSubmit: (value) => widget.gateway.updateCampaign(
           campaignId: campaign.id,
+          applicationQuestions: value.applicationQuestions,
           title: value.title,
           description: value.description,
           startDate: value.startDate,
@@ -251,7 +256,11 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
         child: CampaignManagementState(
           icon: Icons.cloud_off_outlined,
           title: 'Erreur de chargement',
-          message: _error.toString().replaceAll('Exception: ', ''),
+          message: recruitmentMessage(
+            _error!,
+            fallback:
+                'Impossible de charger les campagnes. Réessaie dans un instant.',
+          ),
           actionLabel: 'Réessayer',
           onAction: () => _load(initial: true),
         ),
@@ -309,6 +318,7 @@ class _CampaignFormValue {
   final DateTime? startDate;
   final DateTime? endDate;
   final bool isActive;
+  final List<Map<String, dynamic>> applicationQuestions;
 
   const _CampaignFormValue({
     required this.title,
@@ -316,6 +326,7 @@ class _CampaignFormValue {
     this.startDate,
     this.endDate,
     required this.isActive,
+    required this.applicationQuestions,
   });
 }
 
@@ -344,6 +355,7 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
   late final TextEditingController _start;
   late final TextEditingController _end;
   late bool _active;
+  late List<RecruitmentApplicationQuestion> _questions;
   bool _submitting = false;
   String? _error;
 
@@ -356,6 +368,9 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
     _start = TextEditingController(text: _formatDate(campaign?.startDateValue));
     _end = TextEditingController(text: _formatDate(campaign?.endDateValue));
     _active = campaign?.isActive ?? false;
+    _questions = List.of(
+      campaign?.applicationQuestions ?? defaultRecruitmentQuestions,
+    );
   }
 
   @override
@@ -389,6 +404,7 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
           startDate: start,
           endDate: end,
           isActive: _active,
+          applicationQuestions: _questions.map((q) => q.toJson()).toList(),
         ),
       );
       if (mounted) Navigator.of(context).pop(result);
@@ -396,7 +412,11 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = error.toString().replaceAll('Exception: ', '');
+          _error = recruitmentMessage(
+            error,
+            fallback:
+                'Impossible d’enregistrer cette action. Réessaie dans un instant.',
+          );
         });
       }
     }
@@ -466,6 +486,10 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
                     'Une date future gardera la campagne planifiée.',
                   ),
                 ),
+              RecruitmentQuestionnaireEditor(
+                questions: _questions,
+                onChanged: (value) => setState(() => _questions = value),
+              ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
@@ -539,7 +563,11 @@ class _CampaignToggleDialogState extends State<_CampaignToggleDialog> {
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = error.toString().replaceAll('Exception: ', '');
+          _error = recruitmentMessage(
+            error,
+            fallback:
+                'Impossible d’enregistrer cette action. Réessaie dans un instant.',
+          );
         });
       }
     }
@@ -654,7 +682,11 @@ class _CampaignDeleteDialogState extends State<_CampaignDeleteDialog> {
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = error.toString().replaceAll('Exception: ', '');
+          _error = recruitmentMessage(
+            error,
+            fallback:
+                'Impossible d’enregistrer cette action. Réessaie dans un instant.',
+          );
         });
       }
     }
@@ -672,7 +704,7 @@ class _CampaignDeleteDialogState extends State<_CampaignDeleteDialog> {
           Text('${widget.applicationCount} candidatures concernées'),
           const SizedBox(height: 12),
           Text(
-            'Cette suppression est irréversible. Le contrat backend supprime également en cascade toutes les candidatures associées.',
+            'Cette suppression est définitive : la campagne et toutes ses candidatures seront supprimées. Vérifie les dossiers à conserver avant de confirmer.',
             style: TextStyle(
               color: Colors.red.shade800,
               fontWeight: FontWeight.w700,

@@ -1,3 +1,4 @@
+import '../../../shared/models/project_presentation.dart';
 import '../../../core/auth/user_experience.dart';
 
 const archiveCategories = <String>[
@@ -53,6 +54,8 @@ String historicalProjectStatusLabel(String value) =>
     };
 
 String historicalMediaTypeLabel(String value) => switch (value.toLowerCase()) {
+  'minute_enacteur' => 'Minute de l’enacteur',
+  'recit' => 'Récit du club',
   'image' || 'photo' => 'Photo',
   'video' => 'Vidéo',
   'lien_video' => 'Lien vidéo',
@@ -60,6 +63,7 @@ String historicalMediaTypeLabel(String value) => switch (value.toLowerCase()) {
   'rapport' => 'Rapport',
   'presentation' => 'Présentation',
   'document' => 'Document',
+  'lien' => 'Lien officiel',
   _ => archiveTechnicalValueLabel(value),
 };
 
@@ -246,8 +250,33 @@ class ArchiveItemModel {
   }
 }
 
+class ArchiveStorySection {
+  final String title;
+  final String body;
+  const ArchiveStorySection({required this.title, required this.body});
+
+  static List<ArchiveStorySection> parse(dynamic value) => value is List
+      ? value
+            .whereType<Map>()
+            .map(
+              (row) => ArchiveStorySection(
+                title: archiveString(row['title']),
+                body: archiveString(row['body']),
+              ),
+            )
+            .where((row) => row.title.isNotEmpty && row.body.isNotEmpty)
+            .toList()
+      : const [];
+}
+
 class HistoricalProjectModel {
+  final ProjectPresentation? presentation;
+  final List<ProjectReferenceDocument> referenceDocuments;
   final String id;
+  final List<ArchiveStorySection> storySections;
+  final String? imageAsset;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String? archiveItemId;
   final String name;
   final int? year;
@@ -264,7 +293,13 @@ class HistoricalProjectModel {
   final List<String> mediaFileIds;
 
   const HistoricalProjectModel({
+    this.presentation,
+    this.referenceDocuments = const [],
     required this.id,
+    this.storySections = const [],
+    this.imageAsset,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.name,
     this.archiveItemId,
     this.year,
@@ -283,7 +318,15 @@ class HistoricalProjectModel {
 
   factory HistoricalProjectModel.fromJson(Map<String, dynamic> json) =>
       HistoricalProjectModel(
+        presentation: ProjectPresentation.parse(json['presentation']),
+        referenceDocuments: ProjectReferenceDocument.parse(
+          json['reference_documents'],
+        ),
         id: archiveString(json['id']),
+        storySections: ArchiveStorySection.parse(json['story_sections']),
+        imageAsset: archiveNullableString(json['image_asset']),
+        sourceUrl: archiveNullableString(json['source_url']),
+        sourceLabel: archiveNullableString(json['source_label']),
         archiveItemId: archiveNullableString(json['archive_item_id']),
         name: archiveString(json['name'], fallback: 'Projet historique'),
         year: archiveNullableInt(json['year']),
@@ -308,6 +351,10 @@ class HistoricalProjectModel {
 
 class ArchiveAwardModel {
   final String id;
+  final List<ArchiveStorySection> storySections;
+  final String? imageAsset;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String title;
   final int? year;
   final String? competition;
@@ -321,6 +368,10 @@ class ArchiveAwardModel {
 
   const ArchiveAwardModel({
     required this.id,
+    this.storySections = const [],
+    this.imageAsset,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.title,
     this.year,
     this.competition,
@@ -336,6 +387,10 @@ class ArchiveAwardModel {
   factory ArchiveAwardModel.fromJson(Map<String, dynamic> json) =>
       ArchiveAwardModel(
         id: archiveString(json['id']),
+        storySections: ArchiveStorySection.parse(json['story_sections']),
+        imageAsset: archiveNullableString(json['image_asset']),
+        sourceUrl: archiveNullableString(json['source_url']),
+        sourceLabel: archiveNullableString(json['source_label']),
         title: archiveString(json['title'], fallback: 'Distinction'),
         year: archiveNullableInt(json['year']),
         competition: archiveNullableString(json['competition']),
@@ -353,6 +408,10 @@ class ArchiveAwardModel {
 
 class ArchiveCompetitionModel {
   final String id;
+  final List<ArchiveStorySection> storySections;
+  final String? imageAsset;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String name;
   final int? year;
   final String? stage;
@@ -366,6 +425,10 @@ class ArchiveCompetitionModel {
 
   const ArchiveCompetitionModel({
     required this.id,
+    this.storySections = const [],
+    this.imageAsset,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.name,
     this.year,
     this.stage,
@@ -381,6 +444,10 @@ class ArchiveCompetitionModel {
   factory ArchiveCompetitionModel.fromJson(Map<String, dynamic> json) =>
       ArchiveCompetitionModel(
         id: archiveString(json['id']),
+        storySections: ArchiveStorySection.parse(json['story_sections']),
+        imageAsset: archiveNullableString(json['image_asset']),
+        sourceUrl: archiveNullableString(json['source_url']),
+        sourceLabel: archiveNullableString(json['source_label']),
         name: archiveString(json['name'], fallback: 'Compétition'),
         year: archiveNullableInt(json['year']),
         stage: archiveNullableString(json['stage']),
@@ -398,6 +465,18 @@ class ArchiveCompetitionModel {
 
 class ArchiveMediaModel {
   final String id;
+  final List<ProjectPhoto> gallery;
+  final String? speaker;
+  final String? theme;
+  final String? quote;
+  final String? challenge;
+  final String? originalText;
+  final String? editorialNote;
+  final String? spokenOn;
+
+  final String? imageAsset;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String title;
   final String mediaType;
   final int? year;
@@ -410,6 +489,18 @@ class ArchiveMediaModel {
 
   const ArchiveMediaModel({
     required this.id,
+    this.gallery = const [],
+    this.speaker,
+    this.theme,
+    this.quote,
+    this.challenge,
+    this.originalText,
+    this.editorialNote,
+    this.spokenOn,
+
+    this.imageAsset,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.title,
     required this.mediaType,
     this.year,
@@ -424,6 +515,18 @@ class ArchiveMediaModel {
   factory ArchiveMediaModel.fromJson(Map<String, dynamic> json) =>
       ArchiveMediaModel(
         id: archiveString(json['id']),
+        gallery: ProjectPhoto.parse(json['gallery']),
+        speaker: archiveNullableString(json['speaker']),
+        theme: archiveNullableString(json['theme']),
+        quote: archiveNullableString(json['quote']),
+        challenge: archiveNullableString(json['challenge']),
+        originalText: archiveNullableString(json['original_text']),
+        editorialNote: archiveNullableString(json['editorial_note']),
+        spokenOn: archiveNullableString(json['spoken_on']),
+
+        imageAsset: archiveNullableString(json['image_asset']),
+        sourceUrl: archiveNullableString(json['source_url']),
+        sourceLabel: archiveNullableString(json['source_label']),
         title: archiveString(json['title'], fallback: 'Média historique'),
         mediaType: archiveString(json['media_type'], fallback: 'document'),
         year: archiveNullableInt(json['year']),
@@ -487,6 +590,9 @@ class ArchiveDocumentModel {
 
 class HallOfFameEntryModel {
   final String id;
+  final String? imageAsset;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String? archiveItemId;
   final String title;
   final String? subtitle;
@@ -503,6 +609,9 @@ class HallOfFameEntryModel {
 
   const HallOfFameEntryModel({
     required this.id,
+    this.imageAsset,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.title,
     required this.entryType,
     this.archiveItemId,
@@ -521,6 +630,9 @@ class HallOfFameEntryModel {
   factory HallOfFameEntryModel.fromJson(Map<String, dynamic> json) =>
       HallOfFameEntryModel(
         id: archiveString(json['id']),
+        imageAsset: archiveNullableString(json['image_asset']),
+        sourceUrl: archiveNullableString(json['source_url']),
+        sourceLabel: archiveNullableString(json['source_label']),
         archiveItemId: archiveNullableString(json['archive_item_id']),
         title: archiveString(json['title'], fallback: 'Moment marquant'),
         subtitle: archiveNullableString(json['subtitle']),
@@ -547,6 +659,7 @@ class HistoricalStatisticModel {
   final String metricKey;
   final String label;
   final num? value;
+  final bool isMinimum;
   final String? unit;
   final String? description;
   final String? sourceLabel;
@@ -558,6 +671,7 @@ class HistoricalStatisticModel {
     required this.metricKey,
     required this.label,
     required this.value,
+    this.isMinimum = false,
     this.unit,
     this.description,
     this.sourceLabel,
@@ -570,6 +684,7 @@ class HistoricalStatisticModel {
   ) => HistoricalStatisticModel(
     id: archiveString(json['id'], fallback: archiveString(json['metric_key'])),
     metricKey: archiveString(json['metric_key']),
+    isMinimum: json['minimum'] == true,
     label: archiveString(json['label'], fallback: 'Indicateur historique'),
     value: json['value'] is num
         ? json['value'] as num

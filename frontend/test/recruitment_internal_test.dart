@@ -1,3 +1,8 @@
+import 'package:frontend/features/recruitment/models/application_history_model.dart';
+import 'package:frontend/features/recruitment/screens/internal/application_detail_panel.dart';
+import 'package:frontend/features/recruitment/widgets/internal/recruitment_internal_widgets.dart';
+import 'package:frontend/features/recruitment/services/recruitment_message.dart';
+import 'package:frontend/core/api/api_client.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,7 +28,9 @@ ApplicationModel _application({
   DateTime? interviewAt,
   String? interviewLocation,
   double? finalScore = 15,
+  List<ApplicationHistoryModel> history = const [],
 }) => ApplicationModel(
+  history: history,
   id: 'application-$index',
   campaignId: _campaign.id,
   firstName: 'Awa',
@@ -87,6 +94,7 @@ class _FakeGateway implements InternalRecruitmentGateway {
   final Future<ApplicationModel> Function(DateTime interviewAt)?
   interviewMutation;
   ApplicationModel? _current;
+  final anonymousDetailRequests = <bool>[];
   int statusMutationCount = 0;
   int interviewMutationCount = 0;
 
@@ -103,6 +111,7 @@ class _FakeGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> createCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String title,
     String? description,
     DateTime? startDate,
@@ -118,6 +127,7 @@ class _FakeGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> updateCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String campaignId,
     String? title,
     String? description,
@@ -140,8 +150,22 @@ class _FakeGateway implements InternalRecruitmentGateway {
       applications?.call() ?? Future.value([_application()]);
 
   @override
-  Future<ApplicationModel> loadApplication(String applicationId) async =>
-      _current ?? _application();
+  Future<ApplicationModel> loadApplication(
+    String applicationId, {
+    bool anonymized = false,
+  }) async {
+    anonymousDetailRequests.add(anonymized);
+    return _current ?? _application();
+  }
+
+  @override
+  Future<ApplicationReviewModel> createReview({
+    required String applicationId,
+    required Map<String, dynamic> criteriaAssessment,
+    String? comment,
+    String recommendation = 'reserve',
+  }) async =>
+      throw UnimplementedError('Review mutation unused in this fixture');
 
   @override
   Future<List<ApplicationReviewModel>> loadReviews(
@@ -228,6 +252,167 @@ Future<void> _openActions(
 }
 
 void main() {
+  test('technical error details are replaced with a useful message', () {
+    expect(
+      recruitmentMessage(
+        ApiException(
+          statusCode: 500,
+          message: 'SQLAlchemy traceback https://private.invalid',
+        ),
+        fallback: 'Réessaie dans un instant.',
+      ),
+      'Réessaie dans un instant.',
+    );
+    expect(
+      recruitmentMessage(
+        Exception('Le backend ne fournit pas de journal'),
+        fallback: 'Réessaie.',
+      ),
+      'Réessaie.',
+    );
+    expect(
+      recruitmentMessage(
+        Exception('Agenda indisponible.'),
+        fallback: 'Réessaie.',
+      ),
+      'Agenda indisponible.',
+    );
+  });
+
+  for (final dark in [false, true]) {
+    testWidgets('status contrast remains readable dark=$dark', (tester) async {
+      final theme = dark ? AppTheme.darkTheme : AppTheme.lightTheme;
+      for (final status in ApplicationStatusPresentation.supportedStatuses) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Center(child: InternalStatusBadge(status: status)),
+            ),
+          ),
+        );
+        final badge = find.byType(InternalStatusBadge);
+        final container = tester.widget<Container>(
+          find.descendant(of: badge, matching: find.byType(Container)),
+        );
+        final decoration = container.decoration! as BoxDecoration;
+        final text = tester.widget<Text>(
+          find.descendant(of: badge, matching: find.byType(Text)),
+        );
+        final background = Color.alphaBlend(
+          decoration.color!,
+          theme.colorScheme.surface,
+        );
+        final a = text.style!.color!.computeLuminance(),
+            b = background.computeLuminance();
+        final contrast = ((a > b ? a : b) + .05) / ((a > b ? b : a) + .05);
+        expect(contrast, greaterThanOrEqualTo(4.5), reason: status);
+      }
+    });
+    for (final width in [360.0, 768.0, 1366.0, 1600.0]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('candidate list width=$width scale=$scale dark=$dark', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 1000);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: ApplicationWorkbench(
+                      applications: [
+                        for (var i = 0; i < internalStatuses.length; i++)
+                          _application(
+                            index: i + 1,
+                            status: internalStatuses[i],
+                          ),
+                      ],
+                      campaignTitle: (_) => 'Rejoindre Enactus ESP cette année',
+                      anonymized: false,
+                      rangeStart: 1,
+                      rangeEnd: 7,
+                      total: 7,
+                      currentPage: 1,
+                      pageCount: 1,
+                      onOpen: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          if (width >= 1366 && scale == 1) {
+            final evaluation = tester.getRect(find.text('Évaluation'));
+            final documents = tester.getRect(find.text('Documents'));
+            expect(documents.left - evaluation.right, greaterThanOrEqualTo(16));
+          }
+        });
+      }
+    }
+  }
+
+  testWidgets('detail displays dated history and requests anonymous data', (
+    tester,
+  ) async {
+    final detail = _application(
+      history: [
+        ApplicationHistoryModel(
+          id: 'history-1',
+          kind: 'status',
+          title: 'Statut mis à jour',
+          occurredAt: DateTime(2026, 10, 5, 12, 30),
+          actorName: 'Aïta DIA',
+          fromStatus: 'submitted',
+          toStatus: 'under_review',
+        ),
+      ],
+    );
+    final gateway = _FakeGateway(detail: detail);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: ApplicationDetailPanel(
+          summary: detail,
+          campaignTitle: _campaign.title,
+          anonymized: true,
+          gateway: gateway,
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Statut mis à jour'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Reçue → En cours d’étude'), findsOneWidget);
+    expect(find.textContaining('Aïta DIA'), findsOneWidget);
+    expect(find.textContaining('12:30'), findsOneWidget);
+    expect(find.textContaining('backend'), findsNothing);
+    expect(find.textContaining('Évaluateur A'), findsNothing);
+    expect(gateway.anonymousDetailRequests, [true]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('écran interne autorisé avec liste dense', (tester) async {
     await _pump(tester, _FakeGateway());
     expect(find.text('Recrutement'), findsOneWidget);
@@ -312,26 +497,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Documents'), findsWidgets);
     expect(find.text('Lettre de motivation'), findsOneWidget);
-    expect(find.text('Consulter'), findsNWidgets(3));
+    expect(find.text('Consulter la pièce jointe'), findsNWidgets(3));
   });
 
-  testWidgets('évaluations humanisées et moyenne officielle sur 20', (
-    tester,
-  ) async {
-    await _pump(tester, _FakeGateway());
-    await tester.tap(find.text('Ouvrir le dossier'));
-    await tester.pumpAndSettle();
-    await tester.drag(
-      find.byKey(const Key('application-detail-scroll')),
-      const Offset(0, -1400),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Moyenne officielle : 15.0/20'), findsOneWidget);
-    expect(find.textContaining('Favorable'), findsOneWidget);
-    expect(find.textContaining('Avec réserves'), findsOneWidget);
-    expect(find.text('favorable'), findsNothing);
-    expect(find.text('reserve'), findsNothing);
-  });
+  testWidgets(
+    'évaluations antérieures conservées sans moyenne de la nouvelle grille',
+    (tester) async {
+      await _pump(tester, _FakeGateway());
+      await tester.tap(find.text('Ouvrir le dossier'));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const Key('application-detail-scroll')),
+        const Offset(0, -1400),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Note antérieure · Hors de la nouvelle grille'),
+        findsNWidgets(2),
+      );
+      expect(find.textContaining('Indice du jury :'), findsNothing);
+      expect(find.textContaining('Favorable'), findsOneWidget);
+      expect(find.textContaining('Avec réserves'), findsOneWidget);
+      expect(find.text('favorable'), findsNothing);
+      expect(find.text('reserve'), findsNothing);
+    },
+  );
 
   testWidgets('entretien affiche date et lieu', (tester) async {
     final interview = _application(
@@ -383,8 +573,8 @@ void main() {
     await tester.tap(openButton);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Indice de présélection'), findsOneWidget);
-    expect(find.textContaining('/100'), findsOneWidget);
+    expect(find.text('Évaluation selon la grille'), findsOneWidget);
+    expect(find.text('À réaliser'), findsOneWidget);
   });
 
   testWidgets(
@@ -420,8 +610,8 @@ void main() {
     await tester.tap(find.text('Accepter la candidature'));
     await tester.pumpAndSettle();
     expect(find.text('Retenir cette candidature ?'), findsOneWidget);
-    expect(find.text('Moyenne officielle'), findsOneWidget);
-    expect(find.text('15.0/20'), findsWidgets);
+    expect(find.text('Évaluation par critères'), findsOneWidget);
+    expect(find.text('Non disponible'), findsWidgets);
     expect(
       find.textContaining('sans convertir automatiquement'),
       findsOneWidget,
@@ -503,7 +693,7 @@ void main() {
     expect(find.textContaining('Candidature retenue'), findsWidgets);
     expect(find.text('accepted'), findsNothing);
     expect(
-      find.textContaining('conversion en utilisateur reste'),
+      find.textContaining('La création du compte membre vient après'),
       findsOneWidget,
     );
   });

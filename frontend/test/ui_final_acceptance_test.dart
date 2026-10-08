@@ -31,13 +31,13 @@ import 'package:frontend/shared/layout/app_shell.dart';
 
 void main() {
   group('matrice routes', () {
-    test('le router déclare les 43 routes finales attendues', () {
+    test('le router déclare les 60 routes finales attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
         r"path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
-      expect(declared, hasLength(43));
+      expect(declared, hasLength(60));
       for (final path in const [
         '/splash',
         '/login',
@@ -47,22 +47,32 @@ void main() {
         '/application-tracking',
         '/recruitment/apply',
         ':campaignId',
+        '/profile',
         '/settings',
+        '/settings/academic',
+        '/settings/years',
         '/help',
         '/dashboard',
         '/members',
+        ':memberId',
         '/attendance',
         '/attendance/scan',
         '/attendance/nfc',
         '/tasks',
         ':taskId',
+        '/veille',
+        'records/:kind/:id',
         '/finance',
         '/recruitment',
         '/documents',
+        'reglement-interieur',
         ':documentId',
         '/notifications',
         '/posts',
         '/chat',
+        '/meetings',
+        ':meetingId',
+        'live',
         '/poles',
         ':poleId',
         '/projects',
@@ -72,12 +82,17 @@ void main() {
         '/alumni',
         ':profileId',
         '/gamification',
+        'games',
+        ':roomId',
         '/academy',
         'courses/:courseId',
+        'paths/:pathId',
         'admin',
         '/archives',
         'items/:archiveId',
         'projects/:projectId',
+        'competitions/:recordId',
+        'awards/:recordId',
         'hall-of-fame/:entryId',
         '/impact',
         'records',
@@ -103,6 +118,7 @@ void main() {
       for (final path in const [
         '/dashboard',
         '/tasks/task-1',
+        '/veille/records/task/task-1',
         '/archives/hall-of-fame/entry-1',
         '/recruitment',
         '/settings',
@@ -119,6 +135,7 @@ void main() {
 
       for (final path in const [
         '/tasks/task-1',
+        '/veille/records/task/task-1',
         '/documents/document-1',
         '/events/event-1',
         '/academy/courses/course-1',
@@ -134,7 +151,7 @@ void main() {
       }
       expect(
         UserExperience.canAccessPath(member, '/projects/project-1'),
-        isFalse,
+        isTrue,
       );
       expect(UserExperience.canAccessPath(lead, '/projects/project-1'), isTrue);
       expect(UserExperience.canAccessPath(alumni, '/tasks/task-1'), isFalse);
@@ -165,13 +182,15 @@ void main() {
       _ProfileExpectation(
         'membre / enacteur',
         _user('membre', const {'enacteur'}),
-        requiredRoutes: const {'/tasks', '/attendance', '/finance', '/events'},
-        deniedRoutes: const {
-          '/members',
+        requiredRoutes: const {
+          '/tasks',
+          '/attendance',
+          '/finance',
+          '/events',
+          '/poles',
           '/projects',
-          '/impact',
-          '/recruitment',
         },
+        deniedRoutes: const {'/members', '/impact', '/recruitment'},
       ),
       _ProfileExpectation(
         'chef de pôle',
@@ -245,6 +264,7 @@ void main() {
           '/tasks',
           '/attendance',
           '/finance',
+          '/poles',
           '/projects',
           '/impact',
         },
@@ -253,13 +273,13 @@ void main() {
         'recruteur',
         _user('recruteur', const {'recrutement'}),
         requiredRoutes: const {'/recruitment', '/events', '/attendance'},
-        deniedRoutes: const {'/members', '/projects', '/impact'},
+        deniedRoutes: const {'/members', '/impact'},
       ),
       _ProfileExpectation(
         'faculty advisor',
         _user('faculty', const {'faculty_advisor'}),
-        requiredRoutes: const {'/poles', '/projects', '/impact'},
-        deniedRoutes: const {'/members', '/alumni'},
+        requiredRoutes: const {'/poles', '/projects'},
+        deniedRoutes: const {'/members', '/alumni', '/impact', '/recruitment'},
       ),
     ];
 
@@ -309,9 +329,14 @@ void main() {
           final navigation = tester.widget<NavigationBar>(
             find.byType(NavigationBar),
           );
-          final selected =
-              navigation.destinations[navigation.selectedIndex]
-                  as NavigationDestination;
+          final selected = tester.widget<NavigationDestination>(
+            find
+                .descendant(
+                  of: find.byType(NavigationBar),
+                  matching: find.byType(NavigationDestination),
+                )
+                .at(navigation.selectedIndex),
+          );
           expect(selected.label, scenario.$3);
           expect(tester.takeException(), isNull);
         },
@@ -328,7 +353,6 @@ void main() {
         for (final path in const [
           '/attendance',
           '/poles',
-          '/projects',
           '/events',
           '/finance',
           '/alumni',
@@ -352,8 +376,8 @@ void main() {
         'login utilisable à ${viewport.width.toInt()}x${viewport.height.toInt()}',
         (tester) async {
           await _pumpLogin(tester, viewport);
-          expect(find.text('Connexion des comptes validés'), findsOneWidget);
-          expect(find.text('Email'), findsOneWidget);
+          expect(find.text('Bienvenue sur EnactSpace'), findsOneWidget);
+          expect(find.text('Identifiant'), findsOneWidget);
           expect(find.text('Mot de passe'), findsOneWidget);
           expect(find.text('Se connecter'), findsOneWidget);
           expect(find.text('Mot de passe oublié ?'), findsOneWidget);
@@ -394,7 +418,7 @@ void main() {
       tester,
     ) async {
       await _pumpLogin(tester, const Size(390, 844));
-      final accountAction = find.text('Compte Enacteur / Enactrice');
+      final accountAction = find.text('Créer un compte');
       await tester.ensureVisible(accountAction);
       await tester.pumpAndSettle();
       await tester.tap(accountAction);
@@ -463,8 +487,9 @@ void main() {
         isAnonymized: false,
         canConvert: false,
       );
-      expect(application.stabilityLabel, 'Stabilité forte');
-      expect(application.stabilityLabel, isNot(contains('Ã')));
+      expect(application.screeningScore, isNull);
+      expect(application.screeningLabel, 'Évaluation à réaliser');
+      expect(application.screeningLabel, isNot(contains('Ã')));
 
       for (final path in const [
         'lib/features/recruitment/services/recruitment_service.dart',
@@ -528,7 +553,7 @@ void main() {
           gateway: _ChatAcceptanceGateway(),
         ),
       );
-      expect(find.byTooltip('Envoyer'), findsOneWidget);
+      expect(find.byTooltip('Enregistrer un vocal'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -549,6 +574,7 @@ void main() {
             canCancel: false,
           ),
           memberName: 'Aminata Diop',
+          fees: [],
           approve: false,
         ),
         scaffold: false,

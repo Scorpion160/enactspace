@@ -1,15 +1,18 @@
+from app.services.request_rate_limit import protect_public_request
+from app.core.time import utc_now
 import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User, PasswordResetOtp
+from app.models.alumni import AlumniProfile
 from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
@@ -28,6 +31,7 @@ from app.core.security import (
 from app.api.deps import get_current_active_validated_user
 from app.models.account import AuthSession
 from app.services.audit_service import create_audit_log
+from app.services.email_delivery_service import enqueue_email_delivery
 from app.services.session_service import (
     create_session_tokens,
     revoke_current_session,
@@ -38,7 +42,7 @@ from app.services.session_service import (
 )
 
 
-router = APIRouter(prefix="/auth", tags=["Authentification"])
+router = APIRouter(prefix="/auth", dependencies=[Depends(protect_public_request)], tags=["Authentification"])
 
 
 def optional_text(value: str | None) -> str | None:
@@ -57,21 +61,29 @@ def join_request_bio(payload: JoinRequestCreate) -> str | None:
     return content or None
 
 
-def normalize_login_email(email: str) -> str:
-    normalized = email.strip().lower()
-    if not normalized or "@" not in normalized:
+def normalize_login_identifier(identifier: str | None, email: str | None) -> str:
+    raw = identifier if identifier is not None else email
+    normalized = (raw or "").strip().lower()
+    if not normalized:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Identifiant email invalide.",
+            detail="Identifiant requis.",
         )
     return normalized
 
-
-def authenticate_user(email: str, password: str, db: Session) -> User:
-    normalized_email = normalize_login_email(email)
+def authenticate_user(
+    password: str,
+    db: Session,
+    identifier: str | None = None,
+    email: str | None = None,
+) -> User:
+    normalized_identifier = normalize_login_identifier(identifier, email)
     user = (
         db.query(User)
-        .filter(func.lower(User.email) == normalized_email)
+        .filter(or_(
+            func.lower(User.email) == normalized_identifier,
+            func.lower(User.username) == normalized_identifier,
+        ))
         .populate_existing()
         .with_for_update()
         .first()
@@ -80,13 +92,13 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Identifiant ou mot de passe incorrect",
         )
 
     if not verify_password(password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Identifiant ou mot de passe incorrect",
         )
 
     if not user.is_active:
@@ -128,6 +140,9 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
             detail="Compte non autorisé",
         )
 
+    if user.credential_setup_required:
+        raise HTTPException(403, "Activez votre accès avec Première connexion.")
+
     if not user.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -140,6 +155,7 @@ def authenticate_user(email: str, password: str, db: Session) -> User:
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = authenticate_user(
+        identifier=payload.identifier,
         email=payload.email,
         password=payload.password,
         db=db,
@@ -171,7 +187,7 @@ def create_join_request(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de profil invalide",
         )
-    gender = payload.gender.strip().lower()
+    gender = (payload.gender or "").strip().lower()
     if gender not in {"homme", "femme"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -185,33 +201,53 @@ def create_join_request(
 
     first_name = payload.first_name.strip()
     last_name = payload.last_name.strip()
+    username = payload.username.strip()
+    phone = payload.phone.strip()
     department = optional_text(payload.department)
+    promotion = optional_text(payload.promotion)
     if not first_name or not last_name or not department:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Complétez au moins identité, email et filière",
         )
+    if not username or not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le nom d'utilisateur et le téléphone sont obligatoires",
+        )
+    if profile_type == "alumni" and (not promotion or payload.enactus_join_year is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Un Alumni doit renseigner promotion et année d'entrée à Enactus ESP",
+        )
 
     normalized_email = payload.email.strip().lower()
-    existing = db.query(User).filter(func.lower(User.email) == normalized_email).first()
+    normalized_username = username.lower()
+    existing = db.query(User).filter(or_(
+        func.lower(User.email) == normalized_email,
+        func.lower(User.username) == normalized_username,
+    )).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Un compte existe déjà avec cet email",
+            detail="Un compte existe déjà avec cet email ou ce nom d'utilisateur",
         )
 
     user = User(
         first_name=first_name,
         last_name=last_name,
         email=normalized_email,
-        phone=optional_text(payload.phone),
+        username=normalized_username,
+        enactus_join_year=payload.enactus_join_year,
+        phone=phone,
         gender=gender,
         profile_type=profile_type,
         password_hash=hash_password(payload.password.strip()),
+        onboarding_required=True,
         photo_url=optional_text(payload.photo_url),
         department=department,
         study_level=optional_text(payload.level),
-        promotion=optional_text(payload.promotion),
+        promotion=promotion,
         bio=join_request_bio(payload),
         linkedin_url=optional_text(payload.linkedin_url),
         github_url=optional_text(payload.github_url),
@@ -223,6 +259,25 @@ def create_join_request(
 
     db.add(user)
     try:
+        db.flush()
+        if profile_type == "alumni":
+            db.add(AlumniProfile(
+                user_id=user.id,
+                enactus_join_year=payload.enactus_join_year,
+            ))
+        enqueue_email_delivery(
+            db,
+            recipient_email=user.email,
+            user_id=user.id,
+            subject="EnactSpace - Demande d'adhésion reçue",
+            text_body=(
+                f"Bonjour {user.first_name},\n\n"
+                "Votre demande d'adhésion à Enactus ESP a bien été reçue. "
+                "Elle sera examinée par les responsables autorisés.\n\n"
+                "Enactus ESP"
+            ),
+            dedupe_key=f"join-request:{user.id}",
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -248,24 +303,37 @@ def request_password_reset(
 ):
     user = db.query(User).filter(
         func.lower(User.email) == payload.email.strip().lower()
-    ).first()
+    ).populate_existing().with_for_update().first()
     otp = f"{secrets.randbelow(1_000_000):06d}"
 
     if user and user.is_active:
         reset_otp = db.query(PasswordResetOtp).filter(
             PasswordResetOtp.user_id == user.id,
-        ).first()
+        ).populate_existing().with_for_update().first()
         if not reset_otp:
             reset_otp = PasswordResetOtp(
                 user_id=user.id,
                 otp_hash=hash_password(otp),
-                expires_at=datetime.utcnow() + timedelta(minutes=15),
+                expires_at=utc_now() + timedelta(minutes=15),
             )
             db.add(reset_otp)
         else:
+            reset_otp.failed_attempts = 0
             reset_otp.otp_hash = hash_password(otp)
-            reset_otp.expires_at = datetime.utcnow() + timedelta(minutes=15)
-            reset_otp.created_at = datetime.utcnow()
+            reset_otp.expires_at = utc_now() + timedelta(minutes=15)
+            reset_otp.created_at = utc_now()
+        enqueue_email_delivery(
+            db,
+            recipient_email=user.email,
+            user_id=user.id,
+            subject="EnactSpace - Code de réinitialisation",
+            text_body=(
+                f"Bonjour {user.first_name},\n\n"
+                f"Votre code de réinitialisation est : {otp}\n"
+                "Il expire dans 15 minutes.\n\n"
+                "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email."
+            ),
+        )
         db.commit()
 
     return PasswordResetRequestRead(
@@ -283,20 +351,20 @@ def confirm_password_reset(
 ):
     user = db.query(User).filter(
         func.lower(User.email) == payload.email.strip().lower()
-    ).first()
+    ).populate_existing().with_for_update().first()
     reset_otp = None
     if user:
         reset_otp = db.query(PasswordResetOtp).filter(
             PasswordResetOtp.user_id == user.id,
-        ).first()
+        ).populate_existing().with_for_update().first()
 
-    if not user or not reset_otp:
+    if not user or not user.is_active or not reset_otp:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Code OTP invalide ou expiré",
         )
 
-    if reset_otp.expires_at < datetime.utcnow():
+    if reset_otp.expires_at <= utc_now() or reset_otp.failed_attempts >= 5:
         db.delete(reset_otp)
         db.commit()
         raise HTTPException(
@@ -305,6 +373,10 @@ def confirm_password_reset(
         )
 
     if not verify_password(payload.otp.strip(), reset_otp.otp_hash):
+        reset_otp.failed_attempts += 1
+        if reset_otp.failed_attempts >= 5:
+            db.delete(reset_otp)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Code OTP invalide ou expiré",
@@ -329,7 +401,7 @@ def confirm_password_reset(
             new_value={"reason": "password_reset", "count": revoked_count},
         )
     db.delete(reset_otp)
-    user.updated_at = datetime.utcnow()
+    user.updated_at = utc_now()
     db.commit()
 
     return {"ok": True, "message": "Mot de passe réinitialisé avec succès"}
@@ -342,7 +414,7 @@ def login_for_swagger(
     db: Session = Depends(get_db),
 ):
     user = authenticate_user(
-        email=form_data.username,
+        identifier=form_data.username,
         password=form_data.password,
         db=db,
     )

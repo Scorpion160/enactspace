@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
@@ -204,7 +205,7 @@ def _late_tasks_query(db: Session, user_id):
     return _assigned_tasks_query(db, user_id).filter(
         Task.status.in_(["a_faire", "en_cours", "bloque"]),
         Task.due_date.isnot(None),
-        Task.due_date < datetime.utcnow(),
+        Task.due_date < utc_now(),
     )
 
 
@@ -231,7 +232,7 @@ def _unread_messages_count(db: Session, user_id) -> int:
 
 
 def _upcoming_events_query(db: Session, user_id, flags: dict, scope: dict):
-    query = db.query(Event.id).filter(Event.start_time >= datetime.utcnow())
+    query = db.query(Event.id).filter(Event.start_time >= utc_now())
     if (
         flags["can_view_global"]
         or flags["can_view_global_attendance"]

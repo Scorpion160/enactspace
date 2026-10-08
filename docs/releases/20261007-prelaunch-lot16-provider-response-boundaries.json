@@ -1,0 +1,46 @@
+{
+  "lot": 16,
+  "date_utc": "2026-10-07T16:05:56.507794+00:00",
+  "tests": {
+    "final_sqlite": {
+      "passed": 111,
+      "seconds": 30.68,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 24,
+      "seconds": 60.494,
+      "skipped": 0
+    }
+  },
+  "new_scenarios": 10,
+  "suite_counts_overlap": true,
+  "reviewed_files_or_changed_sections": [
+    "backend/app/services/payments/base.py",
+    "backend/app/services/payments/paydunya_provider.py",
+    "backend/app/services/mobile_money_service.py",
+    "backend/app/schemas/mobile_money.py",
+    "backend/app/api/routes/finance.py",
+    "backend/test_prelaunch_mobile_money_boundaries.py",
+    "backend/test_prelaunch_payment_transport.py"
+  ],
+  "whole_manual_review_complete": false,
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_payment_or_email_sent": false,
+  "provider_requests_in_tests": "mocked",
+  "source_head": "20261007_0028",
+  "amount_limit_fcfa": 2147483647,
+  "amount_limit_basis": "existing PostgreSQL Integer storage; not a provider-published limit",
+  "remaining": [
+    "Other module permission review",
+    "Real PayDunya sandbox acceptance and legacy transaction compatibility",
+    "Complete migration chain rehearsal",
+    "Actual Android/web end-to-end checks",
+    "Targeted test recruitment cleanup with backup",
+    "Complete documentation and final deployment with mail recipient cutover"
+  ]
+}

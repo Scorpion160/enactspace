@@ -1,6 +1,9 @@
+import secrets
+from app.core.time import utc_now
 from datetime import date, datetime
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, File, HTTPException, status, Request, UploadFile
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,6 +12,7 @@ from app.db.database import get_db
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.user import User
+from app.models.stored_file import StoredFile
 from app.models.role import Role, UserRole
 from app.schemas.user import (
     UserCreate,
@@ -22,6 +26,8 @@ from app.schemas.user import (
 from app.core.security import hash_password
 from app.core.roles import (
     ADMIN_MANAGED_ROLES,
+    GLOBAL_MANAGEMENT_ROLES,
+    SECRETARIAT_ROLES,
     ADMIN_ROLE,
     ALUMNI_ROLE,
     BASE_ACTIVE_ROLE,
@@ -45,12 +51,14 @@ from app.api.deps import (
 )
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
+from app.services.file_storage_service import delete_physical_file, infer_mime_type, store_bytes
 from app.services.operational_integrity import (
     assert_active_operational_member,
     assert_can_make_alumni,
     assert_suspendable_lifecycle,
     lock_exclusive_role,
     lock_user,
+    lock_role_write,
     reconcile_user_lifecycle,
 )
 
@@ -67,6 +75,18 @@ VALID_USER_STATUSES = {
     "rejected",
     "suspended",
 }
+
+PROFILE_PHOTO_MAX_BYTES = 8 * 1024 * 1024
+PROFILE_PHOTO_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+def lock_account_management(db: Session, actor_id, target_id=None, *, reviewer=False, allowed_roles=None):
+    actor, target = lock_role_write(db, actor_id, target_id if target_id is not None else actor_id)
+    authorized = (can_review_join_requests(db, actor) if reviewer
+                  else bool(get_user_role_names(db, actor.id).intersection(allowed_roles)))
+    if not authorized:
+        raise HTTPException(403, "Action réservée aux responsables habilités.")
+    return actor, target
+
 
 def get_managed_role_names(db: Session, current_user: User) -> set[str]:
     roles = get_user_role_names(db, current_user.id)
@@ -107,6 +127,25 @@ def ensure_role_authority(
     return managed_roles
 
 
+def ensure_admin_removal_allowed(db: Session, user_id) -> None:
+    # Serialize both role-editing paths on the same role row.
+    role = lock_exclusive_role(db, ADMIN_ROLE)
+    admin_links = (
+        db.query(UserRole)
+        .join(User, User.id == UserRole.user_id)
+        .filter(UserRole.role_id == role.id, User.status == "active",
+                User.is_active.is_(True), User.email_verified.is_(True),
+                User.profile_type.in_({"enacteur", "enactrice"}))
+        .with_for_update(of=UserRole)
+        .all()
+    )
+    if any(link.user_id == user_id for link in admin_links) and len(admin_links) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Le dernier administrateur ne peut pas être retiré",
+        )
+
+
 def normalize_lifecycle_roles(db: Session, user: User, role_names: set[str]) -> set[str]:
     role_names = normalize_role_names(role_names)
 
@@ -123,7 +162,11 @@ def normalize_lifecycle_roles(db: Session, user: User, role_names: set[str]) -> 
 
 
 def get_user_or_404(db: Session, user_id: str) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
+    try:
+        parsed_id = UUID(str(user_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    user = db.query(User).filter(User.id == parsed_id).first()
 
     if not user:
         raise HTTPException(
@@ -146,6 +189,8 @@ def build_user_with_roles(db: Session, user: User) -> UserWithRolesRead:
     data["core_pole_id"] = pole_member.pole_id if pole_member else None
     data["pole_position"] = pole_member.position if pole_member else None
     data["can_review_join_requests"] = can_review_join_requests(db, user)
+    from app.api.deps import can_access_recruitment
+    data["can_access_recruitment"] = can_access_recruitment(db, user)
     return UserWithRolesRead(**data)
 
 
@@ -161,13 +206,17 @@ def build_directory_user(db: Session, user: User) -> UserDirectoryRead:
         first_name=user.first_name,
         last_name=user.last_name,
         email=user.email,
+        username=user.username,
         phone=user.phone,
         photo_url=user.photo_url,
         gender=user.gender,
         profile_type=user.profile_type,
         department=user.department,
+        cursus=user.cursus,
         study_level=user.study_level,
+        specialty=user.specialty,
         promotion=user.promotion,
+        enactus_join_year=user.enactus_join_year,
         bio=user.bio,
         core_pole_id=pole_member.pole_id if pole_member else None,
         pole_position=pole_member.position if pole_member else None,
@@ -183,6 +232,7 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
+    current_user, _ = lock_account_management(db, current_user.id, allowed_roles=SECRETARIAT_ROLES)
     normalized_email = payload.email.strip().lower()
     existing = db.query(User).filter(func.lower(User.email) == normalized_email).first()
 
@@ -191,12 +241,12 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Un compte existe déjà avec cet email",
         )
-    if len(payload.password.strip()) < 8:
+    if payload.password is not None and len(payload.password.strip()) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le mot de passe doit contenir au moins 8 caractères",
         )
-    if payload.profile_type not in {BASE_ACTIVE_ROLE, ALUMNI_ROLE}:
+    if payload.profile_type not in {BASE_ACTIVE_ROLE, 'enactrice', ALUMNI_ROLE}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de profil invalide",
@@ -206,10 +256,16 @@ def create_user(
         first_name=payload.first_name,
         last_name=payload.last_name,
         email=normalized_email,
+        username=payload.username,
+        enactus_join_year=payload.enactus_join_year,
+        cursus=payload.cursus,
+        specialty=payload.specialty,
         phone=payload.phone,
         gender=payload.gender,
         profile_type=payload.profile_type,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        credential_setup_required=True,
+        onboarding_required=True,
         department=payload.department,
         study_level=payload.study_level,
         promotion=payload.promotion,
@@ -229,7 +285,7 @@ def create_user(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Un compte existe déjà avec cet email",
+            detail="Un compte existe déjà avec cet email ou ce nom d'utilisateur",
         ) from exc
     db.refresh(user)
 
@@ -250,14 +306,20 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
+    current_user = lock_user(db, current_user.id)
+    if not current_user.is_active or current_user.status not in {"active", "alumni"} or not current_user.email_verified:
+        raise HTTPException(403, "Compte indisponible.")
     fields = [
         "first_name",
         "last_name",
         "phone",
         "photo_url",
         "department",
+        "cursus",
         "study_level",
+        "specialty",
         "promotion",
+        "enactus_join_year",
         "bio",
         "linkedin_url",
         "github_url",
@@ -269,11 +331,98 @@ def update_me(
         if value is not None:
             setattr(current_user, field, value)
 
-    current_user.updated_at = datetime.utcnow()
+    if payload.enactus_join_year is not None:
+        from app.services.alumni_profiles import sync_alumni_join_year
+        sync_alumni_join_year(db, current_user)
+    current_user.updated_at = utc_now()
 
     db.commit()
     db.refresh(current_user)
 
+    return current_user
+
+
+@router.post("/me/photo", response_model=UserRead)
+async def upload_my_profile_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    data = await file.read(PROFILE_PHOTO_MAX_BYTES + 1)
+    mime_type = infer_mime_type(
+        file.filename or "photo-profil.jpg",
+        file.content_type,
+    ).lower()
+    if mime_type not in PROFILE_PHOTO_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format de photo non pris en charge. Utilisez JPEG, PNG ou WebP.",
+        )
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La photo est vide.",
+        )
+    if len(data) > PROFILE_PHOTO_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La photo de profil ne doit pas dépasser 8 Mo.",
+        )
+
+    previous_files = (
+        db.query(StoredFile)
+        .filter(
+            StoredFile.entity_type == "profile_photo",
+            StoredFile.entity_id == current_user.id,
+        )
+        .all()
+    )
+    stored_file = store_bytes(
+        db,
+        data=data,
+        original_filename=file.filename or "photo-profil.jpg",
+        uploaded_by=current_user,
+        mime_type=mime_type,
+        storage_scope="profile",
+        visibility="public_club",
+        entity_type="profile_photo",
+        entity_id=current_user.id,
+        is_temporary=False,
+    )
+    current_user.photo_url = f"/api/files/{stored_file.id}/profile-photo"
+    current_user.updated_at = utc_now()
+    for old_file in previous_files:
+        db.delete(old_file)
+
+    db.commit()
+    db.refresh(current_user)
+    for old_file in previous_files:
+        delete_physical_file(old_file)
+    return current_user
+
+
+@router.delete("/me/photo", response_model=UserRead)
+def delete_my_profile_photo(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    previous_files = (
+        db.query(StoredFile)
+        .filter(
+            StoredFile.entity_type == "profile_photo",
+            StoredFile.entity_id == current_user.id,
+        )
+        .all()
+    )
+    current_user.photo_url = None
+    current_user.updated_at = utc_now()
+    for old_file in previous_files:
+        db.delete(old_file)
+
+    db.commit()
+    db.refresh(current_user)
+    for old_file in previous_files:
+        delete_physical_file(old_file)
     return current_user
 
 
@@ -297,7 +446,7 @@ def list_user_directory(
             User.is_active.is_(True),
             User.status.in_(("active", ALUMNI_ROLE)),
         )
-        .order_by(User.first_name.asc(), User.last_name.asc())
+        .order_by(func.lower(User.last_name).asc(), func.lower(User.first_name).asc(), User.id.asc())
         .all()
     )
     return [build_directory_user(db, user) for user in users]
@@ -333,7 +482,7 @@ def admin_update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, allowed_roles=SECRETARIAT_ROLES)
 
     forbidden_lifecycle_fields = {"status", "is_active"}.intersection(
         payload.model_fields_set
@@ -356,6 +505,8 @@ def admin_update_user(
         "promotion": user.promotion,
     }
 
+    if payload.email_verified is False and user.email_verified and ADMIN_ROLE in get_user_role_names(db, user.id):
+        ensure_admin_removal_allowed(db, user.id)
     if payload.email_verified is not None:
         user.email_verified = payload.email_verified
 
@@ -367,8 +518,12 @@ def admin_update_user(
 
     if payload.promotion is not None:
         user.promotion = payload.promotion
+    if payload.enactus_join_year is not None:
+        user.enactus_join_year = payload.enactus_join_year
+        from app.services.alumni_profiles import sync_alumni_join_year
+        sync_alumni_join_year(db, user)
 
-    user.updated_at = datetime.utcnow()
+    user.updated_at = utc_now()
 
     create_audit_log(
         db=db,
@@ -416,7 +571,7 @@ def approve_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_join_request_reviewer),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, reviewer=True)
     if user.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -431,6 +586,9 @@ def approve_user(
     is_alumni = user.profile_type == ALUMNI_ROLE
     reconcile_user_lifecycle(db, user, ALUMNI_ROLE if is_alumni else "active")
     user.email_verified = True
+    if user.credential_setup_required:
+        from app.services.first_access import issue_activation
+        issue_activation(db, user)
 
     notification_title = (
         "Compte Alumni EnactSpace validé"
@@ -481,7 +639,7 @@ def reject_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_join_request_reviewer),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, reviewer=True)
     if user.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -537,7 +695,7 @@ def suspend_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, allowed_roles=GLOBAL_MANAGEMENT_ROLES)
     current_roles = get_user_role_names(db, current_user.id)
     target_roles = get_user_role_names(db, user.id)
 
@@ -592,7 +750,7 @@ def reactivate_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, allowed_roles=GLOBAL_MANAGEMENT_ROLES)
     if user.status not in {"suspended", "inactive"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -627,6 +785,21 @@ def reactivate_user(
     return user
 
 
+@router.get("/{user_id}/alumni-transition")
+def preview_alumni_transition(user_id: str, db:Session=Depends(get_db), current_user:User=Depends(require_admin_or_team_leader)):
+    current_user,user=lock_account_management(db,current_user.id,user_id,allowed_roles=GLOBAL_MANAGEMENT_ROLES)
+    from app.models.task import Task,TaskAssignee
+    from app.models.pole import PoleMember,Pole
+    from app.models.project import ProjectMember,Project
+    roles=sorted(get_user_role_names(db,user.id))
+    poles=[{"name":p.name,"position":m.position} for m,p in db.query(PoleMember,Pole).join(Pole,Pole.id==PoleMember.pole_id).filter(PoleMember.user_id==user.id,PoleMember.is_active.is_(True),PoleMember.left_at.is_(None)).all()]
+    projects=[{"name":p.name,"position":m.position} for m,p in db.query(ProjectMember,Project).join(Project,Project.id==ProjectMember.project_id).filter(ProjectMember.user_id==user.id,ProjectMember.is_active.is_(True),ProjectMember.left_at.is_(None)).all()]
+    tasks=[{"id":str(t.id),"title":t.title,"status":t.status} for t in db.query(Task).join(TaskAssignee,TaskAssignee.task_id==Task.id).filter(TaskAssignee.user_id==user.id,Task.status.notin_({"valide","annule"})).all()]
+    return {"member_id":str(user.id),"status":user.status,"roles":roles,"poles":poles,"projects":projects,"pending_tasks":tasks,
+        "can_convert":user.status=="active" and user.is_active and user.profile_type in {"enacteur","enactrice"} and user.id!=current_user.id and "administrateur" not in roles,
+        "message":"Le compte et l’historique sont conservés. Les responsabilités et affectations actives dans les pôles et projets sont clôturées. Les tâches ouvertes restent à transmettre ; elles ne sont ni supprimées ni validées automatiquement."}
+
+
 @router.post("/{user_id}/make-alumni", response_model=UserRead)
 def make_user_alumni(
     user_id: str,
@@ -634,7 +807,7 @@ def make_user_alumni(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_team_leader),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_account_management(db, current_user.id, user_id, allowed_roles=GLOBAL_MANAGEMENT_ROLES)
     target_roles = get_user_role_names(db, user.id)
 
     if user.id == current_user.id:
@@ -659,6 +832,11 @@ def make_user_alumni(
     }
 
     reconcile_user_lifecycle(db, user, ALUMNI_ROLE)
+    from app.models.task import Task, TaskAssignee
+    for task in db.query(Task).join(TaskAssignee,TaskAssignee.task_id==Task.id).filter(TaskAssignee.user_id==user.id,Task.status.notin_({"valide","annule"})).all():
+        recipient=task.assigned_by or task.creator_id
+        if recipient and recipient!=user.id:
+            notify_user(db,user_id=recipient,title="Une tâche à transmettre",message=f"{user.first_name} {user.last_name} rejoint les alumni. Organisez le relais pour : {task.title}.",notification_type="task_updated",related_type="task",related_id=task.id)
 
     notify_user(
         db,
@@ -695,7 +873,7 @@ def assign_roles_to_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_role_write(db, current_user.id, user_id)
 
     requested_role_names = normalize_role_names(payload.role_names)
     scoped_roles = requested_role_names.intersection(SCOPED_RESPONSIBILITY_ROLES)
@@ -711,6 +889,9 @@ def assign_roles_to_user(
     managed_roles = ensure_role_authority(db, current_user, requested_role_names)
     current_role_names = get_user_role_names(db, user.id)
     old_roles = sorted(list(current_role_names))
+    if ADMIN_ROLE in current_role_names and ADMIN_ROLE in managed_roles and ADMIN_ROLE not in requested_role_names:
+        ensure_admin_removal_allowed(db, user.id)
+        ensure_role_authority(db, current_user, requested_role_names)
 
     roles = db.query(Role).filter(Role.name.in_(requested_role_names)).all()
     found_role_names = {role.name for role in roles}
@@ -725,7 +906,7 @@ def assign_roles_to_user(
     exclusive_roles = requested_role_names.intersection(
         {TEAM_LEADER_ROLE, SECRETARY_ROLE}
     )
-    for exclusive_role_name in exclusive_roles:
+    for exclusive_role_name in sorted(exclusive_roles):
         exclusive_role = lock_exclusive_role(db, exclusive_role_name)
         previous_links = (
             db.query(UserRole)
@@ -841,7 +1022,7 @@ def remove_role_from_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    user = lock_user(db, user_id)
+    current_user, user = lock_role_write(db, current_user.id, user_id)
     role_name = normalize_role_name(role_name)
     ensure_role_authority(db, current_user, {role_name})
 
@@ -856,17 +1037,8 @@ def remove_role_from_user(
         )
 
     if role_name == ADMIN_ROLE:
-        admin_links = (
-            db.query(UserRole)
-            .filter(UserRole.role_id == role.id)
-            .with_for_update()
-            .all()
-        )
-        if len(admin_links) <= 1:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Le dernier administrateur ne peut pas être retiré",
-            )
+        ensure_admin_removal_allowed(db, user.id)
+        ensure_role_authority(db, current_user, {role_name})
 
     link = db.query(UserRole).filter(
         UserRole.user_id == user.id,

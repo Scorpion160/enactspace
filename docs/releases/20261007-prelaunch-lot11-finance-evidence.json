@@ -1,0 +1,58 @@
+{
+  "lot": 11,
+  "date_utc": "2026-10-07T14:00:51.015528+00:00",
+  "tests": {
+    "initial_sqlite": {
+      "passed": 97,
+      "seconds": 41.004,
+      "skipped": 0
+    },
+    "initial_postgresql": {
+      "passed": 24,
+      "seconds": 72.965,
+      "skipped": 0
+    },
+    "final_sqlite": {
+      "passed": 61,
+      "seconds": 28.521,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 26,
+      "seconds": 61.483,
+      "skipped": 0
+    }
+  },
+  "suite_counts_overlap": true,
+  "reviewed_files": [
+    "backend/app/api/routes/finance.py",
+    "backend/app/api/routes/files.py",
+    "backend/app/schemas/finance.py",
+    "backend/app/services/finance_integrity.py",
+    "backend/app/services/mobile_money_service.py",
+    "backend/app/services/file_storage_service.py",
+    "backend/test_prelaunch_finance_boundaries.py",
+    "backend/test_prelaunch_finance_boundaries_postgresql.py"
+  ],
+  "whole_manual_review_complete": false,
+  "isolated_resources_absent": true,
+  "build_performed": false,
+  "production_changed": false,
+  "git_push": false,
+  "smtp_emails_sent": 0,
+  "real_data_cleanup_performed": false,
+  "changes": [
+    "Bound finance evidence access and immutable deletion boundary",
+    "Permanent retention of newly declared proofs and protection of legacy linked expired proofs",
+    "CSV formula text neutralization",
+    "Incoming Finance amounts bounded, finite and at most two decimal places",
+    "PostgreSQL transaction advisory locks for declaration reference and proof checksum",
+    "Shared account creation helper locks parent user before unique account lookup"
+  ],
+  "limitations": [
+    "No complete manual repository review",
+    "No real-device/browser validation in this lot",
+    "Mobile Money initiation/provider concurrency still needs review",
+    "Other module money inputs and payment references need further review"
+  ]
+}

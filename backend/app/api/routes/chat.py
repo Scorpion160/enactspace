@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import json
 from datetime import datetime
 from uuid import UUID
@@ -13,6 +14,9 @@ from app.models.chat import (
     ChatParticipant,
     ChatMessage,
     ChatMessageReaction,
+    ChatPoll,
+    ChatPollOption,
+    ChatPollVote,
 )
 from app.models.stored_file import StoredFile
 from app.models.pole import PoleMember
@@ -33,6 +37,9 @@ from app.schemas.chat import (
     ChatParticipantRoleUpdate,
     ChatMessageReactionCreate,
     ChatMessageReactionRead,
+    ChatPollCreate,
+    ChatPollVoteCreate,
+    ChatPollRead,
 )
 from app.services.notification_service import notify_user, notify_users
 from app.services.file_storage_service import store_base64
@@ -41,8 +48,8 @@ from app.services.file_storage_service import store_base64
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 VALID_THREAD_TYPES = {"direct", "group", "club", "pole", "project", "enacchef"}
-VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker"}
-MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text"}
+VALID_MESSAGE_TYPES = {"text", "image", "video", "audio", "document", "sticker", "poll"}
+MEDIA_MESSAGE_TYPES = VALID_MESSAGE_TYPES - {"text", "poll"}
 VALID_REACTION_TYPES = {"👍", "❤️", "😂", "😮", "😢", "🙏"}
 ENACCHEF_ROLES = {
     "administrateur",
@@ -62,6 +69,7 @@ MESSAGE_TYPE_LABELS = {
     "audio": "Audio",
     "document": "Document",
     "sticker": "Sticker",
+    "poll": "Sondage",
 }
 
 
@@ -100,6 +108,59 @@ def current_user_reaction(db: Session, message_id, user_id) -> str | None:
     return reaction.reaction_type if reaction else None
 
 
+def serialize_poll(
+    db: Session,
+    poll: ChatPoll,
+    current_user_id=None,
+) -> ChatPollRead:
+    options = db.query(ChatPollOption).filter(
+        ChatPollOption.poll_id == poll.id
+    ).order_by(ChatPollOption.position.asc()).all()
+    counts = dict(
+        db.query(ChatPollVote.option_id, func.count(ChatPollVote.id))
+        .filter(ChatPollVote.poll_id == poll.id)
+        .group_by(ChatPollVote.option_id)
+        .all()
+    )
+    selected = set()
+    if current_user_id is not None:
+        selected = {
+            row[0]
+            for row in db.query(ChatPollVote.option_id).filter(
+                ChatPollVote.poll_id == poll.id,
+                ChatPollVote.user_id == current_user_id,
+            ).all()
+        }
+    total_voters = int(
+        db.query(func.count(func.distinct(ChatPollVote.user_id)))
+        .filter(ChatPollVote.poll_id == poll.id)
+        .scalar()
+        or 0
+    )
+    total_votes = sum(int(value or 0) for value in counts.values())
+    is_closed = bool(poll.closes_at and poll.closes_at <= utc_now())
+    return ChatPollRead(
+        id=poll.id,
+        message_id=poll.message_id,
+        question=poll.question,
+        allows_multiple=poll.allows_multiple,
+        closes_at=poll.closes_at,
+        is_closed=is_closed,
+        total_votes=total_votes,
+        total_voters=total_voters,
+        options=[
+            {
+                "id": option.id,
+                "label": option.label,
+                "position": option.position,
+                "votes_count": int(counts.get(option.id, 0) or 0),
+                "current_user_voted": option.id in selected,
+            }
+            for option in options
+        ],
+    )
+
+
 def serialize_message(
     message: ChatMessage,
     db: Session | None = None,
@@ -111,11 +172,17 @@ def serialize_message(
         if db is not None
         else {}
     )
+    poll_payload = None
+    if db is not None and message.message_type == "poll":
+        poll = db.query(ChatPoll).filter(ChatPoll.message_id == message.id).first()
+        if poll is not None:
+            poll_payload = serialize_poll(db, poll, current_user_id)
 
     return {
         "id": message.id,
         "thread_id": message.thread_id,
         "author_id": message.author_id,
+        "client_message_id": message.client_message_id,
         "content": payload.get("content") or "",
         "message_type": message.message_type,
         "created_at": message.created_at,
@@ -138,12 +205,15 @@ def serialize_message(
         )
         if db is not None and current_user_id is not None
         else None,
+        "poll": poll_payload,
     }
 
 
 def message_preview(message: ChatMessage) -> str:
     if message.message_type == "text":
         return message.content
+    if message.message_type == "poll":
+        return f"Sondage · {message.content}"
 
     payload = parse_message_payload(message)
     label = MESSAGE_TYPE_LABELS.get(message.message_type, "Média")
@@ -228,7 +298,7 @@ def attach_file_to_thread(
     stored_file.entity_type = "chat_thread"
     stored_file.entity_id = thread_id
     stored_file.visibility = "participants"
-    stored_file.updated_at = datetime.utcnow()
+    stored_file.updated_at = utc_now()
     return stored_file
 
 
@@ -680,7 +750,7 @@ def add_thread_participants(
 
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
     if thread:
-        thread.updated_at = datetime.utcnow()
+        thread.updated_at = utc_now()
     if added_user_ids:
         actor_name = user_display_name(current_user)
         notify_users(
@@ -795,7 +865,7 @@ def list_messages(
         ChatMessage.deleted_at.is_(None),
     ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
 
-    participant.last_read_at = datetime.utcnow()
+    participant.last_read_at = utc_now()
     db.commit()
 
     return [
@@ -813,12 +883,26 @@ def send_message(
 ):
     get_participant_or_404(db, thread_id, current_user.id)
 
+    client_message_id = (payload.client_message_id or "").strip() or None
+    if client_message_id:
+        existing = db.query(ChatMessage).filter(
+            ChatMessage.author_id == current_user.id,
+            ChatMessage.client_message_id == client_message_id,
+        ).first()
+        if existing:
+            return serialize_message(existing, db=db, current_user_id=current_user.id)
+
     content = payload.content.strip()
 
     if payload.message_type not in VALID_MESSAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Type de message invalide",
+        )
+    if payload.message_type == "poll":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Utilisez l'endpoint sondage pour créer un sondage",
         )
 
     if payload.message_type == "text" and not content:
@@ -827,8 +911,10 @@ def send_message(
             detail="Le message ne peut pas être vide",
         )
 
+    content_only_sticker = payload.message_type == "sticker" and bool(content)
     if (
         payload.message_type in MEDIA_MESSAGE_TYPES
+        and not content_only_sticker
         and not payload.attachment_url
         and not payload.attachment_file_id
     ):
@@ -851,6 +937,7 @@ def send_message(
     message = ChatMessage(
         thread_id=UUID(thread_id),
         author_id=current_user.id,
+        client_message_id=client_message_id,
         content=build_message_content(
             payload.model_copy(update={"content": content}),
         ),
@@ -859,10 +946,10 @@ def send_message(
 
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
     if thread:
-        thread.updated_at = datetime.utcnow()
+        thread.updated_at = utc_now()
 
     participant = get_participant_or_404(db, thread_id, current_user.id)
-    participant.last_read_at = datetime.utcnow()
+    participant.last_read_at = utc_now()
 
     db.add(message)
     recipient_ids = [
@@ -929,7 +1016,7 @@ def upsert_message_reaction(
     created_reaction = reaction is None
     if reaction:
         reaction.reaction_type = reaction_type
-        reaction.created_at = datetime.utcnow()
+        reaction.created_at = utc_now()
     else:
         reaction = ChatMessageReaction(
             message_id=message.id,
@@ -1022,7 +1109,7 @@ def mark_thread_as_read(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     participant = get_participant_or_404(db, thread_id, current_user.id)
-    participant.last_read_at = datetime.utcnow()
+    participant.last_read_at = utc_now()
     db.commit()
 
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
@@ -1033,3 +1120,222 @@ def mark_thread_as_read(
         )
 
     return build_thread_read(db, thread, current_user.id)
+
+
+def get_poll_or_404(
+    db: Session,
+    thread_id: str,
+    poll_id: str,
+    *,
+    lock: bool = False,
+) -> ChatPoll:
+    query = db.query(ChatPoll).join(
+        ChatMessage,
+        ChatMessage.id == ChatPoll.message_id,
+    ).filter(
+        ChatPoll.id == poll_id,
+        ChatMessage.thread_id == thread_id,
+        ChatMessage.deleted_at.is_(None),
+    )
+    if lock:
+        query = query.with_for_update()
+    poll = query.first()
+    if poll is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sondage introuvable",
+        )
+    return poll
+
+
+def normalize_poll_options(values: list[str]) -> list[str]:
+    labels = [value.strip() for value in values]
+    if any(not label for label in labels):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les options du sondage ne peuvent pas être vides",
+        )
+    if len(labels) < 2 or len(labels) > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Un sondage doit contenir entre 2 et 10 options",
+        )
+    normalized = [label.casefold() for label in labels]
+    if len(set(normalized)) != len(normalized):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les options du sondage doivent être distinctes",
+        )
+    return labels
+
+
+@router.post("/threads/{thread_id}/polls", response_model=ChatMessageRead)
+def create_poll(
+    thread_id: str,
+    payload: ChatPollCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    participant = get_participant_or_404(db, thread_id, current_user.id)
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La question du sondage est obligatoire",
+        )
+    labels = normalize_poll_options(payload.options)
+    if payload.closes_at is not None and payload.closes_at <= utc_now():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La date de clôture doit être dans le futur",
+        )
+    client_message_id = (payload.client_message_id or "").strip() or None
+    if client_message_id:
+        existing = db.query(ChatMessage).filter(
+            ChatMessage.author_id == current_user.id,
+            ChatMessage.client_message_id == client_message_id,
+        ).first()
+        if existing is not None:
+            if str(existing.thread_id) != str(thread_id) or existing.message_type != "poll":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cet identifiant client est déjà utilisé",
+                )
+            return serialize_message(existing, db=db, current_user_id=current_user.id)
+
+    message = ChatMessage(
+        thread_id=UUID(thread_id),
+        author_id=current_user.id,
+        client_message_id=client_message_id,
+        content=question,
+        message_type="poll",
+    )
+    db.add(message)
+    db.flush()
+
+    poll = ChatPoll(
+        message_id=message.id,
+        question=question,
+        allows_multiple=payload.allows_multiple,
+        closes_at=payload.closes_at,
+    )
+    db.add(poll)
+    db.flush()
+    for position, label in enumerate(labels):
+        db.add(ChatPollOption(
+            poll_id=poll.id,
+            label=label,
+            position=position,
+        ))
+
+    thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
+    if thread is not None:
+        thread.updated_at = utc_now()
+    participant.last_read_at = utc_now()
+
+    recipient_ids = [
+        row[0]
+        for row in db.query(ChatParticipant.user_id).filter(
+            ChatParticipant.thread_id == thread_id,
+            ChatParticipant.user_id != current_user.id,
+        ).all()
+    ]
+    if recipient_ids:
+        notify_users(
+            db,
+            user_ids=recipient_ids,
+            title=f"Nouveau sondage de {user_display_name(current_user)}",
+            message=question,
+            notification_type="chat_poll",
+            related_type="chat_thread",
+            related_id=message.thread_id,
+        )
+
+    db.commit()
+    db.refresh(message)
+    return serialize_message(message, db=db, current_user_id=current_user.id)
+
+
+@router.post(
+    "/threads/{thread_id}/polls/{poll_id}/vote",
+    response_model=ChatPollRead,
+)
+def vote_poll(
+    thread_id: str,
+    poll_id: str,
+    payload: ChatPollVoteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+    poll = get_poll_or_404(db, thread_id, poll_id, lock=True)
+    if poll.closes_at is not None and poll.closes_at <= utc_now():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce sondage est clôturé",
+        )
+
+    selected_ids = set(payload.option_ids)
+    if not poll.allows_multiple and len(selected_ids) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce sondage accepte un seul choix",
+        )
+
+    valid_options = db.query(ChatPollOption).filter(
+        ChatPollOption.poll_id == poll.id,
+        ChatPollOption.id.in_(selected_ids),
+    ).all()
+    if len(valid_options) != len(selected_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une option sélectionnée n'appartient pas à ce sondage",
+        )
+
+    existing_votes = db.query(ChatPollVote).filter(
+        ChatPollVote.poll_id == poll.id,
+        ChatPollVote.user_id == current_user.id,
+    ).with_for_update().all()
+    existing_by_option = {vote.option_id: vote for vote in existing_votes}
+    for option_id, vote in existing_by_option.items():
+        if option_id not in selected_ids:
+            db.delete(vote)
+    for option_id in selected_ids:
+        if option_id not in existing_by_option:
+            db.add(ChatPollVote(
+                poll_id=poll.id,
+                option_id=option_id,
+                user_id=current_user.id,
+            ))
+
+    db.commit()
+    db.refresh(poll)
+    return serialize_poll(db, poll, current_user.id)
+
+
+@router.delete(
+    "/threads/{thread_id}/polls/{poll_id}/vote",
+    response_model=ChatPollRead,
+)
+def clear_poll_vote(
+    thread_id: str,
+    poll_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+    poll = get_poll_or_404(db, thread_id, poll_id, lock=True)
+    if poll.closes_at is not None and poll.closes_at <= utc_now():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce sondage est clôturé",
+        )
+    votes = db.query(ChatPollVote).filter(
+        ChatPollVote.poll_id == poll.id,
+        ChatPollVote.user_id == current_user.id,
+    ).with_for_update().all()
+    for vote in votes:
+        db.delete(vote)
+    db.commit()
+    db.refresh(poll)
+    return serialize_poll(db, poll, current_user.id)

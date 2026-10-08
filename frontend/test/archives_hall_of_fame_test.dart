@@ -248,26 +248,27 @@ void main() {
       expect(gateway.timelineLoads, 2);
     });
 
-    testWidgets('mode révision et héritage restent réservés au curateur', (
-      tester,
-    ) async {
-      final curator = _MemoryArchivesGateway();
-      await _pumpCenter(tester, curator);
-      expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
-      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
-      expect(curator.homeLoads, 0);
-      await tester.tap(find.byKey(const Key('memory_review_mode')));
-      await tester.pumpAndSettle();
-      expect(curator.lastTimelineFilters?.review, isTrue);
-      await tester.tap(find.byKey(const Key('memory_legacy_area')));
-      await tester.pumpAndSettle();
-      expect(curator.homeLoads, 1);
-      expect(find.text('Archives héritées à vérifier'), findsWidgets);
+    testWidgets(
+      'mode révision reste curateur mais mémoire validée est accessible',
+      (tester) async {
+        final curator = _MemoryArchivesGateway();
+        await _pumpCenter(tester, curator);
+        expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
+        expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+        expect(curator.homeLoads, 0);
+        await tester.tap(find.byKey(const Key('memory_review_mode')));
+        await tester.pumpAndSettle();
+        expect(curator.lastTimelineFilters?.review, isTrue);
+        await tester.tap(find.byKey(const Key('memory_legacy_area')));
+        await tester.pumpAndSettle();
+        expect(curator.homeLoads, 1);
+        expect(find.text('Mémoire historique Enactus ESP'), findsWidgets);
 
-      await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
-      expect(find.byKey(const Key('memory_review_mode')), findsNothing);
-      expect(find.byKey(const Key('memory_legacy_area')), findsNothing);
-    });
+        await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
+        expect(find.byKey(const Key('memory_review_mode')), findsNothing);
+        expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+      },
+    );
 
     testWidgets('pagination curseur ajoute sans doublon', (tester) async {
       final gateway = _MemoryArchivesGateway(paginated: true);
@@ -452,6 +453,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Rapport sourcé'), findsOneWidget);
       expect(find.text('Ouvrir la source'), findsOneWidget);
+      await tester.scrollUntilVisible(find.textContaining('Télécharger'), 150);
       expect(find.textContaining('Télécharger'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Motif du rejet'), 300);
       expect(find.text('Motif du rejet'), findsOneWidget);
@@ -519,13 +521,17 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Récompenses'), 300);
-      expect(find.text('Contexte'), findsOneWidget);
-      expect(find.text('Le problème'), findsOneWidget);
-      expect(find.text('La réponse'), findsOneWidget);
-      expect(find.text('Impact et héritage'), findsOneWidget);
-      expect(find.text('Équipe'), findsOneWidget);
-      expect(find.text('Récompenses'), findsOneWidget);
+      for (final title in [
+        'Contexte',
+        'Le problème',
+        'La réponse',
+        'Impact et héritage',
+        'Équipe',
+        'Récompenses',
+      ]) {
+        await tester.scrollUntilVisible(find.text(title), 150);
+        expect(find.text(title), findsOneWidget);
+      }
       expect(find.text('Revenus'), findsNothing);
       expect(find.text('Bénéfices'), findsNothing);
       expect(find.text('Emplois'), findsNothing);
@@ -546,7 +552,8 @@ void main() {
       expect(gateway.hallListLoads, 1);
       expect(find.text('Moment serveur'), findsOneWidget);
       expect(find.textContaining('92'), findsNothing);
-      expect(find.text('Pourquoi il compte'), findsOneWidget);
+      expect(find.text('Pourquoi il compte'), findsNothing);
+      expect(find.text('Le moment'), findsOneWidget);
       expect(find.text('Trace / média'), findsOneWidget);
     });
 
@@ -1031,7 +1038,9 @@ class _RecordingStatisticsService extends ArchivesService {
 
 class _OrderingService extends ArchivesService {
   @override
-  Future<List<HallOfFameEntryModel>> getHallOfFame() async {
+  Future<List<HallOfFameEntryModel>> getHallOfFame({
+    bool includeStatic = false,
+  }) async {
     final values = <HallOfFameEntryModel>[
       const HallOfFameEntryModel(
         id: 'old',

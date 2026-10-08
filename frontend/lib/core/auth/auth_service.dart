@@ -15,13 +15,18 @@ class AuthService {
       _authStorage = authStorage ?? apiClient?.authStorage ?? _defaultStorage;
 
   Future<String> login({
-    required String email,
+    String? identifier,
+    String? email,
     required String password,
   }) async {
+    final loginIdentifier = (identifier ?? email ?? '').trim();
+    if (loginIdentifier.isEmpty) {
+      throw ArgumentError('Email ou nom d’utilisateur requis.');
+    }
     final generation = _authStorage.generation;
     final data = await _apiClient.postForm(
       '/auth/token',
-      data: {'username': email, 'password': password},
+      data: {'username': loginIdentifier, 'password': password},
     );
 
     final token = data['access_token'];
@@ -83,9 +88,11 @@ class AuthService {
     required String gender,
     required String firstName,
     required String lastName,
+    required String username,
     required String email,
     required String password,
-    String? phone,
+    required String phone,
+    int? enactusJoinYear,
     String? photoUrl,
     String? department,
     String? level,
@@ -103,9 +110,11 @@ class AuthService {
         'gender': gender,
         'first_name': firstName,
         'last_name': lastName,
+        'username': username,
         'email': email,
         'password': password,
-        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        'phone': phone,
+        'enactus_join_year': ?enactusJoinYear,
         if (photoUrl != null && photoUrl.isNotEmpty) 'photo_url': photoUrl,
         if (department != null && department.isNotEmpty)
           'department': department,

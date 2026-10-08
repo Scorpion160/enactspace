@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_form_dialog.dart';
+
 import '../../members/models/member_model.dart';
 import '../models/pole_management_models.dart';
 import '../models/pole_model.dart';
@@ -53,7 +55,9 @@ class _PoleFormDialogState extends State<PoleFormDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => AppFormDialog(
+    icon: Icons.hub_rounded,
+    description: 'Présentez la mission et les objectifs du pôle.',
     title: Text(widget.pole == null ? 'Créer un pôle' : 'Modifier le pôle'),
     content: SizedBox(
       width: 620,
@@ -343,7 +347,9 @@ class _PoleMemberDialogState extends State<PoleMemberDialog> {
               member.email.toLowerCase().contains(query),
         )
         .toList();
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.group_add_rounded,
+      description: 'Choisissez une personne dans l’annuaire.',
       title: const Text('Ajouter ou réintégrer une personne'),
       content: SizedBox(
         width: 580,
@@ -456,18 +462,35 @@ class PoleResponsibilityDialog extends StatefulWidget {
 }
 
 class _PoleResponsibilityDialogState extends State<PoleResponsibilityDialog> {
+  final _search = TextEditingController();
   MemberModel? _selected;
   bool _sending = false;
   String? _error;
 
   @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final query = _search.text.trim().toLowerCase();
     final lead = widget.targetPosition == PolePositionPresentation.lead;
-    final eligible = widget.directory
-        .where((member) => member.status == 'active' && !member.isAlumni)
-        .where((member) => member.id != widget.currentHolder?.id)
-        .toList();
-    return AlertDialog(
+    final eligible =
+        widget.directory
+            .where((member) => member.status == 'active' && !member.isAlumni)
+            .where((member) => member.id != widget.currentHolder?.id)
+            .where(
+              (member) =>
+                  query.isEmpty ||
+                  member.displayName.toLowerCase().contains(query) ||
+                  member.email.toLowerCase().contains(query),
+            )
+            .toList()
+          ..sort(MemberModel.compareAlphabetically);
+    return AppFormDialog(
+      icon: Icons.workspace_premium_rounded,
       title: Text(lead ? 'Nommer le chef de pôle' : 'Nommer l’adjoint du pôle'),
       content: SizedBox(
         width: 540,
@@ -476,6 +499,16 @@ class _PoleResponsibilityDialogState extends State<PoleResponsibilityDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Pôle · ${widget.poleName}'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() => _selected = null),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                labelText: 'Rechercher un Enacteur',
+              ),
+            ),
+            const SizedBox(height: 10),
             DropdownButtonFormField<MemberModel>(
               key: const ValueKey('pole-responsibility-select'),
               initialValue: _selected,

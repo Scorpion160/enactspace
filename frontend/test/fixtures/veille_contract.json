@@ -1,0 +1,1274 @@
+{
+  "bundle": {
+    "context": {
+      "user_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+      "can_coordinate": true,
+      "global_scope": true,
+      "can_decide": true,
+      "can_manage_settings": true,
+      "members": [
+        {
+          "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "name": "a Test",
+          "pole_ids": [
+            "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c"
+          ],
+          "project_ids": []
+        },
+        {
+          "id": "9b3938e5-3900-4d52-bf62-9a5ab6aed0a9",
+          "name": "admin Test",
+          "pole_ids": [],
+          "project_ids": []
+        },
+        {
+          "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+          "name": "b Test",
+          "pole_ids": [
+            "0e30111e-9364-434e-b45c-b2cf2d5d7c6a"
+          ],
+          "project_ids": []
+        },
+        {
+          "id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+          "name": "lead Test",
+          "pole_ids": [
+            "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c"
+          ],
+          "project_ids": []
+        },
+        {
+          "id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "name": "sg Test",
+          "pole_ids": [],
+          "project_ids": []
+        },
+        {
+          "id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "name": "tl Test",
+          "pole_ids": [],
+          "project_ids": []
+        },
+        {
+          "id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "name": "veille Test",
+          "pole_ids": [
+            "6e2b7a9f-03b6-44e1-b9fe-8c590ae27d68"
+          ],
+          "project_ids": []
+        }
+      ],
+      "managed_pole_ids": [],
+      "managed_project_ids": [],
+      "bureau": [
+        {
+          "id": "9b3938e5-3900-4d52-bf62-9a5ab6aed0a9",
+          "name": "admin Test"
+        },
+        {
+          "id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "name": "sg Test"
+        },
+        {
+          "id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "name": "tl Test"
+        }
+      ],
+      "poles": [
+        {
+          "id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "name": "Projet A"
+        },
+        {
+          "id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+          "name": "Projet B"
+        },
+        {
+          "id": "6e2b7a9f-03b6-44e1-b9fe-8c590ae27d68",
+          "name": "Pôle Veille"
+        }
+      ],
+      "projects": [],
+      "seasons": [],
+      "courses": [
+        {
+          "id": "b70f5a5a-1bc5-4b38-bc6a-39867daf68b4",
+          "name": "Une formation"
+        }
+      ],
+      "rules": [],
+      "settings": {
+        "id": 1,
+        "version": 1,
+        "reminders_enabled": true,
+        "effective_at": "2026-08-05T20:38:17.537659Z",
+        "quiet_start_hour": 21,
+        "quiet_end_hour": 7,
+        "escalation_days": 2,
+        "response_days": 7,
+        "appeal_days": 14,
+        "weekly_day": 0,
+        "report_hour": 8,
+        "auto_reports": false,
+        "updated_at": "2026-10-04T20:38:17.540844Z"
+      }
+    },
+    "summary": {
+      "period_start": "2026-09-28",
+      "period_end": "2026-10-04",
+      "generated_at": "2026-10-04T20:38:17.824455Z",
+      "totals": {
+        "tasks": 3,
+        "due": 0,
+        "accepted": 0,
+        "on_time": 0,
+        "late": 0,
+        "awaiting_review": 0,
+        "blockers": 1,
+        "acceptance_rate": null,
+        "quality": null,
+        "quality_samples": 0,
+        "attendance_due": 0,
+        "attendance_present": 0,
+        "attendance_excused": 0,
+        "attendance_rate": null
+      },
+      "tasks": [
+        {
+          "id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+          "title": "Rencontrer les bénéficiaires",
+          "description": "Préparer les entretiens avec les membres de la communauté.",
+          "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "assigned_by": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+          "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "project_id": null,
+          "priority": "normale",
+          "status": "a_faire",
+          "due_date": "2026-10-06T20:38:17.596894Z",
+          "completed_at": null,
+          "validated_at": null,
+          "validated_by": null,
+          "proof_required": true,
+          "proof_url": null,
+          "is_late_alert_sent": false,
+          "created_at": "2026-10-04T20:38:17.604896Z",
+          "updated_at": "2026-10-04T20:38:17.604899Z",
+          "assignees": [
+            {
+              "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+              "name": "a Test"
+            }
+          ],
+          "pole_name": "Projet A",
+          "project_name": null,
+          "original_due_date": "2026-10-06T20:38:17.596894Z",
+          "late": false,
+          "leave_exempt": false,
+          "can_review": false,
+          "can_change_deadline": true
+        },
+        {
+          "id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+          "title": "Livrable a",
+          "description": null,
+          "creator_id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+          "assigned_by": null,
+          "veille_plan_id": null,
+          "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "project_id": null,
+          "priority": "normale",
+          "status": "bloque",
+          "due_date": "2026-10-07T20:38:17.537696Z",
+          "completed_at": null,
+          "validated_at": null,
+          "validated_by": null,
+          "proof_required": true,
+          "proof_url": "https://example.test/proof",
+          "is_late_alert_sent": false,
+          "created_at": "2026-10-04T20:38:17.539375Z",
+          "updated_at": "2026-10-04T20:38:17.805694Z",
+          "assignees": [
+            {
+              "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+              "name": "a Test"
+            }
+          ],
+          "pole_name": "Projet A",
+          "project_name": null,
+          "original_due_date": "2026-10-07T20:38:17.537696Z",
+          "late": false,
+          "leave_exempt": false,
+          "can_review": false,
+          "can_change_deadline": true
+        },
+        {
+          "id": "bd3fc03c-e5cc-4640-a66b-879bda745a11",
+          "title": "Livrable b",
+          "description": null,
+          "creator_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "assigned_by": null,
+          "veille_plan_id": null,
+          "pole_id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+          "project_id": null,
+          "priority": "normale",
+          "status": "en_cours",
+          "due_date": "2026-10-07T20:38:17.541869Z",
+          "completed_at": null,
+          "validated_at": null,
+          "validated_by": null,
+          "proof_required": true,
+          "proof_url": "https://example.test/proof",
+          "is_late_alert_sent": false,
+          "created_at": "2026-10-04T20:38:17.542084Z",
+          "updated_at": "2026-10-04T20:38:17.542087Z",
+          "assignees": [
+            {
+              "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+              "name": "b Test"
+            }
+          ],
+          "pole_name": "Projet B",
+          "project_name": null,
+          "original_due_date": "2026-10-07T20:38:17.541869Z",
+          "late": false,
+          "leave_exempt": false,
+          "can_review": false,
+          "can_change_deadline": true
+        }
+      ],
+      "members": [
+        {
+          "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "name": "a Test",
+          "assigned": 2,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "9b3938e5-3900-4d52-bf62-9a5ab6aed0a9",
+          "name": "admin Test",
+          "assigned": 0,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+          "name": "b Test",
+          "assigned": 1,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+          "name": "lead Test",
+          "assigned": 0,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "name": "sg Test",
+          "assigned": 0,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "name": "tl Test",
+          "assigned": 0,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        },
+        {
+          "id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "name": "veille Test",
+          "assigned": 0,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "rate": null,
+          "limited_sample": true
+        }
+      ],
+      "groups": [
+        {
+          "kind": "pole",
+          "id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "name": "Projet A",
+          "tasks": 2,
+          "due": 0,
+          "accepted": 0,
+          "late": 0,
+          "blocked": 1
+        },
+        {
+          "kind": "pole",
+          "id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+          "name": "Projet B",
+          "tasks": 1,
+          "due": 0,
+          "accepted": 0,
+          "late": 0,
+          "blocked": 0
+        }
+      ],
+      "method": "Les livrables acceptés sont rapportés aux tâches dues sur la période. La ponctualité utilise la date de remise, et non le délai de relecture. Les tâches annulées et les indisponibilités approuvées sont exclues. Les données décrivent l’état connu au moment du bilan ; elles ne reconstituent pas un historique antérieur non enregistré. Un faible effectif appelle une lecture prudente. Aucun score global ni sanction automatique n’est calculé."
+    },
+    "records": {
+      "plans": [
+        {
+          "owner_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "title": "Préparer une immersion",
+          "expected_result": "Un diagnostic partagé avec la communauté.",
+          "availability": "Deux après-midi cette semaine.",
+          "due_date": "2026-10-09T20:38:17.562754Z",
+          "status": "active",
+          "course_ids": [
+            "b70f5a5a-1bc5-4b38-bc6a-39867daf68b4"
+          ],
+          "updated_at": "2026-10-04T20:38:17.588029Z",
+          "version": 1,
+          "id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+          "created_at": "2026-10-04T20:38:17.588044Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "season_id": null,
+          "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "project_id": null,
+          "member_name": "a Test"
+        }
+      ],
+      "blockers": [
+        {
+          "task_id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+          "owner_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "title": "Un partenaire doit confirmer",
+          "cause": "dependance",
+          "description": "Le partenaire doit confirmer une date de rencontre.",
+          "requested_help": "Le responsable peut nous aider à reprendre contact.",
+          "next_action": "Convenir d’une date de rencontre avec le partenaire.",
+          "review_at": "2026-10-05T20:38:17.799576Z",
+          "status": "open",
+          "resolution": null,
+          "resolved_at": null,
+          "version": 1,
+          "id": "5ef3c8c6-d8ce-4af6-860c-b8acc194373e",
+          "created_at": "2026-10-04T20:38:17.805478Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "member_name": "a Test",
+          "task_title": "Livrable a"
+        }
+      ],
+      "reports": [
+        {
+          "title": "Point de suivi de l’équipe",
+          "kind": "weekly",
+          "period_start": "2026-09-28",
+          "period_end": "2026-10-04",
+          "observations": "Les échanges de terrain ont permis de préciser les besoins.",
+          "next_actions": "Finaliser les entretiens et partager le diagnostic avec l’équipe.",
+          "snapshot": {
+            "period_start": "2026-09-28",
+            "period_end": "2026-10-04",
+            "generated_at": "2026-10-04T20:38:17.772931Z",
+            "totals": {
+              "tasks": 3,
+              "due": 0,
+              "accepted": 0,
+              "on_time": 0,
+              "late": 0,
+              "awaiting_review": 0,
+              "blockers": 0,
+              "acceptance_rate": null,
+              "quality": null,
+              "quality_samples": 0,
+              "attendance_due": 0,
+              "attendance_present": 0,
+              "attendance_excused": 0,
+              "attendance_rate": null
+            },
+            "tasks": [
+              {
+                "id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+                "title": "Rencontrer les bénéficiaires",
+                "description": "Préparer les entretiens avec les membres de la communauté.",
+                "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+                "assigned_by": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+                "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+                "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+                "project_id": null,
+                "priority": "normale",
+                "status": "a_faire",
+                "due_date": "2026-10-06T20:38:17.596894Z",
+                "completed_at": null,
+                "validated_at": null,
+                "validated_by": null,
+                "proof_required": true,
+                "proof_url": null,
+                "is_late_alert_sent": false,
+                "created_at": "2026-10-04T20:38:17.604896Z",
+                "updated_at": "2026-10-04T20:38:17.604899Z",
+                "assignees": [
+                  {
+                    "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+                    "name": "a Test"
+                  }
+                ],
+                "pole_name": "Projet A",
+                "project_name": null,
+                "original_due_date": "2026-10-06T20:38:17.596894Z",
+                "late": false,
+                "leave_exempt": false,
+                "can_review": false,
+                "can_change_deadline": true
+              },
+              {
+                "id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+                "title": "Livrable a",
+                "description": null,
+                "creator_id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+                "assigned_by": null,
+                "veille_plan_id": null,
+                "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+                "project_id": null,
+                "priority": "normale",
+                "status": "en_cours",
+                "due_date": "2026-10-07T20:38:17.537696Z",
+                "completed_at": null,
+                "validated_at": null,
+                "validated_by": null,
+                "proof_required": true,
+                "proof_url": "https://example.test/proof",
+                "is_late_alert_sent": false,
+                "created_at": "2026-10-04T20:38:17.539375Z",
+                "updated_at": "2026-10-04T20:38:17.539380Z",
+                "assignees": [
+                  {
+                    "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+                    "name": "a Test"
+                  }
+                ],
+                "pole_name": "Projet A",
+                "project_name": null,
+                "original_due_date": "2026-10-07T20:38:17.537696Z",
+                "late": false,
+                "leave_exempt": false,
+                "can_review": false,
+                "can_change_deadline": true
+              },
+              {
+                "id": "bd3fc03c-e5cc-4640-a66b-879bda745a11",
+                "title": "Livrable b",
+                "description": null,
+                "creator_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+                "assigned_by": null,
+                "veille_plan_id": null,
+                "pole_id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+                "project_id": null,
+                "priority": "normale",
+                "status": "en_cours",
+                "due_date": "2026-10-07T20:38:17.541869Z",
+                "completed_at": null,
+                "validated_at": null,
+                "validated_by": null,
+                "proof_required": true,
+                "proof_url": "https://example.test/proof",
+                "is_late_alert_sent": false,
+                "created_at": "2026-10-04T20:38:17.542084Z",
+                "updated_at": "2026-10-04T20:38:17.542087Z",
+                "assignees": [
+                  {
+                    "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+                    "name": "b Test"
+                  }
+                ],
+                "pole_name": "Projet B",
+                "project_name": null,
+                "original_due_date": "2026-10-07T20:38:17.541869Z",
+                "late": false,
+                "leave_exempt": false,
+                "can_review": false,
+                "can_change_deadline": true
+              }
+            ],
+            "members": [
+              {
+                "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+                "name": "a Test",
+                "assigned": 2,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "9b3938e5-3900-4d52-bf62-9a5ab6aed0a9",
+                "name": "admin Test",
+                "assigned": 0,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+                "name": "b Test",
+                "assigned": 1,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+                "name": "lead Test",
+                "assigned": 0,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+                "name": "sg Test",
+                "assigned": 0,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+                "name": "tl Test",
+                "assigned": 0,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              },
+              {
+                "id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+                "name": "veille Test",
+                "assigned": 0,
+                "due": 0,
+                "accepted": 0,
+                "on_time": 0,
+                "late": 0,
+                "rate": null,
+                "limited_sample": true
+              }
+            ],
+            "groups": [
+              {
+                "kind": "pole",
+                "id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+                "name": "Projet A",
+                "tasks": 2,
+                "due": 0,
+                "accepted": 0,
+                "late": 0,
+                "blocked": 0
+              },
+              {
+                "kind": "pole",
+                "id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+                "name": "Projet B",
+                "tasks": 1,
+                "due": 0,
+                "accepted": 0,
+                "late": 0,
+                "blocked": 0
+              }
+            ],
+            "method": "Les livrables acceptés sont rapportés aux tâches dues sur la période. La ponctualité utilise la date de remise, et non le délai de relecture. Les tâches annulées et les indisponibilités approuvées sont exclues. Les données décrivent l’état connu au moment du bilan ; elles ne reconstituent pas un historique antérieur non enregistré. Un faible effectif appelle une lecture prudente. Aucun score global ni sanction automatique n’est calculé."
+          },
+          "automatic_key": null,
+          "id": "2fdea6d5-eb6b-45a3-9683-c51ed7e899d8",
+          "created_at": "2026-10-04T20:38:17.785381Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "season_id": null,
+          "pole_id": null,
+          "project_id": null
+        }
+      ],
+      "leaves": [
+        {
+          "member_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "start_date": "2026-10-04",
+          "end_date": "2026-10-07",
+          "reason": "Une période d’indisponibilité doit être prise en compte.",
+          "status": "requested",
+          "response": null,
+          "reviewed_by_id": null,
+          "version": 1,
+          "id": "949679cd-66e7-451c-a8d4-12a9ad726bb8",
+          "created_at": "2026-10-04T20:38:17.793331Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "member_name": "a Test"
+        }
+      ],
+      "cases": [
+        {
+          "member_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "bureau_reviewer_id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "task_id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+          "attendance_id": null,
+          "rule_id": null,
+          "title": "Un engagement à clarifier",
+          "facts": "Le livrable attendu doit être clarifié avec le membre.",
+          "observed_at": "2026-10-04",
+          "status": "decided",
+          "version": 6,
+          "response_deadline": "2026-10-11T20:38:17.626531Z",
+          "proposed_action": "accompagnement",
+          "proposal": "Les éléments et les prochaines actions ont été discutés.",
+          "decision_action": "accompagnement",
+          "decision": "Les éléments et les prochaines actions ont été discutés.",
+          "decided_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "decided_at": "2026-10-04T20:38:17.759425Z",
+          "endorsement": "Les éléments et les prochaines actions ont été discutés.",
+          "endorsed_by_id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "appeal_until": "2026-10-18T20:38:17.759425Z",
+          "appeal_count": 0,
+          "accepted_at": null,
+          "amount": 0.0,
+          "fee_id": null,
+          "id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "created_at": "2026-10-04T20:38:17.617996Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "member_name": "a Test"
+        }
+      ]
+    }
+  },
+  "details": {
+    "plan": {
+      "owner_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+      "title": "Préparer une immersion",
+      "expected_result": "Un diagnostic partagé avec la communauté.",
+      "availability": "Deux après-midi cette semaine.",
+      "due_date": "2026-10-09T20:38:17.562754Z",
+      "status": "active",
+      "course_ids": [
+        "b70f5a5a-1bc5-4b38-bc6a-39867daf68b4"
+      ],
+      "updated_at": "2026-10-04T20:38:17.588029Z",
+      "version": 1,
+      "id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+      "created_at": "2026-10-04T20:38:17.588044Z",
+      "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+      "season_id": null,
+      "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+      "project_id": null,
+      "events": [
+        {
+          "entity_type": "plan",
+          "entity_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+          "action": "created",
+          "message": "Engagement défini",
+          "details": {
+            "due_date": "2026-10-09T20:38:17.562754Z"
+          },
+          "id": "2bc398b5-c1e3-49e7-b7c9-ae1e6554b3dc",
+          "created_at": "2026-10-04T20:38:17.589341Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "actor_name": "veille Test"
+        }
+      ],
+      "member_name": "a Test",
+      "tasks": [
+        {
+          "id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+          "title": "Rencontrer les bénéficiaires",
+          "description": "Préparer les entretiens avec les membres de la communauté.",
+          "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "assigned_by": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+          "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+          "project_id": null,
+          "priority": "normale",
+          "status": "a_faire",
+          "due_date": "2026-10-06T20:38:17.596894Z",
+          "completed_at": null,
+          "validated_at": null,
+          "validated_by": null,
+          "proof_required": true,
+          "proof_url": null,
+          "is_late_alert_sent": false,
+          "created_at": "2026-10-04T20:38:17.604896Z",
+          "updated_at": "2026-10-04T20:38:17.604899Z"
+        }
+      ],
+      "assigned_courses": [
+        {
+          "id": "b70f5a5a-1bc5-4b38-bc6a-39867daf68b4",
+          "title": "Une formation",
+          "prerequisite_course_ids": [],
+          "prerequisites": [],
+          "is_locked": false,
+          "lock_reason": "",
+          "is_mastered": false
+        }
+      ]
+    },
+    "case": {
+      "member_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+      "bureau_reviewer_id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+      "task_id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+      "attendance_id": null,
+      "rule_id": null,
+      "title": "Un engagement à clarifier",
+      "facts": "Le livrable attendu doit être clarifié avec le membre.",
+      "observed_at": "2026-10-04",
+      "status": "decided",
+      "version": 6,
+      "response_deadline": "2026-10-11T20:38:17.626531Z",
+      "proposed_action": "accompagnement",
+      "proposal": "Les éléments et les prochaines actions ont été discutés.",
+      "decision_action": "accompagnement",
+      "decision": "Les éléments et les prochaines actions ont été discutés.",
+      "decided_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+      "decided_at": "2026-10-04T20:38:17.759425Z",
+      "endorsement": "Les éléments et les prochaines actions ont été discutés.",
+      "endorsed_by_id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+      "appeal_until": "2026-10-18T20:38:17.759425Z",
+      "appeal_count": 0,
+      "accepted_at": null,
+      "amount": 0.0,
+      "fee_id": null,
+      "id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+      "created_at": "2026-10-04T20:38:17.617996Z",
+      "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+      "events": [
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "created",
+          "message": "Dossier préparé",
+          "details": {},
+          "id": "99d97f23-7bce-4bbe-a307-8d6df883640a",
+          "created_at": "2026-10-04T20:38:17.618728Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "actor_name": "veille Test"
+        },
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "notify",
+          "message": "Les éléments et les prochaines actions ont été discutés.",
+          "details": {
+            "status": "notified",
+            "outcome": null,
+            "amount": 0
+          },
+          "id": "cb8008db-12a9-4efc-a5ad-0846a772e4b3",
+          "created_at": "2026-10-04T20:38:17.632095Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "actor_name": "veille Test"
+        },
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "respond",
+          "message": "Les éléments et les prochaines actions ont été discutés.",
+          "details": {
+            "status": "response_received",
+            "outcome": null,
+            "amount": 0
+          },
+          "id": "52419322-91c3-483c-9c00-0737868a0e06",
+          "created_at": "2026-10-04T20:38:17.733761Z",
+          "created_by_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "actor_name": "a Test"
+        },
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "propose",
+          "message": "Les éléments et les prochaines actions ont été discutés.",
+          "details": {
+            "status": "proposed",
+            "outcome": "accompagnement",
+            "amount": 0
+          },
+          "id": "3b7ed3ec-3fad-4d92-80ac-729ab3f61de0",
+          "created_at": "2026-10-04T20:38:17.743227Z",
+          "created_by_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+          "actor_name": "veille Test"
+        },
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "endorse",
+          "message": "Les éléments et les prochaines actions ont été discutés.",
+          "details": {
+            "status": "proposed",
+            "outcome": null,
+            "amount": 0
+          },
+          "id": "e81719c6-bf1c-41a3-b9f5-c6936306ff7f",
+          "created_at": "2026-10-04T20:38:17.753447Z",
+          "created_by_id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+          "actor_name": "sg Test"
+        },
+        {
+          "entity_type": "case",
+          "entity_id": "7830931f-e26d-45ae-b9ad-7ca97af9497b",
+          "action": "decide",
+          "message": "Les éléments et les prochaines actions ont été discutés.",
+          "details": {
+            "status": "decided",
+            "outcome": "accompagnement",
+            "amount": 0
+          },
+          "id": "3e726f9a-f1ba-4eb0-a25a-be20a4ff8dd3",
+          "created_at": "2026-10-04T20:38:17.761649Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "actor_name": "tl Test"
+        }
+      ],
+      "member_name": "a Test",
+      "available_actions": [
+        "comment"
+      ],
+      "rule": null,
+      "bureau_reviewer_name": "sg Test"
+    },
+    "report": {
+      "title": "Point de suivi de l’équipe",
+      "kind": "weekly",
+      "period_start": "2026-09-28",
+      "period_end": "2026-10-04",
+      "observations": "Les échanges de terrain ont permis de préciser les besoins.",
+      "next_actions": "Finaliser les entretiens et partager le diagnostic avec l’équipe.",
+      "snapshot": {
+        "period_start": "2026-09-28",
+        "period_end": "2026-10-04",
+        "generated_at": "2026-10-04T20:38:17.772931Z",
+        "totals": {
+          "tasks": 3,
+          "due": 0,
+          "accepted": 0,
+          "on_time": 0,
+          "late": 0,
+          "awaiting_review": 0,
+          "blockers": 0,
+          "acceptance_rate": null,
+          "quality": null,
+          "quality_samples": 0,
+          "attendance_due": 0,
+          "attendance_present": 0,
+          "attendance_excused": 0,
+          "attendance_rate": null
+        },
+        "tasks": [
+          {
+            "id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+            "title": "Rencontrer les bénéficiaires",
+            "description": "Préparer les entretiens avec les membres de la communauté.",
+            "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+            "assigned_by": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+            "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+            "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+            "project_id": null,
+            "priority": "normale",
+            "status": "a_faire",
+            "due_date": "2026-10-06T20:38:17.596894Z",
+            "completed_at": null,
+            "validated_at": null,
+            "validated_by": null,
+            "proof_required": true,
+            "proof_url": null,
+            "is_late_alert_sent": false,
+            "created_at": "2026-10-04T20:38:17.604896Z",
+            "updated_at": "2026-10-04T20:38:17.604899Z",
+            "assignees": [
+              {
+                "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+                "name": "a Test"
+              }
+            ],
+            "pole_name": "Projet A",
+            "project_name": null,
+            "original_due_date": "2026-10-06T20:38:17.596894Z",
+            "late": false,
+            "leave_exempt": false,
+            "can_review": false,
+            "can_change_deadline": true
+          },
+          {
+            "id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+            "title": "Livrable a",
+            "description": null,
+            "creator_id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+            "assigned_by": null,
+            "veille_plan_id": null,
+            "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+            "project_id": null,
+            "priority": "normale",
+            "status": "en_cours",
+            "due_date": "2026-10-07T20:38:17.537696Z",
+            "completed_at": null,
+            "validated_at": null,
+            "validated_by": null,
+            "proof_required": true,
+            "proof_url": "https://example.test/proof",
+            "is_late_alert_sent": false,
+            "created_at": "2026-10-04T20:38:17.539375Z",
+            "updated_at": "2026-10-04T20:38:17.539380Z",
+            "assignees": [
+              {
+                "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+                "name": "a Test"
+              }
+            ],
+            "pole_name": "Projet A",
+            "project_name": null,
+            "original_due_date": "2026-10-07T20:38:17.537696Z",
+            "late": false,
+            "leave_exempt": false,
+            "can_review": false,
+            "can_change_deadline": true
+          },
+          {
+            "id": "bd3fc03c-e5cc-4640-a66b-879bda745a11",
+            "title": "Livrable b",
+            "description": null,
+            "creator_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+            "assigned_by": null,
+            "veille_plan_id": null,
+            "pole_id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+            "project_id": null,
+            "priority": "normale",
+            "status": "en_cours",
+            "due_date": "2026-10-07T20:38:17.541869Z",
+            "completed_at": null,
+            "validated_at": null,
+            "validated_by": null,
+            "proof_required": true,
+            "proof_url": "https://example.test/proof",
+            "is_late_alert_sent": false,
+            "created_at": "2026-10-04T20:38:17.542084Z",
+            "updated_at": "2026-10-04T20:38:17.542087Z",
+            "assignees": [
+              {
+                "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+                "name": "b Test"
+              }
+            ],
+            "pole_name": "Projet B",
+            "project_name": null,
+            "original_due_date": "2026-10-07T20:38:17.541869Z",
+            "late": false,
+            "leave_exempt": false,
+            "can_review": false,
+            "can_change_deadline": true
+          }
+        ],
+        "members": [
+          {
+            "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+            "name": "a Test",
+            "assigned": 2,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "9b3938e5-3900-4d52-bf62-9a5ab6aed0a9",
+            "name": "admin Test",
+            "assigned": 0,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "f34f6deb-0f0c-461d-ada9-0d3ca6287b33",
+            "name": "b Test",
+            "assigned": 1,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "c9973855-56e9-4f57-a2d6-7751a1532865",
+            "name": "lead Test",
+            "assigned": 0,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "09e80d46-9426-4aee-82da-fa311fe0c0f8",
+            "name": "sg Test",
+            "assigned": 0,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+            "name": "tl Test",
+            "assigned": 0,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          },
+          {
+            "id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+            "name": "veille Test",
+            "assigned": 0,
+            "due": 0,
+            "accepted": 0,
+            "on_time": 0,
+            "late": 0,
+            "rate": null,
+            "limited_sample": true
+          }
+        ],
+        "groups": [
+          {
+            "kind": "pole",
+            "id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+            "name": "Projet A",
+            "tasks": 2,
+            "due": 0,
+            "accepted": 0,
+            "late": 0,
+            "blocked": 0
+          },
+          {
+            "kind": "pole",
+            "id": "0e30111e-9364-434e-b45c-b2cf2d5d7c6a",
+            "name": "Projet B",
+            "tasks": 1,
+            "due": 0,
+            "accepted": 0,
+            "late": 0,
+            "blocked": 0
+          }
+        ],
+        "method": "Les livrables acceptés sont rapportés aux tâches dues sur la période. La ponctualité utilise la date de remise, et non le délai de relecture. Les tâches annulées et les indisponibilités approuvées sont exclues. Les données décrivent l’état connu au moment du bilan ; elles ne reconstituent pas un historique antérieur non enregistré. Un faible effectif appelle une lecture prudente. Aucun score global ni sanction automatique n’est calculé."
+      },
+      "automatic_key": null,
+      "id": "2fdea6d5-eb6b-45a3-9683-c51ed7e899d8",
+      "created_at": "2026-10-04T20:38:17.785381Z",
+      "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+      "season_id": null,
+      "pole_id": null,
+      "project_id": null,
+      "events": [
+        {
+          "entity_type": "report",
+          "entity_id": "2fdea6d5-eb6b-45a3-9683-c51ed7e899d8",
+          "action": "created",
+          "message": "Bilan enregistré",
+          "details": {},
+          "id": "107f9d0f-1101-4cef-a106-285220021198",
+          "created_at": "2026-10-04T20:38:17.785955Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "actor_name": "tl Test"
+        }
+      ]
+    },
+    "leave": {
+      "member_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+      "start_date": "2026-10-04",
+      "end_date": "2026-10-07",
+      "reason": "Une période d’indisponibilité doit être prise en compte.",
+      "status": "requested",
+      "response": null,
+      "reviewed_by_id": null,
+      "version": 1,
+      "id": "949679cd-66e7-451c-a8d4-12a9ad726bb8",
+      "created_at": "2026-10-04T20:38:17.793331Z",
+      "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+      "events": [
+        {
+          "entity_type": "leave",
+          "entity_id": "949679cd-66e7-451c-a8d4-12a9ad726bb8",
+          "action": "requested",
+          "message": "Indisponibilité signalée",
+          "details": {},
+          "id": "dfd752bb-be6d-484e-a27b-6ab9e734a1a9",
+          "created_at": "2026-10-04T20:38:17.794823Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "actor_name": "tl Test"
+        }
+      ],
+      "member_name": "a Test"
+    },
+    "blocker": {
+      "task_id": "e88af3fa-7199-45f3-ae58-67fb4a245c85",
+      "owner_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+      "title": "Un partenaire doit confirmer",
+      "cause": "dependance",
+      "description": "Le partenaire doit confirmer une date de rencontre.",
+      "requested_help": "Le responsable peut nous aider à reprendre contact.",
+      "next_action": "Convenir d’une date de rencontre avec le partenaire.",
+      "review_at": "2026-10-05T20:38:17.799576Z",
+      "status": "open",
+      "resolution": null,
+      "resolved_at": null,
+      "version": 1,
+      "id": "5ef3c8c6-d8ce-4af6-860c-b8acc194373e",
+      "created_at": "2026-10-04T20:38:17.805478Z",
+      "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+      "events": [
+        {
+          "entity_type": "blocker",
+          "entity_id": "5ef3c8c6-d8ce-4af6-860c-b8acc194373e",
+          "action": "created",
+          "message": "Le partenaire doit confirmer une date de rencontre.",
+          "details": {},
+          "id": "c69148f2-b379-47a6-915c-290dda7b2b11",
+          "created_at": "2026-10-04T20:38:17.806811Z",
+          "created_by_id": "867feecb-0ac8-4144-8a5f-b0ac8dfc3394",
+          "actor_name": "tl Test"
+        }
+      ],
+      "member_name": "a Test",
+      "task_title": "Livrable a"
+    },
+    "task": {
+      "id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+      "title": "Rencontrer les bénéficiaires",
+      "description": "Préparer les entretiens avec les membres de la communauté.",
+      "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+      "assigned_by": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+      "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+      "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+      "project_id": null,
+      "priority": "normale",
+      "status": "a_faire",
+      "due_date": "2026-10-06T20:38:17.596894Z",
+      "completed_at": null,
+      "validated_at": null,
+      "validated_by": null,
+      "proof_required": true,
+      "proof_url": null,
+      "is_late_alert_sent": false,
+      "created_at": "2026-10-04T20:38:17.604896Z",
+      "updated_at": "2026-10-04T20:38:17.604899Z",
+      "can_manage": true,
+      "current_user_assigned": false,
+      "assignees": [
+        {
+          "id": "38f8d5fa-6ff9-448f-924c-0f48b945a754",
+          "name": "a Test"
+        }
+      ],
+      "can_review": false,
+      "can_change_deadline": true,
+      "events": [
+        {
+          "entity_type": "task",
+          "entity_id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+          "action": "created",
+          "message": "Création de la tâche",
+          "details": {
+            "before": {
+              "title": null,
+              "status": null,
+              "due_date": null,
+              "pole_id": null,
+              "project_id": null,
+              "veille_plan_id": null,
+              "creator_id": null,
+              "proof_url": null,
+              "completed_at": null,
+              "validated_at": null,
+              "validated_by": null
+            },
+            "after": {
+              "title": "Rencontrer les bénéficiaires",
+              "status": "a_faire",
+              "due_date": "2026-10-06T20:38:17.596894Z",
+              "pole_id": "2ca1fa56-f8b9-4686-bf9b-67394ea1c04c",
+              "project_id": null,
+              "veille_plan_id": "341c0b98-9b4e-4d8a-8ee1-2fccc2977cbd",
+              "creator_id": "52c593d4-ce7b-4375-bad5-019a5bf00d41",
+              "proof_url": null,
+              "completed_at": null,
+              "validated_at": null,
+              "validated_by": null
+            }
+          },
+          "id": "03de8216-a95a-4a6d-87ad-521f88a89e21",
+          "created_at": "2026-10-04T20:38:17.605111Z",
+          "created_by_id": null,
+          "actor_name": "EnactSpace"
+        },
+        {
+          "entity_type": "task",
+          "entity_id": "06580513-caaa-41be-adbb-c51f60ac79f2",
+          "action": "assigned",
+          "message": "Affectation mise à jour",
+          "details": {
+            "member_id": "38f8d5fa-6ff9-448f-924c-0f48b945a754"
+          },
+          "id": "93a783ea-de9d-4d18-836c-836fb8063787",
+          "created_at": "2026-10-04T20:38:17.605483Z",
+          "created_by_id": null,
+          "actor_name": "EnactSpace"
+        }
+      ],
+      "checklist": []
+    }
+  }
+}

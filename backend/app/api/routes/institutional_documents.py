@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 from uuid import UUID
 
@@ -150,7 +151,7 @@ def _ensure_entity_ids_exist(
         (pole_id, Pole, "Pôle introuvable."),
         (project_id, Project, "Projet introuvable."),
         (event_id, Event, "Événement introuvable."),
-        (season_id, Season, "Saison introuvable."),
+        (season_id, Season, "Année introuvable."),
     )
     for entity_id, model, message in checks:
         if (
@@ -309,7 +310,7 @@ def create_institutional_document_request(
         if current_season is None:
             raise HTTPException(
                 status_code=409,
-                detail="Aucune saison courante n’est configurée.",
+                detail="Aucune année courante n’est configurée.",
             )
         season_id = current_season.id
 
@@ -421,7 +422,7 @@ def update_institutional_document_request(
         current_season = get_current_season(db)
         if current_season is None:
             raise HTTPException(
-                status_code=409, detail="Aucune saison courante n’est configurée."
+                status_code=409, detail="Aucune année courante n’est configurée."
             )
         item.season_id = current_season.id
 
@@ -447,7 +448,7 @@ def update_institutional_document_request(
 
     if item.status == "rejected":
         item.status = "draft"
-    item.updated_at = datetime.utcnow()
+    item.updated_at = utc_now()
     _audit(
         db,
         http_request,
@@ -488,7 +489,7 @@ def submit_institutional_document_request(
     validate_payload(rule, item.payload_json or {})
 
     old_status = item.status
-    now = datetime.utcnow()
+    now = utc_now()
     item.submitted_by = current_user.id
     item.submitted_at = now
     item.sg_validated_by = None
@@ -538,7 +539,7 @@ def sg_validate_institutional_document_request(
         )
 
     old_status = item.status
-    now = datetime.utcnow()
+    now = utc_now()
     item.sg_validated_by = current_user.id
     item.sg_validated_at = now
     item.status = next_status_after_sg_validation(db, item)
@@ -580,7 +581,7 @@ def approve_institutional_document_request(
         )
 
     old_status = item.status
-    now = datetime.utcnow()
+    now = utc_now()
     item.approved_by = current_user.id
     item.approved_at = now
     item.status = "validated"
@@ -638,7 +639,7 @@ def reject_institutional_document_request(
         )
 
     old_status = item.status
-    now = datetime.utcnow()
+    now = utc_now()
     item.status = "rejected"
     item.rejected_by = current_user.id
     item.rejected_at = now
@@ -677,7 +678,7 @@ def cancel_institutional_document_request(
         )
 
     old_status = item.status
-    now = datetime.utcnow()
+    now = utc_now()
     item.status = "cancelled"
     item.cancelled_by = current_user.id
     item.cancelled_at = now

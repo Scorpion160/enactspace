@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 enum NotificationFamily {
+  veille('veille', 'Pôle Veille', Icons.track_changes_rounded),
   tasks('tasks', 'Tâches', Icons.task_alt_rounded),
   posts('posts', 'Publications', Icons.dynamic_feed_rounded),
   chat('chat', 'Chat', Icons.chat_bubble_rounded),
+  meetings('meetings', 'EnactMeet', Icons.video_call_rounded),
   events('events', 'Événements', Icons.event_rounded),
   attendance('attendance', 'Présences', Icons.fact_check_rounded),
   finance('finance', 'Finance', Icons.payments_rounded),
@@ -54,6 +56,11 @@ NotificationPresentation notificationPresentation(String rawType) {
     'document_shared' => 'Document partagé',
     'mentorship_assigned' => 'Mentorat attribué',
     'chat_message' => 'Nouveau message',
+    'meeting_invitation' => 'Invitation EnactMeet',
+    'meeting_started' => 'Réunion en direct',
+    'meeting_updated' => 'Réunion mise à jour',
+    'meeting_cancelled' => 'Réunion annulée',
+    'meeting_ended' => 'Réunion terminée',
     'post_comment' => 'Nouveau commentaire',
     'post_reaction' => 'Nouvelle réaction',
     'post_mention' => 'Mention dans une publication',
@@ -75,6 +82,7 @@ NotificationPresentation notificationPresentation(String rawType) {
 }
 
 NotificationFamily _familyFor(String type) {
+  if (type.startsWith('veille_')) return NotificationFamily.veille;
   if (type.contains('task') || type.contains('deadline')) {
     return NotificationFamily.tasks;
   }
@@ -83,6 +91,9 @@ NotificationFamily _familyFor(String type) {
   }
   if (type.contains('chat') || type.contains('message')) {
     return NotificationFamily.chat;
+  }
+  if (type.contains('meeting') || type.contains('meet')) {
+    return NotificationFamily.meetings;
   }
   if (type.contains('event')) return NotificationFamily.events;
   if (type.contains('attendance') ||

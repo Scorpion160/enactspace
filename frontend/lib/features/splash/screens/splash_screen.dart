@@ -4,23 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/biometric_authenticator.dart';
 import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final AuthService? authService;
+  final BiometricAuthenticator? biometrics;
+  const SplashScreen({super.key, this.authService, this.biometrics});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final AuthService _authService = AuthService();
+  late final AuthService _authService;
+  late final BiometricAuthenticator _biometrics;
   bool _retry = false;
 
   @override
   void initState() {
     super.initState();
+    _authService = widget.authService ?? AuthService();
+    _biometrics = widget.biometrics ?? BiometricAuthenticator();
     unawaited(_continue());
   }
 
@@ -30,9 +36,20 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 850));
     if (!mounted) return;
     try {
-      final loggedIn = await _authService.restoreSession();
+      final hasSession = await _authService.isLoggedIn();
+      final biometricAvailable = hasSession && await _biometrics.isAvailable();
       if (!mounted) return;
-      context.go(loggedIn ? '/dashboard' : '/login');
+      if (biometricAvailable) {
+        context.go('/login?unlock=1');
+        return;
+      }
+      if (!hasSession) {
+        context.go('/login');
+        return;
+      }
+      final restored = await _authService.restoreSession();
+      if (!mounted) return;
+      context.go(restored ? '/dashboard' : '/login');
     } catch (_) {
       if (mounted) setState(() => _retry = true);
     }

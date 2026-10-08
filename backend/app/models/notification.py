@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -34,5 +35,5 @@ class Notification(Base):
     related_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     related_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

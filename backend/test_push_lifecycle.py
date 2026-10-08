@@ -1,5 +1,6 @@
 """Focused PR-5 encrypted push lifecycle and outbox regressions."""
 
+from app.core.time import utc_now
 import os
 import unittest
 import uuid
@@ -179,7 +180,7 @@ class PushLifecycleTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 404)
 
     def test_10_revoked_installation_rejects_token(self):
-        self.installation.revoked_at = datetime.utcnow()
+        self.installation.revoked_at = utc_now()
         self.db.commit()
         with self.assertRaises(HTTPException) as raised:
             self._register()
@@ -204,7 +205,7 @@ class PushLifecycleTests(unittest.TestCase):
             user_id=self.user.id, installation_key=uuid.uuid4(), platform="ios",
             push_provider="fcm", push_token_hash=self.installation.push_token_hash,
             push_token_ciphertext=encrypt_push_token("duplicate"),
-            push_token_updated_at=datetime.utcnow(),
+            push_token_updated_at=utc_now(),
         )
         self.db.add(second)
         with self.assertRaises(IntegrityError):
@@ -334,21 +335,21 @@ class PushLifecycleTests(unittest.TestCase):
         self._register(); self._notification()
         delivery = self.db.query(PushDelivery).one()
         delivery.status = "processing"
-        delivery.processing_started_at = datetime.utcnow() - timedelta(minutes=6)
+        delivery.processing_started_at = utc_now() - timedelta(minutes=6)
         self.db.commit()
-        claimed = claim_push_deliveries(self.db, now=datetime.utcnow())
+        claimed = claim_push_deliveries(self.db, now=utc_now())
         self.assertEqual(claimed, [delivery.id])
         self.db.refresh(delivery)
         self.assertGreater(
             delivery.processing_started_at,
-            datetime.utcnow() - timedelta(minutes=1),
+            utc_now() - timedelta(minutes=1),
         )
 
     def test_34_fresh_processing_lease_is_not_reclaimed(self):
         self._register(); self._notification()
         delivery = self.db.query(PushDelivery).one()
         delivery.status = "processing"
-        delivery.processing_started_at = datetime.utcnow()
+        delivery.processing_started_at = utc_now()
         self.db.commit()
         self.assertEqual(claim_push_deliveries(self.db), [])
 
@@ -366,7 +367,7 @@ class PushLifecycleTests(unittest.TestCase):
             PushDelivery.notification_id == second.id
         ).one()
         retry.status = "retry"
-        retry.next_attempt_at = datetime.utcnow() - timedelta(seconds=1)
+        retry.next_attempt_at = utc_now() - timedelta(seconds=1)
         self.db.commit()
         claimed = claim_push_deliveries(self.db, limit=10)
         self.assertEqual(set(claimed), {
@@ -380,7 +381,7 @@ class PushLifecycleTests(unittest.TestCase):
         self._register(); self._notification()
         delivery = self.db.query(PushDelivery).one()
         delivery.status = "processing"
-        delivery.processing_started_at = datetime.utcnow() - timedelta(minutes=6)
+        delivery.processing_started_at = utc_now() - timedelta(minutes=6)
         self.db.commit()
         self.assertEqual(claim_push_deliveries(self.db), [delivery.id])
         self.assertEqual(claim_push_deliveries(self.db), [])

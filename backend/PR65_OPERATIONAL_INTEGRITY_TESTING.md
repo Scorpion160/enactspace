@@ -13,7 +13,7 @@ Run from `backend`:
 $env:APP_ENV = 'test'
 $env:AUTO_CREATE_TABLES = 'false'
 $env:DATABASE_URL = 'sqlite://'
-$env:SECRET_KEY = 'replace-with-an-ephemeral-test-secret-at-least-32-characters'
+$env:SECRET_KEY = (& python -c "import secrets; print(secrets.token_hex(48))")
 python -m unittest test_operational_integrity test_operational_integrity_migration -v
 python -m unittest discover -v
 python -m compileall -q app

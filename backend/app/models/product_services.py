@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -40,14 +41,14 @@ class AppInstallation(Base):
     push_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     push_token_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
     __table_args__ = (
@@ -95,13 +96,13 @@ class PushDelivery(Base):
     token_hash_snapshot: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     processing_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -145,15 +146,19 @@ class SupportTicket(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    submission_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     __table_args__ = (
+        UniqueConstraint("user_id", "client_request_id", name="uq_support_ticket_client_request"),
         CheckConstraint(
             "category IN ('general', 'account', 'access', 'technical', 'billing', 'other')",
             name="ck_support_ticket_category",
@@ -182,8 +187,13 @@ class SupportTicketMessage(Base):
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
+
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    submission_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    __table_args__ = (UniqueConstraint("author_id", "client_request_id", name="uq_support_message_client_request"),)
 
 
 class ProductFeedback(Base):
@@ -202,13 +212,18 @@ class ProductFeedback(Base):
     status: Mapped[str] = mapped_column(String(20), default="new", nullable=False)
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    submission_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    public_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
+        UniqueConstraint("user_id", "client_request_id", name="uq_feedback_client_request"),
         CheckConstraint(
             "category IN ('bug', 'idea', 'usability', 'other')",
             name="ck_product_feedback_category",
@@ -248,10 +263,10 @@ class AppRelease(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
     __table_args__ = (
@@ -298,10 +313,10 @@ class AppVersionPolicy(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
     )
 
     __table_args__ = (
