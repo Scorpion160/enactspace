@@ -40,3 +40,8 @@ If documents conflict, stop and use the canonical V1.0.0 documentation. Record a
 - [Sauvegarde et restauration des données](V1_1_BACKUP_RESTORE.md)
 
 - [Copie chiffrée et récupération Windows](BACKUP_RECOVERY_WINDOWS.md)
+
+## Continuité après sauvegarde GitHub — 8 octobre 2026
+
+- [Checkpoint et vérifications du lot 27](releases/20261008-prelaunch-lot27-github-continuity.md)
+- [Configuration et génération du worker Firebase web](FIREBASE_WEB_DEPLOYMENT.md)
