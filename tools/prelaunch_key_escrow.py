@@ -6,7 +6,7 @@ GPG=Path(r"C:\Program Files\Git\usr\bin\gpg.exe")
 def crypt(value,phrase,root,*,decrypt=False):
     if not phrase or len(phrase)<20 or any(c in phrase for c in "\r\n\0"):
         raise ValueError("Use a single-line recovery passphrase of at least twenty characters")
-    work=root/("private-escrow-work-"+secrets.token_hex(6))
+    work=root/("work-"+secrets.token_hex(6))
     # On Windows, Python 3.12 mode 0700 adds an explicit Administrators
     # rule. Inherit the already-private parent, then verify user/SYSTEM ACLs.
     work.mkdir(mode=0o777 if os.name=="nt" else 0o700,exist_ok=False)
@@ -19,8 +19,15 @@ def crypt(value,phrase,root,*,decrypt=False):
         args=[str(GPG),"--no-options","--homedir","gpg","--batch","--yes","--no-tty",
             "--no-symkey-cache","--pinentry-mode","loopback","--passphrase-file","passphrase","--output","-"]
         args+=["--decrypt"] if decrypt else ["--cipher-algo","AES256","--symmetric"]
-        result=subprocess.run(args,input=value,cwd=work,capture_output=True,timeout=60)
-        if result.returncode:raise RuntimeError("portable_key_decryption_failed" if decrypt else "portable_key_encryption_failed")
+        environment=os.environ.copy();environment["LC_ALL"]="C"
+        result=subprocess.run(args,input=value,cwd=work,capture_output=True,env=environment,timeout=60)
+        if result.returncode:
+            category=""
+            diagnostic=result.stderr.decode("utf-8",errors="replace").lower()
+            if "agent" in diagnostic and ("failed to start" in diagnostic or "can't connect" in diagnostic or "no agent running" in diagnostic):category=": AGENT_START_OR_CONNECTION_FAILED"
+            elif "invalid option" in diagnostic or "unknown option" in diagnostic:category=": UNSUPPORTED_OPTION"
+            elif "passphrase" in diagnostic and ("no such file" in diagnostic or "cannot open" in diagnostic):category=": PASSPHRASE_FILE_UNAVAILABLE"
+            raise RuntimeError(("portable_key_decryption_failed" if decrypt else "portable_key_encryption_failed")+category)
         return result.stdout
     finally:
         # Stop only the agent associated with this owned home directory.

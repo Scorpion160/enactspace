@@ -51,7 +51,7 @@ class EscrowTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name=='nt','Real GnuPG and Windows ACL validation must run on Windows')
     def test_windows_real_crypto_rejects_wrong_phrase_and_tampering(self):
-        root=Path(os.environ['LOCALAPPDATA'])/'EnactSpace'/('EscrowSelfTest-'+os.urandom(6).hex())
+        root=Path(os.environ['LOCALAPPDATA'])/'EnactSpace'/('EscrowTest-'+os.urandom(6).hex())
         escrow.windows.private_directory(root)
         try:
             payload=b'synthetic payload; no production key'

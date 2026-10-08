@@ -41,3 +41,5 @@ Le correctif de `tools/prelaunch_key_escrow.py` utilise désormais les chemins r
 Cinq tests de protection du correctif ont réussi dans l'environnement isolé. Le sixième teste GnuPG et les permissions Windows avec des données fictives ; il doit être exécuté sur le PC avant l'export réel. La remise sur un support indépendant et à un second détenteur reste à faire. Aucun export réel n'est autorisé automatiquement par les tests.
 
 Le test Windows du correctif a ensuite réussi les cinq tests unitaires, mais échoué avant GnuPG au contrôle ACL du sous-dossier. La création du sous-dossier sous Windows utilise désormais les permissions héritées du parent privé, suivies du contrôle strict utilisateur/SYSTEM. Cette correction reste à vérifier sur Windows ; aucun export réel ne découle de ces tests.
+
+Au second essai Windows, le contrôle ACL passe, mais GnuPG échoue au chiffrement. Le correctif rapproche les chemins temporaires et la locale du diagnostic réussi, et ne rapporte que des catégories d’erreur fixes. Le nouveau test Windows reste à exécuter.
