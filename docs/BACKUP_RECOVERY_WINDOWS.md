@@ -43,3 +43,13 @@ Cinq tests de protection du correctif ont réussi dans l'environnement isolé. L
 Le test Windows du correctif a ensuite réussi les cinq tests unitaires, mais échoué avant GnuPG au contrôle ACL du sous-dossier. La création du sous-dossier sous Windows utilise désormais les permissions héritées du parent privé, suivies du contrôle strict utilisateur/SYSTEM. Cette correction reste à vérifier sur Windows ; aucun export réel ne découle de ces tests.
 
 Au second essai Windows, le contrôle ACL passe, mais GnuPG échoue au chiffrement. Le correctif rapproche les chemins temporaires et la locale du diagnostic réussi, et ne rapporte que des catégories d’erreur fixes. Le nouveau test Windows reste à exécuter.
+
+## Validation Windows du correctif — 8 octobre 2026, 22:04 UTC
+
+Le résultat PowerShell transmis par l’utilisateur confirme six tests réussis, sans test ignoré, en 9,964 secondes, pour le code du commit `39142a6a4f1b87757a8a0b57cbc4c939886e360d`. Les empreintes SHA-256 des trois fichiers téléchargés ont été contrôlées avant exécution.
+
+Le test Windows exerce réellement GnuPG avec des données fictives : chiffrement AES256, déchiffrement fidèle, refus d’une autre phrase et refus d’un fichier chiffré altéré. Il contrôle aussi les permissions privées utilisateur/SYSTEM et le nettoyage des espaces temporaires. Les autres tests couvrent les arguments relatifs, les erreurs masquées, les délais dépassés, la validation de la phrase et l’identification de la sauvegarde.
+
+Cette validation remplace le statut d’attente du test synthétique des paragraphes précédents, qui relatent les essais successifs. Aucune clé de sauvegarde réelle n’a été lue ou exportée, aucune opération DPAPI réelle n’a été exécutée et aucun build ni déploiement n’a eu lieu. Le bloc téléchargé travaille hors du dépôt Windows et ne met donc pas à jour ses fichiers source.
+
+Restent à réaliser : intégrer la version vérifiée au dépôt Windows sans écraser les modifications locales ; créer le secours chiffré de la clé réelle avec une phrase saisie localement ; vérifier sa récupération sur un autre profil ou poste ; organiser sa conservation et celle de la phrase par des canaux séparés ; terminer la restauration sur hôte vierge. Le succès du test synthétique ne vaut pas validation de ces étapes ni recette générale de l’application.
