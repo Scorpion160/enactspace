@@ -16,6 +16,10 @@ PHRASE='synthetic phrase for diagnostic testing only'
 PAYLOAD=b'EnactSpace synthetic diagnostic payload, no production key'
 
 
+def helper_digest(data):
+    return hashlib.sha256(data.decode('utf-8-sig').replace('\r\n','\n').encode('utf-8')).hexdigest()
+
+
 def classify(stderr):
     text=stderr.decode('utf-8',errors='replace').lower()
     if 'socket' in text and ('not permitted' in text or 'permission denied' in text):return 'SOCKET_CREATION_DENIED'
@@ -69,7 +73,7 @@ def attempt(mode,root,private):
 def execute(repo):
     if os.name!='nt':raise ValueError('Diagnostic prevu sur Windows.')
     helper=repo/'tools/prelaunch_offsite_recovery.py'
-    if hashlib.sha256(helper.read_bytes()).hexdigest()!=HELPER_SHA:
+    if helper_digest(helper.read_bytes())!=HELPER_SHA:
         raise ValueError('Source de protection Windows differente du checkpoint : arret.')
     spec=importlib.util.spec_from_file_location('escrow_private_access',helper)
     windows=importlib.util.module_from_spec(spec);spec.loader.exec_module(windows)

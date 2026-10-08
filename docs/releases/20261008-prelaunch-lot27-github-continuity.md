@@ -13,9 +13,9 @@ Une installation Python 3.12 isolée a été préparée avec les dépendances du
 - **75 tests backend réussis** : réunions, identité des comptes, cycle de vie des comptes et répétition des migrations. Cela vérifie notamment que les mots de passe de test générés restent compatibles avec les scénarios existants.
 - **26 tests réussis** : sécurité de l'extraction/restauration, copies chiffrées hors site et garde de concurrence de la capture planifiée. Ces tests synthétiques ne sont pas une nouvelle restauration de la base réelle.
 - **11 tests Firebase réussis** : validation, génération atomique, cohérence des paramètres et refus des configurations inattendues.
-- **5 tests du diagnostic Windows réussis** : modes de chemins, masquage des erreurs, comparaison des données et suppression des fichiers temporaires. Ces tests utilisent un processus GnuPG simulé ; ils ne valident pas encore le runtime Windows.
+- **6 tests du diagnostic Windows réussis** : modes de chemins, masquage des erreurs, comparaison des données et suppression des fichiers temporaires. Ces tests utilisent un processus GnuPG simulé ; ils ne valident pas encore le runtime Windows.
 
-Total : **117 exécutions de tests réussies**. Le contrôle complet du repository, la recette Flutter et les parcours sur appareils ne sont pas achevés.
+Total : **118 exécutions de tests réussies**. Le contrôle complet du repository, la recette Flutter et les parcours sur appareils ne sont pas achevés.
 
 La version installée de FastAPI émet un avertissement de dépréciation du client `httpx` via Starlette, et SQLite signale le cycle de suppression entre les tables de présences et de frais. Les tests réussissent ; ces messages doivent être examinés dans la revue de compatibilité et ne constituent pas une preuve de recette PostgreSQL.
 

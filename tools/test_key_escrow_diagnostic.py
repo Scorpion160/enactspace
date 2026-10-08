@@ -11,6 +11,9 @@ def private(path):path.mkdir(parents=True,mode=0o700,exist_ok=True)
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_helper_fingerprint_accepts_windows_line_endings(self):
+        self.assertEqual(diagnostic.helper_digest(b'line\n'),diagnostic.helper_digest(b'\xef\xbb\xbfline\r\n'))
+
     def test_path_variants_are_explicit(self):
         home=PureWindowsPath('C:/private/gpg');phrase=PureWindowsPath('C:/private/passphrase')
         self.assertEqual(diagnostic.arguments('relative_workspace',home,phrase),('gpg','passphrase'))
