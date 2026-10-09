@@ -92,7 +92,8 @@ class AcademyOperationalTests(unittest.TestCase):
  def test_no_invented_year_for_undated_minutes_and_memorial(self):
   from app.services.club_voices import MINUTES,HOMMAGE
   self.assertEqual(len({m['id'] for m in MINUTES}),len(MINUTES))
-  self.assertEqual(len(MINUTES),29)
+  # Preserve the original archive baseline while allowing new contributions.
+  self.assertGreaterEqual(len(MINUTES),29)
   self.assertIsNone(HOMMAGE['year'])
   self.assertTrue(all(m['year'] == 2020 for m in MINUTES[:6]))
   self.assertTrue(all(m['source_label'] == 'Archives Enactus ESP' for m in MINUTES if m['spoken_on']))
