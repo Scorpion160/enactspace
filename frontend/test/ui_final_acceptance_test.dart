@@ -31,14 +31,20 @@ import 'package:frontend/shared/layout/app_shell.dart';
 
 void main() {
   group('matrice routes', () {
-    test('le router déclare les 60 routes finales attendues', () {
+    test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
         r"path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
-      expect(declared, hasLength(60));
-      for (final path in const [
+      const expectedRoutes = [
+        '/help-guide',
+        '/welcome-help',
+        '/activate',
+        'manage',
+        'first-access',
+        'minutes',
+        ':minuteId',
         '/splash',
         '/login',
         '/legal/privacy',
@@ -97,9 +103,8 @@ void main() {
         '/impact',
         'records',
         ':impactRecordId',
-      ]) {
-        expect(declared, contains(path), reason: 'route absente : $path');
-      }
+      ];
+      expect(declared, unorderedEquals(expectedRoutes));
     });
 
     test('les routes publiques restent strictement bornées', () {
