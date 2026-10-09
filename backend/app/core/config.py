@@ -183,6 +183,8 @@ class Settings(BaseSettings):
         if self.PAYMENT_CURRENCY != "XOF":
             raise ValueError("PAYMENT_CURRENCY must be XOF for Mobile Money V1.1")
         if self.APP_ENV == "production" and self.MOBILE_MONEY_ENABLED:
+            if self.MOBILE_MONEY_PROVIDER == "mock":
+                raise ValueError("Mock payment provider cannot be enabled in production")
             if self.PAYDUNYA_MODE == "live" and self.MOBILE_MONEY_PROVIDER == "paydunya":
                 required_keys = [
                     self.PAYDUNYA_MASTER_KEY,

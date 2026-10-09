@@ -63,6 +63,26 @@ class JwtAlgorithmConfigTests(unittest.TestCase):
             self.make_settings(algorithm="RS256")
 
 
+class PaymentProviderProductionTests(unittest.TestCase):
+    def settings(self, *, app_env, provider, enabled):
+        values = make_settings(app_env=app_env, enable_seed=False).model_dump()
+        values.update(MOBILE_MONEY_PROVIDER=provider, MOBILE_MONEY_ENABLED=enabled)
+        return Settings(_env_file=None, **values)
+
+    def test_enabled_mock_is_rejected_in_production(self):
+        with self.assertRaisesRegex(ValueError, "Mock payment provider cannot be enabled in production"):
+            self.settings(app_env="production", provider="mock", enabled=True)
+
+    def test_mock_remains_available_only_for_enabled_test_environment(self):
+        self.assertTrue(self.settings(app_env="test", provider="mock", enabled=True).MOBILE_MONEY_ENABLED)
+
+    def test_disabled_mock_does_not_block_production_startup(self):
+        self.assertFalse(self.settings(app_env="production", provider="mock", enabled=False).MOBILE_MONEY_ENABLED)
+
+    def test_manual_proof_remains_available_in_production(self):
+        self.assertEqual(self.settings(app_env="production", provider="manual_proof", enabled=True).MOBILE_MONEY_PROVIDER, "manual_proof")
+
+
 class SeedRouteSecurityTests(unittest.TestCase):
     def test_production_requires_dedicated_refresh_hmac_key(self):
         common = {
