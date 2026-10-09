@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 import prelaunch_recruitment_cleanup as cleanup
 
 class Tests(unittest.TestCase):
@@ -56,8 +58,19 @@ class Tests(unittest.TestCase):
                 report['encrypted_archives'][name]={'bytes':27,'sha256':hashlib.sha256((directory/name).read_bytes()).hexdigest()}
                 report['encrypted_archives'][name]['bytes']=(directory/name).stat().st_size
             path=directory/'rehearsal.json';path.write_text(json.dumps(report))
-            self.assertEqual(cleanup.verify_backup(root,now)['backup_id'],'test')
-            (directory/'database.dump.gpg').write_bytes(b'tampered')
-            with self.assertRaisesRegex(RuntimeError,'integrity'):cleanup.verify_backup(root,now)
+            # Simulate the Linux mode only for this fixture on Windows; production
+            # verify_backup continues to inspect actual Linux permissions.
+            original_stat = Path.stat
+            def fixture_stat(path, *args, **kwargs):
+                value = original_stat(path, *args, **kwargs)
+                if path == directory:
+                    return SimpleNamespace(st_mode=(value.st_mode & ~0o777) | 0o700,
+                                           st_mtime=value.st_mtime, st_size=value.st_size)
+                return value
+            with patch.object(Path, 'stat', fixture_stat):
+                self.assertEqual(cleanup.verify_backup(root,now)['backup_id'],'test')
+                (directory/'database.dump.gpg').write_bytes(b'tampered')
+                with self.assertRaisesRegex(RuntimeError,'integrity'):
+                    cleanup.verify_backup(root,now)
 
 if __name__=='__main__':unittest.main()
