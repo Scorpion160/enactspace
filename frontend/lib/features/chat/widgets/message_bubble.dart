@@ -29,13 +29,20 @@ class ChatMessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: mine ? AppTheme.enactusYellow : Colors.grey.shade100,
+            color: mine
+                ? AppTheme.enactusYellow
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(18).copyWith(
               bottomRight: mine ? const Radius.circular(4) : null,
               bottomLeft: mine ? null : const Radius.circular(4),
             ),
             border: pinned
-                ? Border.all(color: AppTheme.softBlack, width: 1.4)
+                ? Border.all(
+                    color: mine
+                        ? AppTheme.softBlack
+                        : Theme.of(context).colorScheme.outline,
+                    width: 1.4,
+                  )
                 : null,
           ),
           child: child,

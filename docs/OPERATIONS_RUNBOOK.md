@@ -19,7 +19,7 @@ RPO and RTO are **to be approved by Enactus ESP**. Until approved, do not promis
 3. Quiesce writes if the migration/release plan requires it.
 4. Create and verify backups before any migration.
 5. Validate environment names with the repository validator without printing values.
-6. From `backend/`, confirm `python -m alembic heads` returns only `20260913_0009 (head)`.
+6. From `backend/`, confirm `python -m alembic heads` returns only `20261007_0031 (head)`.
 7. Apply `python -m alembic upgrade head` before starting the new application. Keep `AUTO_CREATE_TABLES=false`.
 8. Deploy the approved backend and client artifacts. The public API must use HTTPS; bind the application service to a private/loopback interface behind the proxy.
 9. Run health, authentication, authorization, file-access, and representative domain smoke checks with dedicated non-production-like operator identities.
@@ -52,3 +52,17 @@ Backups must cover PostgreSQL and persistent uploaded files, be encrypted, acces
 5. Recover using a rehearsed path, monitor recurrence, and complete a post-incident review.
 
 Contact names, escalation time objectives, RPO, RTO, and hosting/provider support channels are administrative fields in [Pôle IT handoff](POLE_IT_HANDOFF.md) and remain **to be approved by Enactus ESP** until supplied.
+
+## Première connexion à l'ouverture
+
+Le parcours source du lot 24 doit être livré avec la mise à jour backend et Flutter correspondante. Suivre [Premières connexions](FIRST_ACCESS_ONBOARDING.md) : préparation des contacts par la SG/Team Leader, activation individuelle, récupération des comptes utilisés réservée à l'administrateur, profil obligatoire et confirmation de l'année. Ne pas distribuer de mot de passe collectif ou choisi par un responsable. Les invitations de 30 minutes sont préparées après la mise à disposition de l'application. La redirection des courriels de test est conservée jusqu'à la bascule finale approuvée.
+
+## Centre d’aide — lot 25
+
+Suivre [Centre d’aide et traitement](HELP_SUPPORT_OPERATIONS.md). Le guide public reste accessible avant connexion ; l’accueil ouvre les demandes personnelles. Administration, Team Leader et SG actifs et habilités traitent les retours, avec réponses publiques et notes internes séparées. Livrer la migration 0031 et les versions backend/app/web compatibles ensemble. Vérifier les notifications en redirection avant la bascule approuvée ; aucun envoi réel n’a été effectué dans ce lot.
+
+## Sauvegarde et restauration — lot 26
+
+Restauration locale isolée vérifiée : 19 tests de protection, 111 tables et 721 lignes comparées, schéma complet contrôlé, 14 fichiers et leurs références intacts. Les modifications synthétiques de contrainte, d’index et de colonne sont détectées. La copie Windows et la récupération depuis sa clé DPAPI sont vérifiées. Restent le second secours de clé, la reprise sur un hôte neuf, la planification, la conservation et les objectifs RPO/RTO. Voir [les preuves](releases/20261008-prelaunch-lot26-backup-restore.md) et [la procédure](V1_1_BACKUP_RESTORE.md).
+
+Sauvegardes planifiées : timer actif à 03 h 00 UTC et premier lancement systemd validé, quatre tests de garde réussis. La copie automatique hors du VPS, le secours de clé remis à un second détenteur et la reprise sur un hôte neuf restent à terminer. Voir les preuves du lot 26.

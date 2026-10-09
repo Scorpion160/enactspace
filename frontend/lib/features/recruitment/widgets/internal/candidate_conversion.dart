@@ -1,3 +1,4 @@
+import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -72,7 +73,7 @@ class _CandidateIntegrationSectionState
               value: alreadyLinked ? 'Déjà membre' : 'À créer ou à réactiver',
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'L’intégration crée ou active un compte membre. Elle reste '
               'strictement séparée de la décision de recrutement.',
             ),
@@ -91,15 +92,17 @@ class _CandidateIntegrationSectionState
                   key: const Key('candidate-integration-prepare'),
                   onPressed: _open,
                   icon: const Icon(Icons.assignment_ind_outlined),
-                  label: const Text('Préparer l’intégration'),
+                  label: Text('Préparer l’intégration'),
                 ),
               ),
             ] else if (!alreadyLinked && !application.canConvert) ...[
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'L’intégration est réservée aux responsables autorisés par le '
                 'serveur.',
-                style: TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -143,7 +146,6 @@ class CandidateConversionDialog extends StatefulWidget {
 
 class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
   final _assignmentFormKey = GlobalKey<FormState>();
-  final _password = TextEditingController();
   CandidateConversionCatalog? _catalog;
   CandidateConversionResult? _result;
   Object? _catalogError;
@@ -154,7 +156,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
   final Set<String> _supportPoleIds = {};
   int _step = 0;
   bool _loadingCatalog = true;
-  bool _obscurePassword = true;
   bool _confirmed = false;
   bool _sending = false;
 
@@ -170,7 +171,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
 
   @override
   void dispose() {
-    _password.dispose();
     super.dispose();
   }
 
@@ -225,8 +225,8 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
       Text(
         'Étape ${_step + 1} sur 3',
         key: const Key('candidate-conversion-step'),
-        style: const TextStyle(
-          color: AppTheme.secondaryText,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -246,8 +246,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
           corePoleId: _corePoleId,
           projectId: _projectId,
           supportPoleIds: _supportPoleIds,
-          passwordController: _password,
-          obscurePassword: _obscurePassword,
           onRetry: _loadCatalog,
           onProfileChanged: (value) => setState(() => _profileType = value),
           onCorePoleChanged: (value) => setState(() => _corePoleId = value),
@@ -255,8 +253,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
           onSupportPoleChanged: (id, selected) => setState(() {
             selected ? _supportPoleIds.add(id) : _supportPoleIds.remove(id);
           }),
-          onPasswordVisibilityChanged: () =>
-              setState(() => _obscurePassword = !_obscurePassword),
         ),
         _ => CandidateConversionReview(
           application: widget.application,
@@ -297,7 +293,7 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
       FilledButton(
         key: const Key('candidate-conversion-next'),
         onPressed: _sending ? null : _next,
-        child: const Text('Continuer'),
+        child: Text('Continuer'),
       )
     else
       FilledButton(
@@ -308,7 +304,7 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
                 dimension: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Text('Finaliser l’intégration'),
+            : Text('Finaliser l’intégration'),
       ),
   ];
 
@@ -316,7 +312,7 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
     FilledButton(
       key: const Key('candidate-conversion-close-result'),
       onPressed: () => Navigator.of(context).pop(result),
-      child: const Text('Fermer'),
+      child: Text('Fermer'),
     ),
   ];
 
@@ -341,7 +337,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
       final result = await widget.gateway.convertCandidate(
         CandidateConversionRequest(
           applicationId: widget.application.id,
-          password: _password.text.trim(),
           profileType: _profileType,
           corePoleId: _corePoleId,
           supportPoleIds: _supportPoleIds.toList(),
@@ -395,9 +390,9 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
       _IntegrationLine(label: 'Pôle cœur', value: _corePoleName),
       _IntegrationLine(label: 'Projet', value: _projectName),
       const SizedBox(height: 12),
-      const Text(
+      Text(
         'Aucun mot de passe n’est conservé ni affiché dans ce résultat.',
-        style: TextStyle(color: AppTheme.secondaryText),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     ],
   );
@@ -424,7 +419,7 @@ class CandidateConversionSummary extends StatelessWidget {
         ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 8),
-      const Text(
+      Text(
         'Cette opération crée un compte ou active et relie un compte existant.',
       ),
       const SizedBox(height: 14),
@@ -461,14 +456,11 @@ class CandidateAssignmentStep extends StatelessWidget {
   final String? corePoleId;
   final String? projectId;
   final Set<String> supportPoleIds;
-  final TextEditingController passwordController;
-  final bool obscurePassword;
   final VoidCallback onRetry;
   final ValueChanged<String> onProfileChanged;
   final ValueChanged<String?> onCorePoleChanged;
   final ValueChanged<String?> onProjectChanged;
   final void Function(String id, bool selected) onSupportPoleChanged;
-  final VoidCallback onPasswordVisibilityChanged;
 
   const CandidateAssignmentStep({
     super.key,
@@ -479,14 +471,11 @@ class CandidateAssignmentStep extends StatelessWidget {
     required this.corePoleId,
     required this.projectId,
     required this.supportPoleIds,
-    required this.passwordController,
-    required this.obscurePassword,
     required this.onRetry,
     required this.onProfileChanged,
     required this.onCorePoleChanged,
     required this.onProjectChanged,
     required this.onSupportPoleChanged,
-    required this.onPasswordVisibilityChanged,
   });
 
   @override
@@ -517,7 +506,7 @@ class CandidateAssignmentStep extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Réessayer'),
+            label: Text('Réessayer'),
           ),
         ],
       );
@@ -541,10 +530,12 @@ class CandidateAssignmentStep extends StatelessWidget {
           label: 'Rôle attribué',
           value: 'Membre EnactSpace',
         ),
-        const Text(
+        Text(
           'Le serveur attribue le rôle membre de base. Le profil ci-dessous '
           'adapte uniquement la présentation du membre.',
-          style: TextStyle(color: AppTheme.secondaryText),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
@@ -579,10 +570,7 @@ class CandidateAssignmentStep extends StatelessWidget {
         ),
         if (supportPoles.isNotEmpty) ...[
           const SizedBox(height: 14),
-          const Text(
-            'Pôles support',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
+          Text('Pôles support', style: TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -619,30 +607,9 @@ class CandidateAssignmentStep extends StatelessWidget {
           onChanged: onProjectChanged,
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          key: const Key('candidate-conversion-password'),
-          controller: passwordController,
-          obscureText: obscurePassword,
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Mot de passe initial',
-            helperText: '8 caractères minimum. Il ne sera pas réaffiché.',
-            suffixIcon: IconButton(
-              key: const Key('candidate-conversion-password-visibility'),
-              onPressed: onPasswordVisibilityChanged,
-              tooltip: obscurePassword
-                  ? 'Afficher le mot de passe'
-                  : 'Masquer le mot de passe',
-              icon: Icon(
-                obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-              ),
-            ),
-          ),
-          validator: (value) => (value ?? '').trim().length < 8
-              ? 'Le mot de passe doit contenir au moins 8 caractères.'
-              : null,
+        const Text(
+          'Le membre recevra un code personnel pour choisir son mot de passe et compléter son profil.',
+          style: TextStyle(height: 1.5),
         ),
       ],
     );
@@ -707,7 +674,7 @@ class CandidateConversionReview extends StatelessWidget {
         contentPadding: EdgeInsets.zero,
         value: confirmed,
         onChanged: sending ? null : (value) => onConfirmed(value ?? false),
-        title: const Text(
+        title: Text(
           'Je confirme les affectations et l’ouverture de l’accès EnactSpace.',
         ),
         controlAffinity: ListTileControlAffinity.leading,
@@ -727,7 +694,7 @@ class _ConversionNotice extends StatelessWidget {
       color: AppTheme.enactusYellow.withValues(alpha: .16),
       borderRadius: BorderRadius.circular(10),
     ),
-    child: const Text(
+    child: Text(
       'Cette opération est distincte de la décision de recrutement.',
       style: TextStyle(fontWeight: FontWeight.w800),
     ),
@@ -773,10 +740,7 @@ class _IntegrationLine extends StatelessWidget {
       children: [
         SizedBox(
           width: 140,
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+          child: Text(label, style: TextStyle(fontWeight: FontWeight.w700)),
         ),
         Expanded(child: Text(value)),
       ],
@@ -805,7 +769,7 @@ String _humanConversionError(Object error) {
     return 'Un membre actif utilise déjà cette adresse e-mail.';
   }
   if (normalized.contains('mot de passe')) {
-    return 'Le mot de passe initial doit contenir au moins 8 caractères.';
+    return 'Le membre choisit son mot de passe dans Première connexion.';
   }
   if (normalized.contains('pôle introuvable') ||
       normalized.contains('pole introuvable')) {
@@ -819,7 +783,8 @@ String _humanConversionError(Object error) {
       normalized.contains('socket')) {
     return 'Le réseau est indisponible. Vérifiez la connexion puis réessayez.';
   }
-  return raw.isEmpty
-      ? 'Impossible de finaliser l’intégration. Réessayez.'
-      : raw;
+  return recruitmentMessage(
+    error,
+    fallback: 'Impossible de finaliser l’intégration. Réessayez.',
+  );
 }

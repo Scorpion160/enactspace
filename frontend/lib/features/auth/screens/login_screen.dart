@@ -1,27 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/academic/esp_academic_catalog.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/biometric_authenticator.dart';
+import '../../../core/auth/login_preferences.dart';
 import '../../../core/brand/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AuthService? authService;
+  final BiometricAuthenticator? biometrics;
+  const LoginScreen({super.key, this.authService, this.biometrics});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _authService = AuthService();
+  late final AuthService _authService;
+  late final BiometricAuthenticator _biometrics;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
+  bool _biometricAvailable = false;
+  bool _automaticBiometricAttempted = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = widget.authService ?? AuthService();
+    _biometrics = widget.biometrics ?? BiometricAuthenticator();
+    _prepareRememberedLogin();
+  }
+
+  Future<void> _prepareRememberedLogin() async {
+    final remembered = await LoginPreferences.readIdentifier();
+    final hasSession = await _authService.isLoggedIn();
+    final supported = await _biometrics.isAvailable();
+    final cached = remembered == null && hasSession
+        ? await _authService.getCachedCurrentUser()
+        : null;
+    final identifier = remembered ?? cached?['email']?.toString();
+    if (!mounted) return;
+    setState(() {
+      if (_emailController.text.isEmpty && identifier != null) {
+        _emailController.text = identifier;
+      }
+      _biometricAvailable = hasSession && supported;
+    });
+    if (_biometricAvailable && !_automaticBiometricAttempted) {
+      _automaticBiometricAttempted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_loading) _loginWithBiometrics();
+      });
+    }
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final authenticated = await _biometrics.authenticate();
+      if (!authenticated) {
+        if (mounted) {
+          setState(
+            () => _error =
+                'Déverrouillage annulé. Réessaie avec la biométrie ou utilise ton mot de passe.',
+          );
+        }
+        return;
+      }
+      final restored = await _authService.restoreSession();
+      if (!mounted) return;
+      if (restored) {
+        context.go('/dashboard');
+      } else {
+        setState(() {
+          _biometricAvailable = false;
+          _error =
+              'La session sécurisée a expiré. Connecte-toi une fois avec ton mot de passe.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Authentification biométrique indisponible. Utilise ton mot de passe.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -37,10 +116,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      final identifier = _emailController.text.trim();
       await _authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        identifier: identifier,
+        password: _passwordController.text,
       );
+      await LoginPreferences.rememberIdentifier(identifier);
 
       if (!mounted) return;
       context.go('/dashboard');
@@ -64,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Row(
         children: [
-          if (isWide) const Expanded(flex: 4, child: _BrandPanel()),
+          if (isWide) Expanded(flex: 4, child: _BrandPanel()),
           Expanded(
             flex: 5,
             child: _LoginPanel(
@@ -72,12 +153,14 @@ class _LoginScreenState extends State<LoginScreen> {
               passwordController: _passwordController,
               obscurePassword: _obscurePassword,
               loading: _loading,
+              biometricAvailable: _biometricAvailable,
               error: _error,
               showMobileBrand: !isWide,
               onTogglePassword: () {
                 setState(() => _obscurePassword = !_obscurePassword);
               },
               onLogin: _login,
+              onBiometric: _loginWithBiometrics,
             ),
           ),
         ],
@@ -94,120 +177,47 @@ class _BrandPanel extends StatelessWidget {
     return ColoredBox(
       color: AppTheme.softBlack,
       child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 720;
-            final padding = compact ? 32.0 : 42.0;
-            final logoSize = compact ? 112.0 : 142.0;
-            final minPanelHeight = (constraints.maxHeight - (padding * 2))
-                .clamp(0.0, double.infinity)
-                .toDouble();
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(padding),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: minPanelHeight),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _BrandMark(size: logoSize, onDark: true),
-                        SizedBox(height: compact ? 20 : 28),
-                        const Text(
-                          'Enactus ESP',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'EnactSpace',
-                          style: TextStyle(
-                            color: AppTheme.enactusYellow,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Le QG numérique des Enacteurs: annonces, tâches, '
-                          'présences, documents, finance, projets et vie de '
-                          'communauté.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 17,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            _BrandPill(
-                              icon: Icons.forum_rounded,
-                              label: 'Fil social',
-                            ),
-                            _BrandPill(
-                              icon: Icons.task_alt_rounded,
-                              label: 'Tâches',
-                            ),
-                            _BrandPill(
-                              icon: Icons.groups_2_rounded,
-                              label: 'Communauté',
-                            ),
-                            _BrandPill(
-                              icon: Icons.notifications_rounded,
-                              label: 'Alertes',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 28),
-                        const _BrandGeometry(),
-                      ],
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _BrandMark(size: 118, onDark: true),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'EnactSpace',
+                    style: TextStyle(
+                      color: AppTheme.enactusYellow,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w900,
                     ),
-                    Padding(
-                      padding: EdgeInsets.only(top: compact ? 24 : 34),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.10),
-                          ),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.verified_rounded,
-                              color: AppTheme.enactusYellow,
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Connexion sécurisée, accès par rôle et '
-                                'expérience pensée pour mobile, tablette et web.',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Enactus ESP',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Un espace simple pour collaborer, apprendre et faire avancer les projets du club.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -219,44 +229,42 @@ class _LoginPanel extends StatelessWidget {
   final TextEditingController passwordController;
   final bool obscurePassword;
   final bool loading;
+  final bool biometricAvailable;
   final String? error;
   final bool showMobileBrand;
   final VoidCallback onTogglePassword;
   final VoidCallback onLogin;
+  final VoidCallback onBiometric;
 
   const _LoginPanel({
     required this.emailController,
     required this.passwordController,
     required this.obscurePassword,
     required this.loading,
+    required this.biometricAvailable,
     required this.error,
     required this.showMobileBrand,
     required this.onTogglePassword,
     required this.onLogin,
+    required this.onBiometric,
   });
 
   void _showForgotPasswordDialog(BuildContext context) {
     showDialog(context: context, builder: (_) => const _ForgotPasswordDialog());
   }
 
-  void _showJoinRequestSheet(
-    BuildContext context, {
-    String profileType = 'enacteur',
-  }) {
+  void _showJoinRequestSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => _JoinEnactusSheet(initialProfileType: profileType),
+      showDragHandle: false,
+      builder: (_) => const _JoinEnactusSheet(),
     );
   }
 
   void _showGuideDialog(BuildContext context) {
     showDialog(context: context, builder: (_) => const _BeginnerGuideDialog());
-  }
-
-  void _showBiometricDialog(BuildContext context) {
-    showDialog(context: context, builder: (_) => const _BiometricSetupDialog());
   }
 
   @override
@@ -290,37 +298,39 @@ class _LoginPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
-                        'Connexion des comptes validés',
+                      Text(
+                        'Bienvenue sur EnactSpace',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Accède à ton espace Enactus ESP avec ton compte validé.',
-                        style: TextStyle(color: Colors.black54, height: 1.4),
+                      SizedBox(height: 6),
+                      Text(
+                        'Connecte-toi avec ton email ou ton nom d’utilisateur.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      const _ValidatedAccountHint(),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       TextField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
+                          labelText: 'Identifiant',
+                          hintText: 'Email ou nom d’utilisateur',
+                          prefixIcon: Icon(Icons.alternate_email_rounded),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       TextField(
                         controller: passwordController,
                         obscureText: obscurePassword,
                         onSubmitted: (_) => loading ? null : onLogin(),
                         decoration: InputDecoration(
                           labelText: 'Mot de passe',
-                          prefixIcon: const Icon(Icons.lock_outline),
+                          prefixIcon: Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             onPressed: onTogglePassword,
                             tooltip: obscurePassword
@@ -334,25 +344,25 @@ class _LoginPanel extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: loading
                               ? null
                               : () => _showForgotPasswordDialog(context),
-                          child: const Text('Mot de passe oublié ?'),
+                          child: Text('Mot de passe oublié ?'),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      SizedBox(height: 14),
                       if (error != null) ...[
                         _ErrorBanner(message: error!),
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
                       ],
                       ElevatedButton.icon(
                         onPressed: loading ? null : onLogin,
                         icon: loading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
@@ -360,47 +370,37 @@ class _LoginPanel extends StatelessWidget {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Icon(Icons.login_rounded),
-                        label: const Text('Se connecter'),
+                            : Icon(Icons.login_rounded),
+                        label: Text('Se connecter'),
                       ),
-                      const SizedBox(height: 12),
-                      const _LoginSectionLabel('Autres accès'),
-                      const SizedBox(height: 6),
-                      _AccountRequestActions(
-                        loading: loading,
-                        onCreateMemberAccount: () =>
-                            _showJoinRequestSheet(context),
-                        onCreateAlumniAccount: () => _showJoinRequestSheet(
-                          context,
-                          profileType: 'alumni',
+                      if (biometricAvailable) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          key: const Key('biometric_unlock'),
+                          onPressed: loading ? null : onBiometric,
+                          icon: const Icon(Icons.fingerprint_rounded),
+                          label: const Text('Déverrouiller avec la biométrie'),
                         ),
+                      ],
+                      SizedBox(height: 12),
+                      const _LoginSectionLabel('Autres accès'),
+                      SizedBox(height: 6),
+                      OutlinedButton.icon(
+                        onPressed: loading
+                            ? null
+                            : () => _showJoinRequestSheet(context),
+                        icon: Icon(Icons.person_add_alt_1_rounded),
+                        label: Text('Créer un compte'),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       const Divider(height: 1),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       const _LoginSectionLabel('Candidature Enactus ESP'),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       _LoginSupportActions(
                         onRecruitment: () => context.go('/recruitment/apply'),
                         onTracking: () => context.go('/application-tracking'),
                         onGuide: () => _showGuideDialog(context),
-                        onBiometric: () => _showBiometricDialog(context),
-                      ),
-                      const SizedBox(height: 18),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.enactusYellow.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Text(
-                          'Les nouveaux comptes sont validés par les responsables autorisés avant accès complet.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -423,74 +423,11 @@ class _LoginSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        color: Colors.black54,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 12,
         fontWeight: FontWeight.w900,
       ),
-    );
-  }
-}
-
-class _ValidatedAccountHint extends StatelessWidget {
-  const _ValidatedAccountHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.30),
-        ),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.verified_user_rounded, size: 20),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Cette connexion est réservée aux comptes validés. Les candidats suivent leur dossier dans l’espace candidature.',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AccountRequestActions extends StatelessWidget {
-  final bool loading;
-  final VoidCallback onCreateMemberAccount;
-  final VoidCallback onCreateAlumniAccount;
-
-  const _AccountRequestActions({
-    required this.loading,
-    required this.onCreateMemberAccount,
-    required this.onCreateAlumniAccount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton.icon(
-          onPressed: loading ? null : onCreateMemberAccount,
-          icon: const Icon(Icons.school_rounded),
-          label: const Text('Compte Enacteur / Enactrice'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: loading ? null : onCreateAlumniAccount,
-          icon: const Icon(Icons.workspace_premium_rounded),
-          label: const Text('Compte Alumni'),
-        ),
-      ],
     );
   }
 }
@@ -499,13 +436,11 @@ class _LoginSupportActions extends StatelessWidget {
   final VoidCallback onRecruitment;
   final VoidCallback onTracking;
   final VoidCallback onGuide;
-  final VoidCallback onBiometric;
 
   const _LoginSupportActions({
     required this.onRecruitment,
     required this.onTracking,
     required this.onGuide,
-    required this.onBiometric,
   });
 
   @override
@@ -516,24 +451,30 @@ class _LoginSupportActions extends StatelessWidget {
       runSpacing: 8,
       children: [
         TextButton.icon(
+          onPressed: () => context.go('/activate'),
+          icon: const Icon(Icons.key_outlined),
+          label: const Text('Première connexion'),
+        ),
+        TextButton.icon(
+          onPressed: () => context.push('/help-guide'),
+          icon: const Icon(Icons.menu_book_outlined),
+          label: const Text('Guide et FAQ'),
+        ),
+
+        TextButton.icon(
           onPressed: onRecruitment,
-          icon: const Icon(Icons.how_to_reg_rounded),
-          label: const Text('Postuler'),
+          icon: Icon(Icons.how_to_reg_rounded),
+          label: Text('Postuler'),
         ),
         TextButton.icon(
           onPressed: onTracking,
-          icon: const Icon(Icons.route_rounded),
-          label: const Text('Suivre ma candidature'),
+          icon: Icon(Icons.route_rounded),
+          label: Text('Suivre ma candidature'),
         ),
         TextButton.icon(
           onPressed: onGuide,
-          icon: const Icon(Icons.explore_rounded),
-          label: const Text('Guide débutant'),
-        ),
-        TextButton.icon(
-          onPressed: onBiometric,
-          icon: const Icon(Icons.fingerprint_rounded),
-          label: const Text('Biométrie'),
+          icon: Icon(Icons.explore_rounded),
+          label: Text('Guide débutant'),
         ),
       ],
     );
@@ -649,7 +590,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Réinitialiser le mot de passe'),
+      title: const _PublicDialogTitle('Mot de passe oublié'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: SingleChildScrollView(
@@ -657,11 +598,14 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Un code OTP sera envoyé à ton email avant de définir le nouveau mot de passe.',
-                style: TextStyle(color: Colors.black54, height: 1.4),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -672,7 +616,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 ),
               ),
               if (_codeSent) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextField(
                   controller: _otpController,
                   keyboardType: TextInputType.number,
@@ -681,13 +625,13 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                     prefixIcon: Icon(Icons.pin_outlined),
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Nouveau mot de passe',
-                    prefixIcon: const Icon(Icons.lock_reset_rounded),
+                    prefixIcon: Icon(Icons.lock_reset_rounded),
                     suffixIcon: IconButton(
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
@@ -703,7 +647,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextField(
                   controller: _confirmController,
                   obscureText: _obscurePassword,
@@ -714,7 +658,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 ),
               ],
               if (_error != null) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 _ErrorBanner(message: _error!),
               ],
             ],
@@ -724,12 +668,12 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
+          child: Text('Fermer'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : (_codeSent ? _confirmReset : _sendCode),
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
@@ -743,9 +687,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
 }
 
 class _JoinEnactusSheet extends StatefulWidget {
-  final String initialProfileType;
-
-  const _JoinEnactusSheet({required this.initialProfileType});
+  const _JoinEnactusSheet();
 
   @override
   State<_JoinEnactusSheet> createState() => _JoinEnactusSheetState();
@@ -755,49 +697,35 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
   final AuthService _authService = AuthService();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _photoController = TextEditingController();
   final _departmentController = TextEditingController();
   final _levelController = TextEditingController();
   final _promotionController = TextEditingController();
-  final _skillsController = TextEditingController();
-  final _linkedinController = TextEditingController();
-  final _githubController = TextEditingController();
-  final _portfolioController = TextEditingController();
-  final _motivationController = TextEditingController();
+  final _joinYearController = TextEditingController();
 
-  late String _profileType;
-  String _gender = 'homme';
+  bool _isAlumni = false;
+  String? _gender;
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _profileType = widget.initialProfileType;
-  }
-
-  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _phoneController.dispose();
-    _photoController.dispose();
     _departmentController.dispose();
     _levelController.dispose();
     _promotionController.dispose();
-    _skillsController.dispose();
-    _linkedinController.dispose();
-    _githubController.dispose();
-    _portfolioController.dispose();
-    _motivationController.dispose();
+    _joinYearController.dispose();
     super.dispose();
   }
 
@@ -805,12 +733,30 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     final requiredFields = [
       _firstNameController.text.trim(),
       _lastNameController.text.trim(),
+      _usernameController.text.trim(),
       _emailController.text.trim(),
+      _phoneController.text.trim(),
       _departmentController.text.trim(),
+      _levelController.text.trim(),
+      _gender ?? '',
     ];
-
     if (requiredFields.any((value) => value.isEmpty)) {
-      setState(() => _error = 'Complète au moins identité, email et filière.');
+      setState(
+        () => _error =
+            'Prénom, nom, nom d’utilisateur, genre, email, téléphone, département et niveau sont obligatoires.',
+      );
+      return;
+    }
+    if (_isAlumni &&
+        [
+          _departmentController.text.trim(),
+          _promotionController.text.trim(),
+          _joinYearController.text.trim(),
+        ].any((value) => value.isEmpty)) {
+      setState(
+        () => _error =
+            'Pour un Alumni, département, année d’entrée et année d’arrivée dans Enactus ESP sont obligatoires.',
+      );
       return;
     }
     if (_passwordController.text.length < 8) {
@@ -824,6 +770,16 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
       return;
     }
 
+    final joinYear = _joinYearController.text.trim().isEmpty
+        ? null
+        : int.tryParse(_joinYearController.text.trim());
+    if (_joinYearController.text.trim().isNotEmpty && joinYear == null) {
+      setState(
+        () => _error = 'L’année d’entrée dans Enactus doit être valide.',
+      );
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -831,22 +787,18 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
 
     try {
       await _authService.submitJoinRequest(
-        profileType: _profileType,
-        gender: _gender,
+        profileType: _isAlumni ? 'alumni' : 'enacteur',
+        gender: _gender!,
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
+        username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
         phone: _phoneController.text.trim(),
-        photoUrl: _photoController.text.trim(),
+        enactusJoinYear: _isAlumni ? joinYear : null,
         department: _departmentController.text.trim(),
         level: _levelController.text.trim(),
-        promotion: _promotionController.text.trim(),
-        skills: _skillsController.text.trim(),
-        linkedinUrl: _linkedinController.text.trim(),
-        githubUrl: _githubController.text.trim(),
-        portfolioUrl: _portfolioController.text.trim(),
-        motivation: _motivationController.text.trim(),
+        promotion: _isAlumni ? _promotionController.text.trim() : null,
       );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -893,54 +845,60 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                         width: 42,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.black26,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    const Text(
+                    SizedBox(height: 18),
+                    Text(
                       'Rejoindre Enactus ESP',
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       'Le compte reste en attente jusqu’à validation par les responsables autorisés.',
-                      style: TextStyle(color: Colors.black54, height: 1.4),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
                     ),
-                    const SizedBox(height: 18),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(
-                          value: 'enacteur',
-                          label: Text('Enacteur / Enactrice'),
-                          icon: Icon(Icons.school_rounded),
-                        ),
-                        ButtonSegment(
-                          value: 'alumni',
-                          label: Text('Alumni'),
-                          icon: Icon(Icons.workspace_premium_rounded),
-                        ),
-                      ],
-                      selected: {_profileType},
-                      onSelectionChanged: (values) {
-                        setState(() => _profileType = values.first);
-                      },
+                    SizedBox(height: 18),
+                    SwitchListTile.adaptive(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      value: _isAlumni,
+                      onChanged: _loading
+                          ? null
+                          : (value) => setState(() => _isAlumni = value),
+                      title: Text(
+                        'Je suis Alumni',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        'Active cette option si ton parcours Enactus ESP est déjà terminé.',
+                      ),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     DropdownButtonFormField<String>(
                       initialValue: _gender,
+                      isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Genre',
+                        labelText: 'Genre *',
                         prefixIcon: Icon(Icons.person_outline_rounded),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'homme', child: Text('Homme')),
                         DropdownMenuItem(value: 'femme', child: Text('Femme')),
+                        DropdownMenuItem(
+                          value: 'non_precise',
+                          child: Text('Préfère ne pas préciser'),
+                        ),
                       ],
+                      validator: (value) =>
+                          value == null ? 'Champ obligatoire' : null,
                       onChanged: _loading
                           ? null
                           : (value) {
@@ -949,7 +907,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                               }
                             },
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final twoColumns = constraints.maxWidth >= 560;
@@ -973,79 +931,67 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                               width: fieldWidth,
                             ),
                             _JoinField(
+                              controller: _usernameController,
+                              label: 'Nom d’utilisateur *',
+                              icon: Icons.alternate_email_rounded,
+                              width: fieldWidth,
+                            ),
+                            _JoinField(
                               controller: _emailController,
-                              label: 'Email',
+                              label: 'Email *',
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
                               width: fieldWidth,
                             ),
                             _JoinField(
                               controller: _phoneController,
-                              label: 'Téléphone',
+                              label: 'Téléphone *',
                               icon: Icons.phone_outlined,
                               keyboardType: TextInputType.phone,
                               width: fieldWidth,
                             ),
-                            _JoinField(
-                              controller: _photoController,
-                              label: 'Photo de profil (lien)',
-                              icon: Icons.add_a_photo_outlined,
-                              keyboardType: TextInputType.url,
-                              width: fieldWidth,
-                            ),
-                            _JoinField(
+                            _JoinChoiceField(
                               controller: _departmentController,
-                              label: 'Filière / école',
+                              label: 'Département ESP *',
                               icon: Icons.account_balance_outlined,
                               width: fieldWidth,
+                              options: espAcademicDepartments,
                             ),
-                            _JoinField(
+                            _JoinChoiceField(
                               controller: _levelController,
-                              label: _profileType == 'alumni'
-                                  ? 'Dernier niveau'
-                                  : 'Niveau',
-                              icon: Icons.timeline_rounded,
+                              label: 'Niveau d’études *',
+                              icon: Icons.school_outlined,
                               width: fieldWidth,
+                              options: espAcademicLevels,
                             ),
-                            _JoinField(
-                              controller: _promotionController,
-                              label: 'Promotion',
-                              icon: Icons.groups_3_outlined,
-                              width: fieldWidth,
-                            ),
-                            _JoinField(
-                              controller: _linkedinController,
-                              label: 'LinkedIn',
-                              icon: Icons.link_rounded,
-                              keyboardType: TextInputType.url,
-                              width: fieldWidth,
-                            ),
-                            _JoinField(
-                              controller: _githubController,
-                              label: 'GitHub',
-                              icon: Icons.code_rounded,
-                              keyboardType: TextInputType.url,
-                              width: fieldWidth,
-                            ),
-                            _JoinField(
-                              controller: _portfolioController,
-                              label: 'Portfolio',
-                              icon: Icons.language_rounded,
-                              keyboardType: TextInputType.url,
-                              width: fieldWidth,
-                            ),
+                            if (_isAlumni) ...[
+                              _JoinField(
+                                controller: _promotionController,
+                                label: 'Promotion (année d’entrée à l’ESP) *',
+                                icon: Icons.groups_3_outlined,
+                                keyboardType: TextInputType.number,
+                                width: fieldWidth,
+                              ),
+                              _JoinField(
+                                controller: _joinYearController,
+                                label: 'Année d’arrivée dans Enactus ESP *',
+                                icon: Icons.calendar_month_outlined,
+                                keyboardType: TextInputType.number,
+                                width: fieldWidth,
+                              ),
+                            ],
                           ],
                         );
                       },
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       autofillHints: const [AutofillHints.newPassword],
                       decoration: InputDecoration(
                         labelText: 'Mot de passe',
-                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        prefixIcon: Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
                           onPressed: () {
                             setState(
@@ -1063,7 +1009,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     TextField(
                       controller: _confirmPasswordController,
                       obscureText: _obscurePassword,
@@ -1073,31 +1019,11 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                         prefixIcon: Icon(Icons.verified_user_outlined),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _skillsController,
-                      minLines: 2,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Compétences clés',
-                        prefixIcon: Icon(Icons.auto_awesome_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _motivationController,
-                      minLines: 3,
-                      maxLines: 5,
-                      decoration: const InputDecoration(
-                        labelText: 'Motivation / expérience Enactus',
-                        prefixIcon: Icon(Icons.edit_note_rounded),
-                      ),
-                    ),
                     if (_error != null) ...[
-                      const SizedBox(height: 14),
+                      SizedBox(height: 14),
                       _ErrorBanner(message: _error!),
                     ],
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     Row(
                       children: [
                         Expanded(
@@ -1105,23 +1031,23 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
                             onPressed: _loading
                                 ? null
                                 : () => Navigator.of(context).pop(),
-                            child: const Text('Annuler'),
+                            child: Text('Annuler'),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _loading ? null : _submit,
                             icon: _loading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 18,
                                     height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Icon(Icons.send_rounded),
-                            label: const Text('Envoyer'),
+                                : Icon(Icons.send_rounded),
+                            label: Text('Envoyer'),
                           ),
                         ),
                       ],
@@ -1165,6 +1091,50 @@ class _JoinField extends StatelessWidget {
   }
 }
 
+class _JoinChoiceField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final double width;
+  final List<String> options;
+
+  const _JoinChoiceField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.width,
+    required this.options,
+  });
+
+  @override
+  State<_JoinChoiceField> createState() => _JoinChoiceFieldState();
+}
+
+class _JoinChoiceFieldState extends State<_JoinChoiceField> {
+  @override
+  Widget build(BuildContext context) {
+    final current = widget.controller.text.trim();
+    return SizedBox(
+      width: widget.width,
+      child: DropdownButtonFormField<String>(
+        initialValue: widget.options.contains(current) ? current : null,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          prefixIcon: Icon(widget.icon),
+        ),
+        items: [
+          for (final option in widget.options)
+            DropdownMenuItem(value: option, child: Text(option)),
+        ],
+        onChanged: (value) => setState(() {
+          widget.controller.text = value ?? '';
+        }),
+      ),
+    );
+  }
+}
+
 class _BeginnerGuideDialog extends StatelessWidget {
   const _BeginnerGuideDialog();
 
@@ -1193,12 +1163,12 @@ class _BeginnerGuideDialog extends StatelessWidget {
         icon: Icons.privacy_tip_rounded,
         title: 'Accès adapté',
         body:
-            'L’interface change selon ton rôle: Enacteur, Alumni, Enacchef, Financier ou Admin.',
+            'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
       ),
     ];
 
     return AlertDialog(
-      title: const Text('Guide débutant'),
+      title: const _PublicDialogTitle('Guide débutant'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -1216,7 +1186,7 @@ class _BeginnerGuideDialog extends StatelessWidget {
                   ),
                   title: Text(
                     item.title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                   subtitle: Text(item.body),
                 ),
@@ -1229,8 +1199,8 @@ class _BeginnerGuideDialog extends StatelessWidget {
       actions: [
         ElevatedButton.icon(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.check_rounded),
-          label: const Text('Compris'),
+          icon: Icon(Icons.check_rounded),
+          label: Text('Compris'),
         ),
       ],
     );
@@ -1249,57 +1219,58 @@ class _GuideItem {
   });
 }
 
-class _BiometricSetupDialog extends StatelessWidget {
-  const _BiometricSetupDialog();
+class _MobileBrandHeader extends StatelessWidget {
+  const _MobileBrandHeader();
+
+  @override
+  Widget build(BuildContext context) => const _PublicInlineHeader();
+}
+
+class _PublicInlineHeader extends StatelessWidget {
+  const _PublicInlineHeader();
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Déverrouillage biométrique'),
-      content: const Text(
-        'L’écran est prêt pour Face ID, empreinte et déverrouillage mobile. '
-        'La dépendance native sera ajoutée lors du branchement mobile final.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Plus tard'),
+    final scaledBodySize = MediaQuery.textScalerOf(context).scale(16);
+    final showLabel = scaledBodySize < 24;
+    return Row(
+      children: [
+        Image.asset(
+          BrandAssets.logoFull,
+          width: 112,
+          height: 46,
+          fit: BoxFit.contain,
         ),
-        ElevatedButton.icon(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.fingerprint_rounded),
-          label: const Text('Activer bientôt'),
-        ),
+        if (showLabel) ...[
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'EnactSpace',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _MobileBrandHeader extends StatelessWidget {
-  const _MobileBrandHeader();
+class _PublicDialogTitle extends StatelessWidget {
+  final String title;
+  const _PublicDialogTitle(this.title);
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        _BrandMark(size: 92),
-        SizedBox(height: 10),
-        Text(
-          'Enactus ESP',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'EnactSpace',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppTheme.softBlack,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
+    return Text(
+      title,
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
     );
   }
 }
@@ -1353,77 +1324,6 @@ class _BrandMark extends StatelessWidget {
   }
 }
 
-class _BrandPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _BrandPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppTheme.enactusYellow, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrandGeometry extends StatelessWidget {
-  const _BrandGeometry();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 96,
-      height: 34,
-      child: Stack(
-        children: [
-          _tile(left: 0, top: 8, color: Colors.white24),
-          _tile(left: 26, top: 0, color: AppTheme.enactusYellow),
-          _tile(left: 52, top: 8, color: Colors.white24),
-        ],
-      ),
-    );
-  }
-
-  Widget _tile({
-    required double left,
-    required double top,
-    required Color color,
-  }) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: Transform.rotate(
-        angle: 0.78,
-        child: Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(border: Border.all(color: color, width: 2)),
-        ),
-      ),
-    );
-  }
-}
-
 class _ErrorBanner extends StatelessWidget {
   final String message;
 
@@ -1431,14 +1331,15 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: colors.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: colors.error.withValues(alpha: 0.35)),
       ),
-      child: Text(message, style: TextStyle(color: Colors.red.shade700)),
+      child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }

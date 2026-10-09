@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import base64
 import hashlib
 import hmac
@@ -49,7 +50,7 @@ def generate_attendance_qr_token(
     ttl_seconds: int | None = None,
     now: datetime | None = None,
 ) -> tuple[str, AttendanceQrPayload]:
-    issued_at = now or datetime.utcnow()
+    issued_at = now or utc_now()
     ttl = ttl_seconds or settings.ATTENDANCE_QR_TTL_SECONDS
     payload = AttendanceQrPayload(
         session_id=str(session_id),
@@ -90,7 +91,7 @@ def validate_attendance_qr_token(
     if payload.version != TOKEN_VERSION:
         raise AttendanceQrInvalidError("invalid_token")
 
-    if (now or datetime.utcnow()) > payload.expires_at:
+    if (now or utc_now()) > payload.expires_at:
         raise AttendanceQrExpiredError("expired_token")
 
     return payload

@@ -3,78 +3,24 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/ui/app_back_button.dart';
 import '../../models/application_status_presentation.dart';
 import '../../models/application_tracking_model.dart';
 import '../../models/recruitment_campaign_model.dart';
 
 class PublicRecruitmentShell extends StatelessWidget {
   final Widget child;
-  final String? backPath;
 
-  const PublicRecruitmentShell({
-    super.key,
-    required this.child,
-    this.backPath = '/login',
-  });
+  const PublicRecruitmentShell({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              height: 72,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: AppTheme.border)),
-              ),
-              child: Row(
-                children: [
-                  if (backPath != null)
-                    IconButton(
-                      onPressed: () => context.go(backPath!),
-                      tooltip: 'Retour',
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                  Image.asset(
-                    'assets/img/logo_enactus_esp.png',
-                    width: 64,
-                    height: 48,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'EnactSpace',
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        Text(
-                          'L’impact en mouvement',
-                          style: TextStyle(
-                            color: AppTheme.secondaryText,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (MediaQuery.sizeOf(context).width >= 620)
-                    TextButton(
-                      onPressed: () => context.go('/application-tracking'),
-                      child: const Text('Suivre une candidature'),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(child: child),
-          ],
-        ),
+      appBar: AppBar(
+        leading: const AppBackButton(fallbackPath: '/login'),
+        title: const Text('EnactSpace'),
       ),
+      body: SafeArea(child: child),
     );
   }
 }
@@ -100,10 +46,12 @@ class CampaignPublicCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'CANDIDATURES OUVERTES',
                 style: TextStyle(
-                  color: AppTheme.success,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.green.shade200
+                      : Colors.green.shade800,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.1,
                   fontSize: 12,
@@ -120,7 +68,7 @@ class CampaignPublicCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   campaign.description!.trim(),
-                  style: const TextStyle(height: 1.55),
+                  style: TextStyle(height: 1.55),
                 ),
               ],
               const SizedBox(height: 18),
@@ -147,7 +95,7 @@ class CampaignPublicCard extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onStart,
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Commencer ma candidature'),
+                  label: Text('Commencer ma candidature'),
                 ),
               ),
             ],
@@ -187,11 +135,11 @@ class PublicRecruitmentEmptyState extends StatelessWidget {
     actions: [
       FilledButton(
         onPressed: () => context.go('/application-tracking'),
-        child: const Text('Suivre une candidature'),
+        child: Text('Suivre une candidature'),
       ),
       TextButton(
         onPressed: () => context.go('/login'),
-        child: const Text('Retour à la connexion'),
+        child: Text('Retour à la connexion'),
       ),
     ],
   );
@@ -211,7 +159,7 @@ class PublicRecruitmentErrorState extends StatelessWidget {
       FilledButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh_rounded),
-        label: const Text('Réessayer'),
+        label: Text('Réessayer'),
       ),
     ],
   );
@@ -243,15 +191,15 @@ class _PublicState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 10),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 height: 1.5,
-                color: AppTheme.secondaryText,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 22),
@@ -285,22 +233,22 @@ class ApplicationStepHeader extends StatelessWidget {
         children: [
           Text(
             'Étape $currentStep sur $totalSteps',
-            style: const TextStyle(
-              color: AppTheme.secondaryText,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             title,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: progress,
             minHeight: 8,
             borderRadius: BorderRadius.circular(8),
-            backgroundColor: AppTheme.border,
+            backgroundColor: Theme.of(context).colorScheme.outlineVariant,
             color: AppTheme.enactusYellow,
           ),
         ],
@@ -325,8 +273,8 @@ class ApplicationReviewSection extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppTheme.border),
+      color: Theme.of(context).colorScheme.surface,
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
     ),
     child: Column(
@@ -335,18 +283,15 @@ class ApplicationReviewSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+              child: Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
             ),
-            TextButton(onPressed: onEdit, child: const Text('Modifier')),
+            TextButton(onPressed: onEdit, child: Text('Modifier')),
           ],
         ),
         for (final line in lines.where((line) => line.trim().isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(top: 5),
-            child: Text(line, style: const TextStyle(height: 1.4)),
+            child: Text(line, style: TextStyle(height: 1.4)),
           ),
       ],
     ),
@@ -374,7 +319,7 @@ class ApplicationSuccessView extends StatelessWidget {
           children: [
             const Icon(Icons.mark_email_read_outlined, size: 64),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'Candidature envoyée',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
@@ -395,27 +340,27 @@ class ApplicationSuccessView extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'TON CODE DE SUIVI',
                       style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     SelectableText(
                       trackingCode,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.enactusYellow,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(email, style: const TextStyle(color: Colors.white70)),
+                    Text(email, style: TextStyle(color: Colors.white70)),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Conserve ce code avec ton adresse e-mail. Ils seront demandés pour consulter l’avancement du dossier.',
               textAlign: TextAlign.center,
               style: TextStyle(height: 1.5),
@@ -441,16 +386,16 @@ class ApplicationSuccessView extends StatelessWidget {
                       }
                     },
                     icon: const Icon(Icons.copy_rounded),
-                    label: const Text('Copier le code'),
+                    label: Text('Copier le code'),
                   ),
                 ),
                 FilledButton(
                   onPressed: () => context.go('/application-tracking'),
-                  child: const Text('Suivre ma candidature'),
+                  child: Text('Suivre ma candidature'),
                 ),
                 TextButton(
                   onPressed: () => context.go('/login'),
-                  child: const Text('Retour à la connexion'),
+                  child: Text('Retour à la connexion'),
                 ),
               ],
             ),
@@ -512,10 +457,12 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = exception
-        ? AppTheme.warning
+        ? (Theme.of(context).brightness == Brightness.dark
+              ? Colors.orange.shade200
+              : Colors.brown.shade800)
         : complete || current
-        ? AppTheme.softBlack
-        : AppTheme.secondaryText;
+        ? Theme.of(context).colorScheme.onSurface
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -535,7 +482,9 @@ class _TimelineItem extends StatelessWidget {
               Container(
                 width: 2,
                 height: 38,
-                color: complete ? AppTheme.enactusYellow : AppTheme.border,
+                color: complete
+                    ? AppTheme.enactusYellow
+                    : Theme.of(context).colorScheme.outlineVariant,
               ),
           ],
         ),

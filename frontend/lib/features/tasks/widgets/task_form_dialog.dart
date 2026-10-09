@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_form_dialog.dart';
+
 import '../../members/models/member_model.dart';
 import '../models/task_center_models.dart';
 import '../models/task_model.dart';
@@ -32,6 +34,8 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   late final TextEditingController _title;
   late final TextEditingController _description;
   late final TextEditingController _proofUrl;
+  final TextEditingController _deadlineReason = TextEditingController();
+  final TextEditingController _assigneeSearch = TextEditingController();
   late String _priority;
   late String _status;
   DateTime? _dueDate;
@@ -45,6 +49,18 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   String? _error;
 
   bool get _editing => widget.task != null;
+
+  List<MemberModel> get _visibleEligibleMembers {
+    final query = _assigneeSearch.text.trim().toLowerCase();
+    final members = _eligibleMembers.where((member) {
+      return query.isEmpty ||
+          member.displayName.toLowerCase().contains(query) ||
+          member.email.toLowerCase().contains(query) ||
+          member.departmentLabel.toLowerCase().contains(query);
+    }).toList();
+    members.sort(MemberModel.compareAlphabetically);
+    return members;
+  }
 
   @override
   void initState() {
@@ -68,10 +84,13 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
     _title.dispose();
     _description.dispose();
     _proofUrl.dispose();
+    _deadlineReason.dispose();
+    _assigneeSearch.dispose();
     super.dispose();
   }
 
   Future<void> _selectScope({String? poleId, String? projectId}) async {
+    _assigneeSearch.clear();
     setState(() {
       _poleId = poleId;
       _projectId = projectId;
@@ -131,6 +150,9 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
             priority: _priority,
             status: _status,
             dueDate: _dueDate,
+            deadlineChangeReason: _dueDate != widget.task!.dueAt
+                ? _deadlineReason.text
+                : null,
             proofRequired: _proofRequired,
             proofUrl: _proofUrl.text.trim().isEmpty ? null : _proofUrl.text,
           ),
@@ -160,7 +182,9 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   @override
   Widget build(BuildContext context) {
     final data = widget.centerData;
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.task_alt_rounded,
+      description: 'Précisez le résultat attendu et les personnes concernées.',
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
       title: Text(_editing ? 'Modifier la tâche' : 'Créer une tâche'),
       content: SizedBox(
@@ -216,7 +240,7 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                   DropdownButtonFormField<String>(
                     initialValue: _status,
                     decoration: const InputDecoration(labelText: 'Statut'),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'a_faire',
                         child: Text('À faire'),
@@ -230,7 +254,11 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                         value: 'termine',
                         child: Text('Terminé'),
                       ),
-                      DropdownMenuItem(value: 'valide', child: Text('Validé')),
+                      if (!widget.task!.currentUserAssigned)
+                        const DropdownMenuItem(
+                          value: 'valide',
+                          child: Text('Validé'),
+                        ),
                       DropdownMenuItem(value: 'annule', child: Text('Annulé')),
                     ],
                     onChanged: _submitting
@@ -246,6 +274,20 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                     _dueDate == null ? 'Sans échéance' : _formatDate(_dueDate!),
                   ),
                 ),
+                if (_editing && _dueDate != widget.task!.dueAt) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _deadlineReason,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Pourquoi ajuster cette échéance ?',
+                    ),
+                    validator: (value) => (value?.trim().length ?? 0) < 6
+                        ? 'Expliquez le changement d’échéance.'
+                        : null,
+                  ),
+                ],
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _proofRequired,
@@ -255,11 +297,9 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                   title: const Text('Preuve requise'),
                 ),
                 if (_editing)
-                  TextFormField(
-                    controller: _proofUrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Lien de preuve',
-                    ),
+                  const Text(
+                    'Joignez le justificatif depuis le suivi de la tâche.',
+                    style: TextStyle(height: 1.5),
                   ),
                 if (!_editing && data != null) ...[
                   const SizedBox(height: 12),
@@ -321,26 +361,40 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Text('Aucun membre disponible pour ce périmètre.'),
                     )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _eligibleMembers
-                          .map(
-                            (member) => FilterChip(
-                              label: Text(member.displayName),
-                              selected: _assigneeIds.contains(member.id),
-                              onSelected: _submitting
-                                  ? null
-                                  : (selected) => setState(
-                                      () => selected
-                                          ? _assigneeIds.add(member.id)
-                                          : _assigneeIds.remove(member.id),
-                                    ),
-                            ),
-                          )
-                          .toList(),
+                  else ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _assigneeSearch,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search_rounded),
+                        labelText: 'Rechercher un Enacteur',
+                      ),
                     ),
+                    const SizedBox(height: 10),
+                    if (_visibleEligibleMembers.isEmpty)
+                      const Text('Aucun Enacteur ne correspond à la recherche.')
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _visibleEligibleMembers
+                            .map(
+                              (member) => FilterChip(
+                                label: Text(member.displayName),
+                                selected: _assigneeIds.contains(member.id),
+                                onSelected: _submitting
+                                    ? null
+                                    : (selected) => setState(
+                                        () => selected
+                                            ? _assigneeIds.add(member.id)
+                                            : _assigneeIds.remove(member.id),
+                                      ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                  ],
                 ],
               ],
             ),

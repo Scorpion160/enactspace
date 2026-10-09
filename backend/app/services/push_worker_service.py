@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime, timedelta
 
 from sqlalchemy import and_, or_
@@ -7,7 +8,11 @@ from app.core.config import settings
 from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.product_services import AppInstallation, PushDelivery
-from app.services.push_lifecycle import cancel_unsent_deliveries, clear_installation_push
+from app.services.push_lifecycle import (
+    cancel_unsent_deliveries,
+    clear_installation_push,
+    push_recipient_allowed,
+)
 from app.services.push_locking import lock_push_delivery, lock_user_installation
 from app.services.push_provider import (
     FirebaseAdminPushProvider,
@@ -26,7 +31,7 @@ PROCESSING_LEASE = timedelta(minutes=5)
 def claim_push_deliveries(
     db: Session, *, limit: int = 25, now: datetime | None = None
 ) -> list:
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     expired_before = now - PROCESSING_LEASE
     query = db.query(PushDelivery).filter(
         or_(
@@ -72,7 +77,7 @@ def process_push_delivery(db: Session, delivery_id, provider: PushProvider) -> s
             return "ignored"
         delivery.status = "cancelled"
         delivery.processing_started_at = None
-        delivery.updated_at = datetime.utcnow()
+        delivery.updated_at = utc_now()
         db.commit()
         return "cancelled"
 
@@ -97,6 +102,7 @@ def process_push_delivery(db: Session, delivery_id, provider: PushProvider) -> s
         and notification
         and installation
         and installation.user_id == notification.user_id
+        and push_recipient_allowed(db, notification.user_id)
         and installation.revoked_at is None
         and preference
         and preference.notification_push_enabled
@@ -107,7 +113,7 @@ def process_push_delivery(db: Session, delivery_id, provider: PushProvider) -> s
     if not valid:
         delivery.status = "cancelled"
         delivery.processing_started_at = None
-        delivery.updated_at = datetime.utcnow()
+        delivery.updated_at = utc_now()
         db.commit()
         return "cancelled"
     delivery.attempt_count += 1
@@ -123,7 +129,7 @@ def process_push_delivery(db: Session, delivery_id, provider: PushProvider) -> s
         delivery.processing_started_at = None
         delivery.provider_message_id = message_id[:255]
         delivery.last_error_code = None
-        delivery.sent_at = datetime.utcnow()
+        delivery.sent_at = utc_now()
     except PushTokenConfigurationError:
         _retry(delivery, "token_decrypt_unavailable")
     except PushProviderError as error:
@@ -135,7 +141,7 @@ def process_push_delivery(db: Session, delivery_id, provider: PushProvider) -> s
             delivery.last_error_code = error.code
         else:
             _retry(delivery, error.code)
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = utc_now()
     db.commit()
     return delivery.status
 
@@ -147,7 +153,7 @@ def _retry(delivery: PushDelivery, code: str) -> None:
         delivery.status = "dead"
         return
     delivery.status = "retry"
-    delivery.next_attempt_at = datetime.utcnow() + timedelta(
+    delivery.next_attempt_at = utc_now() + timedelta(
         seconds=min(3600, 30 * (2 ** max(0, delivery.attempt_count - 1)))
     )
 

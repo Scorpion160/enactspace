@@ -1,0 +1,33 @@
+# Copie chiffrée hors du VPS et récupération Windows
+
+## Périmètre vérifié
+
+Les archives chiffrées de PostgreSQL, du schéma de référence, des fichiers persistants et du manifeste du point de récupération sont conservées sous %LOCALAPPDATA%\EnactSpace\PrivateBackups\<identifiant>. Le reçu de capture et les résultats agrégés des essais sont également présents. Aucun contenu de fiche ni fichier métier déchiffré n’est conservé dans ce dossier.
+
+La clé protégée est conservée séparément sous %LOCALAPPDATA%\EnactSpace\RecoveryKeys\<identifiant>.dpapi. Les dossiers et fichiers sont limités au compte Windows courant et à SYSTEM. DPAPI CurrentUser lie la récupération au profil Windows qui a protégé la clé ; copier seulement le fichier .dpapi vers un autre compte ne constitue pas un secours de clé indépendant.
+
+Le point vérifié est 20261008T094513Z_fcf746 : révision de production à la capture 20261006_0025, 111 tables, 721 lignes et 14 fichiers. Conserver la source compatible et le plan de récupération de l’environnement séparément.
+
+## Outil et mode de récupération
+
+tools/prelaunch_offsite_recovery.py s’exécute avec Python 3.12 sur le PC Windows autorisé. L’option --execute-offsite-rehearsal est obligatoire. Fournir --backup-id et --repo avec le dossier du dépôt.
+
+Lors d’une nouvelle copie, l’outil télécharge uniquement les archives chiffrées et le reçu par SSH/SCP, compare les empreintes, transfère la clé par canal SSH sans l’afficher, puis la protège avec DPAPI.
+
+Pour répéter la récupération d’une copie existante, ajouter --restore-existing. Ce mode utilise la clé protégée du PC et les archives conservées ; il ne relit pas la clé d’origine sur le VPS. L’outil crée ensuite un espace privé de retour, transfère les archives du PC et restaure un conteneur PostgreSQL isolé. Aucun backend ni worker n’est démarré, aucune ligne de production n’est consultée et aucun message n’est envoyé.
+
+La base, le schéma, les séquences et les fichiers sont comparés au manifeste chiffré du point de récupération. Les références des fichiers sont contrôlées. Les espaces privés de retour et les ressources Docker attribuées à l’essai sont supprimés, y compris la clé déchiffrée temporaire. Les archives chiffrées du PC et la clé DPAPI restent conservées.
+
+Les résultats agrégés sont enregistrés dans offsite-rehearsal.json. Ne pas ouvrir ou afficher une clé déchiffrée dans un terminal, un rapport ou une conversation. En cas d’échec, conserver les preuves chiffrées et diagnostiquer les contrôles avant toute nouvelle tentative.
+
+## Limites et décisions restantes
+
+La restauration a été exécutée dans l’environnement Docker actuel du VPS, avec son image PostgreSQL déjà disponible. La reprise sur un serveur entièrement neuf, la disponibilité externe de cette image, les configurations, les secrets et les artefacts de livraison n’ont pas encore été vérifiés.
+
+Prévoir un secours de clé réellement indépendant du profil Windows et désigner les personnes habilitées. Définir la conservation, les objectifs RPO/RTO et le calendrier de capture. Aucune purge automatique ni tâche planifiée n’est activée par cet outil. Le PC est un premier emplacement hors du VPS ; il ne suffit pas à lui seul à clôturer le plan de reprise.
+
+Preuves : [lot 26](releases/20261008-prelaunch-lot26-backup-restore.md).
+
+## État du secours portable
+
+Outil préparé : tools/prelaunch_key_escrow.py, option --execute-key-escrow et --backup-id. La phrase est saisie de façon masquée et confirmée pour l’export. Un import avec --import-file doit créer une nouvelle clé DPAPI sans écraser celle d’un profil existant. Ne jamais partager la phrase dans la conversation. Aucun export de clé réelle ni remise à un second détenteur n’a été effectué. Test synthétique actuel : False.

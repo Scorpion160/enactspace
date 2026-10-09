@@ -1,0 +1,44 @@
+{
+  "lot": 17,
+  "date_utc": "2026-10-07T16:18:13.332184+00:00",
+  "tests": {
+    "final_sqlite": {
+      "passed": 55,
+      "seconds": 18.296,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 11,
+      "seconds": 29.53,
+      "skipped": 0
+    }
+  },
+  "portable_new_scenarios": 10,
+  "postgresql_additional_race": 1,
+  "suite_counts_overlap": true,
+  "reviewed_files": [
+    "backend/app/api/routes/poles.py",
+    "backend/app/api/routes/projects.py",
+    "backend/app/services/operational_integrity.py",
+    "backend/app/schemas/pole.py",
+    "backend/app/schemas/project.py",
+    "backend/app/models/pole.py",
+    "backend/app/models/project.py",
+    "backend/test_prelaunch_structure_boundaries.py",
+    "backend/test_prelaunch_structure_boundaries_postgresql.py"
+  ],
+  "whole_manual_review_complete": false,
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_email_or_payment_sent": false,
+  "source_head": "20261007_0028",
+  "remaining": [
+    "Concurrent actor lifecycle changes and responsibilities across multiple structures",
+    "Year foreign-key validation and date coherence",
+    "Other module permissions and incomplete full source review",
+    "Full migration rehearsal, Android/web acceptance, targeted test cleanup and final documentation"
+  ]
+}

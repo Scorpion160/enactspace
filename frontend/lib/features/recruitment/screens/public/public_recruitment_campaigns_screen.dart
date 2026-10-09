@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/public_recruitment_gateway.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
+import '../../widgets/public/recruitment_welcome.dart';
 
 class PublicRecruitmentCampaignsScreen extends StatefulWidget {
   final PublicRecruitmentGateway? gateway;
@@ -48,8 +48,6 @@ class _PublicRecruitmentCampaignsScreenState
       child: switch ((_campaigns, _failed)) {
         (_, true) => PublicRecruitmentErrorState(onRetry: _load),
         (null, false) => const _CampaignLoadingState(),
-        (final campaigns?, false) when campaigns.isEmpty =>
-          const PublicRecruitmentEmptyState(),
         (final campaigns?, false) => _CampaignList(campaigns: campaigns),
       },
     );
@@ -91,20 +89,65 @@ class _CampaignList extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => context.go('/login'),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Retour à la connexion'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.go('/application-tracking'),
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('Suivre ma candidature'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
                 'Rejoins le mouvement',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Découvre les campagnes ouvertes et choisis celle qui correspond à ton envie d’agir avec Enactus ESP.',
                 style: TextStyle(
-                  color: AppTheme.secondaryText,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 16,
                   height: 1.55,
                 ),
               ),
               const SizedBox(height: 28),
+              const RecruitmentWelcome(),
+              if (campaigns.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Aucune campagne n’est ouverte pour le moment',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            height: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Reviens ici pour découvrir les prochaines candidatures ; ton suivi reste disponible si tu as déjà postulé.',
+                          style: TextStyle(height: 1.6),
+                        ),
+                        TextButton(
+                          onPressed: () => context.go('/application-tracking'),
+                          child: const Text('Suivre une candidature'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               for (var index = 0; index < campaigns.length; index++) ...[
                 CampaignPublicCard(
                   campaign: campaigns[index],

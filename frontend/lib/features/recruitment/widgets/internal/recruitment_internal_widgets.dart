@@ -49,7 +49,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(campaignLabel, style: const TextStyle(color: Colors.white70)),
+        Text(campaignLabel, style: TextStyle(color: Colors.white70)),
       ],
     );
     final manageCampaigns = Semantics(
@@ -130,7 +130,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
             label: '$visibleCount candidatures visibles sur $totalCount',
             child: Text(
               '$visibleCount candidatures · $totalCount dossiers chargés',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.enactusYellow,
                 fontWeight: FontWeight.w800,
               ),
@@ -444,92 +444,124 @@ class ApplicationWorkbench extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mobile = MediaQuery.sizeOf(context).width < 760;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          label: '$rangeStart à $rangeEnd sur $total candidatures',
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              '$rangeStart–$rangeEnd sur $total candidatures',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ),
-        if (pageCount > 1)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  key: const Key('internal-previous-page'),
-                  onPressed: onPrevious,
-                  tooltip: 'Page précédente',
-                  icon: const Icon(Icons.chevron_left_rounded),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mobile =
+            constraints.maxWidth < 1300 ||
+            MediaQuery.textScalerOf(context).scale(16) > 21;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              label: '$rangeStart à $rangeEnd sur $total candidatures',
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  '$rangeStart–$rangeEnd sur $total candidatures',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                Text('Page $currentPage sur $pageCount'),
-                IconButton(
-                  key: const Key('internal-next-page'),
-                  onPressed: onNext,
-                  tooltip: 'Page suivante',
-                  icon: const Icon(Icons.chevron_right_rounded),
+              ),
+            ),
+            if (pageCount > 1)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      key: const Key('internal-previous-page'),
+                      onPressed: onPrevious,
+                      tooltip: 'Page précédente',
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    Text('Page $currentPage sur $pageCount'),
+                    IconButton(
+                      key: const Key('internal-next-page'),
+                      onPressed: onNext,
+                      tooltip: 'Page suivante',
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        if (mobile)
-          ...applications.map(
-            (item) => _ApplicationRow(
-              application: item,
-              campaign: campaignTitle(item.campaignId),
-              anonymized: anonymized,
-              mobile: true,
-              onOpen: () => onOpen(item),
-            ),
-          )
-        else
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                const _TableHeader(),
-                ...applications.map(
-                  (item) => _ApplicationRow(
-                    application: item,
-                    campaign: campaignTitle(item.campaignId),
-                    anonymized: anonymized,
-                    mobile: false,
-                    onOpen: () => onOpen(item),
-                  ),
+              ),
+            if (mobile)
+              ...applications.map(
+                (item) => _ApplicationRow(
+                  application: item,
+                  campaign: campaignTitle(item.campaignId),
+                  anonymized: anonymized,
+                  mobile: true,
+                  onOpen: () => onOpen(item),
                 ),
-              ],
-            ),
-          ),
-      ],
+              )
+            else
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    const _TableHeader(),
+                    ...applications.map(
+                      (item) => _ApplicationRow(
+                        application: item,
+                        campaign: campaignTitle(item.campaignId),
+                        anonymized: anonymized,
+                        mobile: false,
+                        onOpen: () => onOpen(item),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
 
+Widget _tableColumns({
+  required Widget identity,
+  required Widget campaign,
+  required Widget path,
+  required Widget status,
+  required Widget evaluation,
+  required Widget documents,
+  required Widget action,
+}) => Row(
+  children: [
+    Expanded(flex: 3, child: identity),
+    const SizedBox(width: 16),
+    Expanded(flex: 2, child: campaign),
+    const SizedBox(width: 16),
+    Expanded(flex: 2, child: path),
+    const SizedBox(width: 16),
+    SizedBox(width: 180, child: status),
+    const SizedBox(width: 16),
+    SizedBox(width: 110, child: evaluation),
+    const SizedBox(width: 16),
+    SizedBox(width: 112, child: documents),
+    const SizedBox(width: 16),
+    SizedBox(width: 148, child: action),
+  ],
+);
+
 class _TableHeader extends StatelessWidget {
   const _TableHeader();
-
   @override
   Widget build(BuildContext context) => Container(
-    color: AppTheme.softBlack.withValues(alpha: .04),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    child: const Row(
-      children: [
-        Expanded(flex: 3, child: Text('Candidat / référence')),
-        Expanded(flex: 2, child: Text('Campagne')),
-        Expanded(flex: 2, child: Text('Parcours / pôle')),
-        Expanded(flex: 2, child: Text('Statut')),
-        Expanded(child: Text('Évaluation')),
-        Expanded(child: Text('Documents')),
-        SizedBox(width: 142),
-      ],
+    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    child: DefaultTextStyle.merge(
+      style: const TextStyle(fontWeight: FontWeight.w700),
+      child: _tableColumns(
+        identity: const Text('Candidat / référence'),
+        campaign: const Text('Campagne'),
+        path: const Text('Parcours'),
+        status: const Text('Statut'),
+        evaluation: const Text('Évaluation', maxLines: 1, softWrap: false),
+        documents: const Text('Documents', maxLines: 1, softWrap: false),
+        action: const SizedBox.shrink(),
+      ),
     ),
   );
 }
@@ -568,17 +600,19 @@ class _ApplicationRow extends StatelessWidget {
                   Expanded(
                     child: Text(
                       identity,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  InternalStatusBadge(status: application.status),
+                  Flexible(
+                    child: InternalStatusBadge(status: application.status),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(campaign, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 6),
               Text(
-                '${application.department ?? 'Département non renseigné'} · ${application.preferredPole ?? 'Pôle non renseigné'}',
+                '${application.department ?? 'Département non renseigné'} · ${application.studyLevel ?? 'Niveau non renseigné'}',
               ),
               Text(
                 'Évaluation : ${application.scoreLabel} · $documents/3 documents',
@@ -592,50 +626,41 @@ class _ApplicationRow extends StatelessWidget {
               ),
             ],
           )
-        : Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: _TwoLines(
-                  first: identity,
-                  second: anonymized
-                      ? 'Identité masquée'
-                      : (application.trackingCode ?? application.id),
-                ),
-              ),
-              Expanded(flex: 2, child: Text(campaign, maxLines: 2)),
-              Expanded(
-                flex: 2,
-                child: _TwoLines(
-                  first:
-                      '${application.department ?? 'Non renseigné'} · ${application.className ?? '—'}',
-                  second: application.preferredPole ?? 'Pôle non renseigné',
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: InternalStatusBadge(status: application.status),
-              ),
-              Expanded(
-                child: Semantics(
-                  label: 'Évaluation officielle ${application.scoreLabel}',
-                  child: Text(application.scoreLabel),
-                ),
-              ),
-              Expanded(
-                child: Semantics(
-                  label: '$documents documents',
-                  child: Text('$documents/3'),
-                ),
-              ),
-              SizedBox(
-                width: 142,
-                child: TextButton(
-                  onPressed: onOpen,
-                  child: const Text('Ouvrir le dossier'),
-                ),
-              ),
-            ],
+        : _tableColumns(
+            identity: _TwoLines(
+              first: identity,
+              second: anonymized
+                  ? 'Identité masquée'
+                  : (application.trackingCode ?? application.id),
+            ),
+            campaign: Text(
+              campaign,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            path: _TwoLines(
+              first: application.department ?? 'Non renseigné',
+              second: [application.studyLevel, application.className]
+                  .whereType<String>()
+                  .where((value) => value.trim().isNotEmpty)
+                  .join(' · '),
+            ),
+            status: Align(
+              alignment: Alignment.centerLeft,
+              child: InternalStatusBadge(status: application.status),
+            ),
+            evaluation: Semantics(
+              label: 'Évaluation officielle ${application.scoreLabel}',
+              child: Text(application.scoreLabel),
+            ),
+            documents: Semantics(
+              label: '$documents documents',
+              child: Text('$documents/3'),
+            ),
+            action: TextButton(
+              onPressed: onOpen,
+              child: const Text('Ouvrir le dossier'),
+            ),
           );
     return Semantics(
       label: 'Candidature $identity, ${application.statusLabel}',
@@ -645,7 +670,7 @@ class _ApplicationRow extends StatelessWidget {
         child: InkWell(
           onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             child: row,
           ),
         ),
@@ -668,7 +693,7 @@ class _TwoLines extends StatelessWidget {
         first,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
       Text(
         second,
@@ -688,27 +713,29 @@ class InternalStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final presentation = ApplicationStatusPresentation.fromStatus(status);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (presentation.status) {
-      'accepted' => Colors.green.shade700,
-      'rejected' => Colors.red.shade700,
-      'interview_scheduled' => Colors.blue.shade700,
-      'waiting_list' => Colors.orange.shade800,
-      'cancelled' => Colors.grey.shade700,
-      _ => AppTheme.softBlack,
+      'accepted' => dark ? Colors.green.shade200 : Colors.green.shade800,
+      'rejected' => dark ? Colors.red.shade200 : Colors.red.shade800,
+      'under_review' => dark ? Colors.blue.shade200 : Colors.blue.shade800,
+      'interview_scheduled' =>
+        dark ? Colors.purple.shade200 : Colors.purple.shade800,
+      'waiting_list' => dark ? Colors.orange.shade200 : Colors.brown.shade800,
+      'cancelled' => Theme.of(context).colorScheme.onSurfaceVariant,
+      _ => Theme.of(context).colorScheme.onSurface,
     };
     return Semantics(
       label: 'Statut ${presentation.title}',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: .1),
+          color: color.withValues(alpha: dark ? .14 : .08),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: color.withValues(alpha: .28)),
         ),
         child: Text(
           presentation.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          softWrap: true,
           style: TextStyle(
             color: color,
             fontSize: 12,
@@ -742,7 +769,11 @@ class InternalRecruitmentState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Column(
         children: [
-          Icon(icon, size: 42, color: AppTheme.secondaryText),
+          Icon(
+            icon,
+            size: 42,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
           Text(title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),

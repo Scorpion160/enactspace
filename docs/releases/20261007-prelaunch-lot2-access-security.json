@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-07",
+  "tests_passed": 86,
+  "duration_seconds": 31.714,
+  "database": "ephemeral SQLite",
+  "network": "none",
+  "production_changed": false,
+  "emails_sent": 0,
+  "builds": 0,
+  "code_review_complete": false,
+  "sources": [
+    {
+      "file": "backend/app/core/security.py",
+      "lines": 61,
+      "sha256": "ab8ac53b405fffca9ec034099c2fcb038123fb53939f83045c7c5dfc99ff1ad2",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/api/deps.py",
+      "lines": 267,
+      "sha256": "0b0b00492c50a6a039ad1ad1cb3d6f51da44980e2558c817e3e8cd5be157ed22",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/api/routes/files.py",
+      "lines": 354,
+      "sha256": "7db29a57fc880f31ae917742bf428102eef5b079e19dc0f26387cf47fb77faef",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/services/file_storage_service.py",
+      "lines": 381,
+      "sha256": "5d233ceefab4107f1668b05a853b722f55d4130a8970b0f7a6a814326eb0804e",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/services/session_service.py",
+      "lines": 162,
+      "sha256": "983c81a2a858476d1ef03ab020f58c3bd5f533a0e802ded73a9755a514add2f4",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/models/account.py",
+      "lines": 145,
+      "sha256": "29b067394c3954ad323e173b7f47ddf78afe99864818699f9ffe8ae6babc7a0e",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/core/roles.py",
+      "lines": 114,
+      "sha256": "bbf4eaf39dea756fecd9977807db15b387ec3203fced973315e2ea9367f37064",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/api/routes/auth.py",
+      "lines": 513,
+      "sha256": "1d4a09e83177b2e76d75bf57ab0d0259751177cc68d6ea8de1136b97278f8a3f",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/main.py",
+      "lines": 167,
+      "sha256": "0176a2dbba3241bec55406ab3151227ffd3ad6afe14efaf8b1170094647b12f5",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/app/services/public_uploads.py",
+      "lines": 15,
+      "sha256": "fd3eed9bb8e5fb036efddd656722ec917fea57251337ab620707d8e10e2bb7ed",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    },
+    {
+      "file": "backend/test_prelaunch_security_boundaries.py",
+      "lines": 164,
+      "sha256": "35e80760aa0efe9dd57d428cb37d351b715abbc8d84e9b87a2bcb883566834da",
+      "manual_review": "REVIEWED_LOT2",
+      "scope": "Access/file/session review; global security approval still pending"
+    }
+  ]
+}

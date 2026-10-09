@@ -19,6 +19,18 @@ class MembersService {
     return _getMembersFrom('/users/');
   }
 
+  Future<MemberModel> getMember(String memberId) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    final response = await _apiClient.get('/users/$memberId', token: token);
+    if (response is! Map<String, dynamic>) {
+      throw Exception('Profil membre invalide.');
+    }
+    return MemberModel.fromJson(response);
+  }
+
   Future<List<MemberModel>> getPendingMembers() {
     return _getMembersFrom('/users/pending');
   }
@@ -44,17 +56,19 @@ class MembersService {
       rawList = [];
     }
 
-    return rawList
+    final members = rawList
         .whereType<Map<String, dynamic>>()
         .map(MemberModel.fromJson)
         .toList();
+    members.sort(MemberModel.compareAlphabetically);
+    return members;
   }
 
   Future<MemberModel> createMember({
     required String firstName,
     required String lastName,
     required String email,
-    required String password,
+    String? password,
   }) async {
     final token = await _authService.getToken();
 
@@ -69,7 +83,6 @@ class MembersService {
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
         'email': email.trim(),
-        'password': password.trim(),
         'status': 'pending',
       },
     );
@@ -127,6 +140,15 @@ class MembersService {
 
   Future<MemberModel> reactivateMember(String userId) {
     return _postMemberAction(userId, 'reactivate');
+  }
+
+  Future<Map<String, dynamic>> previewAlumni(String memberId) async {
+    final token = await _authService.getToken();
+    final result = await _apiClient.get(
+      '/users/$memberId/alumni-transition',
+      token: token,
+    );
+    return Map<String, dynamic>.from(result as Map);
   }
 
   Future<MemberModel> makeAlumni(String userId) {

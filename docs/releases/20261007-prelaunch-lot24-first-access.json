@@ -1,0 +1,380 @@
+{
+  "lot": 24,
+  "generated_at": "2026-10-07T21:17:53.983863+00:00",
+  "source_branch": "recovery/final-20260927",
+  "source_base_commit": "90f1e33cc18737203a35baae9279eefa788839a3",
+  "source_alembic_head": "20261007_0030",
+  "production_alembic_revision": "20261006_0025",
+  "production_changed": false,
+  "build_performed": false,
+  "git_push_performed": false,
+  "deployment_performed": false,
+  "real_emails_sent": 0,
+  "real_push_sent": 0,
+  "real_payments": 0,
+  "test_email_redirection_preserved": true,
+  "sqlite": {
+    "tests_passed": 141,
+    "seconds": 88.928,
+    "ignored_tests": 0
+  },
+  "postgresql": {
+    "tests_passed": 45,
+    "seconds": 127.004,
+    "ignored_tests": 0
+  },
+  "postgresql_new_race_scenarios": 5,
+  "flutter": {
+    "tests_passed": 82,
+    "targeted_analysis_passed": true,
+    "format_passed": true
+  },
+  "migration_rehearsal": {
+    "account_creation_on_real_schema": true,
+    "baseline_tables_checked": 110,
+    "case_insensitive_username_collision_refused": true,
+    "completed_onboarding_survives_rollback_and_replay": true,
+    "downgrade_preserves_baseline_data": true,
+    "existing_account_activation_backfill": true,
+    "failed_transaction_rolls_back": true,
+    "fresh_install_exit": 0,
+    "join_year_saved_and_preserved_for_alumni": true,
+    "new_constraints_enforced": 3,
+    "new_security_fields_reset_after_downgrade": true,
+    "orm_reads_and_writes_new_fields": true,
+    "repeat_upgrade_noop": true,
+    "reupgrade_preserves_baseline_data": true,
+    "upgrade_preserves_all_baseline_tables": true
+  },
+  "migration_rehearsal_after_last_schema_change": true,
+  "production_cohort_counts_read_only": {
+    "production_revision": "20261006_0025",
+    "eligible_accounts": 25,
+    "eligible_with_session_history": 0,
+    "eligible_without_session_history": 24,
+    "eligible_reserved_or_missing_contact": 15,
+    "bootstrap_administrators": 1,
+    "current_unarchived_years": 1
+  },
+  "production_personal_rows_exported": false,
+  "owned_lot24_containers_and_networks_remaining": 0,
+  "unattributed_volume_cleanup_performed": false,
+  "source_syntax_and_diff_checks_passed": true,
+  "protected_untracked_backup_preserved": true,
+  "manual_line_review_complete": false,
+  "lot24_reviewed_source_files": [
+    {
+      "file": "backend/app/models/first_access.py",
+      "lines": 19,
+      "sha256": "d2756edbba8fd6d3fff957c6249cb3717f810263b80e9cfa90b7ed6168da038a",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/schemas/first_access.py",
+      "lines": 58,
+      "sha256": "ea6a6df249a00aac172febf16cbc1711034fc499195a12cbf68c619614f661f8",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/services/first_access.py",
+      "lines": 158,
+      "sha256": "450de46907668c74bdc567eee604d9642c1553c7fbae41db7bb7c6f80b05f9fc",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/api/routes/first_access.py",
+      "lines": 195,
+      "sha256": "913e113722ba1afac697b25648da27af59ad6971c736cdd3e2b6495bcd35dd17",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/core/http_errors.py",
+      "lines": 18,
+      "sha256": "0f582991e43de03380932969c89fddb7bfce1e60aa48155e5c394bc1884176c6",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/alembic/versions/20261007_0030_first_access.py",
+      "lines": 34,
+      "sha256": "19d4af41287cbc21bd10aa98bdba855912040773e5fcef3007ce8caa367062cc",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_first_access.py",
+      "lines": 341,
+      "sha256": "f0609e84e1ff6c60e6b768b466065f94e41dab6fdd8b069d0fc1dd94badf5cf7",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_first_access_postgresql.py",
+      "lines": 111,
+      "sha256": "ba3ce2ec266fc1c7da0106739555a96b8b15de50b700ade25a32c0537b25ee4d",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/first_access/services/first_access_service.dart",
+      "lines": 103,
+      "sha256": "3ca4c33ccb10b7c035e474cd56b4566d1dc1ca08d22875bdaf9a0025e2e3ad6e",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/first_access/screens/activation_screen.dart",
+      "lines": 225,
+      "sha256": "e985c2c6af8cd6039d87d91daf90d778486f202d97590e74f3570b7d5adbec41",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/first_access/screens/first_access_gate.dart",
+      "lines": 476,
+      "sha256": "2fe95f34d2692b9eb568c9cebf29cfcdc5de7bfa7b2393ae067ab267f344b523",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/first_access/screens/first_access_management_screen.dart",
+      "lines": 391,
+      "sha256": "c65f9025ebf5688851586dc0dabc707518a932ab178d81a1756a913397fbba6f",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/test/first_access_service_test.dart",
+      "lines": 179,
+      "sha256": "a42588db6ba5fb0f6b74e95ba8cccd3b0d18624720bba25f0dc553fd3e2ae88e",
+      "manual_review": "REVIEWED_LOT24",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/models/user.py",
+      "lines": 105,
+      "sha256": "72c1fdd95bcb6ee3fb39b9c61ab28fa40a7dec947579f002facd62a61e77130f",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "scope": "Reviewed source; whole application security approval pending",
+      "previous_review_status": "REVIEWED_LOT22",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/models/base.py",
+      "lines": 115,
+      "sha256": "1266f208579d95b760259608835dfb1788c55fed2267e6c24301f013a532d110",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT4",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/schemas/user.py",
+      "lines": 119,
+      "sha256": "c4788a042d52f2c1277f0b7553ee2d0999b74adeb7b52549934ac538b08cf60b",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT22",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/api/deps.py",
+      "lines": 271,
+      "sha256": "379946cc65c3a2b2e122034703f3dab75e789ad8ed37c4f735fd4509cfd6ec7d",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "scope": "Access/file/session review; global security approval still pending",
+      "previous_review_status": "REVIEWED_LOT20",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/api/routes/auth.py",
+      "lines": 524,
+      "sha256": "d54ea965818bdcb4c59c791efb5fa453ab4f43044481f53c562ced2ffba7746e",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "scope": "Reviewed source; whole application security approval pending",
+      "previous_review_status": "PARTIAL_LOT22",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/api/routes/users.py",
+      "lines": 1079,
+      "sha256": "05c6b3a6cb1600e4c8a2877f5c037348dd05cef326b424eaa15384de4bba4cdc",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT22",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/api/routes/recruitment.py",
+      "lines": 1688,
+      "sha256": "346490b8f48824db8a9faf951f0e456845027edd36fcf245853f4535a957c949",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PARTIAL_LOT4",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/schemas/recruitment.py",
+      "lines": 411,
+      "sha256": "ba952cb0363cbc3214fc9000480a5728f415979cab7cb5d1f8a05b9c11684dfe",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/services/session_service.py",
+      "lines": 163,
+      "sha256": "1c6de0df993d10e449dbb51ef09a6409a9e36a634c743c0303fc886b340f0a67",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "scope": "Access/file/session review; global security approval still pending",
+      "previous_review_status": "REVIEWED_LOT2",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/services/request_rate_limit.py",
+      "lines": 97,
+      "sha256": "029cbea8f4fae9ba99b70a5a644808d633720437921fc0ae9ea234d96496f9b4",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT13",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/scripts/import_members.py",
+      "lines": 739,
+      "sha256": "a81b49d85675c5a709d3e18ded4462c4daa06a31e40cbf5eba9642eab24d365a",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/app/main.py",
+      "lines": 177,
+      "sha256": "5b611c1aa7c7fced2e20124e2ec970e2b9a4091f242e334c814c0a58d2cc7974",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "scope": "Access/file/session review; global security approval still pending",
+      "previous_review_status": "REVIEWED_LOT5",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_migration_rehearsal.py",
+      "lines": 172,
+      "sha256": "2e9a3bc5a317e22b4e8683af285a6a5987ab92069b9d4fd24d77e9abe36ded16",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "REVIEWED_LOT22",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/core/api/api_client.dart",
+      "lines": 588,
+      "sha256": "519e290d38614da4197fbd45781d36c92f1c4a7b386e93390c02a1b4bf2b3774",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/app/app_router.dart",
+      "lines": 689,
+      "sha256": "4b64e3fcf5f05d0ce00611b5fdf6c64d37f6fbf82cd59d14a01e90bf83ceda36",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/core/auth/user_experience.dart",
+      "lines": 361,
+      "sha256": "a2258e58ce0b4e38966fa4ce55d08bb2fc85ff9e208ec360cb563242e9a5e1eb",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/auth/screens/login_screen.dart",
+      "lines": 1339,
+      "sha256": "381c3a6d400c546f7943ef70d2f9d10b272fbb4e6a59a24fd1ae50012a6ddd65",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/members/screens/members_screen.dart",
+      "lines": 2896,
+      "sha256": "0cc1c532487ffb11c954827d9c74568fee3a58b9d3b2c0ad62f29aacef8bf1ce",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/members/services/members_service.dart",
+      "lines": 287,
+      "sha256": "195b8c0477f0fdb9b8029670f83412f0860c3239742ac874e02b74c8317edea4",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/recruitment/screens/recruitment_screen.dart",
+      "lines": 3014,
+      "sha256": "4bf64491386205f98ac1211587cf20919947e344d47ffcb34644e6d3c2e2eb9e",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/recruitment/widgets/internal/candidate_conversion.dart",
+      "lines": 790,
+      "sha256": "4b67e70618ea1d604ccf12bdb54ced8d4343b764f5a8499e7034ff52346188fb",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/recruitment/services/recruitment_service.dart",
+      "lines": 502,
+      "sha256": "38415516ad9360eaedb85f0b8a836b3b3d76202cce5661d963c74ec85fafc3e0",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/recruitment/models/candidate_conversion_model.dart",
+      "lines": 95,
+      "sha256": "08beffea34aa64ec61bbb57cd712ccf9837a08f2911e5bf51951633fd21d82e8",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/lib/features/recruitment/services/internal_recruitment_gateway.dart",
+      "lines": 209,
+      "sha256": "c6547acf2d93b5f0e16621dea06ec2f3931fd7582fd32b2590132c7218436683",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/test/first_access_test.dart",
+      "lines": 440,
+      "sha256": "849e576e36906f89081ae569fab360c773482d32f7c2b76bd975b7f309ac5388",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    },
+    {
+      "file": "frontend/test/recruitment_conversion_test.dart",
+      "lines": 601,
+      "sha256": "a4af78cf7feb802fcf65fde8b2588aac07652d43f2de0278623ae24ce88dc8e3",
+      "manual_review": "LOT24_CHANGED_SECTIONS_REVIEWED",
+      "previous_review_status": "PENDING",
+      "reviewed_at": "2026-10-07T21:17:53.983863+00:00"
+    }
+  ],
+  "known_remaining": [
+    "Individual confirmation of missing contacts before invitations",
+    "Other privileged modules and full manual repository review",
+    "Full backup restoration rehearsal",
+    "Final Android/web device acceptance",
+    "Complete mail/push event coverage",
+    "Mobile Money sandbox validation",
+    "Provenance-based recruitment test cleanup",
+    "Approved final email cutover and coherent release"
+  ]
+}

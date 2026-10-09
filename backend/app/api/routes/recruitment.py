@@ -1,9 +1,15 @@
+import secrets
+from app.services.request_rate_limit import protect_public_request
+from app.services.recruitment_history import application_history, member_name
+from app.services.recruitment_questionnaire import effective_questions, questionnaire_version
+from app.core.time import utc_now
 from datetime import date, datetime, timedelta
 import csv
 from io import StringIO
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, File, Form, UploadFile
+from pydantic import ValidationError
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -24,6 +30,7 @@ from app.schemas.recruitment import (
     RecruitmentCampaignCreate,
     RecruitmentCampaignUpdate,
     RecruitmentCampaignRead,
+    RecruitmentCampaignPublicRead,
     ApplicationCreate,
     ApplicationUpdate,
     ApplicationInterviewSchedule,
@@ -45,10 +52,14 @@ from app.core.config import settings
 from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES
 from app.services.notification_service import notify_user, notify_users
 from app.services.audit_service import create_audit_log, get_client_ip
+from app.services.email_delivery_service import enqueue_email_delivery
+from app.services.recruitment_emails import enqueue_candidate_update
 from app.services.operational_integrity import lock_row, to_naive_utc
 
 
-router = APIRouter(prefix="/recruitment", tags=["Recrutement"])
+from app.services.recruitment_rubric import VERSION as RUBRIC_VERSION, rubric_payload, assess_ratings, structured_summary
+
+router = APIRouter(prefix="/recruitment", dependencies=[Depends(protect_public_request)], tags=["Recrutement"])
 
 
 VALID_APPLICATION_STATUSES = {
@@ -109,6 +120,48 @@ VALID_RECOMMENDATIONS = {
     "defavorable",
 }
 
+MEMBER_ONBOARDING_CHECKLIST = [
+    {
+        "id": "beginner-guide",
+        "title": "Guide du débutant",
+        "route": "/help",
+    },
+    {
+        "id": "academy-new-enacteur",
+        "title": "Parcours Academy — Nouveau Enacteur",
+        "route": "/academy",
+    },
+    {
+        "id": "discover-pole",
+        "title": "Découvrir mon pôle",
+        "route": "/poles",
+    },
+    {
+        "id": "meet-team",
+        "title": "Découvrir l'équipe et mon parrain",
+        "route": "/members",
+    },
+    {
+        "id": "useful-documents",
+        "title": "Consulter les documents utiles",
+        "route": "/documents",
+    },
+    {
+        "id": "first-project",
+        "title": "Rejoindre un projet ou une première mission",
+        "route": "/projects",
+    },
+]
+
+
+def member_onboarding_payload() -> dict:
+    return {
+        "academy_path_id": "new-enacteur",
+        "academy_path_title": "Nouveau Enacteur",
+        "checklist": [dict(item) for item in MEMBER_ONBOARDING_CHECKLIST],
+    }
+
+
 RECRUITMENT_NOTIFICATION_ROLES = RECRUITMENT_ACCESS_ROLES
 RECRUITMENT_CONVERSION_ROLES = {
     "administrateur",
@@ -139,7 +192,7 @@ def apply_application_status(application: Application, value: str) -> bool:
             detail=f"Transition de candidature interdite : {current_status} -> {next_status}",
         )
     application.status = next_status
-    application.updated_at = datetime.utcnow()
+    application.updated_at = utc_now()
     return True
 
 
@@ -195,12 +248,17 @@ def recompute_application_score(db: Session, application: Application):
         ApplicationReview.score.isnot(None),
     ).scalar()
 
-    if avg_score is None:
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    reviews = db.query(ApplicationReview).filter(ApplicationReview.application_id == application.id).all()
+    summary = structured_summary(reviews, campaign.screening_rubric_version or RUBRIC_VERSION)
+    if summary["screening_score"] is not None:
+        application.final_score = round(summary["screening_score"] / 5, 2)
+    elif avg_score is None:
         application.final_score = None
     else:
         application.final_score = round(float(avg_score), 2)
 
-    application.updated_at = datetime.utcnow()
+    application.updated_at = utc_now()
 
 
 def notify_recruitment_responsibles(
@@ -242,10 +300,11 @@ def notify_recruitment_responsibles(
     )
 
 
-def notify_application_status_if_linked(
+def notify_application_status(
     db: Session,
     application: Application,
 ) -> None:
+    enqueue_candidate_update(db, application)
     if not application.converted_user_id:
         return
 
@@ -253,7 +312,7 @@ def notify_application_status_if_linked(
     notify_user(
         db,
         user_id=application.converted_user_id,
-        title="Statut de candidature mis a jour",
+        title="Statut de candidature mis à jour",
         message=APPLICATION_TRACKING_NEXT_STEPS.get(
             normalized_status,
             "Votre candidature a ete mise a jour.",
@@ -261,7 +320,8 @@ def notify_application_status_if_linked(
         notification_type="recruitment_status",
         related_type="application",
         related_id=application.id,
-        dedupe=True,
+        dedupe=False,
+        send_email=False,
     )
 
 
@@ -278,6 +338,12 @@ def create_campaign(
         description=payload.description,
         start_date=payload.start_date,
         end_date=payload.end_date,
+        target_headcount=payload.target_headcount,
+        positions=[item.model_dump() for item in payload.positions],
+        target_profiles=payload.target_profiles,
+        communication_actions=[item.model_dump() for item in payload.communication_actions],
+        interview_questions=[item.model_dump() for item in payload.interview_questions],
+        application_questions=[q.model_dump() for q in payload.application_questions] if payload.application_questions is not None else None,
         is_active=payload.is_active,
         created_by=current_user.id,
     )
@@ -303,7 +369,7 @@ def list_campaigns(
     return query.order_by(RecruitmentCampaign.created_at.desc()).all()
 
 
-@router.get("/campaigns/public", response_model=list[RecruitmentCampaignRead])
+@router.get("/campaigns/public", response_model=list[RecruitmentCampaignPublicRead])
 def list_public_active_campaigns(
     db: Session = Depends(get_db),
 ):
@@ -347,10 +413,31 @@ def update_campaign(
     if payload.end_date is not None:
         campaign.end_date = payload.end_date
 
+    if payload.target_headcount is not None:
+        campaign.target_headcount = payload.target_headcount
+
+    if payload.positions is not None:
+        campaign.positions = [item.model_dump() for item in payload.positions]
+
+    if payload.target_profiles is not None:
+        campaign.target_profiles = payload.target_profiles
+
+    if payload.communication_actions is not None:
+        campaign.communication_actions = [
+            item.model_dump() for item in payload.communication_actions
+        ]
+
+    if payload.interview_questions is not None:
+        campaign.interview_questions = [
+            item.model_dump() for item in payload.interview_questions
+        ]
+
+    if payload.application_questions is not None:
+        campaign.application_questions = [q.model_dump() for q in payload.application_questions]
     if payload.is_active is not None:
         campaign.is_active = payload.is_active
 
-    campaign.updated_at = datetime.utcnow()
+    campaign.updated_at = utc_now()
 
     db.commit()
     db.refresh(campaign)
@@ -395,6 +482,10 @@ def submit_application(
     payload: ApplicationCreate,
     db: Session = Depends(get_db),
 ):
+    return create_application(payload, db)
+
+
+def create_application(payload, db, attachments=None, created_files=None):
     campaign = get_campaign_or_404(db, str(payload.campaign_id))
 
     if not campaign_is_open(campaign):
@@ -402,6 +493,23 @@ def submit_application(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cette campagne de recrutement n'est pas ouverte",
         )
+    first_name = payload.first_name.strip()
+    last_name = payload.last_name.strip()
+    gender = payload.gender.strip().lower()
+    phone = payload.phone.strip()
+    department = payload.department.strip()
+    study_level = payload.study_level.strip()
+    if not all((first_name, last_name, phone, department, study_level)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Identité, téléphone et parcours sont obligatoires",
+        )
+    if gender not in {"homme", "femme", "non_precise"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Genre invalide",
+        )
+
     duplicate = (
         db.query(Application.id)
         .filter(
@@ -416,16 +524,43 @@ def submit_application(
             detail="Une candidature existe déjà pour cet email",
         )
 
+    answer_snapshot = None
+    if payload.questionnaire_version and payload.questionnaire_version != questionnaire_version(campaign.application_questions):
+        raise HTTPException(status_code=409, detail="Le questionnaire a changé. Recharge la campagne pour relire tes réponses.")
+    if payload.questionnaire_answers is None and campaign.application_questions is not None:
+        # Older clients can still answer existing fields; new required questions cannot be skipped.
+        for q in effective_questions(campaign.application_questions):
+            answer = (getattr(payload, q.get('legacy_field') or '', '') or '').strip()
+            if q.get('required') and not answer:
+                raise HTTPException(422, "Une réponse obligatoire est manquante : " + q['label'])
+    if payload.questionnaire_answers is not None:
+        questions = effective_questions(campaign.application_questions)
+        answers = payload.questionnaire_answers or {}
+        known = {q['id'] for q in questions}
+        if set(answers) - known:
+            raise HTTPException(status_code=422, detail="Le questionnaire contient une question inconnue")
+        answer_snapshot = []
+        for q in questions:
+            answer = answers.get(q['id'], '').strip()
+            if len(answer) > 5000:
+                raise HTTPException(status_code=422, detail="Une réponse dépasse 5 000 caractères")
+            if q.get('required') and not answer:
+                raise HTTPException(status_code=422, detail="Une réponse obligatoire est manquante : " + q['label'])
+            answer_snapshot.append({'id': q['id'], 'question': q['label'], 'answer': answer})
+            if q.get('legacy_field'):
+                setattr(payload, q['legacy_field'], answer or None)
+
     application = Application(
         campaign_id=payload.campaign_id,
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        gender=payload.gender,
+        first_name=first_name,
+        last_name=last_name,
+        gender=gender,
         email=payload.email,
-        phone=payload.phone,
-        department=payload.department,
-        study_level=payload.study_level,
+        phone=phone,
+        department=department,
+        study_level=study_level,
         class_name=payload.class_name,
+        questionnaire_answers=answer_snapshot,
         motivation=payload.motivation,
         known_enactus_from=payload.known_enactus_from,
         enactus_knowledge=payload.enactus_knowledge,
@@ -453,17 +588,68 @@ def submit_application(
             status_code=status.HTTP_409_CONFLICT,
             detail="Une candidature existe déjà pour cet email",
         ) from exc
+    from app.services.file_storage_service import store_bytes
+    for field, (name, data) in (attachments or {}).items():
+        stored = store_bytes(db, data=data, original_filename=name, uploaded_by=None,
+            storage_scope="recruitment", visibility="private", entity_type="application",
+            entity_id=application.id, is_temporary=False)
+        if created_files is not None:
+            created_files.append(stored)
+        setattr(application, field, f"/api/files/{stored.id}/download")
     ensure_tracking_code(db, application)
     notify_recruitment_responsibles(db, application, campaign)
-    candidate_email_ready()
+    enqueue_email_delivery(
+        db,
+        recipient_email=application.email,
+        subject=f"EnactSpace - Candidature {campaign.title}",
+        text_body=(
+            f"Bonjour {application.first_name},\n\n"
+            "Votre candidature à Enactus ESP a bien été reçue.\n"
+            f"Code de suivi : {application.tracking_code}\n\n"
+            "Conservez ce code pour suivre l'avancement de votre candidature."
+        ),
+        dedupe_key=f"recruitment-submission:{application.id}",
+    )
     db.commit()
     db.refresh(application)
 
     return application_payload(db, None, application)
 
 
+@router.post("/applications/with-files", response_model=ApplicationRead)
+async def submit_application_files(
+    payload: str = Form(...), cv: UploadFile | None = File(default=None),
+    motivation_letter: UploadFile | None = File(default=None), attachment: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+):
+    if len(payload) > 240000:
+        raise HTTPException(413, "Le formulaire dépasse la taille autorisée.")
+    try:
+        parsed = ApplicationCreate.model_validate_json(payload)
+    except ValidationError:
+        raise HTTPException(422, "Vérifiez les champs obligatoires et les réponses du formulaire.")
+    campaign = get_campaign_or_404(db, str(parsed.campaign_id))
+    if not campaign_is_open(campaign):
+        raise HTTPException(400, "Cette campagne de recrutement n’est pas ouverte.")
+    from app.services.attachment_service import read_attachment
+    from app.models.stored_file import StoredFile
+    from app.services.file_storage_service import delete_physical_file
+    attachments = {}
+    for field, file in (("cv_url",cv),("motivation_letter_url",motivation_letter),("attachment_url",attachment)):
+        if file is not None:
+            attachments[field] = await read_attachment(file, application=True)
+    created_files = []
+    try:
+        return create_application(parsed, db, attachments, created_files)
+    except Exception:
+        db.rollback()
+        for stored in created_files:
+            delete_physical_file(stored)
+        raise
+
+
 def build_tracking_code(application: Application | None = None) -> str:
-    year = datetime.utcnow().year
+    year = utc_now().year
     if application and application.created_at:
         year = application.created_at.year
     return f"ESP-{year}-{uuid.uuid4().hex[:8].upper()}"
@@ -616,8 +802,23 @@ def application_payload(
     application: Application,
     *,
     anonymized: bool = False,
+    include_history: bool = False,
+    prefetched_campaigns: dict | None = None,
+    prefetched_reviews: dict | None = None,
 ) -> dict:
     data = ApplicationRead.model_validate(application).model_dump()
+    if current_user is not None:
+        campaign = (prefetched_campaigns.get(application.campaign_id) if prefetched_campaigns is not None
+                    else get_campaign_or_404(db, str(application.campaign_id)))
+        version = campaign.screening_rubric_version or RUBRIC_VERSION
+        reviews = (prefetched_reviews.get(application.id, []) if prefetched_reviews is not None
+                   else db.query(ApplicationReview).filter(ApplicationReview.application_id == application.id).all())
+        data.update(structured_summary(reviews, version))
+        data["screening_rubric"] = rubric_payload(version)
+        own_review = next((review for review in reviews if review.reviewer_id == current_user.id), None)
+        data["my_review"] = ApplicationReviewRead.model_validate(own_review).model_dump() if own_review else None
+    if include_history and current_user is not None:
+        data["history"] = application_history(db, application)
     data["status"] = normalize_application_status(application.status)
     data["tracking_code"] = application.tracking_code or str(application.id)
     data["is_anonymized"] = anonymized
@@ -643,6 +844,7 @@ def application_payload(
                 "associative_experience": None,
                 "availability": None,
                 "public_comment": None,
+                "questionnaire_answers": None,
                 "attachment_url": None,
             }
         )
@@ -769,12 +971,21 @@ def list_applications(
         query = query.filter(Application.created_at < submitted_to + timedelta(days=1))
 
     applications = query.order_by(Application.created_at.desc()).all()
+    campaigns = {row.id: row for row in db.query(RecruitmentCampaign).filter(
+        RecruitmentCampaign.id.in_({row.campaign_id for row in applications})).all()} if applications else {}
+    reviews_by_application = {}
+    if applications:
+        for review in db.query(ApplicationReview).filter(ApplicationReview.application_id.in_(
+                [row.id for row in applications])).all():
+            reviews_by_application.setdefault(review.application_id, []).append(review)
     return [
         application_payload(
             db,
             current_user,
             application,
             anonymized=anonymized,
+            prefetched_campaigns=campaigns,
+            prefetched_reviews=reviews_by_application,
         )
         for application in applications
     ]
@@ -849,11 +1060,12 @@ def export_applications_csv(
 @router.get("/applications/{application_id}", response_model=ApplicationRead)
 def get_application(
     application_id: str,
+    anonymized: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
-    return application_payload(db, current_user, application)
+    return application_payload(db, current_user, application, anonymized=anonymized, include_history=True)
 
 
 @router.post("/applications/{application_id}/interview", response_model=ApplicationRead)
@@ -868,6 +1080,10 @@ def schedule_application_interview(
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
 
+    old_interview = {
+        name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
+        for name in ("interview_at", "interview_location", "interview_link", "interview_jury", "interview_note")
+    }
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, "interview_scheduled")
 
@@ -876,9 +1092,9 @@ def schedule_application_interview(
     application.interview_link = payload.interview_link
     application.interview_jury = payload.interview_jury
     application.interview_note = payload.interview_note
-    application.updated_at = datetime.utcnow()
+    application.updated_at = utc_now()
     if changed:
-        notify_application_status_if_linked(db, application)
+        notify_application_status(db, application)
         create_audit_log(
             db=db,
             action="changement_statut_candidature",
@@ -886,7 +1102,26 @@ def schedule_application_interview(
             entity_type="application",
             entity_id=application.id,
             old_value={"status": old_status},
-            new_value={"status": application.status, "interview_scheduled": True},
+            new_value={"status": application.status, "interview_scheduled": True, "interview_at": application.interview_at.isoformat() + "Z"},
+            ip_address=get_client_ip(request),
+        )
+
+    elif old_interview != {
+        name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
+        for name in old_interview
+    }:
+        public_interview_changed = any(
+            old_interview[name] != (getattr(application, name).isoformat()
+                if isinstance(getattr(application, name), datetime) else getattr(application, name))
+            for name in ("interview_at", "interview_location", "interview_link")
+        )
+        if public_interview_changed:
+            notify_application_status(db, application)
+        create_audit_log(
+            db=db, action="programmation_entretien_candidature", user_id=current_user.id,
+            entity_type="application", entity_id=application.id,
+            old_value={"interview_at": old_interview["interview_at"]},
+            new_value={"interview_at": application.interview_at.isoformat() + "Z"},
             ip_address=get_client_ip(request),
         )
 
@@ -946,9 +1181,9 @@ def update_application(
         if value is not None:
             setattr(application, field, value)
 
-    application.updated_at = datetime.utcnow()
+    application.updated_at = utc_now()
     if status_changed:
-        notify_application_status_if_linked(db, application)
+        notify_application_status(db, application)
         create_audit_log(
             db=db,
             action="changement_statut_candidature",
@@ -980,7 +1215,7 @@ def change_application_status(
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, payload.status)
     if changed:
-        notify_application_status_if_linked(db, application)
+        notify_application_status(db, application)
         create_audit_log(
             db=db,
             action="changement_statut_candidature",
@@ -1022,6 +1257,16 @@ def delete_application(
         "message": "Candidature supprimée",
     }
 
+def lock_review_application(db: Session, application_id: str) -> Application:
+    campaign_id = db.query(Application.campaign_id).filter(Application.id == application_id).scalar()
+    if campaign_id is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    lock_row(db, RecruitmentCampaign, campaign_id)
+    application = lock_row(db, Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    return application
+
 
 @router.post("/reviews", response_model=ApplicationReviewRead)
 def create_or_update_review(
@@ -1041,7 +1286,20 @@ def create_or_update_review(
             detail="Le score doit être compris entre 0 et 20",
         )
 
-    application = get_application_or_404(db, str(payload.application_id))
+    application = lock_review_application(db, str(payload.application_id))
+    snapshot = None
+    score = payload.score
+    if payload.criteria_assessment is not None:
+        campaign = get_campaign_or_404(db, str(application.campaign_id))
+        version = campaign.screening_rubric_version or RUBRIC_VERSION
+        try:
+            snapshot, score = assess_ratings(payload.criteria_assessment.get("ratings"),
+                                             payload.criteria_assessment.get("rubric_version"))
+            if snapshot["rubric_version"] != version:
+                raise ValueError("La grille de cette campagne a changé. Recharge le dossier.")
+        except (ValueError, AttributeError) as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        campaign.screening_rubric_version = version
 
     review = db.query(ApplicationReview).filter(
         ApplicationReview.application_id == payload.application_id,
@@ -1049,15 +1307,19 @@ def create_or_update_review(
     ).first()
 
     if review:
-        review.score = payload.score
+        if review.criteria_assessment is not None and snapshot is None:
+            raise HTTPException(status_code=409, detail="Utilise la grille pour modifier cette évaluation.")
+        review.score = score
+        review.criteria_assessment = snapshot
         review.comment = payload.comment
         review.recommendation = payload.recommendation
-        review.updated_at = datetime.utcnow()
+        review.updated_at = utc_now()
     else:
         review = ApplicationReview(
             application_id=payload.application_id,
             reviewer_id=current_user.id,
-            score=payload.score,
+            score=score,
+            criteria_assessment=snapshot,
             comment=payload.comment,
             recommendation=payload.recommendation,
         )
@@ -1081,9 +1343,10 @@ def list_application_reviews(
 ):
     get_application_or_404(db, application_id)
 
-    return db.query(ApplicationReview).filter(
+    rows = db.query(ApplicationReview, User).outerjoin(User, User.id == ApplicationReview.reviewer_id).filter(
         ApplicationReview.application_id == application_id
     ).order_by(ApplicationReview.created_at.desc()).all()
+    return [dict(ApplicationReviewRead.model_validate(review).model_dump(), reviewer_name=member_name(actor)) for review, actor in rows]
 
 
 @router.patch("/reviews/{review_id}", response_model=ApplicationReviewRead)
@@ -1108,6 +1371,8 @@ def update_review(
             detail="Vous ne pouvez modifier que votre propre évaluation",
         )
 
+    application = lock_review_application(db, str(review.application_id))
+    db.refresh(review)
     if payload.recommendation is not None:
         if payload.recommendation not in VALID_RECOMMENDATIONS:
             raise HTTPException(
@@ -1116,7 +1381,21 @@ def update_review(
             )
         review.recommendation = payload.recommendation
 
-    if payload.score is not None:
+    if payload.criteria_assessment is not None:
+        application = get_application_or_404(db, str(review.application_id))
+        campaign = get_campaign_or_404(db, str(application.campaign_id))
+        try:
+            snapshot, computed = assess_ratings(payload.criteria_assessment.get("ratings"), payload.criteria_assessment.get("rubric_version"))
+            if snapshot["rubric_version"] != (campaign.screening_rubric_version or RUBRIC_VERSION):
+                raise ValueError("La grille de cette campagne a changé. Recharge le dossier.")
+        except (ValueError, AttributeError) as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        review.criteria_assessment = snapshot
+        review.score = computed
+        campaign.screening_rubric_version = snapshot["rubric_version"]
+    elif payload.score is not None:
+        if review.criteria_assessment is not None:
+            raise HTTPException(status_code=409, detail="Utilise la grille pour modifier cette évaluation.")
         if payload.score < 0 or payload.score > 20:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1127,9 +1406,9 @@ def update_review(
     if payload.comment is not None:
         review.comment = payload.comment
 
-    review.updated_at = datetime.utcnow()
+    review.updated_at = utc_now()
 
-    application = get_application_or_404(db, str(review.application_id))
+    db.flush()
     recompute_application_score(db, application)
 
     db.commit()
@@ -1159,12 +1438,11 @@ def delete_review(
             detail="Vous ne pouvez supprimer que votre propre évaluation",
         )
 
-    application_id = review.application_id
+    application = lock_review_application(db, str(review.application_id))
 
     db.delete(review)
     db.flush()
 
-    application = get_application_or_404(db, str(application_id))
     recompute_application_score(db, application)
 
     db.commit()
@@ -1200,7 +1478,7 @@ def convert_application_to_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="La candidature doit être acceptée avant création du compte",
         )
-    if len(payload.password.strip()) < 8:
+    if payload.password is not None and len(payload.password.strip()) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le mot de passe initial doit contenir au moins 8 caractères",
@@ -1238,11 +1516,14 @@ def convert_application_to_user(
                 ),
             )
         application.converted_user_id = existing_user.id
+        ensure_user_role(db, existing_user, BASE_ACTIVE_ROLE)
         existing_user.gender = existing_user.gender or application.gender
         existing_user.department = existing_user.department or application.department
         existing_user.study_level = existing_user.study_level or application.study_level
         existing_user.promotion = existing_user.promotion or application.class_name
-        application.updated_at = datetime.utcnow()
+        application.updated_at = utc_now()
+        from app.services.first_access import issue_activation
+        issue_activation(db, existing_user)
         notify_user(
             db,
             user_id=existing_user.id,
@@ -1272,6 +1553,7 @@ def convert_application_to_user(
             "profile_type": existing_user.profile_type,
             "core_pole_id": None,
             "project_id": None,
+            "onboarding": member_onboarding_payload(),
         }
 
     user = User(
@@ -1281,7 +1563,9 @@ def convert_application_to_user(
         phone=application.phone,
         gender=application.gender,
         profile_type=requested_profile_type,
-        password_hash=hash_password(payload.password.strip()),
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        credential_setup_required=True,
+        onboarding_required=True,
         department=application.department,
         study_level=application.study_level,
         promotion=application.class_name,
@@ -1324,7 +1608,8 @@ def convert_application_to_user(
                 detail="Un compte existe déjà avec cet email",
             ) from exc
         application.converted_user_id = existing_user.id
-        application.updated_at = datetime.utcnow()
+        ensure_user_role(db, existing_user, BASE_ACTIVE_ROLE)
+        application.updated_at = utc_now()
         notify_user(
             db,
             user_id=existing_user.id,
@@ -1353,6 +1638,7 @@ def convert_application_to_user(
             "profile_type": existing_user.profile_type,
             "core_pole_id": None,
             "project_id": None,
+            "onboarding": member_onboarding_payload(),
         }
     ensure_user_role(db, user, BASE_ACTIVE_ROLE)
     if payload.core_pole_id:
@@ -1362,13 +1648,15 @@ def convert_application_to_user(
     if payload.project_id:
         ensure_project_membership(db, user, payload.project_id)
 
+    from app.services.first_access import issue_activation
+    issue_activation(db, user)
     application.converted_user_id = user.id
-    application.updated_at = datetime.utcnow()
+    application.updated_at = utc_now()
     notify_user(
         db,
         user_id=user.id,
-        title="Compte EnactSpace cree",
-        message="Votre compte membre EnactSpace est actif.",
+        title="Votre profil EnactSpace est créé",
+        message="Activez votre accès depuis Première connexion, puis complétez votre profil.",
         notification_type="recruitment_update",
         related_type="application",
         related_id=application.id,
@@ -1396,4 +1684,5 @@ def convert_application_to_user(
         "profile_type": user.profile_type,
         "core_pole_id": str(payload.core_pole_id) if payload.core_pole_id else None,
         "project_id": str(payload.project_id) if payload.project_id else None,
+        "onboarding": member_onboarding_payload(),
     }

@@ -45,6 +45,7 @@ class ImpactService {
     return ProjectImpactMetricModel(
       id: _string(json['id'], fallback: 'project'),
       projectName: _string(json['project_name'], fallback: 'Projet'),
+      impactRecordId: json['impact_record_id']?.toString(),
       status: _string(json['status'], fallback: 'Actif'),
       poleName: _string(json['pole_name'], fallback: 'Projet'),
       projectLead: _string(json['project_lead'], fallback: 'Non assigné'),
@@ -126,16 +127,29 @@ class ImpactService {
     if (value is! Map<String, dynamic>) return null;
     final json = value;
     return HistoricalImpactModel(
-      createdProjects: _int(json['created_projects']),
-      developingProjects: _int(json['developing_projects']),
-      developedProducts: _int(json['developed_products']),
-      touchedSdgs: _int(json['touched_sdgs']),
-      createdJobs: _int(json['created_jobs']),
-      savedLives: _int(json['saved_lives']),
-      plantedTrees: _int(json['planted_trees']),
-      cumulativeUsdGains: _double(json['cumulative_usd_gains']),
-      cumulativeFcfaGains: _double(json['cumulative_fcfa_gains']),
-      impactedLives: _int(json['impacted_lives']),
+      sourceLabel: _nullableString(json['source_label']),
+      developedProducts: _nullableInt(json['developed_products']),
+      touchedSdgs: _nullableInt(json['touched_sdgs']),
+      createdJobs: _nullableInt(json['created_jobs']),
+      createdJobsIsMinimum: json['created_jobs_is_minimum'] == true,
+      peopleTrained: _nullableInt(json['people_trained']),
+      workHours: _nullableInt(json['work_hours']),
+      plantedTrees: _nullableInt(json['planted_trees']),
+      fieldKilometers: _nullableInt(json['field_kilometers']),
+      revenueUsd2021To2022: _nullableDouble(json['revenue_usd_2021_2022']),
+      dimbaliRevenueUsd2021To2022: _nullableDouble(
+        json['dimbali_revenue_usd_2021_2022'],
+      ),
+      menNanRevenueUsd2021To2022: _nullableDouble(
+        json['men_nan_revenue_usd_2021_2022'],
+      ),
+      beneficiaryIncomeIncreasePct: _nullableDouble(
+        json['beneficiary_income_increase_pct'],
+      ),
+      malnutritionBeforePct: _nullableDouble(json['malnutrition_before_pct']),
+      malnutritionAfterPct: _nullableDouble(json['malnutrition_after_pct']),
+      impactedLives: _nullableInt(json['impacted_lives']),
+      impactedLivesIsMinimum: json['impacted_lives_is_minimum'] == true,
       emblematicProjects: _stringList(json['emblematic_projects']),
       distinctions: _stringList(json['distinctions']),
     );

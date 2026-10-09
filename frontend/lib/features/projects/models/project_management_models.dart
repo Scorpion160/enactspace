@@ -17,7 +17,7 @@ class ProjectSeasonOption {
   factory ProjectSeasonOption.fromJson(Map<String, dynamic> json) {
     return ProjectSeasonOption(
       id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Saison sans nom',
+      name: json['name']?.toString() ?? 'Année sans nom',
       isCurrent: json['is_current'] == true,
     );
   }

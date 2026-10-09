@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/auth/user_experience.dart';
 import '../models/alumni_profile_model.dart';
 import '../services/alumni_gateway.dart';
+import '../services/alumni_error_message.dart';
 
 class AlumniProfileDetailScreen extends StatefulWidget {
   final String profileId;
@@ -86,7 +87,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Supprimer le profil alumni ?'),
         content: const Text(
-          'Cette suppression est définitive et sera contrôlée par le backend.',
+          'Cette suppression est définitive. Vérifie le profil avant de confirmer.',
         ),
         actions: [
           TextButton(
@@ -469,5 +470,8 @@ List<String> _skills(String? value) => value == null
           .map((v) => v.trim())
           .where((v) => v.isNotEmpty)
           .toList();
-String _message(Object error) =>
-    error.toString().replaceFirst('Exception: ', '');
+String _message(Object error) => alumniErrorMessage(
+  error,
+  fallback:
+      'Impossible d’ouvrir ou de mettre à jour ce profil. Réessayez dans quelques instants.',
+);

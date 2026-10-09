@@ -211,6 +211,10 @@ class AuthStorage {
 
   Future<void> _purgePrivateSessionData() async {
     purgePrivateSessionMemory();
+    await Future.wait([
+      _secureStore.delete(documentOfflineCacheSecureKey),
+      _secureStore.delete(chatOfflineCacheSecureKey),
+    ]);
     final preferences = await _preferencesFactory();
     await purgePrivateSessionPreferences(preferences);
   }

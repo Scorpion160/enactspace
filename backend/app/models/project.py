@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
@@ -37,8 +38,8 @@ class Project(Base):
     started_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     ended_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     @validates("status")
     def normalize_status(self, _key, value):

@@ -220,7 +220,9 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
               FilledButton.icon(
                 onPressed: _loading ? null : _save,
                 icon: const Icon(Icons.save_outlined),
-                label: Text(widget.request == null ? 'Créer le brouillon' : 'Enregistrer'),
+                label: Text(
+                  widget.request == null ? 'Créer le brouillon' : 'Enregistrer',
+                ),
               ),
             ],
           ),
@@ -247,10 +249,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         ),
         items: veillePoles
             .map(
-              (pole) => DropdownMenuItem(
-                value: pole.id,
-                child: Text(pole.name),
-              ),
+              (pole) =>
+                  DropdownMenuItem(value: pole.id, child: Text(pole.name)),
             )
             .toList(),
         onChanged: (value) => setState(() => _poleId = value),
@@ -287,12 +287,14 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         children: [
           Text(
             'Périmètre du document',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           SegmentedButton<String>(
+            expandedInsets: EdgeInsets.zero,
+            showSelectedIcon: false,
             segments: const [
               ButtonSegment(value: 'none', label: Text('Club')),
               ButtonSegment(value: 'pole', label: Text('Pôle')),
@@ -325,8 +327,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _poleId = value),
-              validator: (value) =>
-                  _optionalScope == 'pole' && value == null
+              validator: (value) => _optionalScope == 'pole' && value == null
                   ? 'Sélectionnez un pôle.'
                   : null,
             ),
@@ -346,8 +347,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _projectId = value),
-              validator: (value) =>
-                  _optionalScope == 'project' && value == null
+              validator: (value) => _optionalScope == 'project' && value == null
                   ? 'Sélectionnez un projet.'
                   : null,
             ),
@@ -379,7 +379,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                 ),
               )
               .toList(),
-          onChanged: (value) => setState(() => _singleUsers[field.name] = value),
+          onChanged: (value) =>
+              setState(() => _singleUsers[field.name] = value),
           validator: (value) => field.required && value == null
               ? 'Ce champ est obligatoire.'
               : null,
@@ -452,7 +453,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
           icon: const Icon(Icons.clear_rounded),
         ),
       ),
-      validator: (value) => field.required && (value == null || value.trim().isEmpty)
+      validator: (value) =>
+          field.required && (value == null || value.trim().isEmpty)
           ? 'Ce champ est obligatoire.'
           : null,
     );
@@ -486,7 +488,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         alignLabelWithHint: rich,
         helperText: _helper(field.type),
       ),
-      validator: (value) => field.required && (value == null || value.trim().isEmpty)
+      validator: (value) =>
+          field.required && (value == null || value.trim().isEmpty)
           ? 'Ce champ est obligatoire.'
           : null,
     );
@@ -535,7 +538,10 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
             minute: int.tryParse(parts[1]) ?? TimeOfDay.now().minute,
           )
         : TimeOfDay.now();
-    final selected = await showTimePicker(context: context, initialTime: initial);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
     if (selected != null && mounted) {
       _controllers[field.name]?.text =
           '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
@@ -569,7 +575,9 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   }
 
   Future<void> _chooseMembers(InstitutionalFieldModel field) async {
-    final selected = Set<String>.from(_multiUsers[field.name] ?? const <String>{});
+    final selected = Set<String>.from(
+      _multiUsers[field.name] ?? const <String>{},
+    );
     final result = await showDialog<Set<String>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -712,25 +720,33 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
     switch (type) {
       case 'structured_list':
       case 'decision_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['title'] ?? item['name'] ?? item['label'] ?? ''} | ${item['details'] ?? item['description'] ?? item['decision'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['title'] ?? item['name'] ?? item['label'] ?? ''} | ${item['details'] ?? item['description'] ?? item['decision'] ?? ''}';
+            })
+            .join('\n');
       case 'action_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['action'] ?? item['title'] ?? ''} | ${item['responsible'] ?? item['owner'] ?? ''} | ${item['deadline'] ?? item['due_date'] ?? ''} | ${item['status'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['action'] ?? item['title'] ?? ''} | ${item['responsible'] ?? item['owner'] ?? ''} | ${item['deadline'] ?? item['due_date'] ?? ''} | ${item['status'] ?? ''}';
+            })
+            .join('\n');
       case 'vote_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['title'] ?? item['resolution'] ?? ''} | ${item['for'] ?? 0} | ${item['against'] ?? 0} | ${item['abstain'] ?? 0}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['title'] ?? item['resolution'] ?? ''} | ${item['for'] ?? 0} | ${item['against'] ?? 0} | ${item['abstain'] ?? 0}';
+            })
+            .join('\n');
       case 'route_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['from'] ?? ''} | ${item['to'] ?? ''} | ${item['distance'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['from'] ?? ''} | ${item['to'] ?? ''} | ${item['distance'] ?? ''}';
+            })
+            .join('\n');
       default:
         return value.map((item) => item.toString()).join('\n');
     }

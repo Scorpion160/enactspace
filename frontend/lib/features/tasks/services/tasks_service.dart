@@ -90,6 +90,7 @@ class TasksService {
     required DateTime? dueDate,
     required bool proofRequired,
     required String? proofUrl,
+    String? deadlineChangeReason,
   }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -103,6 +104,7 @@ class TasksService {
         'priority': priority,
         'status': status,
         'due_date': dueDate?.toIso8601String(),
+        if (deadlineChangeReason != null) 'deadline_change_reason': deadlineChangeReason.trim(),
         'proof_required': proofRequired,
         'proof_url': proofUrl?.trim(),
       },

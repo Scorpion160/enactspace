@@ -1,4 +1,8 @@
+import 'recruitment_question_model.dart';
+
 class RecruitmentCampaignModel {
+  final List<RecruitmentApplicationQuestion> applicationQuestions;
+  final String? questionnaireVersion;
   final String id;
   final String? seasonId;
   final String title;
@@ -11,6 +15,8 @@ class RecruitmentCampaignModel {
   final String? updatedAt;
 
   const RecruitmentCampaignModel({
+    this.applicationQuestions = defaultRecruitmentQuestions,
+    this.questionnaireVersion,
     required this.id,
     this.seasonId,
     required this.title,
@@ -25,6 +31,17 @@ class RecruitmentCampaignModel {
 
   factory RecruitmentCampaignModel.fromJson(Map<String, dynamic> json) {
     return RecruitmentCampaignModel(
+      applicationQuestions: json['application_questions'] is List
+          ? (json['application_questions'] as List)
+                .whereType<Map>()
+                .map(
+                  (q) => RecruitmentApplicationQuestion.fromJson(
+                    Map<String, dynamic>.from(q),
+                  ),
+                )
+                .toList()
+          : defaultRecruitmentQuestions,
+      questionnaireVersion: json['questionnaire_version']?.toString(),
       id: json['id']?.toString() ?? '',
       seasonId: json['season_id']?.toString(),
       title: json['title']?.toString() ?? 'Campagne sans titre',
@@ -48,7 +65,10 @@ class RecruitmentCampaignModel {
     String? startDate,
     String? endDate,
     bool? isActive,
+    List<RecruitmentApplicationQuestion>? applicationQuestions,
   }) => RecruitmentCampaignModel(
+    applicationQuestions: applicationQuestions ?? this.applicationQuestions,
+    questionnaireVersion: questionnaireVersion,
     id: id,
     seasonId: seasonId,
     title: title ?? this.title,

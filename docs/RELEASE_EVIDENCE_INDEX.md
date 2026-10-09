@@ -41,3 +41,23 @@ Allowed states are `NOT_RUN`, `LOCAL_PASS`, `EXTERNAL_GATE_OPEN`, `BLOCKED`, `AP
 | 33 | Go/no-go decision and timestamp | NOT_RUN | Future RC | Signed decision | Future release record | — | — | — | Release authority | Final decision required |
 
 Evidence must be sanitized. Do not attach credentials, signing material, provider files, full tokens, private URLs, member data, or unsanitized production logs.
+
+## Audit de préproduction — lot 24
+
+- [Première connexion et accueil](releases/20261007-prelaunch-lot24-first-access.md) : activation, contact manquant, récupération, profil obligatoire, année courante et Alumni ; 141 tests SQLite, 45 PostgreSQL et 82 Flutter.
+- [Preuves structurées du lot 24](releases/20261007-prelaunch-lot24-first-access.json).
+- [Guide opérationnel](FIRST_ACCESS_ONBOARDING.md). Résultats sur source non déployée, sans build ni envoi réel.
+
+## Audit de préproduction — lot 25
+
+- [Accueil, guide, FAQ et centre d’aide](releases/20261007-prelaunch-lot25-help.md) : 88 tests SQLite, 32 PostgreSQL, 105 Flutter et migration 0031 isolée réussis.
+- [Preuves structurées](releases/20261007-prelaunch-lot25-help.json).
+- [Guide opérationnel du centre d’aide](HELP_SUPPORT_OPERATIONS.md). Source non déployée ; aucun envoi réel.
+
+## Audit de préproduction — lot 26
+
+- [Restauration locale vérifiée](releases/20261008-prelaunch-lot26-backup-restore.md) : 19 tests, 111 tables, 721 lignes et 14 fichiers comparés ; contrôles de schéma et essais négatifs réussis.
+- [Preuves structurées](releases/20261008-prelaunch-lot26-backup-restore.json).
+- La copie Windows et sa récupération DPAPI sont vérifiées ; reprise sur un hôte neuf, second secours de clé et planification encore ouverts.
+
+Sauvegardes planifiées : timer actif à 03 h 00 UTC et premier lancement systemd validé, quatre tests de garde réussis. La copie automatique hors du VPS, le secours de clé remis à un second détenteur et la reprise sur un hôte neuf restent à terminer. Voir les preuves du lot 26.

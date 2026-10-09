@@ -135,8 +135,19 @@ class _ConversionGateway implements InternalRecruitmentGateway {
   Future<List<ApplicationModel>> loadApplications() async => [application];
 
   @override
-  Future<ApplicationModel> loadApplication(String applicationId) async =>
-      application;
+  Future<ApplicationModel> loadApplication(
+    String applicationId, {
+    bool anonymized = false,
+  }) async => application;
+
+  @override
+  Future<ApplicationReviewModel> createReview({
+    required String applicationId,
+    required Map<String, dynamic> criteriaAssessment,
+    String? comment,
+    String recommendation = 'reserve',
+  }) async =>
+      throw UnimplementedError('Review mutation unused in this fixture');
 
   @override
   Future<List<ApplicationReviewModel>> loadReviews(
@@ -161,6 +172,7 @@ class _ConversionGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> createCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String title,
     String? description,
     DateTime? startDate,
@@ -170,6 +182,7 @@ class _ConversionGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> updateCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String campaignId,
     String? title,
     String? description,
@@ -229,14 +242,9 @@ Future<void> _reachAssignments(
 
 Future<void> _reachReview(
   WidgetTester tester,
-  _ConversionGateway gateway, {
-  String password = 'Factice-2026',
-}) async {
+  _ConversionGateway gateway,
+) async {
   await _reachAssignments(tester, gateway);
-  await tester.enterText(
-    find.byKey(const Key('candidate-conversion-password')),
-    password,
-  );
   await tester.tap(find.byKey(const Key('candidate-conversion-next')));
   await tester.pumpAndSettle();
 }
@@ -350,49 +358,16 @@ void main() {
     expect(find.text('Réessayer'), findsOneWidget);
   });
 
-  testWidgets('mot de passe trop court bloque la vérification', (tester) async {
+  testWidgets('le responsable ne choisit aucun mot de passe', (tester) async {
     await _reachAssignments(tester, _ConversionGateway());
-    await tester.enterText(
+    expect(
       find.byKey(const Key('candidate-conversion-password')),
-      'court',
+      findsNothing,
     );
+    expect(find.textContaining('code personnel'), findsOneWidget);
     await tester.tap(find.byKey(const Key('candidate-conversion-next')));
-    await tester.pump();
-    expect(
-      find.text('Le mot de passe doit contenir au moins 8 caractères.'),
-      findsOneWidget,
-    );
-    expect(find.text('Étape 2 sur 3'), findsOneWidget);
-  });
-
-  testWidgets('mot de passe initial est masqué', (tester) async {
-    await _reachAssignments(tester, _ConversionGateway());
-    final field = tester.widget<EditableText>(
-      find.descendant(
-        of: find.byKey(const Key('candidate-conversion-password')),
-        matching: find.byType(EditableText),
-      ),
-    );
-    expect(field.obscureText, isTrue);
-  });
-
-  testWidgets('mot de passe peut être affiché puis masqué', (tester) async {
-    await _reachAssignments(tester, _ConversionGateway());
-    await tester.tap(
-      find.byKey(const Key('candidate-conversion-password-visibility')),
-    );
-    await tester.pump();
-    expect(
-      tester
-          .widget<EditableText>(
-            find.descendant(
-              of: find.byKey(const Key('candidate-conversion-password')),
-              matching: find.byType(EditableText),
-            ),
-          )
-          .obscureText,
-      isFalse,
-    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vérification finale'), findsOneWidget);
   });
 
   testWidgets('vérification finale humanise toutes les affectations', (
@@ -525,24 +500,21 @@ void main() {
     );
   });
 
-  testWidgets('formulaire et mot de passe restent conservés après erreur', (
+  testWidgets('les affectations restent accessibles après erreur', (
     tester,
   ) async {
     final gateway = _ConversionGateway(
       conversion: (_) => throw Exception('Erreur serveur'),
     );
-    await _reachReview(tester, gateway, password: 'Memoire-2026');
+    await _reachReview(tester, gateway);
     await _confirmAndSubmit(tester);
     await tester.tap(find.text('Précédent'));
-    await tester.pump();
-    final editable = tester.widget<EditableText>(
-      find.descendant(
-        of: find.byKey(const Key('candidate-conversion-password')),
-        matching: find.byType(EditableText),
-      ),
+    await tester.pumpAndSettle();
+    expect(find.text('Affectations et accès initial'), findsOneWidget);
+    expect(
+      find.byKey(const Key('candidate-conversion-password')),
+      findsNothing,
     );
-    expect(editable.controller.text, 'Memoire-2026');
-    expect(editable.obscureText, isTrue);
   });
 
   testWidgets('candidature déjà liée ne propose aucune nouvelle conversion', (
@@ -587,12 +559,16 @@ void main() {
     expect(decisions, 0);
   });
 
-  testWidgets('résultat ne contient aucune donnée sensible', (tester) async {
-    const password = 'Secret-Factice-2026';
-    await _reachReview(tester, _ConversionGateway(), password: password);
+  testWidgets('la conversion ne demande ni ne montre de secret', (
+    tester,
+  ) async {
+    await _reachReview(tester, _ConversionGateway());
     await _confirmAndSubmit(tester);
-    expect(find.textContaining(password), findsNothing);
-    expect(find.textContaining('mot de passe'), findsOneWidget);
+    expect(
+      find.byKey(const Key('candidate-conversion-password')),
+      findsNothing,
+    );
+    expect(find.text('Compte membre créé'), findsOneWidget);
   });
 
   testWidgets('parcours mobile 390 px reste sans overflow', (tester) async {

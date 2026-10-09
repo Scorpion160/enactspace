@@ -1,0 +1,9 @@
+[Unit]
+Description=EnactSpace daily verified encrypted backup at 03:00 UTC
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=enactspace-verified-backup.service
+[Install]
+WantedBy=timers.target

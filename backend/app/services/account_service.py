@@ -125,7 +125,7 @@ def build_user_data_export(db: Session, user: User, app_version: str) -> dict:
             "product_feedback": _rows(
                 db.query(ProductFeedback).filter(ProductFeedback.user_id == user_id).all(),
                 ("id", "category", "message", "rating", "platform", "app_version",
-                 "build_number", "status", "created_at", "updated_at"),
+                 "build_number", "status", "public_reply", "created_at", "updated_at"),
             ),
             "roles": [row[0] for row in roles],
             "pole_memberships": _rows(

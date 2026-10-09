@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
@@ -30,8 +31,8 @@ class Pole(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     objectives: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class PoleMember(Base):
