@@ -1,0 +1,11 @@
+{
+  "lock_sha256": "f93f0655be168aaf8a33fb4141038a612531fb7e1d8cfde7ba257ab8ae7c7b90",
+  "queried_packages": 122,
+  "excluded_non_hosted": [
+    "flutter",
+    "flutter_test",
+    "flutter_web_plugins",
+    "sky_engine"
+  ],
+  "alerts": []
+}
