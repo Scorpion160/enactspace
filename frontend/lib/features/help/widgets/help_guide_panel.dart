@@ -14,7 +14,7 @@ class HelpQuestion {
 const helpGuideArticles = [
   HelpArticle(
     "Activer mon accès et compléter mon profil",
-    "Si votre profil a été préparé par l’équipe, choisissez « Première connexion ». Utilisez votre email ou votre nom d’utilisateur pour recevoir votre code personnel. Vous choisissez votre propre mot de passe ; personne dans EnacChef n’a besoin de le connaître.\n\nAprès la connexion, vérifiez les informations préremplies. Votre année d’entrée dans Enactus ESP et votre parcours scolaire situent votre expérience. Une adresse provisoire doit être confirmée avec la SG. Gardez le même compte pour conserver votre historique.",
+    "Si votre profil a été préparé par l’équipe, choisissez « Première connexion ». Utilisez votre email ou votre nom d’utilisateur pour recevoir votre code personnel. Vous choisissez votre propre mot de passe. Il est personnel et doit rester confidentiel.\n\nAprès la connexion, vérifiez les informations préremplies. Votre année d’entrée dans Enactus ESP et votre parcours scolaire situent votre expérience. Une adresse provisoire doit être confirmée avec la SG. Gardez le même compte pour conserver votre historique.",
     Icons.key_outlined,
   ),
   HelpArticle(
