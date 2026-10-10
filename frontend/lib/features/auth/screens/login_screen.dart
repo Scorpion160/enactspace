@@ -181,17 +181,17 @@ class _BrandPanel extends StatelessWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Padding(
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(24),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
+                  constraints: const BoxConstraints(maxWidth: 360),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Row(
                         children: [
-                          _BrandMark(size: 72, onDark: true),
+                          _BrandMark(size: 48, onDark: true),
                           SizedBox(width: 16),
                           Expanded(
                             child: Text(
@@ -205,14 +205,14 @@ class _BrandPanel extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 16),
                       const _LoginPhotoMosaic(),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 16),
                       const Text(
                         'Ensemble, donnons\nvie aux idées.',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 34,
+                          fontSize: 30,
                           fontWeight: FontWeight.w800,
                           height: 1.15,
                         ),
@@ -222,11 +222,11 @@ class _BrandPanel extends StatelessWidget {
                         'Apprendre, entreprendre et agir avec les communautés.',
                         style: TextStyle(
                           color: Colors.white70,
-                          fontSize: 17,
+                          fontSize: 15,
                           height: 1.55,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       const Text(
                         'Une équipe. Des projets. Un impact partagé.',
                         style: TextStyle(
@@ -260,9 +260,9 @@ class _LoginPhotoMosaic extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       const _LoginStoryPhoto(
-        asset: 'haffe-2025-rencontre',
-        label: 'Enactus ESP à la rencontre des communautés à Haffé.',
-        aspectRatio: 1.8,
+        asset: 'world-cup-2022-delegation',
+        label: 'L’équipe Enactus ESP réunie à la World Cup 2022.',
+        aspectRatio: 2.4,
       ),
       const SizedBox(height: 10),
       Row(
@@ -270,22 +270,22 @@ class _LoginPhotoMosaic extends StatelessWidget {
         children: [
           const Expanded(
             child: _LoginStoryPhoto(
-              asset: 'world-cup-2022-delegation',
-              label: 'L’équipe Enactus ESP réunie à la World Cup 2022.',
-              aspectRatio: 1.5,
+              asset: 'haffe-2025-rencontre',
+              label: 'Enactus ESP à la rencontre des communautés à Haffé.',
+              aspectRatio: 1.8,
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.only(top: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const _LoginStoryPhoto(
                     asset: 'niaguiss-2025-demonstration',
                     label: 'Une démonstration de projet sur le terrain à Niaguiss.',
-                    aspectRatio: 1.5,
+                    aspectRatio: 1.8,
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -528,12 +528,31 @@ class _LoginPanel extends StatelessWidget {
                       SizedBox(height: 10),
                       const Divider(height: 1),
                       SizedBox(height: 8),
-                      const _LoginSectionLabel('Candidature Enactus ESP'),
+                      const _LoginSectionLabel('Premiers pas et aide'),
                       SizedBox(height: 8),
                       _LoginSupportActions(
-                        onRecruitment: () => context.go('/recruitment/apply'),
-                        onTracking: () => context.go('/application-tracking'),
                         onGuide: () => _showGuideDialog(context),
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1),
+                      const SizedBox(height: 8),
+                      const _LoginSectionLabel('Rejoindre Enactus ESP'),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => context.go('/recruitment/apply'),
+                            icon: const Icon(Icons.how_to_reg_rounded),
+                            label: const Text('Postuler'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => context.go('/application-tracking'),
+                            icon: const Icon(Icons.route_rounded),
+                            label: const Text('Suivre ma candidature'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -566,13 +585,9 @@ class _LoginSectionLabel extends StatelessWidget {
 }
 
 class _LoginSupportActions extends StatelessWidget {
-  final VoidCallback onRecruitment;
-  final VoidCallback onTracking;
   final VoidCallback onGuide;
 
   const _LoginSupportActions({
-    required this.onRecruitment,
-    required this.onTracking,
     required this.onGuide,
   });
 
@@ -594,16 +609,6 @@ class _LoginSupportActions extends StatelessWidget {
           label: const Text('Guide et FAQ'),
         ),
 
-        TextButton.icon(
-          onPressed: onRecruitment,
-          icon: Icon(Icons.how_to_reg_rounded),
-          label: Text('Postuler'),
-        ),
-        TextButton.icon(
-          onPressed: onTracking,
-          icon: Icon(Icons.route_rounded),
-          label: Text('Suivre ma candidature'),
-        ),
         TextButton.icon(
           onPressed: onGuide,
           icon: Icon(Icons.explore_rounded),
