@@ -173,55 +173,188 @@ class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppTheme.softBlack,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(48),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _BrandMark(size: 118, onDark: true),
-                  const SizedBox(height: 28),
-                  const Text(
-                    'EnactSpace',
-                    style: TextStyle(
-                      color: AppTheme.enactusYellow,
-                      fontSize: 38,
-                      fontWeight: FontWeight.w900,
-                    ),
+  Widget build(BuildContext context) => ColoredBox(
+    color: AppTheme.softBlack,
+    child: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          _BrandMark(size: 72, onDark: true),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              'Enactus ESP',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      const _LoginPhotoMosaic(),
+                      const SizedBox(height: 28),
+                      const Text(
+                        'Ensemble, donnons\nvie aux idées.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Apprendre, entreprendre et agir avec les communautés.',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 17,
+                          height: 1.55,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Une équipe. Des projets. Un impact partagé.',
+                        style: TextStyle(
+                          color: AppTheme.enactusYellow,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Photothèque Enactus ESP',
+                        style: TextStyle(color: Colors.white60, fontSize: 11),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enactus ESP',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Un espace simple pour collaborer, apprendre et faire avancer les projets du club.',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _LoginPhotoMosaic extends StatelessWidget {
+  const _LoginPhotoMosaic();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      const _LoginStoryPhoto(
+        asset: 'haffe-2025-rencontre',
+        label: 'Enactus ESP à la rencontre des communautés à Haffé.',
+        aspectRatio: 1.8,
+      ),
+      const SizedBox(height: 10),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Expanded(
+            child: _LoginStoryPhoto(
+              asset: 'world-cup-2022-delegation',
+              label: 'L’équipe Enactus ESP réunie à la World Cup 2022.',
+              aspectRatio: 1.5,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _LoginStoryPhoto(
+                    asset: 'niaguiss-2025-demonstration',
+                    label: 'Une démonstration de projet sur le terrain à Niaguiss.',
+                    aspectRatio: 1.5,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(height: 2, color: AppTheme.enactusYellow),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppTheme.enactusYellow,
+                        size: 22,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+class _LoginStoryPhoto extends StatelessWidget {
+  final String asset;
+  final String label;
+  final double aspectRatio;
+  const _LoginStoryPhoto({
+    required this.asset,
+    required this.label,
+    required this.aspectRatio,
+  });
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: const _LoginPhotoClipper(),
+    child: AspectRatio(
+      aspectRatio: aspectRatio,
+      child: ColoredBox(
+        color: const Color(0xFF1C2933),
+        child: Image.asset(
+          'assets/heritage/$asset.jpg',
+          fit: BoxFit.contain,
+          semanticLabel: label,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(Icons.groups_rounded, color: Colors.white60, size: 42),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _LoginPhotoClipper extends CustomClipper<Path> {
+  const _LoginPhotoClipper();
+
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(14, 0)
+    ..lineTo(size.width, 0)
+    ..lineTo(size.width, size.height - 14)
+    ..lineTo(size.width - 14, size.height)
+    ..lineTo(0, size.height)
+    ..lineTo(0, 14)
+    ..close();
+
+  @override
+  bool shouldReclip(_LoginPhotoClipper oldClipper) => false;
 }
 
 class _LoginPanel extends StatelessWidget {
