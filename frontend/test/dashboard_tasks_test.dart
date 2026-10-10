@@ -258,7 +258,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Préparer atelier'), findsOneWidget);
       expect(find.text('Modifier'), findsOneWidget);
-      expect(find.text('Valider'), findsOneWidget);
+      expect(find.text('Valider'), findsNothing);
       expect(find.text('Historique technique'), findsOneWidget);
     });
 
@@ -276,7 +276,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Changer le statut'), findsOneWidget);
-      expect(find.text('Preuve'), findsWidgets);
+      expect(find.text('Joindre un justificatif'), findsOneWidget);
       expect(find.text('Modifier'), findsNothing);
     });
 

@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Index, String, Text, Date, DateTime, ForeignKey, Boolean, Numeric, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, Index, String, Text, Date, DateTime, ForeignKey, Boolean, Integer, JSON, Numeric, UniqueConstraint, func
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +30,16 @@ class RecruitmentCampaign(Base):
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Internal recruitment preparation. These fields never belong to the public campaign payload.
+    target_headcount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    positions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    target_profiles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    communication_actions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    interview_questions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+
+    application_questions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    screening_rubric_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -37,8 +48,8 @@ class RecruitmentCampaign(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class Application(Base):
@@ -79,6 +90,7 @@ class Application(Base):
     associative_experience: Mapped[str | None] = mapped_column(Text, nullable=True)
     availability: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    questionnaire_answers: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     interview_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     interview_location: Mapped[str | None] = mapped_column(String(180), nullable=True)
     interview_link: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -104,8 +116,8 @@ class Application(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint(
@@ -144,13 +156,14 @@ class ApplicationReview(Base):
     )
 
     score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    criteria_assessment: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     recommendation: Mapped[str] = mapped_column(String(50), default="reserve")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("application_id", "reviewer_id", name="uq_application_reviewer"),

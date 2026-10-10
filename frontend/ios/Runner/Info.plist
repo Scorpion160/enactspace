@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -42,10 +42,13 @@
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
-	</dict>
+</dict>
 
 	<key>NSCameraUsageDescription</key>
-	<string>EnactSpace utilise l’appareil photo pour scanner les QR codes de présence.</string>
+	<string>EnactSpace utilise la caméra pour les réunions EnactMeet et le scan des QR codes de présence.</string>
+
+	<key>NSMicrophoneUsageDescription</key>
+	<string>EnactSpace utilise le microphone pour les réunions EnactMeet et l’envoi de messages vocaux.</string>
 
 	<key>NFCReaderUsageDescription</key>
 	<string>EnactSpace utilise le NFC pour enregistrer les badges et permettre l’émargement aux activités compatibles.</string>
@@ -67,10 +70,10 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
-				</dict>
+</dict>
 			</array>
-		</dict>
-	</dict>
+</dict>
+</dict>
 
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
@@ -101,5 +104,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Utiliser Face ID pour d?verrouiller votre session EnactSpace.</string>
 </dict>
 </plist>

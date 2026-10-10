@@ -125,13 +125,43 @@ class _PolesPortfolioScreenState extends State<PolesPortfolioScreen> {
             else if (desktop)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
-                sliver: SliverList.separated(
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) => PolePortfolioRow(
-                    item: items[index],
-                    onOpen: () => _open(items[index]),
-                  ),
+                sliver: SliverList.builder(
+                  itemCount:
+                      (items.length /
+                              (MediaQuery.textScalerOf(context).scale(16) > 24
+                                  ? 1
+                                  : constraints.maxWidth >= 1300
+                                  ? 3
+                                  : 2))
+                          .ceil(),
+                  itemBuilder: (context, row) {
+                    final columns =
+                        MediaQuery.textScalerOf(context).scale(16) > 24
+                        ? 1
+                        : constraints.maxWidth >= 1300
+                        ? 3
+                        : 2;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var column = 0; column < columns; column++) ...[
+                            if (column > 0) const SizedBox(width: 16),
+                            Expanded(
+                              child: row * columns + column < items.length
+                                  ? PolePortfolioCard(
+                                      item: items[row * columns + column],
+                                      onOpen: () =>
+                                          _open(items[row * columns + column]),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
               )
             else

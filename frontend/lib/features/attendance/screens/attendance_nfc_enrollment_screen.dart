@@ -262,10 +262,10 @@ class _AttendanceNfcEnrollmentScreenState
     final isWide = width >= 860;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Badges NFC')),
+      appBar: AppBar(title: Text('Badges NFC')),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
@@ -275,25 +275,25 @@ class _AttendanceNfcEnrollmentScreenState
                       nfcAvailable: _nfcAvailable,
                       listening: _listening,
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     if (_error != null)
                       _NfcErrorCard(message: _error!, onRetry: _load),
-                    if (_error != null) const SizedBox(height: 18),
+                    if (_error != null) SizedBox(height: 18),
                     if (isWide)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(child: _buildMemberPicker()),
-                          const SizedBox(width: 18),
+                          SizedBox(width: 18),
                           Expanded(child: _buildEnrollmentPanel()),
                         ],
                       )
                     else ...[
                       _buildMemberPicker(),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       _buildEnrollmentPanel(),
                     ],
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     _NfcTagsList(
                       tags: _tags,
                       membersById: {
@@ -329,11 +329,11 @@ class _AttendanceNfcEnrollmentScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Sélectionner un membre',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
@@ -342,16 +342,16 @@ class _AttendanceNfcEnrollmentScreenState
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             if (memberLoadState == NfcMemberLoadState.failed)
               _NfcMembersLoadFailure(message: _membersError!, onRetry: _load)
             else if (memberLoadState == NfcMemberLoadState.empty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(18),
                 child: Text('Aucun membre actif trouvé.'),
               )
             else if (members.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(18),
                 child: Text('Aucun résultat pour cette recherche.'),
               )
@@ -387,13 +387,13 @@ class _AttendanceNfcEnrollmentScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Association badge',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             if (member == null)
-              const Text('Choisissez un membre pour associer un badge NFC.')
+              Text('Choisissez un membre pour associer un badge NFC.')
             else ...[
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -405,25 +405,25 @@ class _AttendanceNfcEnrollmentScreenState
                 title: Text(member.displayName),
                 subtitle: Text(member.email),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               _NfcTagStatus(tag: tag),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               ElevatedButton.icon(
                 onPressed: _nfcAvailable && !_listening
                     ? _startEnrollment
                     : null,
-                icon: const Icon(Icons.nfc_rounded),
+                icon: Icon(Icons.nfc_rounded),
                 label: Text(
                   _listening
                       ? 'Approchez le badge...'
                       : 'Associer un badge NFC',
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: tag?.isActive == true ? _revokeSelectedTag : null,
-                icon: const Icon(Icons.block_rounded),
-                label: const Text('Révoquer le badge'),
+                icon: Icon(Icons.block_rounded),
+                label: Text('Révoquer le badge'),
               ),
             ],
           ],
@@ -452,29 +452,31 @@ class _NfcHeader extends StatelessWidget {
               color: AppTheme.enactusYellow,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.nfc_rounded, color: AppTheme.softBlack),
+            child: Icon(Icons.nfc_rounded, color: AppTheme.softBlack),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Enrôlement NFC',
                   style: TextStyle(
-                    color: AppTheme.darkText,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   listening
                       ? 'Approchez le badge NFC du telephone.'
                       : nfcAvailable
                       ? 'NFC disponible sur cet appareil.'
                       : 'NFC indisponible sur cet appareil.',
-                  style: const TextStyle(color: AppTheme.secondaryText),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -503,28 +505,30 @@ class _NfcTagStatus extends StatelessWidget {
             : Colors.black.withAlpha(6),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: active ? AppTheme.enactusYellow : Colors.black12,
+          color: active
+              ? AppTheme.enactusYellow
+              : Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
       child: Row(
         children: [
           Icon(active ? Icons.verified_rounded : Icons.credit_card_off_rounded),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   current?.maskedTag ?? 'Aucun badge actif',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 Text(
                   current == null
                       ? 'Non attribué'
                       : 'Statut: ${current.status}'
                             '${current.lastUsedAt == null ? '' : ' - déjà utilisé'}',
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -562,7 +566,7 @@ class _NfcTagsList extends StatelessWidget {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final title = const Text(
+                final title = Text(
                   'Gestion des badges',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 );
@@ -612,13 +616,13 @@ class _NfcTagsList extends StatelessWidget {
                 }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [title, const SizedBox(height: 12), filters],
+                  children: [title, SizedBox(height: 12), filters],
                 );
               },
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             if (tags.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(18),
                 child: Text('Aucun badge pour ce filtre.'),
               )
@@ -628,7 +632,9 @@ class _NfcTagsList extends StatelessWidget {
                 return ListTile(
                   leading: Icon(
                     tag.isActive ? Icons.nfc_rounded : Icons.block_rounded,
-                    color: tag.isActive ? AppTheme.softBlack : Colors.black45,
+                    color: tag.isActive
+                        ? AppTheme.softBlack
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   title: Text(member?.displayName ?? tag.maskedTag),
                   subtitle: Text('${tag.maskedTag} - ${tag.status}'),
@@ -636,7 +642,7 @@ class _NfcTagsList extends StatelessWidget {
                       ? IconButton(
                           tooltip: 'Révoquer',
                           onPressed: () => onRevoke(tag),
-                          icon: const Icon(Icons.block_rounded),
+                          icon: Icon(Icons.block_rounded),
                         )
                       : null,
                 );
@@ -686,7 +692,7 @@ class _NfcErrorCard extends StatelessWidget {
         title: Text(message),
         trailing: IconButton(
           onPressed: onRetry,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: Icon(Icons.refresh_rounded),
         ),
       ),
     );
@@ -707,11 +713,11 @@ class _NfcMembersLoadFailure extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(message, style: TextStyle(color: Colors.red.shade700)),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Réessayer'),
+            icon: Icon(Icons.refresh_rounded),
+            label: Text('Réessayer'),
           ),
         ],
       ),

@@ -1,0 +1,26 @@
+[
+  {
+    "source": "Document de synthése AQUATUS[1].pdf",
+    "asset": "aquatus-synthese.pdf",
+    "bytes": 1480897,
+    "sha256": "fcae4963241e11c9ee5708bd69185671264b92c2e5c29344a8d71eadd2050a49"
+  },
+  {
+    "source": "Présentation du projet SHERY.pdf",
+    "asset": "shery-presentation.pdf",
+    "bytes": 592544,
+    "sha256": "ae100d7154a46ae12da13dc9b1e6099e57faeafc9e122a14cb76632fcddc102d"
+  },
+  {
+    "source": "Présentation Mën Nañ final - Enactus ESP.pdf",
+    "asset": "men-nan-presentation.pdf",
+    "bytes": 386429,
+    "sha256": "9bbed02f525f28835631d6773f5c78436e3cf1ac32c252dd1a70ddda537b7dea"
+  },
+  {
+    "source": "Document WC Terrasen.pdf",
+    "asset": "terrasen-world-cup.pdf",
+    "bytes": 729166,
+    "sha256": "d1c3c53491abcf29dacf022b1feebdf27acad276d12d1419ca741947fe335fe4"
+  }
+]

@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean
+from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean, Integer
 from app.db.types import GUID
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,6 +27,7 @@ class AlumniProfile(Base):
     )
 
     graduation_year: Mapped[int | None] = mapped_column(nullable=True)
+    enactus_join_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     current_company: Mapped[str | None] = mapped_column(String(150), nullable=True)
     current_position: Mapped[str | None] = mapped_column(String(150), nullable=True)
@@ -41,8 +43,8 @@ class AlumniProfile(Base):
 
     visibility: Mapped[str] = mapped_column(String(50), default="internal")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     user = relationship("User")
 
@@ -96,5 +98,5 @@ class Mentorship(Base):
     started_at: Mapped[date] = mapped_column(Date, default=date.today)
     ended_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

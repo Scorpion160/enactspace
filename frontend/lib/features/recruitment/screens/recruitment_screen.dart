@@ -1,4 +1,7 @@
+import '../widgets/internal/human_assessment_editor.dart';
+import '../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
@@ -84,7 +87,11 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        );
       });
     } finally {
       if (mounted) {
@@ -144,7 +151,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Candidature enregistrée'),
+          title: Text('Candidature enregistrée'),
           content: SelectableText(
             'Code de suivi : ${created.publicTrackingCode}\n\n'
             'Le candidat doit conserver ce code et utiliser son '
@@ -153,7 +160,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Compris'),
+              child: Text('Compris'),
             ),
           ],
         ),
@@ -182,7 +189,13 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(
+            recruitmentMessage(
+              e,
+              fallback:
+                  'Impossible de terminer cette action. Réessaie dans un instant.',
+            ),
+          ),
         ),
       );
     }
@@ -279,7 +292,13 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(
+            recruitmentMessage(
+              e,
+              fallback:
+                  'Impossible de terminer cette action. Réessaie dans un instant.',
+            ),
+          ),
         ),
       );
     }
@@ -303,11 +322,13 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
         .length;
   }
 
-  double get _averageScore {
-    final scored = _applications.where((a) => a.finalScore != null).toList();
-    if (scored.isEmpty) return 0;
+  double? get _averageScore {
+    final scored = _applications
+        .where((a) => a.screeningScore != null)
+        .toList();
+    if (scored.isEmpty) return null;
 
-    final total = scored.fold<double>(0, (sum, a) => sum + a.finalScore!);
+    final total = scored.fold<double>(0, (sum, a) => sum + a.screeningScore!);
     return total / scored.length;
   }
 
@@ -376,7 +397,7 @@ class _RecruitmentScreenState extends State<RecruitmentScreen> {
           _RecruitmentMethodPanel(anonymousReview: _anonymousReview),
           const SizedBox(height: 22),
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(),
@@ -407,7 +428,7 @@ class _RecruitmentHeader extends StatelessWidget {
   final int received;
   final int interview;
   final int accepted;
-  final double averageScore;
+  final double? averageScore;
   final VoidCallback onRefresh;
   final VoidCallback onCreateCampaign;
   final VoidCallback onCreateApplication;
@@ -436,23 +457,23 @@ class _RecruitmentHeader extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          icon: Icon(Icons.refresh_rounded),
+          label: Text('Actualiser'),
         ),
         OutlinedButton.icon(
           onPressed: onExportCsv,
-          icon: const Icon(Icons.table_view_rounded),
-          label: const Text('Exporter CSV'),
+          icon: Icon(Icons.table_view_rounded),
+          label: Text('Exporter CSV'),
         ),
         ElevatedButton.icon(
           onPressed: onCreateCampaign,
-          icon: const Icon(Icons.campaign_rounded),
-          label: const Text('Nouvelle campagne'),
+          icon: Icon(Icons.campaign_rounded),
+          label: Text('Nouvelle campagne'),
         ),
         ElevatedButton.icon(
           onPressed: onCreateApplication,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('Nouvelle candidature'),
+          icon: Icon(Icons.person_add_alt_1_rounded),
+          label: Text('Nouvelle candidature'),
         ),
       ],
     );
@@ -470,7 +491,7 @@ class _RecruitmentHeader extends StatelessWidget {
                   children: [
                     _HeaderIcon(),
                     const SizedBox(width: 18),
-                    const Expanded(child: _HeaderText()),
+                    Expanded(child: _HeaderText()),
                     actions,
                   ],
                 )
@@ -481,7 +502,7 @@ class _RecruitmentHeader extends StatelessWidget {
                       children: [
                         _HeaderIcon(),
                         const SizedBox(width: 18),
-                        const Expanded(child: _HeaderText()),
+                        Expanded(child: _HeaderText()),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -513,7 +534,7 @@ class _HeaderIcon extends StatelessWidget {
         color: AppTheme.enactusYellow,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.how_to_reg_rounded,
         color: AppTheme.softBlack,
         size: 34,
@@ -527,7 +548,7 @@ class _HeaderText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -554,7 +575,7 @@ class _StatsGrid extends StatelessWidget {
   final int received;
   final int interview;
   final int accepted;
-  final double averageScore;
+  final double? averageScore;
 
   const _StatsGrid({
     required this.campaigns,
@@ -578,8 +599,10 @@ class _StatsGrid extends StatelessWidget {
       ),
       _StatItem('Acceptées', accepted.toString(), Icons.verified_rounded),
       _StatItem(
-        'Score moyen',
-        '${averageScore.toStringAsFixed(1)}/20',
+        'Indice moyen du jury',
+        averageScore == null
+            ? 'À évaluer'
+            : '${averageScore!.toStringAsFixed(1)}/100',
         Icons.star_rounded,
       ),
     ];
@@ -619,7 +642,7 @@ class _StatsGrid extends StatelessWidget {
                         stat.value,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
                           fontSize: 18,
@@ -630,7 +653,7 @@ class _StatsGrid extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70),
+                        style: TextStyle(color: Colors.white70),
                       ),
                     ],
                   ),
@@ -714,10 +737,10 @@ class _RecruitmentFilters extends StatelessWidget {
                       labelText: anonymousReview
                           ? 'Recherche désactivée en mode anonymisé'
                           : 'Rechercher',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      prefixIcon: Icon(Icons.search_rounded),
                       suffixIcon: IconButton(
                         onPressed: onSearch,
-                        icon: const Icon(Icons.arrow_forward_rounded),
+                        icon: Icon(Icons.arrow_forward_rounded),
                       ),
                     ),
                     onSubmitted: (_) => onSearch(),
@@ -836,11 +859,11 @@ class _RecruitmentFilters extends StatelessWidget {
                     onChanged: onAnonymousChanged,
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    title: const Text(
+                    title: Text(
                       'Mode anonymisé',
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    subtitle: const Text('Masquer identité pendant le tri'),
+                    subtitle: Text('Masquer identité pendant le tri'),
                   ),
                 ),
               ],
@@ -876,7 +899,7 @@ class _RecruitmentTextFilter extends StatelessWidget {
           suffixIcon: IconButton(
             tooltip: 'Filtrer',
             onPressed: onSearch,
-            icon: const Icon(Icons.filter_alt_rounded),
+            icon: Icon(Icons.filter_alt_rounded),
           ),
         ),
         textInputAction: TextInputAction.search,
@@ -1010,10 +1033,7 @@ class _MethodBlock extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
                 ),
               ),
             ],
@@ -1046,23 +1066,20 @@ class _NeedRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 94,
-            child: Text(
-              pole,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
+            child: Text(pole, style: TextStyle(fontWeight: FontWeight.w900)),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  target,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
+                Text(target, style: TextStyle(fontWeight: FontWeight.w800)),
                 Text(
                   detail,
-                  style: const TextStyle(color: Colors.black54, height: 1.35),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -1082,11 +1099,11 @@ class _CriterionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Chip(
-      avatar: const Icon(Icons.check_circle_outline_rounded, size: 16),
+      avatar: Icon(Icons.check_circle_outline_rounded, size: 16),
       label: Text('$label · $weight'),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -1101,10 +1118,14 @@ class _AnonymityNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: enabled ? Colors.green.shade50 : Colors.white,
+        color: enabled
+            ? AppTheme.success.withValues(alpha: 0.12)
+            : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: enabled ? Colors.green.shade200 : Colors.black12,
+          color: enabled
+              ? AppTheme.success.withValues(alpha: 0.35)
+              : Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
       child: Row(
@@ -1119,7 +1140,7 @@ class _AnonymityNotice extends StatelessWidget {
               enabled
                   ? 'Anonymisation active: les évaluateurs voient les codes candidat.'
                   : 'Anonymisation inactive: les identités restent visibles.',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -1153,7 +1174,7 @@ class _RecruitmentFlowNotice extends StatelessWidget {
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Text(
+          Text(
             'Parcours recommandé',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
           ),
@@ -1165,7 +1186,7 @@ class _RecruitmentFlowNotice extends StatelessWidget {
                 child: Text(step.$1),
               ),
               label: Text(step.$2),
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
             ),
         ],
       ),
@@ -1273,7 +1294,7 @@ class _ApplicationCard extends StatelessWidget {
                   foregroundColor: AppTheme.softBlack,
                   child: Text(
                     avatarLabel,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1282,10 +1303,7 @@ class _ApplicationCard extends StatelessWidget {
                     displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
                   ),
                 ),
               ],
@@ -1297,14 +1315,16 @@ class _ApplicationCard extends StatelessWidget {
                   : application.email,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               campaignTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -1313,7 +1333,6 @@ class _ApplicationCard extends StatelessWidget {
               children: [
                 Chip(label: Text(application.statusLabel)),
                 Chip(label: Text(application.scoreLabel)),
-                Chip(label: Text(application.stabilityLabel)),
                 if (application.department != null)
                   Chip(label: Text(application.department!)),
                 if (application.className?.trim().isNotEmpty == true)
@@ -1324,8 +1343,7 @@ class _ApplicationCard extends StatelessWidget {
                   Chip(label: Text(application.projectInterest!.trim())),
                 if (application.interviewAt != null)
                   Chip(label: Text(application.interviewLabel)),
-                if (application.isConverted)
-                  const Chip(label: Text('Compte créé')),
+                if (application.isConverted) Chip(label: Text('Compte créé')),
               ],
             ),
             const SizedBox(height: 10),
@@ -1337,7 +1355,10 @@ class _ApplicationCard extends StatelessWidget {
               application.motivation ?? 'Aucune motivation renseignée.',
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, height: 1.35),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
@@ -1374,13 +1395,13 @@ class _ApplicationCard extends StatelessWidget {
               children: [
                 OutlinedButton.icon(
                   onPressed: () => onReview(application),
-                  icon: const Icon(Icons.rate_review_rounded),
-                  label: const Text('Évaluer'),
+                  icon: Icon(Icons.rate_review_rounded),
+                  label: Text('Évaluer'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => onInterview(application),
-                  icon: const Icon(Icons.event_available_rounded),
-                  label: const Text('Entretien'),
+                  icon: Icon(Icons.event_available_rounded),
+                  label: Text('Entretien'),
                 ),
                 ElevatedButton.icon(
                   onPressed:
@@ -1389,8 +1410,8 @@ class _ApplicationCard extends StatelessWidget {
                           application.canConvert
                       ? () => onConvert(application)
                       : null,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Créer compte'),
+                  icon: Icon(Icons.person_add_alt_1_rounded),
+                  label: Text('Créer compte'),
                 ),
               ],
             ),
@@ -1457,12 +1478,12 @@ class _ScreeningScoreBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = application.screeningScore;
-    final progress = score / 100;
+    final progress = score == null ? null : score / 100;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1470,30 +1491,34 @@ class _ScreeningScoreBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.analytics_rounded, size: 18),
+              Icon(Icons.analytics_rounded, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   application.screeningLabel,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
-              Text(
-                '$score/100',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+              if (score != null)
+                Text(
+                  '${score.toStringAsFixed(1)}/100',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
             ],
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: Colors.white,
-              color: AppTheme.enactusYellow,
+          if (score != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
+                color: AppTheme.enactusYellow,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1524,7 +1549,7 @@ class _ProgressChip extends StatelessWidget {
         ? Colors.red.shade100
         : active
         ? AppTheme.enactusYellow.withValues(alpha: 0.34)
-        : Colors.black.withValues(alpha: 0.06);
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06);
     final foregroundColor = rejected ? Colors.red.shade800 : AppTheme.softBlack;
 
     return Container(
@@ -1623,7 +1648,11 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        );
       });
     } finally {
       if (mounted) {
@@ -1638,7 +1667,7 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Nouvelle campagne'),
+      title: Text('Nouvelle campagne'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: Form(
@@ -1675,25 +1704,25 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.event_rounded),
-                        title: const Text('Date début'),
+                        leading: Icon(Icons.event_rounded),
+                        title: Text('Date début'),
                         subtitle: Text(_dateLabel(_startDate)),
                         trailing: TextButton(
                           onPressed: _loading
                               ? null
                               : () => _pickDate(isStart: true),
-                          child: const Text('Choisir'),
+                          child: Text('Choisir'),
                         ),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.event_available_rounded),
-                        title: const Text('Date fin'),
+                        leading: Icon(Icons.event_available_rounded),
+                        title: Text('Date fin'),
                         subtitle: Text(_dateLabel(_endDate)),
                         trailing: TextButton(
                           onPressed: _loading
                               ? null
                               : () => _pickDate(isStart: false),
-                          child: const Text('Choisir'),
+                          child: Text('Choisir'),
                         ),
                       ),
                     ],
@@ -1701,7 +1730,7 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
                 ),
                 SwitchListTile(
                   value: _isActive,
-                  title: const Text('Campagne active'),
+                  title: Text('Campagne active'),
                   onChanged: _loading
                       ? null
                       : (value) {
@@ -1716,7 +1745,7 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
@@ -1729,7 +1758,7 @@ class _CreateCampaignDialogState extends State<CreateCampaignDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -1770,8 +1799,6 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   final _contributionController = TextEditingController();
   final _projectIdeasController = TextEditingController();
   final _leadershipController = TextEditingController();
-  final _preferredPoleController = TextEditingController();
-  final _projectInterestController = TextEditingController();
   final _associativeExperienceController = TextEditingController();
   final _availabilityController = TextEditingController();
   final _publicCommentController = TextEditingController();
@@ -1782,6 +1809,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   String? _campaignId;
 
   bool _loading = false;
+  SelectedAttachment? _cvFile, _motivationLetterFile, _attachmentFile;
   String? _error;
 
   @override
@@ -1807,8 +1835,6 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
     _contributionController.dispose();
     _projectIdeasController.dispose();
     _leadershipController.dispose();
-    _preferredPoleController.dispose();
-    _projectInterestController.dispose();
     _associativeExperienceController.dispose();
     _availabilityController.dispose();
     _publicCommentController.dispose();
@@ -1851,21 +1877,23 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
         contribution: _contributionController.text,
         projectIdeas: _projectIdeasController.text,
         leadershipProfile: _leadershipController.text,
-        preferredPole: _preferredPoleController.text,
-        projectInterest: _projectInterestController.text,
         associativeExperience: _associativeExperienceController.text,
         availability: _availabilityController.text,
         publicComment: _publicCommentController.text,
-        cvUrl: _cvUrlController.text,
-        motivationLetterUrl: _motivationLetterUrlController.text,
-        attachmentUrl: _attachmentUrlController.text,
+        cvFile: _cvFile,
+        motivationLetterFile: _motivationLetterFile,
+        attachmentFile: _attachmentFile,
       );
 
       if (!mounted) return;
       Navigator.of(context).pop(application);
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        );
       });
     } finally {
       if (mounted) {
@@ -1894,7 +1922,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Nouvelle candidature'),
+      title: Text('Nouvelle candidature'),
       content: SizedBox(
         width: _dialogWidth(context, 620),
         child: Form(
@@ -2028,34 +2056,10 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                _AdaptiveFieldRow(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _classNameController,
-                        decoration: const InputDecoration(labelText: 'Classe'),
-                        validator: _requiredText,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _preferredPoleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Pôle souhaité',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _projectInterestController,
-                        decoration: const InputDecoration(
-                          labelText: 'Projet d’intérêt',
-                        ),
-                      ),
-                    ),
-                  ],
+                TextFormField(
+                  controller: _classNameController,
+                  decoration: const InputDecoration(labelText: 'Classe'),
+                  validator: _requiredText,
                 ),
                 const SizedBox(height: 18),
                 const _ApplicationSectionHeader(
@@ -2097,7 +2101,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                 TextFormField(
                   controller: _knownFromController,
                   decoration: const InputDecoration(
-                    labelText: 'Comment a-t-il connu Enactus ?',
+                    labelText: 'Comment le candidat a-t-il connu Enactus ESP ?',
                   ),
                   validator: _requiredText,
                 ),
@@ -2154,31 +2158,27 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                   subtitle:
                       'Optionnel maintenant, utile si le pole veille veut approfondir le dossier.',
                 ),
-                TextFormField(
-                  controller: _cvUrlController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien CV',
-                    prefixIcon: Icon(Icons.link_rounded),
-                  ),
+                AttachmentPickerField(
+                  label: 'CV',
+                  value: _cvFile,
+                  application: true,
+                  enabled: !_loading,
+                  onChanged: (file) => setState(() => _cvFile = file),
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _motivationLetterUrlController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien lettre de motivation',
-                    prefixIcon: Icon(Icons.link_rounded),
-                  ),
+                AttachmentPickerField(
+                  label: 'Lettre de motivation',
+                  value: _motivationLetterFile,
+                  application: true,
+                  enabled: !_loading,
+                  onChanged: (file) =>
+                      setState(() => _motivationLetterFile = file),
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _attachmentUrlController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien pièce jointe complémentaire',
-                    prefixIcon: Icon(Icons.attach_file_rounded),
-                  ),
+                AttachmentPickerField(
+                  label: 'Document complémentaire',
+                  value: _attachmentFile,
+                  application: true,
+                  enabled: !_loading,
+                  onChanged: (file) => setState(() => _attachmentFile = file),
                 ),
               ],
             ),
@@ -2188,7 +2188,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
@@ -2201,7 +2201,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -2238,15 +2238,12 @@ class _ApplicationSectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.black54,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2399,7 +2396,13 @@ class _ScheduleInterviewDialogState extends State<ScheduleInterviewDialog> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      setState(
+        () => _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -2437,7 +2440,7 @@ class _ScheduleInterviewDialogState extends State<ScheduleInterviewDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _loading ? null : _pickDate,
-                      icon: const Icon(Icons.calendar_month_rounded),
+                      icon: Icon(Icons.calendar_month_rounded),
                       label: Text(_dateLabel),
                     ),
                   ),
@@ -2445,7 +2448,7 @@ class _ScheduleInterviewDialogState extends State<ScheduleInterviewDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _loading ? null : _pickTime,
-                      icon: const Icon(Icons.schedule_rounded),
+                      icon: Icon(Icons.schedule_rounded),
                       label: Text(_timeLabel),
                     ),
                   ),
@@ -2493,11 +2496,11 @@ class _ScheduleInterviewDialogState extends State<ScheduleInterviewDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
-          icon: const Icon(Icons.event_available_rounded),
+          icon: Icon(Icons.event_available_rounded),
           label: Text(_loading ? 'Programmation...' : 'Programmer'),
         ),
       ],
@@ -2521,7 +2524,7 @@ class ReviewApplicationDialog extends StatefulWidget {
 }
 
 class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
-  final _scoreController = TextEditingController(text: '15');
+  Map<String, dynamic>? _assessment;
   final _commentController = TextEditingController();
   String _recommendation = 'reserve';
 
@@ -2529,18 +2532,28 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    final own = widget.application.myReview;
+    _assessment = own?.criteriaAssessment;
+    _commentController.text = own?.comment ?? '';
+    _recommendation = own?.recommendation ?? 'reserve';
+  }
+
+  @override
   void dispose() {
-    _scoreController.dispose();
     _commentController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final score = double.tryParse(_scoreController.text.trim());
-
-    if (score == null || score < 0 || score > 20) {
+    if (!isCompleteHumanAssessment(
+      _assessment,
+      widget.application.screeningRubric,
+    )) {
       setState(() {
-        _error = 'Le score doit être compris entre 0 et 20.';
+        _error =
+            'Renseigne les cinq niveaux et un exemple pour chacun. Une information manquante reste à préciser.';
       });
       return;
     }
@@ -2553,7 +2566,11 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
     try {
       await widget.service.createReview(
         applicationId: widget.application.id,
-        score: score,
+        score: (_assessment!['ratings'] as List).fold<double>(
+          0,
+          (sum, row) => sum + (row['rating'] as int),
+        ),
+        criteriaAssessment: _assessment,
         comment: _commentController.text,
         recommendation: _recommendation,
       );
@@ -2562,7 +2579,11 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        );
       });
     } finally {
       if (mounted) {
@@ -2580,63 +2601,70 @@ class _ReviewApplicationDialogState extends State<ReviewApplicationDialog> {
       title: Text('Évaluer ${widget.application.fullName}'),
       content: SizedBox(
         width: _dialogWidth(context, 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_error != null) _DialogError(message: _error!),
-            TextFormField(
-              controller: _scoreController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Score',
-                suffixText: '/20',
-                prefixIcon: Icon(Icons.star_rounded),
-              ),
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _recommendation,
-              decoration: const InputDecoration(
-                labelText: 'Avis',
-                prefixIcon: Icon(Icons.how_to_vote_rounded),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'favorable', child: Text('Favorable')),
-                DropdownMenuItem(value: 'reserve', child: Text('Réservé')),
-                DropdownMenuItem(
-                  value: 'defavorable',
-                  child: Text('Défavorable'),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_error != null) _DialogError(message: _error!),
+              if (widget.application.screeningRubric != null)
+                HumanAssessmentEditor(
+                  rubric: widget.application.screeningRubric!,
+                  initialAssessment: _assessment,
+                  enabled: !_loading,
+                  onChanged: (value) => _assessment = value,
+                )
+              else
+                const Text(
+                  'La grille n’a pas pu être chargée. Ferme cette fenêtre et actualise le dossier avant de l’évaluer.',
                 ),
-              ],
-              onChanged: _loading
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        setState(() => _recommendation = value);
-                      }
-                    },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _commentController,
-              minLines: 3,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Commentaire',
-                prefixIcon: Icon(Icons.comment_rounded),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _recommendation,
+                decoration: const InputDecoration(
+                  labelText: 'Avis',
+                  prefixIcon: Icon(Icons.how_to_vote_rounded),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'favorable',
+                    child: Text('Favorable'),
+                  ),
+                  DropdownMenuItem(value: 'reserve', child: Text('Réservé')),
+                  DropdownMenuItem(
+                    value: 'defavorable',
+                    child: Text('Défavorable'),
+                  ),
+                ],
+                onChanged: _loading
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          setState(() => _recommendation = value);
+                        }
+                      },
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _commentController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Commentaire',
+                  prefixIcon: Icon(Icons.comment_rounded),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
-          icon: const Icon(Icons.save_rounded),
+          icon: Icon(Icons.save_rounded),
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],
@@ -2660,7 +2688,6 @@ class ConvertApplicationDialog extends StatefulWidget {
 }
 
 class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
-  final _passwordController = TextEditingController();
   final _polesService = PolesService();
   final _projectsService = ProjectsService();
 
@@ -2686,7 +2713,6 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
 
   @override
   void dispose() {
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -2707,13 +2733,6 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
   }
 
   Future<void> _submit() async {
-    if (_passwordController.text.trim().length < 8) {
-      setState(() {
-        _error = 'Le mot de passe doit contenir au moins 8 caractères.';
-      });
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
@@ -2722,7 +2741,6 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
     try {
       final response = await widget.service.convertToUser(
         applicationId: widget.application.id,
-        password: _passwordController.text.trim(),
         profileType: _profileType,
         corePoleId: _corePoleId,
         supportPoleIds: _supportPoleIds.toList(),
@@ -2741,7 +2759,11 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = recruitmentMessage(
+          e,
+          fallback:
+              'Impossible de terminer cette action. Réessaie dans un instant.',
+        );
       });
     } finally {
       if (mounted) {
@@ -2756,7 +2778,7 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Créer un compte membre'),
+      title: Text('Créer un compte membre'),
       content: SizedBox(
         width: _dialogWidth(context, 560),
         child: SingleChildScrollView(
@@ -2772,13 +2794,13 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
                   color: AppTheme.enactusYellow.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.school_rounded, color: AppTheme.softBlack),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Le parcours Academy "Nouveau membre" sera préparé avec notification et email si le backend est disponible.',
+                        'Le parcours Academy « Nouveau Enacteur » accompagne les premiers pas du membre. Une notification et un e-mail lui présentent la suite de son intégration.',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -2787,13 +2809,9 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
               ),
               const SizedBox(height: 14),
               if (_error != null) _DialogError(message: _error!),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mot de passe initial',
-                  prefixIcon: Icon(Icons.lock_rounded),
-                ),
+              const Text(
+                'Un code personnel permettra au membre de choisir son mot de passe.',
+                style: TextStyle(height: 1.5),
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
@@ -2902,11 +2920,11 @@ class _ConvertApplicationDialogState extends State<ConvertApplicationDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
+          icon: Icon(Icons.person_add_alt_1_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -2921,16 +2939,17 @@ class _DialogError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: colors.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: colors.error.withValues(alpha: 0.35)),
       ),
-      child: Text(message, style: TextStyle(color: Colors.red.shade700)),
+      child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }
@@ -2940,13 +2959,15 @@ class _EmptyRecruitmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune candidature trouvée.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -2973,7 +2994,7 @@ class _ErrorCard extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
@@ -2982,8 +3003,8 @@ class _ErrorCard extends StatelessWidget {
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

@@ -1,0 +1,52 @@
+{
+  "lot": 15,
+  "date_utc": "2026-10-07T15:52:30.818437+00:00",
+  "tests": {
+    "final_sqlite": {
+      "passed": 101,
+      "seconds": 29.443,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 22,
+      "seconds": 54.349,
+      "skipped": 0
+    }
+  },
+  "new_scenarios": 6,
+  "suite_counts_overlap": true,
+  "reviewed_files_or_changed_sections": [
+    "backend/app/core/config.py",
+    "backend/app/models/mobile_money.py",
+    "backend/app/schemas/mobile_money.py",
+    "backend/app/services/mobile_money_service.py",
+    "backend/app/api/routes/finance.py",
+    "backend/alembic/versions/20261007_0028_mobile_money_verification_attempt.py",
+    "backend/test_prelaunch_mobile_money_boundaries.py",
+    ".github/workflows/ci.yml"
+  ],
+  "whole_manual_review_complete": false,
+  "migration": {
+    "source_head": "20261007_0028",
+    "production_applied": false,
+    "sqlite_round_trip_passed": true,
+    "postgresql_round_trip_passed": true
+  },
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_payment_or_email_sent": false,
+  "provider_requests_in_tests": "mocked",
+  "retry_default_seconds": 60,
+  "closed_invoice_lookback_default_days": 7,
+  "remaining": [
+    "Provider field length/type limits and live sandbox acceptance",
+    "Complete migration chain rehearsal from deployed head",
+    "Other modules and roles, incomplete manual source review",
+    "Actual Android/web end-to-end checks",
+    "Targeted test recruitment cleanup with backup",
+    "Final documentation, deployment and recipient cutover"
+  ]
+}

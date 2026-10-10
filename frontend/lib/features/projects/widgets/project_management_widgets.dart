@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_form_dialog.dart';
+
 import '../models/project_management_models.dart';
 import '../models/project_model.dart';
 import '../models/project_portfolio_models.dart';
@@ -133,12 +135,13 @@ class _ProjectFormDialogState extends State<ProjectFormDialog> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      widget.isEditing
-                          ? 'Modifier le projet'
-                          : 'Nouveau projet',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800),
+                    child: AppFormHeader(
+                      icon: Icons.lightbulb_rounded,
+                      title: Text(
+                        widget.isEditing
+                            ? 'Modifier le projet'
+                            : 'Nouveau projet',
+                      ),
                     ),
                   ),
                   IconButton(
@@ -206,12 +209,12 @@ class _ProjectFormDialogState extends State<ProjectFormDialog> {
                                 ? _seasonId
                                 : null,
                             decoration: const InputDecoration(
-                              labelText: 'Saison',
+                              labelText: 'Année',
                             ),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,
-                                child: Text('Aucune saison'),
+                                child: Text('Aucune année'),
                               ),
                               ...widget.seasons.map(
                                 (season) => DropdownMenuItem<String?>(
@@ -408,7 +411,8 @@ class _ProjectStatusDialogState extends State<ProjectStatusDialog> {
   Widget build(BuildContext context) {
     final project = widget.item.project;
     final target = _target;
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.flag_rounded,
       title: Text(_title(target)),
       content: SizedBox(
         width: 540,

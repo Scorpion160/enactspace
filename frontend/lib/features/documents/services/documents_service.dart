@@ -1,7 +1,12 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/storage/secure_storage_options.dart';
+import '../../../core/storage/session_private_data.dart';
 import '../models/document_model.dart';
 
 class DocumentUploadedFileModel {
@@ -30,13 +35,44 @@ class DocumentUploadedFileModel {
   }
 }
 
+abstract interface class DocumentOfflineCacheStore {
+  Future<String?> read();
+  Future<void> write(String value);
+  Future<void> delete();
+}
+
+class SecureDocumentOfflineCacheStore implements DocumentOfflineCacheStore {
+  final FlutterSecureStorage _storage;
+
+  const SecureDocumentOfflineCacheStore({
+    this._storage = enactSpaceSecureStorage,
+  });
+
+  @override
+  Future<String?> read() => _storage.read(key: documentOfflineCacheSecureKey);
+
+  @override
+  Future<void> write(String value) =>
+      _storage.write(key: documentOfflineCacheSecureKey, value: value);
+
+  @override
+  Future<void> delete() => _storage.delete(key: documentOfflineCacheSecureKey);
+}
+
 class DocumentsService {
   final ApiClient _apiClient;
   final AuthService _authService;
+  final DocumentOfflineCacheStore _offlineCache;
 
-  DocumentsService({ApiClient? apiClient, AuthService? authService})
-    : _apiClient = apiClient ?? ApiClient(),
-      _authService = authService ?? AuthService();
+  bool lastLoadUsedOfflineCache = false;
+
+  DocumentsService({
+    ApiClient? apiClient,
+    AuthService? authService,
+    DocumentOfflineCacheStore? offlineCache,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _authService = authService ?? AuthService(),
+       _offlineCache = offlineCache ?? const SecureDocumentOfflineCacheStore();
 
   Future<List<DocumentModel>> getDocuments({
     String? search,
@@ -49,64 +85,79 @@ class DocumentsService {
     bool? isTemplate,
     bool? isOfficial,
   }) async {
-    final token = await _authService.getToken();
-    if (token == null) throw Exception('Utilisateur non connecté.');
+    lastLoadUsedOfflineCache = false;
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('Utilisateur non connecté.');
 
-    final params = <String, String>{};
+      final params = <String, String>{};
+      if (search != null && search.trim().isNotEmpty) {
+        params['search'] = search.trim();
+      }
+      if (category != null && category.isNotEmpty && category != 'all') {
+        params['category'] = category;
+      }
+      if (visibility != null && visibility.isNotEmpty && visibility != 'all') {
+        params['visibility'] = visibility;
+      }
+      if (status != null && status.isNotEmpty && status != 'all') {
+        params['status_filter'] = status;
+      }
+      if (poleId != null && poleId.isNotEmpty && poleId != 'all') {
+        params['pole_id'] = poleId;
+      }
+      if (projectId != null && projectId.isNotEmpty && projectId != 'all') {
+        params['project_id'] = projectId;
+      }
+      if (eventId != null && eventId.isNotEmpty && eventId != 'all') {
+        params['event_id'] = eventId;
+      }
+      if (isTemplate != null) params['is_template'] = isTemplate.toString();
+      if (isOfficial != null) params['is_official'] = isOfficial.toString();
 
-    if (search != null && search.trim().isNotEmpty) {
-      params['search'] = search.trim();
+      final query = params.entries
+          .map(
+            (e) =>
+                '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
+          )
+          .join('&');
+      final path = query.isEmpty ? '/documents/' : '/documents/?$query';
+      final response = await _apiClient.get(path, token: token);
+      final documents = _extractList(
+        response,
+      ).whereType<Map<String, dynamic>>().map(DocumentModel.fromJson).toList();
+
+      if (_isUnfiltered(
+        search: search,
+        category: category,
+        visibility: visibility,
+        status: status,
+        poleId: poleId,
+        projectId: projectId,
+        eventId: eventId,
+        isTemplate: isTemplate,
+        isOfficial: isOfficial,
+      )) {
+        await _writeOfflineCache(documents);
+      }
+      return documents;
+    } catch (_) {
+      final cached = await _readOfflineCache();
+      if (cached == null) rethrow;
+      lastLoadUsedOfflineCache = true;
+      return _filterOffline(
+        cached,
+        search: search,
+        category: category,
+        visibility: visibility,
+        status: status,
+        poleId: poleId,
+        projectId: projectId,
+        eventId: eventId,
+        isTemplate: isTemplate,
+        isOfficial: isOfficial,
+      );
     }
-
-    if (category != null && category.isNotEmpty && category != 'all') {
-      params['category'] = category;
-    }
-
-    if (visibility != null && visibility.isNotEmpty && visibility != 'all') {
-      params['visibility'] = visibility;
-    }
-
-    if (status != null && status.isNotEmpty && status != 'all') {
-      params['status_filter'] = status;
-    }
-
-    if (poleId != null && poleId.isNotEmpty && poleId != 'all') {
-      params['pole_id'] = poleId;
-    }
-
-    if (projectId != null && projectId.isNotEmpty && projectId != 'all') {
-      params['project_id'] = projectId;
-    }
-
-    if (eventId != null && eventId.isNotEmpty && eventId != 'all') {
-      params['event_id'] = eventId;
-    }
-
-    if (isTemplate != null) {
-      params['is_template'] = isTemplate.toString();
-    }
-
-    if (isOfficial != null) {
-      params['is_official'] = isOfficial.toString();
-    }
-
-    final query = params.entries
-        .map(
-          (e) =>
-              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
-        )
-        .join('&');
-
-    final path = query.isEmpty ? '/documents/' : '/documents/?$query';
-
-    final response = await _apiClient.get(path, token: token);
-
-    final rawList = _extractList(response);
-
-    return rawList
-        .whereType<Map<String, dynamic>>()
-        .map(DocumentModel.fromJson)
-        .toList();
   }
 
   Future<DocumentModel> createDocument({
@@ -156,15 +207,26 @@ class DocumentsService {
   }
 
   Future<DocumentModel> getDocument(String documentId) async {
-    final token = await _requireToken();
-    final response = await _apiClient.get(
-      '/documents/$documentId',
-      token: token,
-    );
-    if (response is Map<String, dynamic>) {
-      return DocumentModel.fromJson(response);
+    try {
+      final token = await _requireToken();
+      final response = await _apiClient.get(
+        '/documents/$documentId',
+        token: token,
+      );
+      if (response is Map<String, dynamic>) {
+        return DocumentModel.fromJson(response);
+      }
+      throw Exception('Document introuvable.');
+    } catch (_) {
+      final cached = await _readOfflineCache();
+      if (cached == null) rethrow;
+      final match = cached.where((item) => item.id == documentId).firstOrNull;
+      if (match != null) {
+        lastLoadUsedOfflineCache = true;
+        return match;
+      }
+      rethrow;
     }
-    throw Exception('Document introuvable.');
   }
 
   Future<DocumentModel> updateDocument({
@@ -313,6 +375,118 @@ class DocumentsService {
     if (token == null) throw Exception('Utilisateur non connecté.');
 
     await _apiClient.delete('/documents/$documentId', token: token);
+  }
+
+  Future<void> _writeOfflineCache(List<DocumentModel> documents) async {
+    final payload = {
+      'version': 1,
+      'cached_at': DateTime.now().toUtc().toIso8601String(),
+      'documents': documents
+          .map((item) => item.toJson(includeCapabilities: false))
+          .toList(),
+    };
+    try {
+      await _offlineCache.write(jsonEncode(payload));
+    } catch (_) {
+      // A secure-storage failure must never block the online document center.
+    }
+  }
+
+  Future<List<DocumentModel>?> _readOfflineCache() async {
+    try {
+      final raw = await _offlineCache.read();
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+        await _offlineCache.delete();
+        return null;
+      }
+      final items = decoded['documents'];
+      if (items is! List) {
+        await _offlineCache.delete();
+        return null;
+      }
+      return items
+          .whereType<Map<String, dynamic>>()
+          .map(DocumentModel.fromJson)
+          .toList();
+    } catch (_) {
+      try {
+        await _offlineCache.delete();
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  bool _isUnfiltered({
+    String? search,
+    String? category,
+    String? visibility,
+    String? status,
+    String? poleId,
+    String? projectId,
+    String? eventId,
+    bool? isTemplate,
+    bool? isOfficial,
+  }) =>
+      (search == null || search.trim().isEmpty) &&
+      (category == null || category.isEmpty || category == 'all') &&
+      (visibility == null || visibility.isEmpty || visibility == 'all') &&
+      (status == null || status.isEmpty || status == 'all') &&
+      (poleId == null || poleId.isEmpty || poleId == 'all') &&
+      (projectId == null || projectId.isEmpty || projectId == 'all') &&
+      (eventId == null || eventId.isEmpty || eventId == 'all') &&
+      isTemplate == null &&
+      isOfficial == null;
+
+  List<DocumentModel> _filterOffline(
+    List<DocumentModel> documents, {
+    String? search,
+    String? category,
+    String? visibility,
+    String? status,
+    String? poleId,
+    String? projectId,
+    String? eventId,
+    bool? isTemplate,
+    bool? isOfficial,
+  }) {
+    final query = search?.trim().toLowerCase() ?? '';
+    return documents.where((item) {
+      final searchable = [
+        item.title,
+        item.description ?? '',
+        item.categoryLabel,
+        item.fileTypeLabel,
+      ].join(' ').toLowerCase();
+      return (query.isEmpty || searchable.contains(query)) &&
+          (category == null ||
+              category.isEmpty ||
+              category == 'all' ||
+              item.category == category) &&
+          (visibility == null ||
+              visibility.isEmpty ||
+              visibility == 'all' ||
+              item.visibility == visibility) &&
+          (status == null ||
+              status.isEmpty ||
+              status == 'all' ||
+              item.status == status) &&
+          (poleId == null ||
+              poleId.isEmpty ||
+              poleId == 'all' ||
+              item.poleId == poleId) &&
+          (projectId == null ||
+              projectId.isEmpty ||
+              projectId == 'all' ||
+              item.projectId == projectId) &&
+          (eventId == null ||
+              eventId.isEmpty ||
+              eventId == 'all' ||
+              item.eventId == eventId) &&
+          (isTemplate == null || item.isTemplate == isTemplate) &&
+          (isOfficial == null || item.isOfficial == isOfficial);
+    }).toList();
   }
 
   List<dynamic> _extractList(dynamic response) {

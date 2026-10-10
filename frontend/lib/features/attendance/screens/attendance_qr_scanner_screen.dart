@@ -98,11 +98,11 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Saisie QR',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               TextField(
                 controller: _manualTokenController,
                 minLines: 3,
@@ -112,12 +112,12 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                   prefixIcon: Icon(Icons.qr_code_2_rounded),
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: () =>
                     Navigator.of(context).pop(_manualTokenController.text),
-                icon: const Icon(Icons.check_rounded),
-                label: const Text('Valider'),
+                icon: Icon(Icons.check_rounded),
+                label: Text('Valider'),
               ),
             ],
           ),
@@ -138,17 +138,17 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scanner presence'),
+        title: Text('Scanner presence'),
         actions: [
           IconButton(
             tooltip: 'Lampe',
             onPressed: () => _scannerController.toggleTorch(),
-            icon: const Icon(Icons.flash_on_rounded),
+            icon: Icon(Icons.flash_on_rounded),
           ),
           IconButton(
             tooltip: 'Camera',
             onPressed: () => _scannerController.switchCamera(),
-            icon: const Icon(Icons.cameraswitch_rounded),
+            icon: Icon(Icons.cameraswitch_rounded),
           ),
         ],
       ),
@@ -161,14 +161,14 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(flex: 5, child: _buildScannerCard()),
-                      const SizedBox(width: 20),
+                      SizedBox(width: 20),
                       Expanded(flex: 4, child: _buildResultCard()),
                     ],
                   )
                 : ListView(
                     children: [
                       _buildScannerCard(),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       _buildResultCard(),
                     ],
                   ),
@@ -185,12 +185,14 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AppSectionHeader(title: 'Pointage de présence'),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: 6),
+          Text(
             'Le QR signé permet d’identifier automatiquement la session concernée.',
-            style: TextStyle(color: AppTheme.secondaryText),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           AspectRatio(
             aspectRatio: 1,
             child: ClipRRect(
@@ -210,13 +212,13 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.videocam_off_rounded,
                                   color: AppTheme.enactusYellow,
                                   size: 44,
                                 ),
-                                const SizedBox(height: 12),
-                                const Text(
+                                SizedBox(height: 12),
+                                Text(
                                   'Caméra indisponible',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
@@ -225,8 +227,8 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                                     fontWeight: FontWeight.w900,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                const Text(
+                                SizedBox(height: 8),
+                                Text(
                                   'Autorisez la caméra ou utilisez la saisie du code QR.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
@@ -234,16 +236,16 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                                     height: 1.35,
                                   ),
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 OutlinedButton.icon(
                                   onPressed: _processing
                                       ? null
                                       : _openManualEntry,
-                                  icon: const Icon(Icons.keyboard_rounded),
-                                  label: const Text('Saisir un code'),
+                                  icon: Icon(Icons.keyboard_rounded),
+                                  label: Text('Saisir un code'),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.white,
-                                    side: const BorderSide(
+                                    side: BorderSide(
                                       color: AppTheme.enactusYellow,
                                     ),
                                   ),
@@ -260,7 +262,7 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -268,13 +270,13 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
             children: [
               ElevatedButton.icon(
                 onPressed: _processing ? null : _scanAgain,
-                icon: const Icon(Icons.qr_code_scanner_rounded),
-                label: const Text('Scanner'),
+                icon: Icon(Icons.qr_code_scanner_rounded),
+                label: Text('Scanner'),
               ),
               OutlinedButton.icon(
                 onPressed: _processing ? null : _openManualEntry,
-                icon: const Icon(Icons.keyboard_rounded),
-                label: const Text('Saisie'),
+                icon: Icon(Icons.keyboard_rounded),
+                label: Text('Saisie'),
               ),
             ],
           ),
@@ -303,24 +305,26 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                   : AppTheme.enactusYellow.withAlpha(55),
               child: Icon(icon, color: color, size: 40),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Text(
               success ? 'Presence enregistree' : 'Pointage QR',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _error == null ? Colors.black54 : Colors.red.shade700,
+                color: _error == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Colors.red.shade700,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
             ),
             if (result?.attendanceStatus != null) ...[
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               Center(
                 child: Chip(
                   avatar: Icon(
@@ -332,11 +336,11 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             OutlinedButton.icon(
               onPressed: _processing ? null : _scanAgain,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Nouveau scan'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Nouveau scan'),
             ),
           ],
         ),
@@ -362,11 +366,11 @@ class _ScannerFrame extends StatelessWidget {
           if (processing)
             Container(
               color: Colors.black.withAlpha(140),
-              child: const Center(
+              child: Center(
                 child: CircularProgressIndicator(color: AppTheme.enactusYellow),
               ),
             ),
-          const Align(
+          Align(
             alignment: Alignment.topCenter,
             child: Padding(
               padding: EdgeInsets.all(16),

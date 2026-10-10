@@ -1,0 +1,178 @@
+[
+  {
+    "id": "aquatus",
+    "asset_path": "assets/heritage/aquatus.jpg",
+    "source_url": "https://www.enactusesp.com/projects/aquatus",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/6c53a08d9b8908ab916393551ca63845153724cb-5184x3456.jpg?rect=0,270,5184,2916&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/6c53a08d9b8908ab916393551ca63845153724cb-5184x3456.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Aquatus",
+    "sha256": "afa42d9bddc48416c8f9795be88766575fc7950dd1fbe1b4cd835a8879089001",
+    "bytes": 239991,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "terrasen",
+    "asset_path": "assets/heritage/terrasen.jpg",
+    "source_url": "https://www.enactusesp.com/projects/terrasen",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/52811bc5c568c40e4ef9c4e5af21dc2d17c8abca-2000x1000.jpg?rect=111,0,1778,1000&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/52811bc5c568c40e4ef9c4e5af21dc2d17c8abca-2000x1000.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Terrasen",
+    "sha256": "2502e6681bc545aee1d4fb295fb804c335ce9bbed3f7556324d955f7ce340379",
+    "bytes": 107272,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "men-nan",
+    "asset_path": "assets/heritage/men-nan.jpg",
+    "source_url": "https://www.enactusesp.com/projects/men-nan",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/75fa6169424772fd843046bb8b23804293d6bb28-5184x3456.jpg?rect=0,270,5184,2916&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/75fa6169424772fd843046bb8b23804293d6bb28-5184x3456.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Men-nan",
+    "sha256": "58b504cd0b48e673bda6095273ee4ff93a4552861e7f06055bc9c24ecaee1182",
+    "bytes": 226564,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "shery",
+    "asset_path": "assets/heritage/shery.jpg",
+    "source_url": "https://www.enactusesp.com/projects/shery",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/2ed00d4d0b3fabc11e07f0d96b7931f64fcbf24b-1080x1080.png?rect=0,62,1080,608&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/2ed00d4d0b3fabc11e07f0d96b7931f64fcbf24b-1080x1080.png?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Shery",
+    "sha256": "e5db0ad1c95d9685f384cdb3268f8357acdf07da4b2e1a2df24b45e063d01ccb",
+    "bytes": 71411,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "polytech-innovation-2025",
+    "asset_path": "assets/heritage/polytech-innovation-2025.jpg",
+    "source_url": "https://www.enactusesp.com/stories/concours-polytech-innovation-2025",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/e0271c986a84746a7af3e44ac6b1ddf6ccb59373-1280x960.jpg?rect=0,120,1280,720&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/e0271c986a84746a7af3e44ac6b1ddf6ccb59373-1280x960.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Concours Polytech'Innovation 2025",
+    "sha256": "88da73f779778e5374c48d5c5902c056c729fac543e0de0007c278c309ef0354",
+    "bytes": 271346,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "salon-polytechnicien-2025",
+    "asset_path": "assets/heritage/salon-polytechnicien-2025.jpg",
+    "source_url": "https://www.enactusesp.com/stories/salon-polytechnicien-2025",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/4c0360b59225b899489e49658435dcc828da8941-2560x1706.jpg?rect=0,133,2560,1440&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/4c0360b59225b899489e49658435dcc828da8941-2560x1706.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Salon Polytechnicien 2025",
+    "sha256": "1c2a2163ac324b797656fc17f1080de46ef628eaed22b3e17ecd984ec5353e3b",
+    "bytes": 111355,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "immersion-mars-2025",
+    "asset_path": "assets/heritage/immersion-mars-2025.jpg",
+    "source_url": "https://www.enactusesp.com/stories/voyage-d-immersion-de-mars-2025",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/8097397e210d3202649727a799ff11eecfd00ff4-720x1280.jpg?rect=0,438,720,405&w=1600&h=900&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/8097397e210d3202649727a799ff11eecfd00ff4-720x1280.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Voyage d'immersion de Mars 2025",
+    "sha256": "60d3bf4bb7cb3d834fd62319bc23a2317cf341443713616bdd12b9d1f3e66324",
+    "bytes": 247587,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-1",
+    "asset_path": "assets/heritage/galerie-1.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/0c3abf02b9480b0c46003d4ab2bbc48d302678fc-4032x3024.jpg?rect=504,0,3024,3024&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/0c3abf02b9480b0c46003d4ab2bbc48d302678fc-4032x3024.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 1",
+    "sha256": "ffebb40f7375a33a581629ab9d52549e6f763809b2b279e4286f8001adb1220a",
+    "bytes": 336129,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-2",
+    "asset_path": "assets/heritage/galerie-2.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/1f12b8f063e9ebd68ea6ed7da500050d4c3b5a20-1600x1065.jpg?rect=268,0,1065,1065&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/1f12b8f063e9ebd68ea6ed7da500050d4c3b5a20-1600x1065.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 2",
+    "sha256": "c97b470edf8ac56d61cda805946a71ca3e2c3477893ea383d06d655929664be9",
+    "bytes": 129984,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-3",
+    "asset_path": "assets/heritage/galerie-3.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/5e591175a483e55d83adf1c120d70ed610affc21-4032x3024.jpg?rect=504,0,3024,3024&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/5e591175a483e55d83adf1c120d70ed610affc21-4032x3024.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 3",
+    "sha256": "5d3b499209d91227c64059de5ab4be4072aeaf4fd5325ca35c35281ed3565470",
+    "bytes": 357708,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-4",
+    "asset_path": "assets/heritage/galerie-4.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/54b905cc752bf523bb6590b79d3522b7439584f0-4167x6250.jpg?rect=0,1042,4167,4167&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/54b905cc752bf523bb6590b79d3522b7439584f0-4167x6250.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 4",
+    "sha256": "d564a4dd56a9d58d7393a29a31cf55df77f3dd4376166d601979d2cbde6a3333",
+    "bytes": 576281,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-5",
+    "asset_path": "assets/heritage/galerie-5.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/d9c7a719e22372e6d5d99d15aaa7aa886f1ef0da-1301x864.jpg?rect=219,0,864,864&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/d9c7a719e22372e6d5d99d15aaa7aa886f1ef0da-1301x864.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 5",
+    "sha256": "4b99063a30853838a38621a7053f7ff8e12a988d4bbafee1c4a4f0c75ad1b801",
+    "bytes": 102517,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-6",
+    "asset_path": "assets/heritage/galerie-6.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/526b37d21d822947d89d79444bc2903cfde7f209-4956x6400.jpg?rect=0,722,4956,4956&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/526b37d21d822947d89d79444bc2903cfde7f209-4956x6400.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 6",
+    "sha256": "d699ddda370068dc8e340233d08d913ca84db25c93d4ce084cbb04b57f1ece6a",
+    "bytes": 413155,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-7",
+    "asset_path": "assets/heritage/galerie-7.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/bf09de433e34e9a7e473529f1761311b8f1e3f8c-6250x5000.jpg?rect=625,0,5000,5000&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/bf09de433e34e9a7e473529f1761311b8f1e3f8c-6250x5000.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 7",
+    "sha256": "4ffa7d306929c5c97fcfd704e2cf17bc87aad626f8180ff23bdfc1f14856c3f2",
+    "bytes": 137788,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-8",
+    "asset_path": "assets/heritage/galerie-8.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/26e57e6bd6669dcae0d5937fd039c71f4a360f09-1600x1200.jpg?rect=200,0,1200,1200&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/26e57e6bd6669dcae0d5937fd039c71f4a360f09-1600x1200.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 8",
+    "sha256": "7a93c493221fa5c10c10a3f99d4e67e62d173b7452d3c657e851731d39769ed4",
+    "bytes": 272272,
+    "retrieved_at": "2026-10-03"
+  },
+  {
+    "id": "galerie-9",
+    "asset_path": "assets/heritage/galerie-9.jpg",
+    "source_url": "https://www.enactusesp.com/",
+    "image_source_url": "https://cdn.sanity.io/images/ur9b3lzb/production/6c53a08d9b8908ab916393551ca63845153724cb-5184x3456.jpg?rect=864,0,3456,3456&w=1000&h=1000&auto=format",
+    "download_url": "https://cdn.sanity.io/images/ur9b3lzb/production/6c53a08d9b8908ab916393551ca63845153724cb-5184x3456.jpg?w=1200&fit=max&q=82&fm=jpg",
+    "alt": "Moment 9",
+    "sha256": "afa42d9bddc48416c8f9795be88766575fc7950dd1fbe1b4cd835a8879089001",
+    "bytes": 239991,
+    "retrieved_at": "2026-10-03"
+  }
+]

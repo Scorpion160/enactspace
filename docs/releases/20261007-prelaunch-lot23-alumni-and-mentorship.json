@@ -1,0 +1,47 @@
+{
+  "lot": 23,
+  "date_utc": "2026-10-07T19:50:22.862349+00:00",
+  "tests": {
+    "sqlite": {
+      "passed": 74,
+      "seconds": 45.777,
+      "skipped": 0
+    },
+    "postgresql": {
+      "passed": 44,
+      "seconds": 99.569,
+      "skipped": 0
+    },
+    "final_privacy_sqlite": {
+      "passed": 2,
+      "seconds": 1.586,
+      "skipped": 0,
+      "overlap_with_suite": true
+    },
+    "final_privacy_postgresql": {
+      "passed": 2,
+      "seconds": 9.233,
+      "skipped": 0,
+      "overlap_with_suite": true
+    }
+  },
+  "portable_added": 15,
+  "postgresql_races_added": 4,
+  "counts_overlap": true,
+  "resources_absent": true,
+  "git_diff_check": true,
+  "whole_manual_review_complete": false,
+  "build_performed": false,
+  "production_changed": false,
+  "git_push": false,
+  "real_email_or_payment_sent": false,
+  "source_head": "20261007_0029",
+  "reviewed_files": [
+    "backend/app/api/routes/alumni.py",
+    "backend/app/services/alumni_integrity.py",
+    "backend/app/schemas/alumni.py",
+    "backend/app/models/alumni.py",
+    "backend/test_prelaunch_alumni_boundaries.py",
+    "backend/test_prelaunch_alumni_boundaries_postgresql.py"
+  ]
+}

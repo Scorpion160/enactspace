@@ -1,3 +1,4 @@
+import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/application_model.dart';
@@ -51,20 +52,20 @@ class CandidateActionsSection extends StatelessWidget {
       if (allowed.contains('interview_scheduled') ||
           application.status == 'interview_scheduled')
         _ActionButton(
-        key: const Key('candidate-action-interview'),
-        icon: Icons.event_available_rounded,
-        label: application.status == 'interview_scheduled'
-            ? 'Modifier l’entretien'
-            : 'Planifier un entretien',
-        onPressed: () => showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => CandidateInterviewDialog(
-            application: application,
-            onConfirm: onInterview,
+          key: const Key('candidate-action-interview'),
+          icon: Icons.event_available_rounded,
+          label: application.status == 'interview_scheduled'
+              ? 'Modifier l’entretien'
+              : 'Planifier un entretien',
+          onPressed: () => showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => CandidateInterviewDialog(
+              application: application,
+              onConfirm: onInterview,
+            ),
           ),
         ),
-      ),
       if (allowed.contains('waiting_list'))
         _ActionButton(
           key: const Key('candidate-action-waiting-list'),
@@ -126,7 +127,7 @@ class CandidateActionsSection extends StatelessWidget {
         Wrap(spacing: 10, runSpacing: 10, children: actions),
         const SizedBox(height: 10),
         Text(
-          'La conversion en utilisateur reste une action séparée.',
+          'La création du compte membre vient après la décision de recrutement.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -138,13 +139,24 @@ class CandidateActionsSection extends StatelessWidget {
     return switch (application.status) {
       'submitted' => const {'under_review', 'cancelled'},
       'under_review' => const {
-        'interview_scheduled', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+        'interview_scheduled',
+        'waiting_list',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       'interview_scheduled' => const {
-        'under_review', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+        'under_review',
+        'waiting_list',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       'waiting_list' => const {
-        'interview_scheduled', 'accepted', 'rejected', 'cancelled',
+        'interview_scheduled',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       _ => const {},
     };
@@ -266,7 +278,7 @@ class _CandidateDecisionDialogState extends State<CandidateDecisionDialog> {
             _DialogLine('Nouveau statut', target),
             if (widget.kind == CandidateDecisionKind.acceptance) ...[
               _DialogLine(
-                'Moyenne officielle',
+                'Évaluation par critères',
                 widget.reviewAverage == null
                     ? 'Non disponible'
                     : '${widget.reviewAverage!.toStringAsFixed(1)}/20',
@@ -625,7 +637,5 @@ String? _optional(String value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-String _humanError(Object error, String fallback) {
-  final raw = error.toString().replaceFirst('Exception: ', '').trim();
-  return raw.isEmpty ? fallback : raw;
-}
+String _humanError(Object error, String fallback) =>
+    recruitmentMessage(error, fallback: fallback);

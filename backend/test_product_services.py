@@ -1,5 +1,6 @@
 """Focused PR-3 product-services backend regressions."""
 
+from app.core.time import utc_now
 import os
 import inspect
 import unittest
@@ -241,15 +242,15 @@ class ProductServicesTests(unittest.TestCase):
             settings.SMTP_HOST = "smtp.example.test"
             settings.FCM_SERVER_KEY = "configured-for-test"
             self.assertFalse(_dispatch_push(future, self.other, None))
-            self.assertFalse(_dispatch_email(future, self.user, preference))
+            self.assertFalse(_dispatch_email(self.db, future, self.user, preference))
             self.assertFalse(_dispatch_push(future, self.user, preference))
             preference.notification_email_enabled = True
             preference.notification_push_enabled = True
-            self.assertTrue(_dispatch_email(future, self.user, preference))
+            self.assertTrue(_dispatch_email(self.db, future, self.user, preference))
             self.assertTrue(_dispatch_push(future, self.user, preference))
             settings.EMAIL_ENABLED = False
             settings.PUSH_ENABLED = False
-            self.assertFalse(_dispatch_email(future, self.user, preference))
+            self.assertFalse(_dispatch_email(self.db, future, self.user, preference))
             self.assertFalse(_dispatch_push(future, self.user, preference))
         finally:
             (
@@ -640,7 +641,7 @@ class ProductServicesTests(unittest.TestCase):
                 ProductPlatform.web,
                 AppVersionPolicyUpdate(
                     maintenance_enabled=True,
-                    maintenance_starts_at=datetime.utcnow(),
+                    maintenance_starts_at=utc_now(),
                 ),
                 db=self.db,
                 current_user=self.admin,
@@ -677,7 +678,7 @@ class ProductServicesTests(unittest.TestCase):
             db=self.db,
             current_user=self.admin,
         )
-        future_start = datetime.utcnow() + timedelta(days=1)
+        future_start = utc_now() + timedelta(days=1)
         future_end = future_start + timedelta(hours=1)
         product.update_app_version_policy(
             ProductPlatform.web,
@@ -691,7 +692,7 @@ class ProductServicesTests(unittest.TestCase):
         self.assertFalse(product.product_bootstrap(
             ProductPlatform.web, "1.0.0", 1, db=self.db
         )["maintenance"]["active"])
-        expired_end = datetime.utcnow() - timedelta(hours=1)
+        expired_end = utc_now() - timedelta(hours=1)
         expired_start = expired_end - timedelta(hours=1)
         product.update_app_version_policy(
             ProductPlatform.web,
@@ -705,8 +706,8 @@ class ProductServicesTests(unittest.TestCase):
         self.assertFalse(product.product_bootstrap(
             ProductPlatform.web, "1.0.0", 1, db=self.db
         )["maintenance"]["active"])
-        active_start = datetime.utcnow() - timedelta(hours=1)
-        active_end = datetime.utcnow() + timedelta(hours=1)
+        active_start = utc_now() - timedelta(hours=1)
+        active_end = utc_now() + timedelta(hours=1)
         product.update_app_version_policy(
             ProductPlatform.web,
             AppVersionPolicyUpdate(

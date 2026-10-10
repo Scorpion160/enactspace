@@ -17,12 +17,18 @@ TaskModel task(String status, {required bool manager, bool assigned = true}) {
 void main() {
   group('PR-6.5 task transition truth', () {
     test('assignee sees only allowed progression', () {
-      expect(task('a_faire', manager: false).allowedStatusTransitions,
-          ['en_cours', 'bloque']);
-      expect(task('en_cours', manager: false).allowedStatusTransitions,
-          ['bloque', 'termine']);
-      expect(task('bloque', manager: false).allowedStatusTransitions,
-          ['en_cours', 'termine']);
+      expect(task('a_faire', manager: false).allowedStatusTransitions, [
+        'en_cours',
+        'bloque',
+      ]);
+      expect(task('en_cours', manager: false).allowedStatusTransitions, [
+        'bloque',
+        'termine',
+      ]);
+      expect(task('bloque', manager: false).allowedStatusTransitions, [
+        'en_cours',
+        'termine',
+      ]);
     });
 
     test('assignee cannot validate cancel or reopen completed work', () {
@@ -32,17 +38,35 @@ void main() {
     });
 
     test('manager can cancel nonterminal task', () {
-      expect(task('a_faire', manager: true).allowedStatusTransitions,
-          contains('annule'));
-      expect(task('en_cours', manager: true).allowedStatusTransitions,
-          contains('annule'));
-      expect(task('bloque', manager: true).allowedStatusTransitions,
-          contains('annule'));
+      expect(
+        task('a_faire', manager: true).allowedStatusTransitions,
+        contains('annule'),
+      );
+      expect(
+        task('en_cours', manager: true).allowedStatusTransitions,
+        contains('annule'),
+      );
+      expect(
+        task('bloque', manager: true).allowedStatusTransitions,
+        contains('annule'),
+      );
     });
 
     test('manager can validate or return completed task for correction', () {
-      expect(task('termine', manager: true).allowedStatusTransitions,
-          ['en_cours', 'valide']);
+      expect(
+        task(
+          'termine',
+          manager: true,
+          assigned: false,
+        ).allowedStatusTransitions,
+        ['en_cours', 'valide'],
+      );
+    });
+
+    test('assigned manager cannot validate their own completed work', () {
+      expect(task('termine', manager: true).allowedStatusTransitions, [
+        'en_cours',
+      ]);
     });
 
     test('validated and cancelled tasks remain terminal for manager', () {
@@ -53,12 +77,18 @@ void main() {
 
   group('PR-6.5 recruitment status aliases', () {
     test('legacy values map to canonical presentation', () {
-      expect(ApplicationStatusPresentation.fromStatus('received').status,
-          'submitted');
-      expect(ApplicationStatusPresentation.fromStatus('preselected').status,
-          'under_review');
-      expect(ApplicationStatusPresentation.fromStatus('interview').status,
-          'interview_scheduled');
+      expect(
+        ApplicationStatusPresentation.fromStatus('received').status,
+        'submitted',
+      );
+      expect(
+        ApplicationStatusPresentation.fromStatus('preselected').status,
+        'under_review',
+      );
+      expect(
+        ApplicationStatusPresentation.fromStatus('interview').status,
+        'interview_scheduled',
+      );
     });
 
     test('terminal recruitment statuses stay canonical', () {

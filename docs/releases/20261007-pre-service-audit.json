@@ -1,0 +1,105 @@
+{
+  "audit_date": "2026-10-07",
+  "production_read_only": true,
+  "emails_sent_during_this_audit": 0,
+  "email_live": {
+    "email_enabled": true,
+    "test_restriction_enabled": true,
+    "test_mailbox_matches_expected": true,
+    "institutional_sender_configured": true,
+    "smtp_credentials_present": true,
+    "queued_deliveries": 0,
+    "queued_outside_test_mailbox": 0,
+    "queued_marked_test": 0,
+    "delivery_status_counts": {
+      "cancelled": 1,
+      "sent": 74
+    },
+    "read_only": true,
+    "emails_sent_by_this_audit": 0
+  },
+  "infrastructure_live": {
+    "push_enabled": true,
+    "push_test_restriction_enabled": true,
+    "mobile_money_enabled": false,
+    "paydunya_test_mode": true,
+    "paydunya_required_credentials_present": false,
+    "meet_jwt_required": true,
+    "meet_jwt_configured": true,
+    "meet_uses_private_domain": true,
+    "meet_recording_enabled": false,
+    "read_only": true,
+    "workers": {
+      "backend": {
+        "running": true,
+        "restart_count": 0
+      },
+      "email_worker": {
+        "running": true,
+        "restart_count": 0
+      },
+      "push_worker": {
+        "running": true,
+        "restart_count": 0
+      },
+      "veille_worker": {
+        "running": true,
+        "restart_count": 0
+      }
+    }
+  },
+  "email_isolated": {
+    "email_tests": 14,
+    "tests_passed": true,
+    "network_disabled": true,
+    "smtp_messages_sent": 0,
+    "worker_rechecks_test_recipient": false
+  },
+  "ecc_sources": {
+    "repository": "https://github.com/affaan-m/ECC",
+    "commit": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "retrieved_at": "2026-10-07T09:56:44.780485+00:00",
+    "executed_third_party_code": false,
+    "installed_global_configuration": false,
+    "files": [
+      {
+        "path": "skills/verification-loop/SKILL.md",
+        "url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/skills/verification-loop/SKILL.md",
+        "sha256": "503aebee7d414f559c4874600081a40b1e7aea269b58073c5c9660c6641b00a0",
+        "bytes": 2792
+      },
+      {
+        "path": "skills/e2e-testing/SKILL.md",
+        "url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/skills/e2e-testing/SKILL.md",
+        "sha256": "b0e00e7e17cb259101139900816c5528aed18dd10bcf5f9cb42cfc35baf8a755",
+        "bytes": 8170
+      },
+      {
+        "path": "skills/eval-harness/SKILL.md",
+        "url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/skills/eval-harness/SKILL.md",
+        "sha256": "3a5339a5a80099a5c9d55da9b6c8e05a690f5befc6f78d779c75dd79d818ca07",
+        "bytes": 8738
+      },
+      {
+        "path": "skills/security-review/SKILL.md",
+        "url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/skills/security-review/SKILL.md",
+        "sha256": "b9eb6416eebc8dda046674f0a2dbb3be88aff526d182b60a0f55998d3d6d0d8d",
+        "bytes": 12955
+      },
+      {
+        "path": ".codex-plugin/README.md",
+        "url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/.codex-plugin/README.md",
+        "sha256": "905789be9498d1442fad88e12befb4e527653970b18bf44565fb83e93b764fa2",
+        "bytes": 5509
+      }
+    ]
+  },
+  "confirmed_gaps": [
+    "candidate_status_email_requires_converted_user",
+    "no_worker_time_test_recipient_guard"
+  ],
+  "native_build14_validated": false,
+  "planned_acceptance_scenarios": 44,
+  "third_party_installer_executed": false,
+  "application_sources_modified_by_this_audit": false
+}

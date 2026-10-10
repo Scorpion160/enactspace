@@ -70,6 +70,12 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
         _filters = effectiveFilters;
         _items = page.items;
         _nextCursor = page.nextCursor;
+        if (page.items.isEmpty &&
+            !effectiveFilters.isFiltered &&
+            !effectiveFilters.review) {
+          _legacyMode = true;
+          _legacyHome ??= _gateway.loadHome();
+        }
       });
     } catch (error) {
       if (mounted) setState(() => _initialError = error);
@@ -274,7 +280,13 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
           else if (_items.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _MemoryEmpty(filtered: _filters.isFiltered),
+              child: _MemoryEmpty(
+                filtered: _filters.isFiltered,
+                onOpenHistorical:
+                    !_filters.isFiltered && _permissions.canValidate
+                    ? _showLegacy
+                    : null,
+              ),
             )
           else
             SliverPadding(
@@ -342,7 +354,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Une chronologie institutionnelle vérifiée, reliée à ses sources.',
+            'Les projets, les rencontres et les moments qui racontent Enactus ESP.',
           ),
           const SizedBox(height: 16),
           TextField(
@@ -389,13 +401,19 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
                 icon: const Icon(Icons.tune),
                 label: const Text('Filtres'),
               ),
-              if (_permissions.canValidate)
-                OutlinedButton.icon(
-                  key: const Key('memory_legacy_area'),
-                  onPressed: _showLegacy,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('Archives héritées à vérifier'),
-                ),
+              OutlinedButton.icon(
+                key: const Key('memory_minutes'),
+                onPressed: () =>
+                    context.push('/archives/minutes', extra: _gateway),
+                icon: const Icon(Icons.record_voice_over_rounded),
+                label: const Text('Minute de l’enacteur'),
+              ),
+              OutlinedButton.icon(
+                key: const Key('memory_legacy_area'),
+                onPressed: _showLegacy,
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('L’histoire du club'),
+              ),
             ],
           ),
         ],
@@ -403,39 +421,54 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     ),
   );
 
-  Widget _buildLegacy() => FutureBuilder<ArchivesHomeData>(
-    future: _legacyHome,
-    builder: (context, snapshot) => ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: () => setState(() => _legacyMode = false),
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Retour à la mémoire vérifiée',
-            ),
-            const Expanded(
-              child: Text(
-                'Archives héritées à vérifier',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+  Widget _buildLegacy() => RefreshIndicator(
+    onRefresh: () async {
+      final future = _gateway.loadHome();
+      setState(() => _legacyHome = future);
+      try {
+        await future;
+      } catch (_) {
+        // The FutureBuilder displays the error with its retry action.
+      }
+    },
+    child: FutureBuilder<ArchivesHomeData>(
+      future: _legacyHome,
+      builder: (context, snapshot) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() => _legacyMode = false),
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Retour aux Archives',
               ),
+              Expanded(
+                child: const Text(
+                  'Mémoire historique Enactus ESP',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            'De nos premières initiatives aux projets d’aujourd’hui, explore les idées, les rencontres et les réussites qui ont façonné Enactus ESP.',
+          ),
+          const SizedBox(height: 20),
+          if (snapshot.connectionState == ConnectionState.waiting)
+            const Center(child: CircularProgressIndicator())
+          else if (snapshot.hasError)
+            _MemoryError(
+              onRetry: () => setState(() => _legacyHome = _gateway.loadHome()),
+            )
+          else
+            HistoricalMemoryContents(
+              home: snapshot.requireData,
+              gateway: _gateway,
             ),
-          ],
-        ),
-        const Text(
-          'Contenu de compatibilité distinct de la mémoire institutionnelle vérifiée.',
-        ),
-        const SizedBox(height: 20),
-        if (snapshot.connectionState == ConnectionState.waiting)
-          const Center(child: CircularProgressIndicator())
-        else if (snapshot.hasError)
-          _MemoryError(
-            onRetry: () => setState(() => _legacyHome = _gateway.loadHome()),
-          )
-        else
-          ArchivesOverview(home: snapshot.requireData, gateway: _gateway),
-      ],
+        ],
+      ),
     ),
   );
 
@@ -606,17 +639,63 @@ class _MemoryDetail extends StatelessWidget {
 
 class _MemoryEmpty extends StatelessWidget {
   final bool filtered;
-  const _MemoryEmpty({required this.filtered});
+  final VoidCallback? onOpenHistorical;
+
+  const _MemoryEmpty({required this.filtered, this.onOpenHistorical});
 
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Text(
-        filtered
-            ? 'Aucun repère ne correspond à ces filtres.'
-            : 'Aucun repère institutionnel vérifié pour le moment.',
-        textAlign: TextAlign.center,
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  filtered
+                      ? Icons.search_off_rounded
+                      : Icons.history_edu_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  filtered
+                      ? 'Aucun repère ne correspond à ces filtres.'
+                      : 'Explore l’histoire du club à travers ses projets, ses rencontres et ses moments marquants.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (!filtered) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Retrouve les projets, les compétitions, les distinctions et l’impact d’Enactus ESP dans l’histoire du club.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (onOpenHistorical != null) ...[
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: onOpenHistorical,
+                      icon: const Icon(Icons.inventory_2_outlined),
+                      label: const Text('Consulter la mémoire historique'),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     ),
   );

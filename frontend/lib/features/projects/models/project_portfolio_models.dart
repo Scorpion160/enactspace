@@ -143,6 +143,7 @@ class ProjectPortfolioItem {
   final bool teamUnavailable;
   final bool tasksUnavailable;
   final bool impactUnavailable;
+  final bool impactRestricted;
 
   const ProjectPortfolioItem({
     required this.project,
@@ -153,6 +154,7 @@ class ProjectPortfolioItem {
     required this.teamUnavailable,
     required this.tasksUnavailable,
     required this.impactUnavailable,
+    this.impactRestricted = false,
   });
 
   List<ProjectMemberModel> get activeMembers =>
