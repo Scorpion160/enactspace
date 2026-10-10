@@ -75,8 +75,11 @@ Le resultat doit contenir un `access_token`.
 ## 4. Profil utilisateur
 
 ```powershell
-curl.exe https://api.enactspace.example.com/api/users/me `
-  -H "Authorization: Bearer TOKEN_ICI"
+if ([string]::IsNullOrWhiteSpace($env:ENACTSPACE_SMOKE_ACCESS_TOKEN)) {
+    throw 'Charger le token du compte de recette dans le processus local avant ce controle.'
+}
+Invoke-RestMethod -Uri 'https://api.enactspace.example.com/api/users/me' `
+  -Headers @{ Authorization = ('Bearer ' + $env:ENACTSPACE_SMOKE_ACCESS_TOKEN) }
 ```
 
 Verifier:

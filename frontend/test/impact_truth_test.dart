@@ -149,6 +149,9 @@ void main() {
       expect(find.text('17'), findsOneWidget);
 
       await tester.scrollUntilVisible(find.text('Indicateurs'), 400);
+      await tester.ensureVisible(find.text('Charger').first);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -140));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Charger').first);
       await tester.pumpAndSettle();
 

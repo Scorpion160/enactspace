@@ -99,6 +99,44 @@ class InstitutionalDocumentWorkflowTests(unittest.TestCase):
         self.db.close()
         self.engine.dispose()
 
+    def _dismissal(self, effective="2026-10-10", target=None):
+        item = InstitutionalDocumentRequest(
+            template_code="notification_renvoi", template_version="2.0",
+            status="validated", requested_by=self.veille_lead.id,
+            sg_validated_by=self.sg.id, approved_by=self.tl.id,
+            payload_json={"member_id": str((target or self.other_lead).id),
+                          "effective_date": effective, "dismissal_execution_enabled": True},
+        )
+        self.db.add(item)
+        self.db.flush()
+        return item
+
+    def test_dismissal_closes_memberships_and_executes_once(self):
+        from app.services.disciplinary_execution import apply_approved_dismissal
+        item = self._dismissal()
+        self.assertTrue(apply_approved_dismissal(self.db, item, date(2026, 10, 10)))
+        self.assertFalse(self.other_lead.is_active)
+        self.assertEqual(self.other_lead.status, "suspended")
+        self.assertFalse(self.db.query(ProjectMember).filter_by(user_id=self.other_lead.id).one().is_active)
+        self.assertFalse(apply_approved_dismissal(self.db, item, date(2026, 10, 10)))
+
+    def test_future_dismissal_keeps_access_until_effective_date(self):
+        from app.services.disciplinary_execution import apply_approved_dismissal
+        item = self._dismissal("2026-10-12")
+        self.assertFalse(apply_approved_dismissal(self.db, item, date(2026, 10, 10)))
+        self.assertTrue(self.other_lead.is_active)
+        self.assertTrue(apply_approved_dismissal(self.db, item, date(2026, 10, 12)))
+
+    def test_dismissal_does_not_apply_unapproved_notice_or_target_admin(self):
+        from app.services.disciplinary_execution import apply_approved_dismissal
+        item = self._dismissal(target=self.admin)
+        item.status = "pending_approval"
+        self.assertFalse(apply_approved_dismissal(self.db, item, date(2026, 10, 10)))
+        item.status = "validated"
+        with self.assertRaises(HTTPException):
+            apply_approved_dismissal(self.db, item, date(2026, 10, 10))
+        self.assertTrue(self.admin.is_active)
+
     def _user(self, email):
         user = User(
             first_name="Test",

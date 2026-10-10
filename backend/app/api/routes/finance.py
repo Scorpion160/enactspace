@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import csv
 import hashlib
 from datetime import datetime
@@ -7,6 +8,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user, notify_users
@@ -37,6 +39,8 @@ from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.role import Role, UserRole
 from app.models.user import User
+from app.models.stored_file import StoredFile
+from app.services.receipt_reading import parse_receipt
 from app.schemas.finance import (
     FeeCreate,
     FeeRead,
@@ -57,9 +61,11 @@ from app.schemas.mobile_money import (
 from app.api.deps import (
     get_current_active_validated_user,
     require_finance_or_admin,
+    can_manage_finance,
     user_has_any_role,
 )
 from app.services.operational_integrity import lock_row
+from app.services.finance_integrity import ensure_financial_account, lock_payment_declaration
 
 router = APIRouter(prefix="/finance", tags=["Finances"])
 
@@ -98,7 +104,7 @@ PAYMENT_SUPERVISOR_ROLES = {"administrateur", "team_leader"}
 
 
 def is_finance_manager(db: Session, current_user: User) -> bool:
-    return user_has_any_role(db, current_user.id, FINANCE_MANAGER_ROLES)
+    return can_manage_finance(db, current_user)
 
 
 def can_review_payment(db: Session, current_user: User, payment: Payment) -> bool:
@@ -109,7 +115,11 @@ def can_review_payment(db: Session, current_user: User, payment: Payment) -> boo
     return user_has_any_role(db, current_user.id, PAYMENT_SUPERVISOR_ROLES)
 
 
-def get_payment_or_404(db: Session, payment_id: str) -> Payment:
+def get_payment_or_404(db: Session, payment_id: str | uuid.UUID) -> Payment:
+    try:
+        payment_id = uuid.UUID(str(payment_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if payment is None:
         raise HTTPException(
@@ -127,6 +137,11 @@ def payment_payload(
     manager = is_finance_manager(db, current_user)
     reviewer = can_review_payment(db, current_user, payment)
     data = PaymentRead.model_validate(payment).model_dump()
+    if payment.proof_file_id:
+        proof = db.query(StoredFile).filter(StoredFile.id == payment.proof_file_id).first()
+        if proof:
+            data["proof_file_name"] = proof.original_filename
+            data["proof_mime_type"] = proof.mime_type
     data["can_validate"] = reviewer and payment.status == "pending"
     data["can_reject"] = reviewer and payment.status == "pending"
     data["can_cancel"] = payment.status in {"pending", "rejected"} and (
@@ -139,28 +154,17 @@ def finance_manager_ids(db: Session) -> list:
     rows = (
         db.query(UserRole.user_id)
         .join(Role, Role.id == UserRole.role_id)
-        .filter(Role.name.in_(FINANCE_MANAGER_ROLES))
+        .join(User, User.id == UserRole.user_id)
+        .filter(
+            Role.name.in_(FINANCE_MANAGER_ROLES),
+            User.status == "active",
+            User.is_active.is_(True),
+            User.email_verified.is_(True),
+        )
         .distinct()
         .all()
     )
     return [row[0] for row in rows]
-
-
-def ensure_financial_account(db: Session, user_id):
-    account = db.query(FinancialAccount).filter(
-        FinancialAccount.user_id == user_id
-    ).populate_existing().with_for_update().first()
-
-    if not account:
-        account = FinancialAccount(
-            user_id=user_id,
-            balance_due=0,
-            total_paid=0,
-        )
-        db.add(account)
-        db.flush()
-
-    return account
 
 
 def update_fee_status(fee: Fee):
@@ -174,23 +178,38 @@ def update_fee_status(fee: Fee):
     else:
         fee.status = "paid"
         if fee.paid_at is None:
-            fee.paid_at = datetime.utcnow()
+            fee.paid_at = utc_now()
 
-    fee.updated_at = datetime.utcnow()
+    fee.updated_at = utc_now()
 
 
 def allocate_payment_to_unpaid_fees(
     db: Session,
     payment: Payment,
 ):
-    remaining = float(payment.amount or 0)
+    remaining = round(float(payment.amount or 0), 2)
 
     fees = db.query(Fee).filter(
         Fee.user_id == payment.user_id,
         Fee.status.in_(["unpaid", "partial"]),
-    ).order_by(Fee.id.asc()).with_for_update().all()
+    ).order_by(
+        Fee.due_date.asc(), Fee.created_at.asc(), Fee.id.asc()
+    ).with_for_update().all()
+
+    declared_plan = payment.allocation_plan
+    if declared_plan is not None:
+        selected_order = {
+            str(item.get("fee_id")): index
+            for index, item in enumerate(declared_plan)
+            if isinstance(item, dict) and item.get("fee_id")
+        }
+        fees = sorted(
+            (fee for fee in fees if str(fee.id) in selected_order),
+            key=lambda fee: selected_order[str(fee.id)],
+        )
 
     allocations = []
+    final_plan = []
 
     for fee in fees:
         if remaining <= 0:
@@ -198,28 +217,35 @@ def allocate_payment_to_unpaid_fees(
 
         fee_amount = float(fee.amount or 0)
         fee_paid = float(fee.amount_paid or 0)
-        fee_remaining = fee_amount - fee_paid
+        fee_remaining = round(max(0, fee_amount - fee_paid), 2)
 
         if fee_remaining <= 0:
             update_fee_status(fee)
             continue
 
-        allocation_amount = min(remaining, fee_remaining)
+        allocation_amount = round(min(remaining, fee_remaining), 2)
+        if allocation_amount <= 0:
+            continue
 
         allocation = PaymentAllocation(
             payment_id=payment.id,
             fee_id=fee.id,
             amount=allocation_amount,
         )
-
         db.add(allocation)
 
-        fee.amount_paid = fee_paid + allocation_amount
+        fee.amount_paid = round(fee_paid + allocation_amount, 2)
         update_fee_status(fee)
 
-        remaining -= allocation_amount
+        remaining = round(remaining - allocation_amount, 2)
         allocations.append(allocation)
+        final_plan.append({
+            "fee_id": str(fee.id),
+            "amount": allocation_amount,
+        })
 
+    payment.allocation_plan = final_plan
+    payment.unallocated_amount = round(max(0, remaining), 2)
     return allocations
 
 
@@ -255,7 +281,7 @@ def create_fee(
 
     account = ensure_financial_account(db, payload.user_id)
     account.balance_due = float(account.balance_due or 0) + payload.amount
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
 
     db.add(fee)
     db.flush()
@@ -356,18 +382,20 @@ def create_manual_penalty(
 
 @router.post("/fees/{fee_id}/cancel", response_model=FeeRead)
 def cancel_fee(
-    fee_id: str,
+    fee_id: uuid.UUID,
     payload: FeeCancelRequest,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    fee = db.query(Fee).filter(Fee.id == fee_id).first()
+    fee = lock_row(db, Fee, fee_id)
     if not fee:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Frais introuvable",
         )
+    if fee.status == "cancelled":
+        return fee
     if fee.status == "paid":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -382,12 +410,12 @@ def cancel_fee(
     old_status = fee.status
     remaining = max(0, float(fee.amount or 0) - float(fee.amount_paid or 0))
     fee.status = "cancelled"
-    fee.cancelled_at = datetime.utcnow()
+    fee.cancelled_at = utc_now()
     fee.description = f"{fee.description or ''}\nAnnulation: {reason}".strip()
-    fee.updated_at = datetime.utcnow()
+    fee.updated_at = utc_now()
     account = ensure_financial_account(db, fee.user_id)
     account.balance_due = max(0, float(account.balance_due or 0) - remaining)
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
     notify_user(
         db,
         user_id=fee.user_id,
@@ -423,7 +451,7 @@ def list_fees(
 
 @router.get("/fees/user/{user_id}", response_model=list[FeeRead])
 def list_user_fees(
-    user_id: str,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
@@ -454,7 +482,7 @@ def list_financial_accounts(
 
 @router.get("/accounts/user/{user_id}", response_model=FinancialAccountRead)
 def get_user_financial_account(
-    user_id: str,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
@@ -578,7 +606,7 @@ def create_fee_record(
     )
     account = ensure_financial_account(db, user_id)
     account.balance_due = float(account.balance_due or 0) + amount
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
     db.add(fee)
     db.flush()
     notify_user(
@@ -654,7 +682,7 @@ def mobile_money_event(
         old_status=old_status,
         new_status=new_status,
         provider_event_id=provider_event_id,
-        processed_at=datetime.utcnow(),
+        processed_at=utc_now(),
         is_duplicate=is_duplicate,
         error_message=error_message,
         metadata_json=metadata_json or {},
@@ -717,10 +745,7 @@ def active_mobile_money_transaction_for_fees(
         .order_by(MobileMoneyTransaction.created_at.desc())
         .all()
     )
-    now = datetime.utcnow()
     for transaction in candidates:
-        if transaction.expires_at and transaction.expires_at <= now:
-            continue
         metadata_ids = sorted(
             str(item_id)
             for item_id in (transaction.metadata_json or {}).get("finance_item_ids", [])
@@ -770,6 +795,8 @@ async def initiate_mobile_money_payment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Une dette selectionnee est introuvable",
         )
+    fee_by_id = {fee.id: fee for fee in fees}
+    fees = [fee_by_id[fee_id] for fee_id in fee_ids]
     for fee in fees:
         if fee.user_id != target_member_id:
             raise HTTPException(
@@ -783,13 +810,28 @@ async def initiate_mobile_money_payment(
             )
 
     fee_ids_as_text = [str(fee.id) for fee in fees]
-    amount = sum(fee_remaining_xof_amount(fee) for fee in fees)
-    if amount <= 0:
+    maximum_amount = sum(fee_remaining_xof_amount(fee) for fee in fees)
+    if maximum_amount <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Aucun montant restant a payer",
         )
+    amount = payload.amount or maximum_amount
+    from app.services.payments.base import MAX_MOBILE_MONEY_AMOUNT
+    if amount > MAX_MOBILE_MONEY_AMOUNT:
+        raise HTTPException(status_code=400, detail="Le montant dépasse la limite autorisée pour un paiement Mobile Money.")
 
+    if amount > maximum_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le montant dépasse le solde des dettes sélectionnées",
+        )
+
+    await run_in_threadpool(
+        lock_payment_declaration, db, method="mobile_money_initiation",
+        reference=f"{target_member_id}|{','.join(sorted(fee_ids_as_text))}|{amount}",
+        checksum=None,
+    )
     existing = active_mobile_money_transaction_for_fees(
         db,
         member_id=target_member_id,
@@ -799,7 +841,7 @@ async def initiate_mobile_money_payment(
     if existing:
         return mobile_money_public_payload(existing)
 
-    window = int(datetime.utcnow().timestamp()) // 300
+    window = int(utc_now().timestamp()) // 300
     semantic_material = (
         f"{target_member_id}|{','.join(sorted(fee_ids_as_text))}|"
         f"{amount}|{payload.channel or ''}|{window}"
@@ -836,6 +878,8 @@ async def initiate_mobile_money_payment(
         metadata_json={
             "finance_item_ids": fee_ids_as_text,
             "finance_item_labels": [fee.label for fee in fees],
+            "selected_balance": maximum_amount,
+            "requested_amount": amount,
             "initiated_by": str(current_user.id),
             "assisted_payment": assisted_payment,
         },
@@ -893,7 +937,7 @@ async def initiate_mobile_money_payment(
             "public_message",
             "Le paiement Mobile Money est indisponible pour le moment.",
         )
-        transaction.updated_at = datetime.utcnow()
+        transaction.updated_at = utc_now()
         mobile_money_event(
             db,
             transaction,
@@ -929,7 +973,7 @@ async def initiate_mobile_money_payment(
     transaction.provider_status = provider_result.provider_status
     transaction.checkout_url = provider_result.checkout_url
     transaction.expires_at = provider_result.expires_at
-    transaction.updated_at = datetime.utcnow()
+    transaction.updated_at = utc_now()
     transaction.metadata_json = {
         **(transaction.metadata_json or {}),
         "provider_metadata": provider_result.metadata,
@@ -969,7 +1013,7 @@ def mobile_money_admin_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
     transactions = (
         db.query(MobileMoneyTransaction)
         .order_by(MobileMoneyTransaction.created_at.desc())
@@ -1076,7 +1120,7 @@ async def reconcile_mobile_money_payments(
     response_model=MobileMoneyInitiationRead,
 )
 def get_mobile_money_payment_status(
-    transaction_id: str,
+    transaction_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -1103,7 +1147,7 @@ def get_mobile_money_payment_status(
     response_model=MobileMoneyInitiationRead,
 )
 async def refresh_mobile_money_payment_status(
-    transaction_id: str,
+    transaction_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
@@ -1216,7 +1260,16 @@ def get_my_finance_stats(
 def csv_download(filename: str, rows: list[list]) -> Response:
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerows(rows)
+    writer.writerows(
+        [
+            "'" + value if isinstance(value, str) and (
+                value.startswith(("\t", "\r", "\n"))
+                or value.lstrip().startswith(("=", "+", "-", "@"))
+            ) else value
+            for value in row
+        ]
+        for row in rows
+    )
     return Response(
         content=output.getvalue(),
         media_type="text/csv; charset=utf-8",
@@ -1328,16 +1381,114 @@ def create_payment(
             detail="Vous ne pouvez enregistrer qu’un paiement pour votre compte",
         )
     if not is_finance_manager(db, current_user):
-        if payload.method in {"manuel", "especes"}:
+        if payload.method == "manuel":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Les paiements en espèces sont saisis par le financier",
+                detail="La saisie manuelle est réservée au responsable financier",
             )
-        if not (payload.reference or payload.proof_url or payload.proof_file_id):
+        if payload.method != "especes" and not (payload.reference or payload.proof_url or payload.proof_file_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Ajoutez une référence ou une preuve de paiement",
             )
+
+    if db.get(User, payload.user_id) is None:
+        raise HTTPException(status_code=404, detail="Membre introuvable")
+    normalized_reference = (payload.reference or "").strip() or None
+    proof = db.get(StoredFile, payload.proof_file_id) if payload.proof_file_id else None
+    lock_payment_declaration(
+        db, method=payload.method, reference=normalized_reference,
+        checksum=proof.checksum if proof else None, proof_id=payload.proof_file_id,
+    )
+    if payload.proof_file_id:
+        proof = lock_row(db, StoredFile, payload.proof_file_id)
+        allowed_proof_types = {
+            "image/jpeg", "image/png", "image/webp", "application/pdf"
+        }
+        if (
+            not proof
+            or proof.uploaded_by_id != current_user.id
+            or proof.mime_type not in allowed_proof_types
+            or proof.visibility != "private"
+            or proof.entity_type is not None
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Justificatif introuvable, déjà lié ou format invalide",
+            )
+        duplicate_proof = (
+            db.query(Payment.id)
+            .join(StoredFile, StoredFile.id == Payment.proof_file_id)
+            .filter(
+                StoredFile.checksum == proof.checksum,
+                Payment.status != "cancelled",
+            )
+            .first()
+        )
+        if duplicate_proof:
+            raise HTTPException(
+                status_code=409,
+                detail="Un justificatif identique a déjà été déclaré",
+            )
+
+    if normalized_reference:
+        duplicate_reference = db.query(Payment.id).filter(
+            func.lower(func.trim(Payment.reference)) == normalized_reference.lower(),
+            Payment.method == payload.method,
+            Payment.status != "cancelled",
+        ).first()
+        if duplicate_reference:
+            raise HTTPException(
+                status_code=409,
+                detail="Cette référence de paiement a déjà été déclarée",
+            )
+
+    if len(payload.fee_ids) != len(set(payload.fee_ids)):
+        raise HTTPException(status_code=400, detail="Frais sélectionnés en double")
+    fees = db.query(Fee).filter(Fee.id.in_(payload.fee_ids), Fee.user_id == payload.user_id).all() if payload.fee_ids else []
+    if len(fees) != len(payload.fee_ids) or any(fee.status == "cancelled" for fee in fees):
+        raise HTTPException(status_code=400, detail="Sélection de frais invalide")
+    by_id = {fee.id: fee for fee in fees}
+    remaining = round(float(payload.amount), 2)
+    plan = []
+    for fee_id in payload.fee_ids:
+        fee = by_id[fee_id]
+        fee_remaining = max(
+            0,
+            float(fee.amount or 0) - float(fee.amount_paid or 0),
+        )
+        part = round(min(remaining, fee_remaining), 2)
+        if part > 0:
+            plan.append({"fee_id": str(fee_id), "amount": part})
+            remaining = round(remaining - part, 2)
+    if payload.fee_ids and not plan:
+        raise HTTPException(
+            status_code=400,
+            detail="Les frais sélectionnés sont déjà réglés",
+        )
+
+    details = (
+        parse_receipt(payload.receipt_text)
+        if payload.receipt_text and payload.proof_file_id
+        else None
+    )
+    if details:
+        details["amount_matches_declaration"] = (
+            details["amount"] is not None
+            and abs(float(details["amount"]) - float(payload.amount)) < 0.01
+        )
+        details["reference_matches_declaration"] = (
+            bool(details.get("reference") and normalized_reference)
+            and str(details["reference"]).strip().lower()
+            == normalized_reference.lower()
+        )
+        detected_method = {
+            "wave": "wave",
+            "orange_money": "orange_money",
+        }.get(details.get("provider_candidate"))
+        details["provider_matches_declaration"] = (
+            detected_method is None or detected_method == payload.method
+        )
 
     payment = Payment(
         user_id=payload.user_id,
@@ -1345,13 +1496,24 @@ def create_payment(
         currency=payload.currency,
         method=payload.method,
         status="pending",
-        reference=payload.reference,
+        reference=normalized_reference,
         proof_url=payload.proof_url,
         proof_file_id=payload.proof_file_id,
+        allocation_plan=plan,
+        receipt_details=details,
+        unallocated_amount=round(max(0, remaining), 2),
     )
 
     db.add(payment)
     db.flush()
+    if payload.proof_file_id:
+        proof.is_temporary = False
+        proof.is_ephemeral = False
+        proof.ephemeral_duration = None
+        proof.expires_at = None
+        proof.storage_scope = "finance"
+        proof.entity_type = "payment"
+        proof.entity_id = payment.id
     if not is_finance_manager(db, current_user):
         notify_users(
             db,
@@ -1399,7 +1561,7 @@ def list_my_payments(
 
 @router.get("/payments/user/{user_id}", response_model=list[PaymentRead])
 def list_user_payments(
-    user_id: str,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
@@ -1414,7 +1576,7 @@ def list_user_payments(
 
 @router.post("/payments/{payment_id}/validate", response_model=PaymentRead)
 def validate_payment(
-    payment_id: str,
+    payment_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
@@ -1445,7 +1607,7 @@ def validate_payment(
 
     payment.status = "validated"
     payment.validated_by = current_user.id
-    payment.validated_at = datetime.utcnow()
+    payment.validated_at = utc_now()
     payment.rejected_at = None
     payment.rejection_reason = None
 
@@ -1460,7 +1622,7 @@ def validate_payment(
         0,
         float(account.balance_due or 0) - allocated_total,
     )
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
 
     transaction = ClubTransaction(
         type="income",
@@ -1494,6 +1656,7 @@ def validate_payment(
             "amount": float(payment.amount or 0),
             "method": payment.method,
             "allocated_total": allocated_total,
+            "unallocated_amount": float(payment.unallocated_amount or 0),
         },
         ip_address=get_client_ip(request),
     )
@@ -1506,7 +1669,7 @@ def validate_payment(
 
 @router.post("/payments/{payment_id}/reject", response_model=PaymentRead)
 def reject_payment(
-    payment_id: str,
+    payment_id: uuid.UUID,
     payload: PaymentRejectRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -1539,7 +1702,7 @@ def reject_payment(
 
     old_status = payment.status
     payment.status = "rejected"
-    payment.rejected_at = datetime.utcnow()
+    payment.rejected_at = utc_now()
     payment.rejection_reason = reason
     payment.validated_by = None
     payment.validated_at = None
@@ -1576,7 +1739,7 @@ def reject_payment(
 
 @router.post("/payments/{payment_id}/cancel", response_model=PaymentRead)
 def cancel_payment(
-    payment_id: str,
+    payment_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
@@ -1653,7 +1816,7 @@ def cancel_payment(
 
 @router.get("/payments/{payment_id}/allocations", response_model=list[PaymentAllocationRead])
 def list_payment_allocations(
-    payment_id: str,
+    payment_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance_or_admin),
 ):
@@ -1672,7 +1835,7 @@ def masked_reference(value: str | None) -> str | None:
 
 @router.get("/payments/{payment_id}/receipt")
 def get_payment_receipt(
-    payment_id: str,
+    payment_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -1706,7 +1869,7 @@ def get_payment_receipt(
     return {
         "payment": payment_payload(db, current_user, payment),
         "member_name": display_user(member),
-        "generated_at": datetime.utcnow(),
+        "generated_at": utc_now(),
         "total_allocated": sum(float(item.amount or 0) for item in allocations),
         "mobile_money": (
             {

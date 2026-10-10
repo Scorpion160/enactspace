@@ -1,6 +1,8 @@
+from app.core.time import utc_now
 import csv
 from datetime import datetime
 from io import StringIO
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -108,6 +110,8 @@ VALID_ARCHIVE_CATEGORIES = {
     "Autre",
 }
 
+
+INSTITUTIONAL_MEMORY_SOURCE_LABEL = "Mémoire institutionnelle Enactus ESP 2015–2026"
 
 INITIAL_HISTORICAL_PROJECTS = [
     {
@@ -305,7 +309,7 @@ INITIAL_AWARDS = [
         "competition": "Compétition Nationale Enactus Sénégal",
         "rank": "Deuxième",
         "result": "Finaliste national",
-        "description": "Performance nationale majeure de la saison 2016.",
+        "description": "Performance nationale majeure de l’année 2016.",
         "archived_project_id": None,
         "file_id": None,
         "media_url": None,
@@ -378,7 +382,7 @@ INITIAL_COMPETITIONS = [
         "stage": "National",
         "result": "Deuxième national",
         "location": "Sénégal",
-        "description": "Saison nationale marquée par une place de deuxième.",
+        "description": "Année nationale marquée par une place de deuxième.",
         "project_ids": [],
         "award_ids": ["deuxieme-national-2016"],
         "file_id": None,
@@ -521,8 +525,184 @@ INITIAL_HALL_OF_FAME = [
 ]
 
 
+# Enactus ESP approved institutional-memory enrichment (2015-2026).
+# The source was supplied and explicitly validated by Enactus ESP.
+_APPROVED_PROJECT_DETAILS = {
+    "sukhalii-gokh": {
+        "name": "SOUKHALI GOKH",
+        "year": 2015,
+        "season_label": "2015 - 2020",
+        "description": "Transformation de céréales locales avec les femmes de Darou Thioub, à Keur Massar.",
+        "problem": "Malnutrition infantile et faibles revenus des femmes de la communauté.",
+        "solution": "Coopérative de transformation, farine fortifiée et formations en production, packaging, vente et gestion.",
+        "impact_summary": "Amélioration nutritionnelle, renforcement des capacités, extension du marché et hausse des revenus.",
+    },
+    "kong-serve": {
+        "name": "KONG’SERVE",
+        "year": 2019,
+        "description": "Projet développé sur la Petite Côte pour améliorer la conservation du Kong fumé.",
+        "problem": "Pertes post-récolte et conservation insuffisante des produits halieutiques.",
+        "solution": "Formation des producteurs de Yoff Tonghor et Mballing à une technique améliorée de conservation du Kong fumé.",
+        "impact_summary": "Augmentation de la production et des revenus des exploitants, avec croissance des exportations.",
+    },
+    "javelisel": {
+        "year": 2015,
+        "description": "Production d'eau de javel à base d'eau et de sel et sensibilisation sanitaire à Pikine et au marché Tilène.",
+        "impact_summary": "1 720 bouteilles distribuées dans des zones insalubres, avec amélioration de l'accès à la désinfection.",
+    },
+    "deconaane": {
+        "description": "Accès à l'eau potable à Sébikotane, puis extension à Sinthiou Dimb.",
+        "solution": "Filtre à base d'argile et d'éléments naturels, poudre de Moringa, pompe et dispositifs de stockage potou ndaa.",
+        "impact_summary": "5 emplois créés, 125 arbres de Moringa plantés, +52 % de revenus mensuels et 515 670 FCFA de chiffre d'affaires sur un mois.",
+    },
+    "dimbali": {
+        "year": 2017,
+        "season_label": "Depuis 2017",
+        "description": "Projet de lutte contre la malnutrition à Ngayène Sabakh puis Ndiédieng, fondé sur la valorisation du Dimb.",
+        "problem": "Malnutrition des enfants de moins de cinq ans, faibles revenus et pertes liées à la saisonnalité du Dimb.",
+        "solution": "Transformation agroalimentaire, compostage, séchoirs solaires et formations des bénéficiaires.",
+        "impact_summary": "Malnutrition ramenée de 15 % à 0 %, plus de 43 M FCFA d'impact économique, +77 % de revenus, 112 emplois et 1 400 femmes formées.",
+    },
+    "meune-nagn": {
+        "name": "MËN NAÑ",
+        "year": 2019,
+        "season_label": "Depuis 2019",
+        "description": "Valorisation des ressources naturelles du Sud du Sénégal dans les zones de Niaguiss, Saré Yoba Diéga et Sinthiou Dimb.",
+        "problem": "Pertes agricoles, faibles revenus, inégalités de genre et difficultés d'accès à l'eau et à la transformation.",
+        "solution": "Transformation, formation, séchoirs solaires, technologies d'accès à l'eau et structuration de GIE.",
+        "impact_summary": "97 emplois dont 49 femmes entrepreneures, plus de 25 produits dans le panier des GIE, 4 218 375 FCFA de chiffre d'affaires cumulé, plus d'une tonne de fruits et 1 351 litres de lait transformés.",
+    },
+    "mobigel": {
+        "year": 2020,
+        "description": "Vélo distributeur de gel antiseptique sans contact et outil mobile de sensibilisation pendant la Covid-19.",
+        "impact_summary": "Prototype testé aux Maristes, associant distribution sans contact, comptage des utilisateurs et messages de prévention alimentés par mini panneau solaire.",
+    },
+    "expansion-dimbali": {
+        "year": 2019,
+        "season_label": "2019",
+        "description": "Mission à Sinthiou Dimb ayant conduit à adapter les technologies d'accès à l'eau au contexte local.",
+        "problem": "Le principal besoin identifié à Sinthiou Dimb était l'accès à l'eau plutôt que la culture du dimb.",
+        "solution": "Adaptation des technologies de Deconaane : pompe, amélioration de l'accès à l'eau et séchoirs pour la conservation des mangues.",
+        "impact_summary": "Extension du savoir-faire technique d'Enactus ESP à Sinthiou Dimb pour l'eau et la conservation alimentaire.",
+    },
+    "expansion-deconaane": {
+        "name": "DECONAANE+",
+        "year": 2019,
+        "season_label": "2019",
+        "description": "Extension de Deconaane à Sinthiou Dimb lors de la mission d'extension de Dimbali.",
+        "problem": "Accès à l'eau insuffisant dans la localité.",
+        "solution": "Installation d'une pompe et adaptation des solutions de stockage et de conservation.",
+        "impact_summary": "Amélioration de l'accès à l'eau et transfert des technologies développées dans Deconaane.",
+    },
+}
+
+for _project in INITIAL_HISTORICAL_PROJECTS:
+    _details = _APPROVED_PROJECT_DETAILS.get(_project["id"])
+    if _details:
+        _project.update(_details)
+
+# Remove the duplicate legacy Soukhali alias now that the canonical historical
+# entry is explicitly documented as SOUKHALI GOKH.
+INITIAL_HISTORICAL_PROJECTS = [
+    _project for _project in INITIAL_HISTORICAL_PROJECTS if _project["id"] != "soukhali"
+]
+
+INITIAL_HISTORICAL_PROJECTS.extend([
+    {
+        "id": "suncuiz", "archive_item_id": None, "name": "SUNCUIZ", "year": 2017,
+        "season_label": "Projet fondateur", "description": "Cuiseur solaire destiné aux femmes rurales, expérimenté à Sambé Nguinth dans le Diourbel puis décliné en paniers thermiques.",
+        "problem": "Déforestation et risques sanitaires liés à la cuisson au bois.", "solution": "Cuisson solaire puis paniers thermiques.",
+        "impact_summary": "Solution énergétique simple destinée à réduire la dépendance au bois de cuisson.", "status": "archivé",
+        "linked_project_id": None, "key_members": [], "awards": [], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "ville-light", "archive_item_id": None, "name": "VILLE LIGHT", "year": 2017,
+        "season_label": "Projet fondateur", "description": "Système d'éclairage à faible coût inspiré des bouteilles solaires, ensuite transformé en kits pédagogiques.",
+        "problem": "Accès limité à un éclairage abordable.", "solution": "Éclairage simple à faible coût et kits de sensibilisation.",
+        "impact_summary": "Sensibilisation aux technologies simples d'éclairage.", "status": "archivé",
+        "linked_project_id": None, "key_members": [], "awards": [], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "diappeu-thi", "archive_item_id": None, "name": "DIAPPEU THI", "year": 2020,
+        "season_label": "2020", "description": "Projet de riposte à la Covid-19 piloté notamment par Balla Hann et Clara.",
+        "problem": "Besoin de prévention et de protection communautaire pendant la pandémie.", "solution": "Sensibilisation, distribution de masques et de gel, et actions communautaires.",
+        "impact_summary": "Initiative communautaire de lutte contre la Covid-19.", "status": "archivé",
+        "linked_project_id": None, "key_members": ["Balla Hann", "Clara"], "awards": [], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "cajor", "archive_item_id": None, "name": "CAJOR", "year": 2022,
+        "season_label": "2022 - 2023", "description": "Projet lancé durant le cycle 2022–2023 et porté par le pôle Chimie.",
+        "problem": None, "solution": None,
+        "impact_summary": "Projet de la nouvelle génération lancée aux côtés de SHERY, Terrasen et Aquatus.", "status": "historique",
+        "linked_project_id": None, "key_members": ["Pôle Chimie"], "awards": [], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "shery", "archive_item_id": None, "name": "SHERY", "year": 2021,
+        "season_label": "Depuis 2021", "description": "Serviettes hygiéniques réutilisables contre la précarité menstruelle, avec tisanes naturelles et plateforme de sensibilisation.",
+        "problem": "Précarité menstruelle, coût des protections jetables et manque d'information.", "solution": "Serviettes réutilisables lavables, tisanes et plateforme numérique.",
+        "impact_summary": "Projet contribuant à 7 ODD, lauréat du premier prix du Salon du Polytechnicien 2023.", "status": "développement",
+        "linked_project_id": None, "key_members": [], "awards": ["Premier prix Salon du Polytechnicien 2023"], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "terrasen", "archive_item_id": None, "name": "TERRASEN", "year": 2022,
+        "season_label": "Depuis 2022", "description": "Micro-jardinage, transformation agroalimentaire et irrigation automatisée à base d'ESP32.",
+        "problem": "Insécurité alimentaire, précarité économique et gestion de l'eau.", "solution": "Micro-jardinage sur table, goutte-à-goutte, arrosage automatisé et transformation.",
+        "impact_summary": "Plus de 50 emplois directs, plus de 17 800 personnes directement impactées, 12,5 tonnes transformées et 55 600 USD de profit annuel total.", "status": "développement",
+        "linked_project_id": None, "key_members": [], "awards": ["1er prix Polytech'Innovation 2025", "2e prix SENAYSKILLS 2025"], "document_ids": [], "media_file_ids": [],
+    },
+    {
+        "id": "aquatus", "archive_item_id": None, "name": "AQUATUS", "year": 2023,
+        "season_label": "Depuis 2023", "description": "Projet d'aquaponie ciblant Ngayène Sabakh, combinant aquaculture et hydroponie.",
+        "problem": "Besoin d'une production alimentaire durable économe en eau, en sol et en espace.", "solution": "Système aquaponique intégrant élevage de poissons et culture hors-sol.",
+        "impact_summary": "Projet audité à Ngayène Sabakh et lauréat du deuxième prix Polytech'Innovation 2025.", "status": "développement",
+        "linked_project_id": None, "key_members": [], "awards": ["2e prix Polytech'Innovation 2025"], "document_ids": [], "media_file_ids": [],
+    },
+])
+
+# Validated institutional distinctions not present in the older compatibility set.
+INITIAL_AWARDS.extend([
+    {"id": "champion-national-2023", "archive_item_id": None, "title": "Champion National 2023", "year": 2023, "competition": "Enactus National Competition", "rank": "Champion national", "result": "Champion national", "description": "Troisième titre national d'Enactus ESP.", "archived_project_id": None, "file_id": None, "media_url": None, "is_featured": True},
+    {"id": "shery-salon-polytechnicien-2023", "archive_item_id": None, "title": "Premier prix Salon du Polytechnicien 2023 — SHERY", "year": 2023, "competition": "Salon du Polytechnicien", "rank": "Premier prix", "result": "Lauréat", "description": "Premier prix obtenu par le projet SHERY.", "archived_project_id": None, "file_id": None, "media_url": None, "is_featured": True},
+    {"id": "terrasen-polytech-innovation-2025", "archive_item_id": None, "title": "Premier prix Polytech'Innovation 2025 — Terrasen", "year": 2025, "competition": "Polytech'Innovation", "rank": "Premier prix", "result": "Lauréat", "description": "Premier prix obtenu par le projet Terrasen.", "archived_project_id": None, "file_id": None, "media_url": None, "is_featured": True},
+    {"id": "aquatus-polytech-innovation-2025", "archive_item_id": None, "title": "Deuxième prix Polytech'Innovation 2025 — Aquatus", "year": 2025, "competition": "Polytech'Innovation", "rank": "Deuxième prix", "result": "Deuxième prix", "description": "Deuxième prix obtenu par le projet Aquatus.", "archived_project_id": None, "file_id": None, "media_url": None, "is_featured": True},
+    {"id": "terrasen-senayskills-2025", "archive_item_id": None, "title": "Deuxième prix SENAYSKILLS 2025 — Terrasen", "year": 2025, "competition": "SENAYSKILLS", "rank": "Deuxième prix", "result": "Deuxième prix", "description": "Deuxième prix obtenu par le projet Terrasen.", "archived_project_id": None, "file_id": None, "media_url": None, "is_featured": True},
+])
+
+INITIAL_COMPETITIONS.extend([
+    {"id": "world-cup-2022", "archive_item_id": None, "name": "Enactus World Cup 2022", "year": 2022, "stage": "International", "result": "Participation", "location": "International", "description": "Retour d'Enactus ESP à la World Cup avec Dimbali et Mën Nañ après qualification sur dossier.", "project_ids": ["dimbali", "meune-nagn"], "award_ids": [], "file_id": None, "is_featured": True},
+    {"id": "competition-nationale-2023", "archive_item_id": None, "name": "Enactus National Competition 2023", "year": 2023, "stage": "National", "result": "Champion national", "location": "Sénégal", "description": "Troisième titre de champion national d'Enactus ESP.", "project_ids": [], "award_ids": ["champion-national-2023"], "file_id": None, "is_featured": True},
+])
+
+INITIAL_HALL_OF_FAME.extend([
+    {"id": "world-cup-2022-hall", "archive_item_id": None, "title": "Retour à Enactus World Cup", "subtitle": "Dimbali et Mën Nañ représentent Enactus ESP", "entry_type": "International", "year": 2022, "description": "Qualification sur dossier et retour sur la scène mondiale.", "score_value": None, "score_label": None, "file_id": None, "external_url": None, "order_index": 50, "is_featured": True},
+    {"id": "champion-national-2023-hall", "archive_item_id": None, "title": "Champion National 2023", "subtitle": "Troisième titre national", "entry_type": "Prix", "year": 2023, "description": "Enactus ESP devient triple champion national après les titres de 2017 et 2018.", "score_value": None, "score_label": None, "file_id": None, "external_url": None, "order_index": 60, "is_featured": True},
+    {"id": "innovations-2025-hall", "archive_item_id": None, "title": "Terrasen et Aquatus primés en 2025", "subtitle": "Polytech'Innovation et SENAYSKILLS", "entry_type": "Prix", "year": 2025, "description": "Terrasen remporte le 1er prix Polytech'Innovation et le 2e prix SENAYSKILLS ; Aquatus obtient le 2e prix Polytech'Innovation.", "score_value": None, "score_label": None, "file_id": None, "external_url": None, "order_index": 70, "is_featured": True},
+])
+
+INITIAL_HISTORICAL_STATISTICS = [
+    {"id": "institutional-lives-impacted", "metric_key": "lives_impacted", "label": "Vies impactées", "value": 150000, "unit": "personnes", "description": "Plus de 150 000 vies impactées.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None, "minimum": True},
+    {"id": "institutional-jobs-created", "metric_key": "jobs_created", "label": "Emplois créés", "value": 200, "unit": "emplois", "description": "Plus de 200 emplois créés.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None, "minimum": True},
+    {"id": "institutional-people-trained", "metric_key": "people_trained", "label": "Personnes formées", "value": 1597, "unit": "personnes", "description": "1 597 personnes formées.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-products-developed", "metric_key": "products_developed", "label": "Produits développés", "value": 39, "unit": "produits", "description": "39 produits développés.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-work-hours", "metric_key": "work_hours", "label": "Heures de travail investies", "value": 36640, "unit": "heures", "description": "36 640 heures de travail investies.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-sdgs", "metric_key": "sdgs_touched", "label": "ODD touchés", "value": 11, "unit": "ODD", "description": "11 Objectifs de Développement Durable touchés.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-revenue-usd-2021-2022", "metric_key": "revenue_usd_2021_2022", "label": "Revenu total annuel 2021–2022", "value": 173193, "unit": "USD", "description": "125 521 USD pour Dimbali et 47 672 USD pour Mën Nañ, soit 173 193 USD au total.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-beneficiary-income", "metric_key": "beneficiary_income_increase_pct", "label": "Hausse des revenus des bénéficiaires", "value": 77, "unit": "%", "description": "Augmentation des revenus des bénéficiaires : +77 %.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-trees-planted", "metric_key": "trees_planted", "label": "Arbres plantés", "value": 1425, "unit": "arbres", "description": "1 425 arbres plantés au cumul.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+    {"id": "institutional-field-km", "metric_key": "field_kilometers", "label": "Kilomètres parcourus sur le terrain", "value": 8949, "unit": "km", "description": "8 949 km parcourus sur le terrain.", "source_label": INSTITUTIONAL_MEMORY_SOURCE_LABEL, "status": "validated", "validated_at": None},
+]
+
+
+from app.services.club_heritage import PUBLIC_HERITAGE_MEDIA, enrich_public_heritage
+
+# Public evidence enriches the approved history without changing current impact.
+enrich_public_heritage(INITIAL_HISTORICAL_PROJECTS, INITIAL_AWARDS, INITIAL_COMPETITIONS, INITIAL_HALL_OF_FAME)
+from app.services.project_presentations import enrich_project_archives, enrich_project_archive
+enrich_project_archives(INITIAL_HISTORICAL_PROJECTS)
+
+
 def _project_payload(project: ArchivedProject) -> dict:
-    return ArchivedProjectRead.model_validate(project).model_dump()
+    return enrich_project_archive(ArchivedProjectRead.model_validate(project).model_dump())
 
 
 def _award_payload(award: Award) -> dict:
@@ -625,15 +805,22 @@ def _is_memory_curator(db: Session, user) -> bool:
 
 
 def _static_compatibility_payload(row: dict) -> dict:
-    return {**row, "legacy": True, "verified": False, "trust": "legacy_unverified"}
+    # These records come from the institutional memory validated by Enactus ESP.
+    # Keep the compatibility shape for existing clients while exposing their
+    # authoritative institutional status and provenance.
+    return {
+        **row,
+        "legacy": False,
+        "verified": True,
+        "trust": "institutional_verified",
+        "source_label": row.get("source_label") or INSTITUTIONAL_MEMORY_SOURCE_LABEL,
+    }
 
 
 def _require_static_compatibility(db: Session, user, include_static: bool) -> None:
-    if include_static and not _is_memory_curator(db, user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Les archives statiques heritees sont reservees aux curateurs",
-        )
+    # Supplied institutional-memory records are approved by Enactus ESP and are
+    # therefore visible to every authenticated validated member.
+    _ = (db, user, include_static)
 
 
 def _parent_archive_item(db: Session, child) -> ArchiveItem | None:
@@ -1088,7 +1275,7 @@ def update_archive_item(
         _mark_file_as_archive(db, data["file_id"])
     for field, value in data.items():
         setattr(archive_item, field, value)
-    archive_item.updated_at = datetime.utcnow()
+    archive_item.updated_at = utc_now()
     db.commit()
     db.refresh(archive_item)
     return archive_item
@@ -1107,7 +1294,7 @@ def submit_archive_item(
     archive_item.rejected_by_id = None
     archive_item.rejected_at = None
     archive_item.rejection_reason = None
-    archive_item.updated_at = datetime.utcnow()
+    archive_item.updated_at = utc_now()
     db.commit()
     db.refresh(archive_item)
     return archive_item
@@ -1129,11 +1316,11 @@ def validate_archive_item(
         raise HTTPException(status_code=409, detail="Une archive finalisee est immuable")
     archive_item.status = "validated"
     archive_item.validated_by_id = current_user.id
-    archive_item.validated_at = datetime.utcnow()
+    archive_item.validated_at = utc_now()
     archive_item.rejected_by_id = None
     archive_item.rejected_at = None
     archive_item.rejection_reason = None
-    archive_item.updated_at = datetime.utcnow()
+    archive_item.updated_at = utc_now()
     create_audit_log(
         db,
         "legacy_archive_validated",
@@ -1180,9 +1367,9 @@ def reject_archive_item(
         raise HTTPException(status_code=409, detail="Une archive finalisee est immuable")
     archive_item.status = "rejected"
     archive_item.rejected_by_id = current_user.id
-    archive_item.rejected_at = datetime.utcnow()
+    archive_item.rejected_at = utc_now()
     archive_item.rejection_reason = payload.reason.strip()
-    archive_item.updated_at = datetime.utcnow()
+    archive_item.updated_at = utc_now()
     create_audit_log(
         db,
         "legacy_archive_rejected",
@@ -1225,7 +1412,7 @@ def archive_archive_item(
     if archive_item.status != "validated":
         raise HTTPException(status_code=409, detail="Seule une archive validee peut etre archivee")
     archive_item.status = "archived"
-    archive_item.updated_at = datetime.utcnow()
+    archive_item.updated_at = utc_now()
     create_audit_log(
         db,
         "legacy_archive_archived",
@@ -1286,7 +1473,7 @@ def list_historical_projects(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
-    include_static: bool = Query(default=False),
+    include_static: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
@@ -1391,7 +1578,7 @@ def update_historical_project(
         )
     for field, value in data.items():
         setattr(project, field, value)
-    project.updated_at = datetime.utcnow()
+    project.updated_at = utc_now()
     db.commit()
     db.refresh(project)
     return project
@@ -1402,7 +1589,7 @@ def list_awards(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=False),
+    include_static: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
@@ -1510,7 +1697,7 @@ def update_award(
     _ensure_legacy_child_editable(db, award)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(award, field, value)
-    award.updated_at = datetime.utcnow()
+    award.updated_at = utc_now()
     db.commit()
     db.refresh(award)
     return award
@@ -1521,7 +1708,7 @@ def list_competitions(
     search: str | None = Query(default=None),
     year: int | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=False),
+    include_static: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
@@ -1637,7 +1824,7 @@ def update_competition(
     _ensure_legacy_child_editable(db, competition)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(competition, field, value)
-    competition.updated_at = datetime.utcnow()
+    competition.updated_at = utc_now()
     db.commit()
     db.refresh(competition)
     return competition
@@ -1667,7 +1854,13 @@ def list_archive_media(
     if media_type:
         query = query.filter(MediaArchive.media_type == media_type)
     if project_id:
-        query = query.filter(MediaArchive.archived_project_id == project_id)
+        # Approved public projects use stable slugs; persisted relations use UUIDs.
+        try:
+            UUID(project_id)
+        except ValueError:
+            query = query.filter(False)
+        else:
+            query = query.filter(MediaArchive.archived_project_id == project_id)
     media = query.order_by(
         MediaArchive.year.desc().nullslast(),
         MediaArchive.is_featured.desc(),
@@ -1678,6 +1871,13 @@ def list_archive_media(
             _media_payload(db, current_user, item)
             for item in media
             if _can_view_legacy_child(db, current_user, item)
+        ] + [
+            _static_compatibility_payload(item)
+            for item in PUBLIC_HERITAGE_MEDIA
+            if (not search or search.casefold() in f"{item['title']} {item['description']} {item['source_label']}".casefold())
+            and (year is None or item["year"] == year)
+            and (not media_type or item["media_type"] == media_type)
+            and (not project_id or item["project_id"] == project_id)
         ]
     }
 
@@ -1735,7 +1935,7 @@ def update_archive_media(
         _mark_file_as_archive(db, data["file_id"])
     for field, value in data.items():
         setattr(media, field, value)
-    media.updated_at = datetime.utcnow()
+    media.updated_at = utc_now()
     db.commit()
     db.refresh(media)
     return _media_payload(db, current_user, media)
@@ -1838,7 +2038,7 @@ def update_historical_document(
         _mark_file_as_archive(db, data["file_id"])
     for field, value in data.items():
         setattr(document, field, value)
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
     db.commit()
     db.refresh(document)
     return _historical_document_payload(db, current_user, document)
@@ -1849,7 +2049,7 @@ def list_hall_of_fame(
     year: int | None = Query(default=None),
     entry_type: str | None = Query(default=None),
     featured: bool | None = Query(default=None),
-    include_static: bool = Query(default=False),
+    include_static: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
@@ -1925,7 +2125,7 @@ def update_hall_of_fame_entry(
         _mark_file_as_archive(db, data["file_id"])
     for field, value in data.items():
         setattr(entry, field, value)
-    entry.updated_at = datetime.utcnow()
+    entry.updated_at = utc_now()
     db.commit()
     db.refresh(entry)
     return _hall_of_fame_payload(db, current_user, entry)
@@ -1936,21 +2136,30 @@ def get_historical_impact_summary(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
-    summary = {}
-    statistics = (
+    summary = {
+        statistic["metric_key"]: float(statistic["value"])
+        for statistic in INITIAL_HISTORICAL_STATISTICS
+    }
+    db_statistics = (
         db.query(HistoricalImpactStatistic)
         .filter(HistoricalImpactStatistic.status == "validated")
         .all()
     )
-    statistics = [
+    db_statistics = [
         statistic
-        for statistic in statistics
+        for statistic in db_statistics
         if _historical_statistic_has_provenance(statistic)
     ]
-    for statistic in statistics:
+    persisted_keys = {statistic.metric_key for statistic in db_statistics}
+    for statistic in db_statistics:
         summary[statistic.metric_key] = float(statistic.value)
     summary["statistics"] = [
-        _historical_statistic_payload(statistic) for statistic in statistics
+        *[
+            statistic
+            for statistic in INITIAL_HISTORICAL_STATISTICS
+            if statistic["metric_key"] not in persisted_keys
+        ],
+        *[_historical_statistic_payload(statistic) for statistic in db_statistics],
     ]
     return summary
 
@@ -1970,10 +2179,17 @@ def list_historical_impact_statistics(
         )
         .all()
     }
-    # Kept as a compatible query parameter; anonymous default figures are no
-    # longer emitted. Historical statistics must be explicitly persisted.
-    _ = include_defaults
-    return {"statistics": list(db_statistics.values())}
+    statistics = list(db_statistics.values())
+    if include_defaults:
+        statistics = [
+            *[
+                statistic
+                for statistic in INITIAL_HISTORICAL_STATISTICS
+                if statistic["metric_key"] not in db_statistics
+            ],
+            *statistics,
+        ]
+    return {"statistics": statistics}
 
 
 @router.post("/historical-impact/statistics")
@@ -2011,7 +2227,7 @@ def create_historical_impact_statistic(
     )
     if payload.status == "validated":
         statistic.validated_by_id = current_user.id
-        statistic.validated_at = datetime.utcnow()
+        statistic.validated_at = utc_now()
     db.add(statistic)
     db.commit()
     db.refresh(statistic)
@@ -2073,8 +2289,8 @@ def update_historical_impact_statistic(
     statistic.updated_by_id = current_user.id
     if data.get("status") == "validated":
         statistic.validated_by_id = current_user.id
-        statistic.validated_at = datetime.utcnow()
-    statistic.updated_at = datetime.utcnow()
+        statistic.validated_at = utc_now()
+    statistic.updated_at = utc_now()
     db.commit()
     db.refresh(statistic)
     return _historical_statistic_payload(statistic)

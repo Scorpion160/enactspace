@@ -1,6 +1,7 @@
 from app.db.database import Base
 from app.db.types import GUID
 from app.models.user import User, PasswordResetOtp
+from app.models.academic import UserAcademicHistory
 from app.models.role import Role, UserRole
 from app.models.season import Season
 from app.models.pole import Pole, PoleMember
@@ -41,6 +42,9 @@ from app.models.chat import (
     ChatParticipant,
     ChatMessage,
     ChatMessageReaction,
+    ChatPoll,
+    ChatPollOption,
+    ChatPollVote,
 )
 from app.models.recruitment import (
     RecruitmentCampaign,
@@ -49,7 +53,9 @@ from app.models.recruitment import (
 )
 from app.models.alumni import AlumniProfile, Mentorship
 from app.models.notification import Notification
+from app.models.email_delivery import EmailDelivery
 from app.models.gamification import EngagementPoint, Badge, UserBadge
+from app.models.games import GameRoom, GamePlayer, GameResponse
 from app.models.audit import AuditLog
 from app.models.account import (
     UserPreference,
@@ -100,3 +106,10 @@ from app.models.product_services import (
     SupportTicket,
     SupportTicketMessage,
 )
+from app.models.meeting import Meeting, MeetingMember
+
+from app.models.veille import (VeilleSettings, VeilleRule, VeillePlan, VeilleBlocker, VeilleReview, VeilleReport, VeilleLeave, VeilleCase, VeilleEvent, VeilleReminder)
+from app.services import veille_history  # register task history on every write
+
+from app.models.security_rate_limit import SecurityRateLimit
+from app.models.first_access import ActivationChallenge

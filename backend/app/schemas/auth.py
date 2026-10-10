@@ -2,14 +2,15 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from app.core.account_identity import normalize_username, validate_join_year
 
 
 class LoginRequest(BaseModel):
-    email: str
+    identifier: str | None = None
+    email: str | None = None
     password: str
     platform: Literal["web", "android", "ios", "api", "unknown"] | None = None
-
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -41,7 +42,7 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordResetConfirm(BaseModel):
     email: EmailStr
-    otp: str
+    otp: str = Field(pattern=r"^[0-9]{6}$", max_length=6)
     new_password: str
 
 
@@ -55,19 +56,23 @@ class JoinRequestCreate(BaseModel):
     gender: str
     first_name: str
     last_name: str
+    username: str
     email: EmailStr
     password: str
-    phone: str | None = None
+    phone: str
     photo_url: str | None = None
-    department: str | None = None
+    department: str
     level: str | None = None
     promotion: str | None = None
+    enactus_join_year: int | None = None
     skills: str | None = None
     linkedin_url: str | None = None
     github_url: str | None = None
     portfolio_url: str | None = None
     motivation: str | None = None
 
+    _username = field_validator('username')(normalize_username)
+    _join_year = field_validator('enactus_join_year')(validate_join_year)
 
 class JoinRequestRead(BaseModel):
     message: str

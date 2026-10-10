@@ -10,8 +10,32 @@ class PushNavigationResolver {
     final source = (relatedType?.isNotEmpty == true ? relatedType! : type)
         .toLowerCase();
     final id = relatedId?.trim();
+    if (source == 'support_ticket_management' ||
+        source == 'product_feedback_management') {
+      return '/help/manage';
+    }
+    if (source == 'support_ticket' ||
+        source == 'product_feedback' ||
+        normalizedType == 'support') {
+      return '/help';
+    }
     if (normalizedType == 'chat_message' && id?.isNotEmpty == true) {
       return '/chat?thread=${Uri.encodeComponent(id!)}';
+    }
+    if (source.startsWith('veille_')) {
+      final kind = source.substring('veille_'.length);
+      if ({
+            'task',
+            'plan',
+            'blocker',
+            'report',
+            'leave',
+            'case',
+          }.contains(kind) &&
+          id?.isNotEmpty == true) {
+        return '/veille/records/$kind/${Uri.encodeComponent(id!)}';
+      }
+      return '/veille';
     }
     if (source.contains('task')) {
       return id?.isNotEmpty == true ? '/tasks/$id' : '/tasks';
@@ -39,6 +63,9 @@ class PushNavigationResolver {
     }
     if (source.contains('chat') || source.contains('message')) {
       return '/chat';
+    }
+    if (source.contains('meeting') || source.contains('meet')) {
+      return id?.isNotEmpty == true ? '/meetings/$id' : '/meetings';
     }
     if (source.contains('event')) {
       return id?.isNotEmpty == true ? '/events/$id' : '/events';

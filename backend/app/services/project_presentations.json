@@ -1,0 +1,311 @@
+[
+  {
+    "id": "aquatus",
+    "name": "Aquatus",
+    "aliases": [
+      "Aquatus",
+      "AquaTus"
+    ],
+    "image_asset": "assets/heritage/aquatus.jpg",
+    "description": "Élever des poissons et cultiver des légumes dans un même circuit : Aquatus explore cette rencontre entre aquaculture et culture hors-sol. Le projet prend forme à partir de 2023, avec Ngayène Sabakh comme territoire cible. Son ambition est de diversifier la production alimentaire tout en tenant compte de l’eau disponible, de l’espace et des compétences des communautés.\n\nL’initiative s’appuie sur une relation déjà construite avec les femmes de Ngayène Sabakh autour de Dimbali. Leur expérience agricole et leur intérêt pour l’élevage de poissons orientent la préparation du projet. Aquatus relie ainsi une recherche technique à une question très concrète : comment une communauté peut-elle prendre en main et faire durer une nouvelle activité de production ?",
+    "problem": "Produire une alimentation variée demande de l’eau, des surfaces, des équipements et un savoir-faire régulier. Lorsque ces ressources sont limitées, l’installation d’un système de production ne suffit pas : il faut aussi pouvoir le surveiller, l’entretenir et vendre ou consommer ses produits.\n\nAquatus cherche à rapprocher la production de poissons et celle de végétaux. L’enjeu est de valoriser les nutriments du circuit plutôt que de traiter ces deux activités séparément, tout en conservant des conditions adaptées aux poissons, aux plantes et aux bactéries.",
+    "solution": "Le système étudié fait circuler l’eau entre les bassins de poissons, les étapes de filtration et les cultures. Les déchets solides sont retenus par une filtration mécanique. Des bactéries du filtre biologique transforment ensuite les composés azotés ; les plantes utilisent une partie des nutriments disponibles avant le retour de l’eau vers les poissons.\n\nCet équilibre demande un suivi quotidien. Une pompe, une bonne aération, des surfaces de culture adaptées et une filtration dimensionnée font partie de l’ensemble. Le choix des espèces, l’alimentation des poissons et la surveillance de l’eau doivent avancer avec les essais du dispositif.",
+    "impact_summary": "Aquatus reçoit le deuxième prix de Polytech’Innovation en 2025, tandis que Terrasen remporte le premier prix du même concours. Cette distinction marque une étape du parcours du projet.\n\nLe développement à Ngayène Sabakh est décrit comme une préparation de pilote. L’amélioration des rendements, les économies d’eau et les revenus attendus restent des objectifs à mesurer sur le terrain. Ils ne sont pas comptés ici comme des résultats déjà obtenus.",
+    "sections": [
+      {
+        "title": "Une rencontre à Ngayène Sabakh",
+        "body": "Lors du voyage d’audit du 9 septembre 2023, les femmes de Ngayène Sabakh présentent à l’équipe un cours d’eau formé pendant les pluies, où elles observent des poissons. Elles expriment aussi leur intérêt pour l’aquaculture. Ce dialogue donne une direction au projet : partir de leurs pratiques agricoles, de leur disponibilité et de l’espace existant pour préparer une activité qu’elles pourront gérer.\n\nCette rencontre constitue un point de départ. Le repérage d’un site et l’intérêt des participantes ouvrent le travail de conception ; la mise en service et la production régulière sont des étapes suivantes."
+      },
+      {
+        "title": "Trois pistes de culture à étudier",
+        "body": "La conception compare plusieurs façons de cultiver hors-sol. Un lit de culture avec substrat soutient les racines dans un matériau adapté et fonctionne avec des cycles d’arrivée et d’évacuation de l’eau. La méthode NFT fait circuler une fine lame d’eau dans des gouttières de culture. La méthode DWC utilise des radeaux qui maintiennent les plantes au-dessus d’un volume d’eau aéré.\n\nCes pistes ne sont pas trois installations déjà déployées. Elles permettent de choisir un dispositif en fonction des plantes, de l’espace, des équipements disponibles et des capacités de maintenance de la communauté."
+      },
+      {
+        "title": "Observer avant de reproduire",
+        "body": "Le pilote doit permettre de suivre la croissance des poissons et des plantes, les récoltes, l’alimentation, la consommation d’eau et le temps consacré à l’entretien. Les difficultés rencontrées comptent autant que les productions : une panne de pompe, un manque d’aération ou une désorganisation du suivi peuvent modifier l’équilibre du système.\n\nL’équipe prévoit d’associer les participantes à ces observations pour ajuster le dispositif. L’extension à d’autres territoires dépendra de ce fonctionnement réel et de la capacité à transmettre les gestes nécessaires."
+      },
+      {
+        "title": "Une place dans la démarche Terrasen",
+        "body": "Aquatus apporte le volet aquaponique à la démarche intégrée de Terrasen. Les poissons et les cultures complètent les activités de production, de transformation et de conservation. Le lien entre les deux projets permet de réunir les compétences sans effacer le parcours propre d’Aquatus.\n\nCette complémentarité est aussi visible dans leurs distinctions de 2025. Les deux premières places de Polytech’Innovation célèbrent un travail collectif, avec deux démarches techniques qui continuent à être identifiables."
+      }
+    ],
+    "documents": [
+      {
+        "title": "Aquatus — dossier de synthèse",
+        "asset": "assets/documents/aquatus-synthese.pdf",
+        "pages": 28,
+        "description": "La démarche de conception, les options de culture, le fonctionnement du circuit et les perspectives du projet.",
+        "filename": "Aquatus-dossier-de-synthese.pdf"
+      }
+    ],
+    "origin_year": 2023,
+    "objectives": "Préparer un pilote aquaponique à Ngayène Sabakh, choisir un circuit adapté aux poissons et aux cultures, puis transmettre son suivi quotidien aux participantes. Les essais doivent guider le dimensionnement, la maintenance et l’organisation de la production.",
+    "expected_impact": "Diversifier l’alimentation et créer une activité de production complémentaire. Le suivi portera sur les récoltes, les ressources utilisées, les coûts d’entretien et les revenus des participantes.",
+    "sdgs": [
+      "2 — Faim « zéro »",
+      "6 — Eau propre et assainissement",
+      "8 — Travail décent et croissance économique",
+      "12 — Consommation et production responsables"
+    ],
+    "target_population": "Femmes de Ngayène Sabakh intéressées par une activité associant aquaculture et cultures hors-sol."
+  },
+  {
+    "id": "shery",
+    "name": "SHERY",
+    "aliases": [
+      "SHERY",
+      "Cherry",
+      "Sherry"
+    ],
+    "image_asset": "assets/heritage/shery.jpg",
+    "description": "Pouvoir vivre ses règles avec dignité, sans que le coût des protections limite les activités du quotidien : c’est le besoin auquel SHERY veut répondre. Lancé à partir de 2021, le projet travaille sur des serviettes hygiéniques lavables et réutilisables, accompagnées d’une démarche d’information et de sensibilisation.\n\nSHERY s’adresse particulièrement aux jeunes filles et aux femmes disposant de peu de moyens. L’équipe pense le produit, son accès et son usage ensemble. Une protection accessible doit aussi être comprise, adaptée aux habitudes des utilisatrices et accompagnée de conditions d’entretien réalisables.",
+    "problem": "Le budget consacré aux protections menstruelles peut peser sur les femmes et les jeunes filles qui n’ont pas de revenu propre. Le manque d’information et les difficultés d’accès à l’eau ou à des espaces sanitaires adaptés compliquent aussi la gestion de l’hygiène menstruelle.\n\nLe besoin dépasse donc le prix d’un produit. Il concerne la possibilité de choisir une protection, de l’utiliser avec confiance et de disposer d’une information claire, dans un sujet encore entouré de tabous.",
+    "solution": "SHERY développe une protection composée de plusieurs couches : une surface en contact avec la peau, un insert absorbant, une barrière imperméable et un tissu extérieur décoratif. Des boutons de pression sont prévus pour maintenir la serviette sur le sous-vêtement.\n\nLa conception s’accompagne d’un projet de plateforme pour présenter l’offre, faciliter la vente et partager des informations sur l’hygiène menstruelle. Un mécanisme de parrainage est envisagé pour permettre à des personnes solidaires de financer des protections destinées à des utilisatrices qui ne peuvent pas les acheter.",
+    "impact_summary": "SHERY remporte le premier prix du Salon du Polytechnicien en 2023. Le projet donne une place à la dignité menstruelle et à l’accès aux protections dans les initiatives d’Enactus ESP.\n\nLa réduction des dépenses, des déchets et des absences scolaires fait partie des changements recherchés. Le dossier de lancement ne permet pas de les présenter comme des résultats chiffrés déjà atteints.",
+    "sections": [
+      {
+        "title": "2021 : les premiers essais",
+        "body": "En juillet 2021, le pôle Chimie et Biologie appliquée réalise un premier prototype. L’équipe examine les tissus, l’absorption, le maintien et le séchage : transformer une idée en protection utilisable exige de regarder chaque geste du quotidien.\n\nLe séchage du tissu supérieur pose notamment question. Les essais suivants doivent comparer les matériaux et la tenue au lavage. La confection à la machine et la recherche de solutions plus adaptées se poursuivent ; la durée de vie envisagée reste alors une cible de conception."
+      },
+      {
+        "title": "Fatick : préparer une fabrication locale",
+        "body": "La réflexion se précise autour des couturières du CEDAF de Fatick. Le projet cherche à rapprocher savoir-faire, équipements de couture et organisation de la production. Le CEDAF, les couturières et Enactus ESP auraient chacun un rôle dans la fabrication, l’approvisionnement, la gestion et la commercialisation.\n\nEn 2021, cette organisation est une proposition à construire avec les partenaires. Une rencontre à Fatick est encore prévue pendant le voyage de mars 2023, mais elle ne peut finalement pas se tenir. Ce rendez-vous manqué fait aussi partie du parcours : préparer un transfert ne signifie pas qu’il a déjà eu lieu."
+      },
+      {
+        "title": "Calculer, ajuster et garder le cap",
+        "body": "Le projet avance aussi sur son modèle économique : prix des tissus, accessoires, couture, conditionnement et transport doivent être pris en compte avant de fixer un prix. Les estimations changent avec le prototype et le mode de production ; elles servent à tester la viabilité, sans annoncer des ventes qui n’ont pas encore été réalisées.\n\nSHERY envisage également une plateforme de vente et de parrainage. L’idée est de permettre à des personnes solidaires de financer l’accès aux protections, tout en accompagnant leur utilisation par une information claire et des échanges de proximité."
+      },
+      {
+        "title": "Concevoir avec les utilisatrices",
+        "body": "Une serviette réutilisable doit s’intégrer dans la vie quotidienne : confort, maintien, absorption, lavage, séchage et rangement sont liés. La phase de prototypage sert à examiner ces usages et à améliorer le produit à partir des retours des utilisatrices.\n\nLe choix d’une solution lavable suppose aussi de considérer l’accès à l’eau, au savon et à un espace de séchage. Ces conditions font partie du travail d’adaptation du projet aux zones rurales et aux quartiers où les moyens sont limités."
+      },
+      {
+        "title": "Rendre l’accès plus solidaire",
+        "body": "Le modèle envisagé associe vente de protections, information et parrainage. Une segmentation des prix selon les moyens des clientes est étudiée afin de rapprocher l’accessibilité économique de la viabilité de l’activité.\n\nLa plateforme doit pouvoir présenter les produits et les points de vente, accueillir les personnes qui souhaitent soutenir le projet et faciliter l’accès à des informations compréhensibles. Cette dimension numérique complète le travail de sensibilisation de proximité."
+      },
+      {
+        "title": "Passer du prototype à une activité durable",
+        "body": "Le dossier de lancement prévoit un transfert de savoir-faire dans une zone de production, la préparation de la commercialisation et la formalisation d’une structure. Les machines à coudre, les tissus, les outils de fixation, le conditionnement et la communication entrent dans cette préparation.\n\nLe budget présenté s’élève à 2 758 000 FCFA. Il correspond à une estimation de lancement, et non à un financement déjà reçu ou à des dépenses réalisées. Les étapes envisagées pour 2024 restent un calendrier de préparation dans ce dossier."
+      },
+      {
+        "title": "Les changements recherchés",
+        "body": "SHERY veut rendre les protections plus accessibles, soutenir une activité de fabrication et réduire la quantité de produits jetables utilisés. Le projet cherche aussi à ouvrir la conversation sur l’hygiène menstruelle, pour que les jeunes filles et les femmes puissent faire des choix informés.\n\nLes améliorations techniques évoquées dans la conception restent des pistes de recherche. Le parcours présenté ici ne leur attribue pas d’efficacité médicale démontrée."
+      }
+    ],
+    "documents": [
+      {
+        "title": "SHERY — présentation du projet",
+        "asset": "assets/documents/shery-presentation.pdf",
+        "pages": 10,
+        "description": "Le besoin social, la conception des protections, le modèle d’accès et le budget de lancement.",
+        "filename": "SHERY-presentation-du-projet.pdf"
+      }
+    ],
+    "gallery": [
+      {
+        "asset": "assets/heritage/resources/shery-identite.jpg",
+        "caption": "SHERY : une identité pour porter le projet"
+      }
+    ],
+    "origin_year": 2021,
+    "objectives": "Développer une protection menstruelle réutilisable adaptée aux usages et aux moyens des jeunes filles et des femmes. Associer les essais du produit à l’information sur son utilisation et son entretien, puis organiser une offre accessible et un accompagnement des utilisatrices.",
+    "expected_impact": "Faciliter l’accès aux protections et à une information claire sur l’hygiène menstruelle. Le projet vise à réduire les dépenses récurrentes et les déchets tout en soutenant la dignité et la participation aux activités du quotidien.",
+    "sdgs": [
+      "3 — Bonne santé et bien-être",
+      "5 — Égalité entre les sexes",
+      "8 — Travail décent et croissance économique",
+      "10 — Inégalités réduites",
+      "12 — Consommation et production responsables",
+      "13 — Mesures relatives aux changements climatiques",
+      "17 — Partenariats pour les objectifs"
+    ],
+    "target_population": "Jeunes filles et femmes confrontées au coût des protections menstruelles, avec une attention aux conditions d’utilisation et d’entretien."
+  },
+  {
+    "id": "meune-nagn",
+    "name": "Mën Nañ",
+    "aliases": [
+      "Mën Nañ",
+      "Men Nan",
+      "MËN NAÑ",
+      "Meune Nagn",
+      "Mën Nañ final"
+    ],
+    "image_asset": "assets/heritage/men-nan.jpg",
+    "description": "Mën Nañ signifie « nous pouvons ». Ce nom porte une idée simple : les ressources d’un territoire peuvent devenir une source de revenus lorsque les communautés disposent des techniques et de l’organisation nécessaires pour les valoriser. À Niaguiss, Saré Yoba Diéga et Sinthiou Dimb, le projet relie transformation alimentaire, conservation, accès à l’eau et renforcement des GIE.\n\nChaque localité apporte un défi différent. Les fruits de Casamance, le lait de Kolda et les besoins d’eau de Sinthiou Dimb ne demandent pas la même réponse. Mën Nañ rassemble ces activités autour de la transmission de savoir-faire et de l’autonomie des femmes, en adaptant le travail aux réalités de chaque groupe.",
+    "problem": "Des fruits peuvent se perdre faute de transformation ou de conservation, alors même qu’ils pourraient être vendus sous une autre forme. Dans la filière laitière, les équipements, les procédés et l’organisation influencent aussi les pertes et les revenus.\n\nÀ Sinthiou Dimb, l’accès à l’eau limite les activités en dehors de la période des pluies. Ces difficultés se combinent avec une place parfois restreinte des femmes dans les responsabilités des groupements. Le projet aborde à la fois la ressource, le produit et les personnes qui conduisent l’activité.",
+    "solution": "Mën Nañ associe des formations techniques à un accompagnement de la gestion : transformation des fruits et du lait, hygiène, comptabilité de caisse, marketing et techniques de vente. Les séchoirs solaires et une pompe artisanale complètent les réponses développées selon les localités.\n\nLe travail avec les GIE vise à rendre ces compétences utilisables dans une activité régulière. Diversifier les produits, mieux les conserver et répartir les responsabilités aide les groupes à poursuivre leur production au-delà d’une seule récolte ou d’une visite de l’équipe.",
+    "impact_summary": "Le bilan historique présente 97 emplois, dont 49 femmes entrepreneures, plus d’une tonne de fruits et 1 351 litres de lait transformés, ainsi qu’un chiffre d’affaires de 4 218 375 FCFA. Ces chiffres décrivent une étape du projet ; ils ne constituent pas un total actualisé pour 2026.\n\nÀ Niaguiss, le chiffre d’affaires cumulé de 2019 à 2022 atteint 3 662 000 FCFA. Ce montant concerne le GIE local et une période précise. Il ne s’ajoute pas automatiquement au bilan global, qui peut déjà couvrir une partie des mêmes activités.",
+    "sections": [
+      {
+        "title": "Niaguiss : partir d’un savoir-faire, construire un collectif",
+        "body": "L’équipe rencontre une femme qui produit du sirop et de la confiture de mangue et de pomme de liane. L’accompagnement contribue à réunir trente autres femmes autour du GIE La Lumière. Le travail porte sur la transformation, mais aussi sur la présentation des produits, la gestion des bénéfices et l’hygiène.\n\nLe groupe diversifie ses productions : sirops, confitures, mangues séchées, thé au moringa et autres produits issus des ressources locales. Quinze menuisiers apprennent à fabriquer les séchoirs solaires conçus par le pôle électromécanique. Le dispositif présenté peut accueillir 1 600 tranches de fruits, avec un séchage sur trois jours."
+      },
+      {
+        "title": "Saré Yoba Diéga : diversifier et mieux organiser",
+        "body": "À Saré Yoba Diéga, l’intervention concerne le GIE Aynobe. La réorganisation du groupement cherche à impliquer davantage ses membres dans la production et les responsabilités. Les formations introduisent notamment le yaourt, le thiakry, l’arraw et les savons naturels, en complément du lait caillé.\n\nLes procédés développés ramènent le temps de transformation de 24 à 8 heures et prolongent la conservation annoncée d’une semaine à un mois dans le cadre de cette activité. Après l’arrêt lié à la pandémie, le groupe reprend ses activités au début de 2023. Des formations en transformation de mangue, comptabilité et management accompagnent cette reprise en mars 2023."
+      },
+      {
+        "title": "Sinthiou Dimb : l’eau avant la diversification",
+        "body": "À Sinthiou Dimb, les activités agricoles se concentrent sur les mois de pluie. Pour développer d’autres productions, l’équipe commence par la contrainte d’eau : la principale source est un puits de 46 mètres.\n\nUne pompe artisanale est fabriquée avec un débit annoncé de 10 litres par minute. Cette réponse ouvre la préparation des formations en maraîchage et en vente. La pompe réalisée et les développements envisagés constituent deux étapes distinctes du parcours."
+      },
+      {
+        "title": "Une continuité au sein de Terrasen",
+        "body": "Mën Nañ représente Enactus ESP aux côtés de Dimbali lors de la World Cup 2022 à Porto Rico. L’équipe atteint la demi-finale. Cette étape internationale réunit des savoir-faire de transformation et des relations construites dans plusieurs territoires.\n\nLe dossier Terrasen inscrit ensuite Mën Nañ dans son volet de transformation agroalimentaire. Les activités de Niaguiss et de Saré Yoba gardent leur histoire, tandis que leurs compétences rejoignent une chaîne plus large de production, de conservation et de distribution. Les résultats issus d’une même activité doivent être lus une seule fois, même lorsque plusieurs noms de projets racontent cette continuité."
+      }
+    ],
+    "documents": [
+      {
+        "title": "Mën Nañ — présentation et bilan",
+        "asset": "assets/documents/men-nan-presentation.pdf",
+        "pages": 9,
+        "description": "Les trois territoires, les formations, les bilans par localité et les perspectives de développement.",
+        "filename": "Men-Nan-presentation-et-bilan.pdf"
+      }
+    ],
+    "origin_year": 2019,
+    "objectives": "Renforcer les activités des GIE de Niaguiss, Saré Yoba Diéga et Sinthiou Dimb par la transformation des ressources locales, la conservation et l’accès à l’eau. Transmettre des compétences techniques et commerciales, puis accompagner la répartition des responsabilités dans les groupements.",
+    "expected_impact": "Limiter les pertes de fruits et de lait, diversifier les produits commercialisés et consolider les revenus locaux. L’autonomie des femmes et la continuité des activités des GIE constituent des objectifs centraux.",
+    "sdgs": [
+      "1 — Pas de pauvreté",
+      "2 — Faim « zéro »",
+      "3 — Bonne santé et bien-être",
+      "8 — Travail décent et croissance économique",
+      "10 — Inégalités réduites",
+      "12 — Consommation et production responsables"
+    ],
+    "target_population": "GIE et communautés de Niaguiss, Saré Yoba Diéga et Sinthiou Dimb, notamment les femmes participant aux activités de transformation et de commercialisation."
+  },
+  {
+    "id": "terrasen",
+    "name": "Terrasen",
+    "aliases": [
+      "Terrasen",
+      "TERRASEN",
+      "Terra Sen",
+      "Terrassen"
+    ],
+    "image_asset": "assets/heritage/terrasen.jpg",
+    "description": "Terrasen cherche à relier les étapes qui font vivre une activité alimentaire : produire, conserver, transformer et distribuer. Développé à partir de 2022, le projet combine micro-jardinage, compostage, gestion de l’eau et transformation locale. Un second volet accompagne l’élevage et la préparation d’aliments pour volaille.\n\nCette démarche rapproche plusieurs savoir-faire du club. Mën Nañ apporte son expérience de transformation et de travail avec les GIE ; Aquatus ouvre la perspective d’une production associant poissons et légumes. Le projet s’appuie sur les femmes, les jeunes et les petits producteurs pour construire des activités adaptées aux territoires.",
+    "problem": "Des ressources disponibles ne se traduisent pas toujours par une alimentation diversifiée ou des revenus réguliers. Une petite surface, une irrigation difficile, des pertes après récolte ou le coût des aliments pour volaille peuvent freiner l’activité.\n\nTerrasen aborde ces contraintes comme les maillons d’une même chaîne. Améliorer la production a peu d’effet si les récoltes se perdent, et transformer un produit demande aussi de pouvoir le conserver et trouver des clients. Les besoins d’équipement, de formation et d’organisation doivent donc être traités ensemble.",
+    "solution": "Le volet agricole associe des tables de micro-jardinage, des substrats disponibles localement, le compostage et des dispositifs de goutte-à-goutte. La transformation et la conservation prolongent la valeur des récoltes : sirops, confitures, condiments et fruits séchés rejoignent les circuits de proximité.\n\nLe volet élevage travaille sur la formulation d’aliments pour volaille à partir d’ingrédients locaux. Aquatus s’inscrit dans la préparation d’un pilote aquaponique à Ngayène Sabakh. L’ensemble repose sur le transfert de compétences, l’entretien des équipements et une organisation que les groupes puissent reprendre.",
+    "impact_summary": "À Niaguiss, la filière maad commercialise 1 133 bocaux en 2024 et réalise un chiffre d’affaires de 1 416 250 FCFA. À Khaffé, le bilan de 2023 indique 414 000 FCFA de chiffre d’affaires et 165 600 FCFA de dépenses, soit 248 400 FCFA de bénéfice.\n\nÀ Khaffé, les recettes atteignent 129 000 FCFA pour environ 45 500 FCFA de dépenses à la date d’août 2025. Le bénéfice de 83 500 FCFA reste provisoire et concerne cette période. Ces bilans locaux sont présentés séparément ; les activités héritées de Mën Nañ ne sont pas comptées une seconde fois dans un nouveau total.",
+    "sections": [
+      {
+        "title": "Du jardin au produit vendu",
+        "body": "Les tables de micro-jardinage permettent d’envisager une production sur de petites surfaces. Des palettes récupérées et des substrats locaux, comme la coque d’arachide, la balle de riz et la latérite, entrent dans les solutions étudiées. L’irrigation goutte-à-goutte et le compostage accompagnent la conduite des cultures.\n\nLa récolte n’est qu’une étape. Les formations en transformation, hygiène, conservation et commercialisation aident les groupes à préparer des produits qui trouvent leur place dans les marchés et les circuits de proximité. Le fonctionnement de cette chaîne dépend aussi de la gestion des commandes, des dépenses et des recettes."
+      },
+      {
+        "title": "Niaguiss et Saré Yoba : des compétences qui se transmettent",
+        "body": "À Niaguiss, le GIE de trente et une femmes poursuit la transformation fruitière. Les savoir-faire développés avec Mën Nañ comprennent les sirops, les confitures, les mangues séchées et la fabrication de séchoirs par les menuisiers locaux. En 2024, la commercialisation de maad constitue un repère économique précis du groupement.\n\nÀ Saré Yoba Diéga, le parcours laitier et la diversification des produits restent liés à l’accompagnement du GIE Aynobe. La reprise de 2023 prolonge les formations et l’organisation installées auparavant. Terrasen rassemble ces expériences dans sa démarche de valorisation des ressources."
+      },
+      {
+        "title": "Khaffé : suivre les recettes et les charges",
+        "body": "À Khaffé, les groupes proposent notamment des sirops de bissap, de bouye, de gingembre et de dakhar. Le suivi des ventes et des dépenses permet de comprendre le résultat de l’activité, au-delà des seules quantités produites.\n\nLe bénéfice de 248 400 FCFA concerne l’année 2023. Celui de 83 500 FCFA est un point provisoire arrêté en août 2025. Conserver ces repères de date et de périmètre permet de suivre une évolution sans confondre chiffre d’affaires et bénéfice."
+      },
+      {
+        "title": "Ngayène Sabakh : préparer le volet Aquatus",
+        "body": "À Ngayène Sabakh, un site est identifié pour préparer le système aquaponique. Des femmes expérimentées en agriculture se montrent intéressées par sa gestion. Ce travail prolonge la relation établie autour des projets antérieurs du club.\n\nLe volet reste présenté comme une préparation de pilote dans le dossier. Les gains de production et d’économie d’eau devront être observés après la mise en service, avec un suivi de la croissance des poissons, des cultures et des conditions du circuit."
+      },
+      {
+        "title": "Une équipe, des responsabilités complémentaires",
+        "body": "L’organisation proposée réunit agriculture, élevage, technique et communication. L’agriculture accompagne les cultures et la transformation ; l’élevage travaille sur l’alimentation de la volaille ; la technique conçoit les structures et assure leur maintenance ; la communication prépare les supports et entretient les liens avec les communautés.\n\nLe suivi porte sur les équipements, les formations, la production, les ventes, les charges et les retours des participantes. Ces informations aident l’équipe à ajuster les priorités et à transmettre le travail aux générations suivantes."
+      },
+      {
+        "title": "Les prochaines étapes et leurs moyens",
+        "body": "Le plan de développement envisage de nouvelles localités, des GIE plus autonomes, des unités de transformation et un site aquaponique pilote. Le budget estimatif de 28 500 000 FCFA couvre notamment équipements, formation, logistique et communication. Il s’agit d’un besoin prévisionnel, distinct des recettes réalisées par les groupes.\n\nEn 2025, Terrasen remporte le premier prix de Polytech’Innovation et le deuxième prix de SENAYSKILLS. Ces distinctions accompagnent le parcours du projet ; les extensions et les objectifs de couverture alimentaire restent une direction de développement."
+      }
+    ],
+    "documents": [
+      {
+        "title": "Terrasen — dossier World Cup",
+        "asset": "assets/documents/terrasen-world-cup.pdf",
+        "pages": 26,
+        "description": "L’approche intégrée, les activités par territoire, les bilans locaux et le plan de développement.",
+        "filename": "Terrasen-dossier-World-Cup.pdf"
+      }
+    ],
+    "origin_year": 2022,
+    "objectives": "Relier production, conservation, transformation et distribution dans des activités adaptées aux territoires. Développer le micro-jardinage, la gestion de l’eau, la valorisation des récoltes et les compétences nécessaires à l’entretien des équipements et à la conduite des activités.",
+    "expected_impact": "Diversifier la production alimentaire et soutenir les revenus des femmes, des jeunes et des petits producteurs. Le suivi distingue les productions, les ventes et les dépenses de chaque localité afin d’apprécier l’évolution de ses activités.",
+    "sdgs": [
+      "1 — Pas de pauvreté",
+      "2 — Faim « zéro »",
+      "5 — Égalité entre les sexes",
+      "8 — Travail décent et croissance économique",
+      "12 — Consommation et production responsables"
+    ],
+    "target_population": "Femmes, jeunes et petits producteurs impliqués dans les activités agricoles, de transformation et d’élevage des territoires accompagnés."
+  },
+  {
+    "id": "dimbali",
+    "name": "Dimbali",
+    "aliases": [
+      "Dimbali"
+    ],
+    "image_asset": "assets/heritage/resources/ngayene-rencontre-2021.jpg",
+    "description": "Dimbali signifie « aider ». À Ngayène Sabakh, l’équipe découvre en 2017 le dimb, un fruit abondant pendant sa période de récolte, et rencontre les femmes qui souhaitent mieux valoriser leurs ressources. Le projet prend forme autour d’une conviction : les habitantes doivent pouvoir produire, s’organiser et faire vivre l’activité elles-mêmes.\n\nLe travail relie transformation alimentaire, conservation et gestion. Avec le groupement FAVEC, les Enacteurs développent des produits à base de dimb, transmettent des savoir-faire et cherchent une organisation qui permette de poursuivre la production au-delà d’un voyage.",
+    "problem": "Un fruit disponible pendant une courte période ne devient pas spontanément une activité régulière. Sans conservation adaptée, une partie de la récolte peut se perdre ; sans organisation commerciale, même un bon produit peut avoir du mal à trouver sa place.\n\nDimbali aborde ces difficultés ensemble : comprendre les pratiques des femmes, transformer la ressource locale, mieux conserver les produits et construire les compétences nécessaires pour gérer les achats, la production et la vente.",
+    "solution": "L’équipe expérimente des farines et d’autres produits à base de dimb. Le séchage solaire indirect accompagne cette diversification : l’air réchauffé dans un capteur circule vers une chambre où les fruits sont disposés sur des claies.\n\nLe transfert associe les gestes techniques à la gestion quotidienne. Les femmes travaillent la transformation, l’hygiène, la présentation des produits, les techniques de vente et la comptabilité de caisse. Des menuisiers sont également formés à la fabrication et à l’entretien des séchoirs pour rapprocher la maintenance de la communauté.",
+    "impact_summary": "Dimbali ouvre en 2017 un chemin qui se poursuit avec les femmes de Ngayène Sabakh. Le bilan de septembre 2018 fait état de 84 emplois et de 800 arbres plantés. Ces repères appartiennent à cette étape historique ; ils ne sont pas un décompte de la situation actuelle.\n\nEn 2018, le travail s’étend à six villages voisins. La relation avec le groupement, la diversification des produits et les formations se prolongent au fil des années. Dimbali et Mën Nañ portent ensemble le parcours présenté par Enactus ESP à la World Cup 2022, où l’équipe atteint la demi-finale.",
+    "sections": [
+      {
+        "title": "2017 : écouter avant de proposer",
+        "body": "Le 18 mars 2017, le voyage à Ngayène Sabakh permet de rencontrer les acteurs locaux et les groupements de femmes. Le dimb retient l’attention de l’équipe, qui revient ensuite au laboratoire pour travailler sa transformation.\n\nLe fruit donne son nom au projet, mais les rencontres lui donnent sa direction. Il ne s’agit pas seulement d’inventer un produit : il faut comprendre qui le prépare, à quel moment, avec quels moyens et pour quels débouchés."
+      },
+      {
+        "title": "FAVEC : une activité qui se construit en équipe",
+        "body": "Le groupement rassemble progressivement 84 femmes. Les formations abordent la production, mais aussi l’approvisionnement, les ventes, la gestion de caisse et le leadership. Une activité durable demande que ces responsabilités soient comprises et partagées.\n\nLes liens avec des partenaires ouvrent d’autres possibilités, notamment la valorisation des graines et la replantation du dimb. La diversification des produits et les nouvelles activités prolongent le travail initial, au rythme des ressources et des choix du groupement."
+      },
+      {
+        "title": "Le séchoir, un outil qui évolue",
+        "body": "Conserver une récolte saisonnière demande un outil que la communauté puisse utiliser et entretenir. Le séchoir solaire indirect sépare le capteur qui réchauffe l’air de la chambre où les fruits sont disposés sur des claies. Ce fonctionnement accompagne la transformation des fruits et leur conservation au-delà de la récolte.\n\nLa conception des versions 2.0+, puis 3.0, approfondit le travail sur la forme du séchoir, la disposition des claies et la circulation de l’air. L’objectif est de faciliter le chargement, d’améliorer le séchage et de rendre l’entretien plus pratique. La simplicité de fabrication, le coût des matériaux et les usages de la communauté orientent cette recherche."
+      },
+      {
+        "title": "Février 2021 : retourner auprès des femmes",
+        "body": "Le transfert de février 2021 réunit de nouveau Enacteurs et participantes à Ngayène Sabakh. Les ateliers, les produits présentés et le travail autour des équipements donnent une place concrète à la transmission.\n\nCes retours comptent dans la vie d’un projet. Revenir permet d’écouter les difficultés, d’ajuster les gestes et de maintenir le lien avec les personnes qui poursuivent l’activité entre deux visites."
+      }
+    ],
+    "documents": [],
+    "gallery": [
+      {
+        "asset": "assets/heritage/resources/ngayene-atelier-2021.jpg",
+        "caption": "Préparer ensemble à Ngayène Sabakh · février 2021"
+      },
+      {
+        "asset": "assets/heritage/resources/ngayene-favec-2021.jpg",
+        "caption": "Les produits du GIE FAVEC · février 2021"
+      },
+      {
+        "asset": "assets/heritage/resources/ngayene-rencontre-2021.jpg",
+        "caption": "Se retrouver à Ngayène Sabakh · février 2021"
+      },
+      {
+        "asset": "assets/heritage/resources/ngayene-technique-2021.jpg",
+        "caption": "Le travail technique accompagne le transfert · février 2021"
+      },
+      {
+        "asset": "assets/heritage/resources/dimbali-sechoir-conception-2.jpg",
+        "caption": "Séchoir solaire : proposition de conception 2.0+"
+      },
+      {
+        "asset": "assets/heritage/resources/dimbali-sechoir-conception-3.jpg",
+        "caption": "Séchoir solaire : proposition de conception 3.0"
+      }
+    ],
+    "origin_year": 2017,
+    "objectives": "Valoriser le dimb avec les femmes de Ngayène Sabakh, diversifier les produits et améliorer leur conservation. Transmettre les techniques de transformation et de séchage ainsi que la gestion, la vente et les compétences locales de fabrication et de maintenance.",
+    "expected_impact": "Créer des possibilités de revenus autour d’une ressource locale et renforcer l’autonomie des femmes. La conservation des récoltes, la transmission des savoir-faire et la continuité de l’activité du groupement contribuent à cette ambition.",
+    "sdgs": [
+      "1 — Pas de pauvreté",
+      "2 — Faim « zéro »",
+      "3 — Bonne santé et bien-être",
+      "8 — Travail décent et croissance économique",
+      "10 — Inégalités réduites",
+      "12 — Consommation et production responsables",
+      "15 — Vie terrestre",
+      "17 — Partenariats pour les objectifs"
+    ],
+    "target_population": "Femmes du groupement FAVEC de Ngayène Sabakh et communautés des villages voisins engagées dans la transformation et la valorisation du dimb."
+  }
+]

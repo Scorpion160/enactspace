@@ -173,7 +173,7 @@ class _AttendanceNfcCheckInScreenState
     final isWide = width >= 820;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pointage NFC')),
+      appBar: AppBar(title: Text('Pointage NFC')),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.all(width < 560 ? 14 : 24),
@@ -187,7 +187,7 @@ class _AttendanceNfcCheckInScreenState
               onPause: _togglePause,
               onRefresh: _load,
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             if (_error != null)
               Card(
                 child: ListTile(
@@ -198,13 +198,13 @@ class _AttendanceNfcCheckInScreenState
                   title: Text(_error!),
                 ),
               ),
-            if (_error != null) const SizedBox(height: 18),
+            if (_error != null) SizedBox(height: 18),
             if (isWide)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _NfcCounters(status: _status)),
-                  const SizedBox(width: 18),
+                  SizedBox(width: 18),
                   Expanded(
                     child: _NfcResultPanel(
                       lastResult: _lastResult,
@@ -216,7 +216,7 @@ class _AttendanceNfcCheckInScreenState
               )
             else ...[
               _NfcCounters(status: _status),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               _NfcResultPanel(
                 lastResult: _lastResult,
                 history: _history,
@@ -264,9 +264,9 @@ class _NfcReaderHeader extends StatelessWidget {
                   color: AppTheme.enactusYellow,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.nfc_rounded, color: AppTheme.softBlack),
+                child: Icon(Icons.nfc_rounded, color: AppTheme.softBlack),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,13 +275,13 @@ class _NfcReaderHeader extends StatelessWidget {
                       sessionTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppTheme.darkText,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       _readerStatusLabel(
                         nfcAvailable: nfcAvailable,
@@ -289,7 +289,9 @@ class _NfcReaderHeader extends StatelessWidget {
                         paused: paused,
                         processing: processing,
                       ),
-                      style: const TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -302,8 +304,8 @@ class _NfcReaderHeader extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: onRefresh,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Actualiser'),
+                icon: Icon(Icons.refresh_rounded),
+                label: Text('Actualiser'),
               ),
               ElevatedButton.icon(
                 onPressed: nfcAvailable ? onPause : null,
@@ -319,14 +321,14 @@ class _NfcReaderHeader extends StatelessWidget {
             return Row(
               children: [
                 Expanded(child: content),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 actions,
               ],
             );
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [content, const SizedBox(height: 16), actions],
+            children: [content, SizedBox(height: 16), actions],
           );
         },
       ),
@@ -366,13 +368,13 @@ class _NfcCounters extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(item.$3),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         item.$2.toString(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
@@ -417,30 +419,30 @@ class _NfcResultPanel extends StatelessWidget {
               size: 52,
               color: success ? Colors.green.shade700 : AppTheme.softBlack,
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             Text(
               result?.memberDisplayName ?? 'Approchez un badge',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               result?.message ??
                   'Le lecteur reste pret pour le prochain badge.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.black54,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 18),
-            const Text(
+            SizedBox(height: 18),
+            Text(
               'Historique recent',
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             if (history.isEmpty)
-              const Text('Aucun pointage NFC pour le moment.')
+              Text('Aucun pointage NFC pour le moment.')
             else
               ...history.map(
                 (item) => ListTile(
@@ -457,14 +459,14 @@ class _NfcResultPanel extends StatelessWidget {
                   subtitle: Text(item.message),
                 ),
               ),
-            const SizedBox(height: 18),
-            const Text(
+            SizedBox(height: 18),
+            Text(
               'Derniers pointages NFC',
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             if (auditLogs.isEmpty)
-              const Text('Aucun log NFC pour le moment.')
+              Text('Aucun log NFC pour le moment.')
             else
               ...auditLogs
                   .take(6)

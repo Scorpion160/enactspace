@@ -85,6 +85,7 @@ class _CampaignGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> createCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String title,
     String? description,
     DateTime? startDate,
@@ -116,6 +117,7 @@ class _CampaignGateway implements InternalRecruitmentGateway {
 
   @override
   Future<RecruitmentCampaignModel> updateCampaign({
+    List<Map<String, dynamic>>? applicationQuestions,
     required String campaignId,
     String? title,
     String? description,
@@ -157,8 +159,19 @@ class _CampaignGateway implements InternalRecruitmentGateway {
   }
 
   @override
-  Future<ApplicationModel> loadApplication(String applicationId) =>
-      throw UnsupportedError('unused');
+  Future<ApplicationModel> loadApplication(
+    String applicationId, {
+    bool anonymized = false,
+  }) => throw UnsupportedError('unused');
+
+  @override
+  Future<ApplicationReviewModel> createReview({
+    required String applicationId,
+    required Map<String, dynamic> criteriaAssessment,
+    String? comment,
+    String recommendation = 'reserve',
+  }) async =>
+      throw UnimplementedError('Review mutation unused in this fixture');
 
   @override
   Future<List<ApplicationReviewModel>> loadReviews(String applicationId) =>
@@ -499,7 +512,12 @@ void main() {
       find.text('Supprimer définitivement cette campagne ?'),
       findsOneWidget,
     );
-    expect(find.textContaining('également en cascade'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'la campagne et toutes ses candidatures seront supprimées',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('irréversible'), findsWidgets);
   });
 

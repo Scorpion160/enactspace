@@ -1,0 +1,47 @@
+{
+  "lot": 14,
+  "date_utc": "2026-10-07T15:31:01.530635+00:00",
+  "tests": {
+    "final_sqlite": {
+      "passed": 95,
+      "seconds": 25.806,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 16,
+      "seconds": 36.622,
+      "skipped": 0
+    }
+  },
+  "suite_counts_overlap": true,
+  "new_scenarios": 9,
+  "reviewed_files": [
+    "backend/app/api/routes/payments.py",
+    "backend/app/services/payments/paydunya_provider.py",
+    "backend/app/services/mobile_money_service.py",
+    "backend/app/scripts/reconcile_mobile_money.py",
+    "backend/test_prelaunch_payment_transport.py",
+    "backend/test_prelaunch_mobile_money_boundaries.py"
+  ],
+  "whole_manual_review_complete": false,
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_payment_or_email_sent": false,
+  "provider_requests_in_tests": "mocked",
+  "reconciliation_commit_scope": "each invoice; rollback failed invoice; preserve prior committed successes",
+  "source_references": [
+    "https://developers.paydunya.com/doc/FR/http_json",
+    "https://developers.paydunya.com/doc/FR/introduction"
+  ],
+  "remaining": [
+    "Real PayDunya sandbox acceptance after credentials configuration",
+    "Delayed payment, verification backlog and provider field limits",
+    "Other modules and roles, incomplete manual source review",
+    "Actual Android/web end-to-end checks",
+    "Targeted test recruitment cleanup with backup",
+    "Final documentation, deployment and recipient cutover"
+  ]
+}

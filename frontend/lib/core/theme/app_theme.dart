@@ -29,6 +29,55 @@ class AppTheme {
   static const double radiusMedium = 16;
   static const double radiusLarge = 24;
 
+  static SegmentedButtonThemeData _segmentedButtonTheme(ColorScheme colors) {
+    return SegmentedButtonThemeData(
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? enactusYellow
+              : colors.surfaceContainerHighest;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? softBlack
+              : colors.onSurface;
+        }),
+        overlayColor: WidgetStatePropertyAll(
+          enactusYellow.withValues(alpha: 0.12),
+        ),
+        side: WidgetStatePropertyAll(BorderSide(color: colors.outlineVariant)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        textStyle: WidgetStatePropertyAll(
+          GoogleFonts.poppins(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  static ChipThemeData _chipTheme(ColorScheme colors) {
+    return ChipThemeData(
+      backgroundColor: colors.surfaceContainerHighest,
+      selectedColor: enactusYellow,
+      disabledColor: colors.surfaceContainerHighest.withValues(alpha: 0.55),
+      checkmarkColor: softBlack,
+      labelStyle: GoogleFonts.poppins(
+        color: colors.onSurface,
+        fontWeight: FontWeight.w700,
+      ),
+      secondaryLabelStyle: GoogleFonts.poppins(
+        color: softBlack,
+        fontWeight: FontWeight.w800,
+      ),
+      side: BorderSide(color: colors.outlineVariant),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radiusSmall),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    );
+  }
+
   static ThemeData get lightTheme {
     final base = ThemeData(
       useMaterial3: true,
@@ -59,6 +108,8 @@ class AppTheme {
           fontWeight: FontWeight.w700,
         ),
       ),
+      segmentedButtonTheme: _segmentedButtonTheme(base.colorScheme),
+      chipTheme: _chipTheme(base.colorScheme),
       cardTheme: CardThemeData(
         color: cardColor,
         elevation: 0,
@@ -67,6 +118,31 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusMedium),
           side: const BorderSide(color: border),
         ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: surfaceElevated,
+        modalBackgroundColor: surfaceElevated,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radiusLarge),
+          ),
+        ),
+        showDragHandle: true,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surfaceElevated,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLarge),
+          side: const BorderSide(color: border),
+        ),
+        titleTextStyle: GoogleFonts.poppins(
+          color: darkText,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -140,6 +216,8 @@ class AppTheme {
           fontWeight: FontWeight.w700,
         ),
       ),
+      segmentedButtonTheme: _segmentedButtonTheme(base.colorScheme),
+      chipTheme: _chipTheme(base.colorScheme),
       cardTheme: CardThemeData(
         color: darkSurface,
         elevation: 0,
@@ -148,6 +226,31 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusMedium),
           side: const BorderSide(color: darkBorder),
         ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkSurface,
+        modalBackgroundColor: darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radiusLarge),
+          ),
+        ),
+        showDragHandle: true,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLarge),
+          side: const BorderSide(color: darkBorder),
+        ),
+        titleTextStyle: GoogleFonts.poppins(
+          color: darkForeground,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

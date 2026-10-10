@@ -9,7 +9,13 @@ import '../widgets/event_widgets.dart';
 
 class EventsScreen extends StatefulWidget {
   final EventsGateway? gateway;
-  const EventsScreen({super.key, this.gateway});
+  final String? initialPoleId, initialProjectId;
+  const EventsScreen({
+    super.key,
+    this.gateway,
+    this.initialPoleId,
+    this.initialProjectId,
+  });
   @override
   State<EventsScreen> createState() => _EventsScreenState();
 }
@@ -72,7 +78,11 @@ class _EventsScreenState extends State<EventsScreen> {
         EventCenterPeriod.past => event.startTime.isBefore(now),
         EventCenterPeriod.all => true,
       };
-      return periodMatches &&
+      return (widget.initialPoleId == null ||
+              event.poleId == widget.initialPoleId) &&
+          (widget.initialProjectId == null ||
+              event.projectId == widget.initialProjectId) &&
+          periodMatches &&
           (_type == 'all' || event.eventType == _type) &&
           (query.isEmpty ||
               event.title.toLowerCase().contains(query) ||
@@ -164,6 +174,8 @@ class _EventsScreenState extends State<EventsScreen> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SegmentedButton<EventCenterPeriod>(
+                          expandedInsets: EdgeInsets.zero,
+                          showSelectedIcon: false,
                           segments: const [
                             ButtonSegment(
                               value: EventCenterPeriod.upcoming,

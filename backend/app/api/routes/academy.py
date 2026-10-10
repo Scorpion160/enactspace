@@ -1,9 +1,12 @@
+from app.core.time import utc_now
 import csv
+import uuid
 from datetime import datetime
 from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -36,6 +39,8 @@ from app.schemas.academy import (
 )
 from app.services.notification_service import notify_user
 from app.models.user import User
+from app.services.academy_progression import (LearningAccess, require_learning_access,
+    require_quiz_access, validate_prerequisites)
 
 
 router = APIRouter(prefix="/academy", tags=["Academy"])
@@ -147,10 +152,10 @@ ROLE_BASED_PATHS = {
         "id": "new-enacteur",
         "title": "Nouveau Enacteur",
         "description": (
-            "Decouvrir Enactus, comprendre ESP, les engagements, EnactSpace "
-            "et les bases de l'impact."
+            "Découvre Enactus ESP, trouve tes repères dans EnactSpace et prépare "
+            "ta première contribution avec les bases du travail en équipe et de l’impact."
         ),
-        "course_ids": ["discover-enactus", "sdgs-impact"],
+        "course_ids": ["discover-enactus", "new-enacteur-tools", "club-history", "teamwork", "social-entrepreneurship", "immersion", "sdgs-impact"],
     },
     "chef_pole": {
         "id": "pole-leader",
@@ -227,6 +232,10 @@ def _normalize_lesson_type(value: str) -> str:
 
 
 def _course_or_404(db: Session, course_id: str) -> AcademyCourse:
+    try:
+        uuid.UUID(str(course_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Formation introuvable")
     course = db.query(AcademyCourse).filter(AcademyCourse.id == course_id).first()
     if not course:
         raise HTTPException(
@@ -237,6 +246,27 @@ def _course_or_404(db: Session, course_id: str) -> AcademyCourse:
 
 
 def _lesson_or_404(db: Session, lesson_id: str) -> AcademyLesson:
+    aliases = {
+        "l1": ("Découvrir Enactus", "La démarche Enactus"),
+        "l2": ("Découvrir Enactus", "Agir avec les communautés"),
+        "l3": ("Découvrir Enactus", "Le rôle de l'enacteur"),
+        "l4": ("Comprendre les ODD", "Les 17 objectifs"),
+        "l5": ("Comprendre les ODD", "Choisir une cible pertinente"),
+        "l6": ("Comprendre les ODD", "Éviter l'affichage d'impact"),
+    }
+    if lesson_id in aliases:
+        title, lesson_title = aliases[lesson_id]
+        lesson = (db.query(AcademyLesson).join(AcademyCourse)
+                  .filter(AcademyCourse.title == title, AcademyLesson.title == lesson_title,
+                          AcademyCourse.is_published.is_(True), AcademyCourse.is_archived.is_(False),
+                          AcademyLesson.is_published.is_(True)).first())
+        if lesson:
+            return lesson
+        raise HTTPException(status_code=404, detail="Leçon introuvable")
+    try:
+        uuid.UUID(str(lesson_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Leçon introuvable")
     lesson = db.query(AcademyLesson).filter(AcademyLesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(
@@ -253,13 +283,19 @@ def _lesson_payload(lesson: AcademyLesson) -> dict:
         "summary": lesson.summary or "",
         "duration_minutes": int(lesson.duration_minutes or 0),
         "lesson_type": lesson.lesson_type,
+        "content": lesson.content,
+        "resource_file_id": str(lesson.resource_file_id) if lesson.resource_file_id else None,
+        "external_url": lesson.external_url,
+        "order_index": lesson.order_index,
         "completed": False,
         "has_resource": lesson.resource_file_id is not None
         or bool((lesson.external_url or "").strip()),
     }
 
 
-def _course_payload(db: Session, course: AcademyCourse) -> dict:
+def _course_payload(db: Session, course: AcademyCourse, user_id=None, access=None) -> dict:
+    access = access or LearningAccess(db, user_id)
+    learning = access.describe(course)
     lessons = (
         db.query(AcademyLesson)
         .filter(AcademyLesson.course_id == course.id)
@@ -271,23 +307,44 @@ def _course_payload(db: Session, course: AcademyCourse) -> dict:
     if duration <= 0:
         duration = sum(int(lesson.duration_minutes or 0) for lesson in lessons)
 
+    progress = {
+        str(row.lesson_id): row.status for row in
+        db.query(AcademyProgress).filter(AcademyProgress.user_id == user_id,
+                                       AcademyProgress.course_id == course.id).all()
+    } if user_id is not None else {}
+    quiz = (db.query(AcademyQuiz).filter(AcademyQuiz.course_id == course.id,
+            AcademyQuiz.is_published.is_(True)).order_by(AcademyQuiz.created_at.asc()).first())
+    lesson_rows = []
+    for lesson in lessons:
+        row = _lesson_payload(lesson)
+        state = progress.get(str(lesson.id), 'not_started')
+        row.update(status=state, started=state != 'not_started',
+                   completed=state in {'completed', 'validated'})
+        if learning["is_locked"]:
+            row.update(content=None, resource_file_id=None, external_url=None, has_resource=False)
+        lesson_rows.append(row)
+    quiz_passed = bool(quiz and user_id and db.query(AcademyQuizAttempt.id).filter(
+        AcademyQuizAttempt.quiz_id == quiz.id, AcademyQuizAttempt.user_id == user_id,
+        AcademyQuizAttempt.passed.is_(True)).first())
     return {
+        **learning,
+        "quiz_passed": quiz_passed,
         "id": str(course.id),
         "title": course.title,
         "category": course.category,
         "level": course.level,
         "description": course.description or "",
         "duration_minutes": duration,
-        "points": int(course.points or len(lessons) * 40),
+        "points": int(course.points or 0),
         "is_required": bool(course.is_required),
         "target_roles": course.target_roles or [],
-        "lessons": [_lesson_payload(lesson) for lesson in lessons],
+        "lessons": lesson_rows,
         "quiz": {
-            "id": f"{course.id}-quiz",
-            "title": f"Quiz - {course.title}",
+            "id": str(quiz.id) if quiz else "",
+            "title": quiz.title if quiz else "",
             "category": course.category,
             "level": course.level,
-            "time_limit_minutes": 8,
+            "time_limit_minutes": int(quiz.time_limit_minutes or 8) if quiz else 0,
             "questions": [],
         },
     }
@@ -368,6 +425,9 @@ def _score_db_quiz(db: Session, quiz: AcademyQuiz, answers: list) -> dict:
         "passed": percent >= float(quiz.passing_score or 60),
         "correct_answers": correct,
         "total_questions": len(questions),
+        "feedback": [{"question": q.prompt, "correct_indices": q.correct_answers or [],
+            "explanation": q.explanation or "", "choices": q.choices or []}
+            for q in questions],
     }
 
 
@@ -436,7 +496,8 @@ def list_courses(
         .order_by(AcademyCourse.updated_at.desc())
         .all()
     )
-    return [_course_payload(db, course) for course in published_courses] + COURSES
+    access = LearningAccess(db, current_user.id)
+    return [_course_payload(db, course, current_user.id, access) for course in published_courses]
 
 
 @router.get("/admin/courses", response_model=list[AcademyCourseRead])
@@ -455,6 +516,7 @@ def create_course(
 ):
     data = payload.model_dump()
     data["level"] = _normalize_level(payload.level)
+    data["prerequisite_course_ids"] = validate_prerequisites(db, payload.prerequisite_course_ids)
     course = AcademyCourse(**data, created_by_id=current_user.id)
     db.add(course)
     db.commit()
@@ -471,11 +533,13 @@ def update_course(
 ):
     course = _course_or_404(db, course_id)
     data = payload.model_dump(exclude_unset=True)
+    if "prerequisite_course_ids" in data:
+        data["prerequisite_course_ids"] = validate_prerequisites(db, data["prerequisite_course_ids"], course.id)
     if "level" in data:
         data["level"] = _normalize_level(data["level"])
     for field, value in data.items():
         setattr(course, field, value)
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(course)
     return course
@@ -490,7 +554,7 @@ def publish_course(
     course = _course_or_404(db, course_id)
     course.is_published = True
     course.is_archived = False
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(course)
     return course
@@ -504,7 +568,7 @@ def unpublish_course(
 ):
     course = _course_or_404(db, course_id)
     course.is_published = False
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(course)
     return course
@@ -519,7 +583,7 @@ def archive_course(
     course = _course_or_404(db, course_id)
     course.is_archived = True
     course.is_published = False
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(course)
     return course
@@ -533,7 +597,7 @@ def restore_course(
 ):
     course = _course_or_404(db, course_id)
     course.is_archived = False
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(course)
     return course
@@ -670,7 +734,7 @@ def create_lesson(
     data["lesson_type"] = _normalize_lesson_type(payload.lesson_type)
     lesson = AcademyLesson(course_id=course.id, **data)
     db.add(lesson)
-    course.updated_at = datetime.utcnow()
+    course.updated_at = utc_now()
     db.commit()
     db.refresh(lesson)
     return lesson
@@ -689,7 +753,7 @@ def update_lesson(
         data["lesson_type"] = _normalize_lesson_type(data["lesson_type"])
     for field, value in data.items():
         setattr(lesson, field, value)
-    lesson.updated_at = datetime.utcnow()
+    lesson.updated_at = utc_now()
     db.commit()
     db.refresh(lesson)
     return lesson
@@ -714,12 +778,15 @@ def start_lesson(
     current_user=Depends(get_current_active_validated_user),
 ):
     lesson = _lesson_or_404(db, lesson_id)
+    if not lesson.is_published:
+        raise HTTPException(404, "Leçon indisponible.")
+    require_learning_access(db, current_user.id, lesson.course_id)
     progress = _lesson_progress(db, user_id=current_user.id, lesson=lesson)
     if progress.status == "not_started":
         progress.status = "in_progress"
         progress.progress_percent = 10
-        progress.started_at = datetime.utcnow()
-    progress.updated_at = datetime.utcnow()
+        progress.started_at = utc_now()
+    progress.updated_at = utc_now()
     db.commit()
     db.refresh(progress)
     return progress
@@ -732,14 +799,18 @@ def complete_lesson(
     current_user=Depends(get_current_active_validated_user),
 ):
     lesson = _lesson_or_404(db, lesson_id)
+    if not lesson.is_published:
+        raise HTTPException(404, "Leçon indisponible.")
+    require_learning_access(db, current_user.id, lesson.course_id)
     progress = _lesson_progress(db, user_id=current_user.id, lesson=lesson)
     progress.status = "completed"
     progress.progress_percent = 100
     if progress.started_at is None:
-        progress.started_at = datetime.utcnow()
-    progress.completed_at = datetime.utcnow()
-    progress.updated_at = datetime.utcnow()
+        progress.started_at = utc_now()
+    progress.completed_at = utc_now()
+    progress.updated_at = utc_now()
 
+    db.flush()
     course = _course_or_404(db, lesson.course_id)
     completion = _course_completion_percent(
         db,
@@ -820,10 +891,14 @@ def get_my_progress(
         )
         .count()
     )
-    total_lessons = sum(len(course["lessons"]) for course in COURSES) + db_lessons
+    total_lessons = db_lessons
     completed_lessons = (
         db.query(AcademyProgress)
+        .join(AcademyLesson, AcademyProgress.lesson_id == AcademyLesson.id)
+        .join(AcademyCourse, AcademyLesson.course_id == AcademyCourse.id)
         .filter(
+            AcademyCourse.is_published.is_(True), AcademyCourse.is_archived.is_(False),
+            AcademyLesson.is_published.is_(True),
             AcademyProgress.user_id == current_user.id,
             AcademyProgress.status.in_(["completed", "validated"]),
             AcademyProgress.lesson_id.isnot(None),
@@ -831,12 +906,16 @@ def get_my_progress(
         .count()
     )
     passed_quizzes = (
-        db.query(AcademyQuizAttempt)
+        db.query(AcademyQuizAttempt.quiz_id)
+        .join(AcademyQuiz, AcademyQuizAttempt.quiz_id == AcademyQuiz.id)
+        .join(AcademyCourse, AcademyQuiz.course_id == AcademyCourse.id)
         .filter(
+            AcademyQuiz.is_published.is_(True), AcademyCourse.is_published.is_(True),
+            AcademyCourse.is_archived.is_(False),
             AcademyQuizAttempt.user_id == current_user.id,
             AcademyQuizAttempt.passed.is_(True),
         )
-        .count()
+        .distinct().count()
     )
     db_courses = (
         db.query(AcademyCourse)
@@ -850,7 +929,9 @@ def get_my_progress(
         "completed_lessons": completed_lessons,
         "total_lessons": total_lessons,
         "passed_quizzes": passed_quizzes,
-        "total_quizzes": len(COURSES) + db_courses,
+        "total_quizzes": (db.query(AcademyQuiz).join(AcademyCourse)
+            .filter(AcademyQuiz.is_published.is_(True), AcademyCourse.is_published.is_(True),
+                    AcademyCourse.is_archived.is_(False)).count()),
         "points": 0,
         "rank": 0,
         "monthly_progress": 0,
@@ -865,15 +946,48 @@ def get_my_academy_paths(
     roles = get_user_role_names(db, current_user.id) or {"enacteur"}
     if current_user.status == "alumni":
         roles.add("alumni")
+    published = db.query(AcademyCourse).filter(AcademyCourse.is_published.is_(True),
+                                              AcademyCourse.is_archived.is_(False)).all()
+    by_title = {course.title: course for course in published}
+    titles = {
+        "discover-enactus": "Découvrir Enactus", "sdgs-impact": "Comprendre les ODD",
+        "leadership-collaboration": "Travail d'équipe et transmission",
+        "pitch-competition": "Présenter un projet", "business-finance": "Modèle économique et pérennité",
+        "new-enacteur-tools": "Premiers pas dans EnactSpace",
+        "club-history": "Histoire d'Enactus ESP", "teamwork": "Travail d'équipe et transmission",
+        "social-entrepreneurship": "Entrepreneuriat social : de l’idée à l’impact",
+        "immersion": "Immersion : écouter avant d’agir",
+    }
+    access = LearningAccess(db, current_user.id)
     paths = []
-    for role in roles:
+    for role in sorted(roles):
         path = ROLE_BASED_PATHS.get(role)
         if not path:
             continue
-        paths.append({**path, "progress": 0})
-    if not paths:
-        paths.append({**ROLE_BASED_PATHS["enacteur"], "progress": 0})
+        selected = [by_title[titles[key]] for key in path['course_ids']
+                    if titles.get(key) in by_title]
+        paths.append({**path, "course_ids": [str(c.id) for c in selected],
+                      "progress": sum(100 if access.mastered(c.id) else 0 for c in selected) / len(selected) if selected else 0})
+    if not any(p["id"] == "new-enacteur" for p in paths):
+        path = ROLE_BASED_PATHS["enacteur"]
+        selected = [by_title[titles[key]] for key in path["course_ids"] if titles.get(key) in by_title]
+        paths.insert(0, {**path, "course_ids": [str(c.id) for c in selected],
+            "progress": sum(100 if access.mastered(c.id) else 0 for c in selected) / len(selected) if selected else 0})
     return paths
+
+
+def _resolve_quiz_id(db: Session, quiz_id: str) -> str:
+    legacy = {"discover-enactus-quiz": "Découvrir Enactus", "sdgs-impact-quiz": "Comprendre les ODD"}
+    if quiz_id in legacy:
+        row = (db.query(AcademyQuiz).join(AcademyCourse)
+               .filter(AcademyCourse.title == legacy[quiz_id], AcademyQuiz.is_published.is_(True)).first())
+        if row:
+            return str(row.id)
+    try:
+        uuid.UUID(str(quiz_id))
+        return quiz_id
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Quiz introuvable")
 
 
 @router.get("/quizzes/{quiz_id}")
@@ -882,8 +996,10 @@ def get_quiz(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    quiz_id = _resolve_quiz_id(db, quiz_id)
     db_quiz = db.query(AcademyQuiz).filter(AcademyQuiz.id == quiz_id).first()
     if db_quiz and db_quiz.is_published:
+        require_quiz_access(db, current_user.id, db_quiz)
         return _quiz_payload(db, db_quiz, include_answers=False)
 
     for course in COURSES:
@@ -904,8 +1020,22 @@ def submit_quiz(
     current_user=Depends(get_current_active_validated_user),
 ):
     answers = payload.answers
+    quiz_id = _resolve_quiz_id(db, quiz_id)
     db_quiz = db.query(AcademyQuiz).filter(AcademyQuiz.id == quiz_id).first()
     if db_quiz and db_quiz.is_published:
+        if payload.client_submission_id:
+            existing_attempt = (
+                db.query(AcademyQuizAttempt)
+                .filter(
+                    AcademyQuizAttempt.user_id == current_user.id,
+                    AcademyQuizAttempt.client_submission_id
+                    == payload.client_submission_id,
+                )
+                .first()
+            )
+            if existing_attempt and existing_attempt.result_payload:
+                return existing_attempt.result_payload
+        require_quiz_access(db, current_user.id, db_quiz)
         result = _score_db_quiz(db, db_quiz, answers)
         attempts_count = (
             db.query(AcademyQuizAttempt)
@@ -915,17 +1045,47 @@ def submit_quiz(
             )
             .count()
         )
+        response_payload = {
+            "quiz_id": quiz_id,
+            "score": result["score"],
+            "passed": result["passed"],
+            "correct_answers": result["correct_answers"],
+            "total_questions": result["total_questions"],
+            "feedback": result["feedback"],
+            "points": 60 if result["passed"] else 0,
+            "attempt_number": attempts_count + 1,
+        }
         attempt = AcademyQuizAttempt(
             quiz_id=db_quiz.id,
             user_id=current_user.id,
             answers=answers,
+            client_submission_id=payload.client_submission_id,
+            result_payload=response_payload,
             score=result["score"],
             max_score=100,
             passed=result["passed"],
             attempt_number=attempts_count + 1,
-            submitted_at=datetime.utcnow(),
+            submitted_at=utc_now(),
         )
         db.add(attempt)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            if payload.client_submission_id:
+                concurrent_attempt = (
+                    db.query(AcademyQuizAttempt)
+                    .filter(
+                        AcademyQuizAttempt.user_id == current_user.id,
+                        AcademyQuizAttempt.client_submission_id
+                        == payload.client_submission_id,
+                    )
+                    .first()
+                )
+                if concurrent_attempt and concurrent_attempt.result_payload:
+                    return concurrent_attempt.result_payload
+            raise
+
         if result["passed"]:
             notify_user(
                 db,
@@ -938,15 +1098,7 @@ def submit_quiz(
                 dedupe=True,
             )
         db.commit()
-        return {
-            "quiz_id": quiz_id,
-            "score": result["score"],
-            "passed": result["passed"],
-            "correct_answers": result["correct_answers"],
-            "total_questions": result["total_questions"],
-            "points": 60 if result["passed"] else 0,
-            "attempt_number": attempt.attempt_number,
-        }
+        return response_payload
 
     quiz = get_quiz(quiz_id, db=db, current_user=current_user)
     questions = quiz["questions"]

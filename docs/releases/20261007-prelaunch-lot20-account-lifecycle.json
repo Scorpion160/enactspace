@@ -1,0 +1,39 @@
+{
+  "lot": 20,
+  "date_utc": "2026-10-07T17:10:34.659199+00:00",
+  "tests": {
+    "sqlite": {
+      "passed": 68,
+      "seconds": 29.177,
+      "skipped": 0
+    },
+    "postgresql": {
+      "passed": 39,
+      "seconds": 108.73,
+      "skipped": 0
+    }
+  },
+  "portable_added": 9,
+  "postgresql_races_added": 4,
+  "counts_overlap": true,
+  "reviewed_files": [
+    "backend/app/api/routes/users.py",
+    "backend/app/api/deps.py",
+    "backend/test_prelaunch_account_lifecycle.py",
+    "backend/test_prelaunch_account_lifecycle_postgresql.py",
+    "backend/test_operational_integrity.py"
+  ],
+  "whole_manual_review_complete": false,
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_email_or_payment_sent": false,
+  "source_head": "20261007_0028",
+  "remaining": [
+    "Other privileged routes and concurrent transactions in other modules",
+    "Migration rehearsal from live 0025 to source 0028",
+    "Incomplete whole-source review, Android/web acceptance, targeted cleanup and final documentation"
+  ]
+}

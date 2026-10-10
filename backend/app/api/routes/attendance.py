@@ -1,10 +1,11 @@
+from app.core.time import utc_now
 import csv
 from io import StringIO
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status, File, Form, UploadFile
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -166,7 +167,7 @@ def _sanctions_started(db: Session) -> bool:
         started_at = to_naive_utc(datetime.fromisoformat(raw))
     except ValueError:
         return True
-    return datetime.utcnow() >= started_at
+    return utc_now() >= started_at
 
 
 def _ensure_financial_account(db: Session, user_id) -> FinancialAccount:
@@ -202,10 +203,10 @@ def _remove_attendance_penalty(db: Session, record: AttendanceRecord) -> None:
             Decimal("0"),
             Decimal(str(account.balance_due or 0)) - remaining,
         )
-        account.updated_at = datetime.utcnow()
+        account.updated_at = utc_now()
         fee.status = "cancelled"
-        fee.cancelled_at = datetime.utcnow()
-        fee.updated_at = datetime.utcnow()
+        fee.cancelled_at = utc_now()
+        fee.updated_at = utc_now()
     record.penalty_amount = 0
     if fee:
         record.penalty_fee_id = fee.id
@@ -268,7 +269,7 @@ def _sync_attendance_penalty(
         total = Decimal(str(existing_fee.amount or 0))
         existing_fee.status = "paid" if paid >= total else ("partial" if paid > 0 else "unpaid")
         existing_fee.cancelled_at = None
-        existing_fee.updated_at = datetime.utcnow()
+        existing_fee.updated_at = utc_now()
         record.penalty_amount = existing_fee.amount
         record.penalty_fee_id = existing_fee.id
         account = _ensure_financial_account(db, record.user_id)
@@ -277,7 +278,7 @@ def _sync_attendance_penalty(
             Decimal("0"),
             Decimal(str(account.balance_due or 0)) - previous_remaining + remaining,
         )
-        account.updated_at = datetime.utcnow()
+        account.updated_at = utc_now()
         return
 
     fee = Fee(
@@ -287,7 +288,7 @@ def _sync_attendance_penalty(
         amount=amount,
         amount_paid=0,
         status="unpaid",
-        due_date=datetime.utcnow().date(),
+        due_date=utc_now().date(),
         related_attendance_id=record.id,
         created_by=current_user.id,
     )
@@ -296,7 +297,7 @@ def _sync_attendance_penalty(
 
     account = _ensure_financial_account(db, record.user_id)
     account.balance_due = Decimal(str(account.balance_due or 0)) + amount
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
 
     record.penalty_amount = amount
     record.penalty_fee_id = fee.id
@@ -683,7 +684,7 @@ def _upsert_record(
         justification_status,
         normalized_status,
     )
-    now = datetime.utcnow()
+    now = utc_now()
     arrival = to_naive_utc(arrival_time) if arrival_time is not None else now
     if normalized_status in {"absent", "justified_absence", "excused", "not_recorded"}:
         arrival = None
@@ -828,7 +829,7 @@ def _qr_scan_result(
 
 def _rate_limit_qr_scan(current_user: User, request: Request) -> bool:
     key = (str(current_user.id), get_client_ip(request) or "unknown")
-    now = datetime.utcnow()
+    now = utc_now()
     window_start = now - timedelta(minutes=1)
     attempts = [
         value
@@ -1061,7 +1062,7 @@ def update_attendance_settings(
         setting = db.query(AttendanceSetting).filter(AttendanceSetting.key == key).first()
         if setting:
             setting.value = value.isoformat() if hasattr(value, "isoformat") else str(value)
-            setting.updated_at = datetime.utcnow()
+            setting.updated_at = utc_now()
     db.commit()
     return _ensure_attendance_settings(db)
 
@@ -1369,7 +1370,7 @@ def update_attendance_session(
 
     for field, value in updates.items():
         setattr(session, field, value)
-    session.updated_at = datetime.utcnow()
+    session.updated_at = utc_now()
     generated = _ensure_expected_members(db, session)
 
     create_audit_log(
@@ -1408,8 +1409,8 @@ def open_attendance_session(
 
     session.status = "open"
     if session.checkin_start is None:
-        session.checkin_start = datetime.utcnow()
-    session.updated_at = datetime.utcnow()
+        session.checkin_start = utc_now()
+    session.updated_at = utc_now()
     generated = _ensure_expected_members(db, session)
 
     notify_users(
@@ -1492,7 +1493,7 @@ def close_attendance_session(
 
     session.status = "closed"
     session.is_closed = True
-    session.updated_at = datetime.utcnow()
+    session.updated_at = utc_now()
 
     create_audit_log(
         db=db,
@@ -1532,7 +1533,7 @@ def archive_attendance_session(
         )
     session.status = "archived"
     session.is_closed = True
-    session.updated_at = datetime.utcnow()
+    session.updated_at = utc_now()
     create_audit_log(
         db=db,
         action="archivage_seance_presence",
@@ -1665,7 +1666,7 @@ def scan_attendance_qr(
         db.commit()
         return _qr_scan_result("invalid_token")
 
-    now = datetime.utcnow()
+    now = utc_now()
     if (
         session.is_closed
         or session.status != "open"
@@ -1934,13 +1935,20 @@ def submit_absence_justification(
             detail="Le motif de justification est obligatoire",
         )
 
+    if payload.file_id:
+        from app.models.stored_file import StoredFile
+        stored = db.get(StoredFile, payload.file_id)
+        if not stored or stored.entity_type != "attendance_record" or stored.entity_id != record.id:
+            raise HTTPException(400, "Joignez le justificatif depuis cette absence.")
+        payload.file_url = f"/api/files/{stored.id}/download"
+
     record.justification = reason
     record.justification_reason = reason
     record.justification_status = "pending"
     record.justification_file_id = payload.file_id
     record.justification_file_url = payload.file_url
     record.is_justified = False
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utc_now()
     _sync_attendance_penalty(db, record, current_user)
     _notify_justification_reviewers(db, record, session)
     create_audit_log(
@@ -1956,6 +1964,37 @@ def submit_absence_justification(
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.post("/records/{record_id}/justify-with-file", response_model=AttendanceRecordRead)
+async def submit_absence_justification_file(
+    record_id: str, request: Request, reason: str = Form(...), file: UploadFile = File(...),
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_validated_user),
+):
+    from app.services.attachment_service import read_attachment
+    from app.services.file_storage_service import store_bytes, delete_physical_file
+    name, data = await read_attachment(file)
+    unlocked = _get_record_or_404(db, record_id)
+    session = lock_row(db, AttendanceSession, unlocked.session_id)
+    record = lock_row(db, AttendanceRecord, record_id)
+    if session is None or record is None:
+        raise HTTPException(404, "Ligne de présence introuvable.")
+    if record.user_id != current_user.id:
+        raise HTTPException(403, "Vous ne pouvez justifier que vos propres absences.")
+    if record.justification_status not in {"not_submitted", "rejected"}:
+        raise HTTPException(409, "Cette justification ne peut plus être soumise.")
+    if record.status not in {"absent", "justified_absence"} or not reason.strip():
+        raise HTTPException(400, "Précisez le motif de cette absence.")
+    stored = store_bytes(db, data=data, original_filename=name, uploaded_by=current_user,
+        storage_scope="document", visibility="private", entity_type="attendance_record",
+        entity_id=record.id, is_temporary=False)
+    try:
+        return submit_absence_justification(record_id,
+            AttendanceJustificationSubmit(reason=reason, file_id=stored.id), request, db, current_user)
+    except Exception:
+        db.rollback()
+        delete_physical_file(stored)
+        raise
 
 
 @router.post(
@@ -1985,7 +2024,7 @@ def approve_absence_justification(
     record.is_justified = True
     if payload.reason and payload.reason.strip():
         record.note = payload.reason.strip()
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utc_now()
     _sync_attendance_penalty(db, record, current_user)
     if linked_fee and float(linked_fee.amount_paid or 0) > 0:
         create_audit_log(
@@ -2054,7 +2093,7 @@ def reject_absence_justification(
     record.justification_status = "rejected"
     record.is_justified = False
     record.note = reason
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utc_now()
     _sync_attendance_penalty(db, record, current_user)
     create_audit_log(
         db=db,

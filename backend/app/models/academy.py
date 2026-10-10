@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -21,6 +22,7 @@ class AcademyCourse(Base):
     category: Mapped[str] = mapped_column(String(100), default="Vie interne")
     level: Mapped[str] = mapped_column(String(60), default="debutant")
     target_roles: Mapped[list] = mapped_column(JSON, default=list)
+    prerequisite_course_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     estimated_duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
     points: Mapped[int] = mapped_column(Integer, default=0)
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -41,11 +43,11 @@ class AcademyCourse(Base):
         ForeignKey("users.id"),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
 
 
@@ -75,11 +77,11 @@ class AcademyLesson(Base):
     )
     external_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
 
 
@@ -112,11 +114,11 @@ class AcademyQuiz(Base):
         ForeignKey("users.id"),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
 
 
@@ -140,7 +142,7 @@ class AcademyQuestion(Base):
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     points: Mapped[float] = mapped_column(Numeric(8, 2), default=1)
     order_index: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class AcademyProgress(Base):
@@ -172,13 +174,20 @@ class AcademyProgress(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
 
 
 class AcademyQuizAttempt(Base):
     __tablename__ = "academy_quiz_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "client_submission_id",
+            name="uq_academy_quiz_attempts_user_client_submission",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         GUID(),
@@ -196,11 +205,16 @@ class AcademyQuizAttempt(Base):
         nullable=False,
     )
     answers: Mapped[list] = mapped_column(JSON, default=list)
+    client_submission_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    result_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     score: Mapped[float] = mapped_column(Numeric(6, 2), default=0)
     max_score: Mapped[float] = mapped_column(Numeric(6, 2), default=0)
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     attempt_number: Mapped[int] = mapped_column(Integer, default=1)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
@@ -223,7 +237,7 @@ class AcademyCertificate(Base):
         nullable=False,
     )
     certificate_code: Mapped[str] = mapped_column(String(80), nullable=False)
-    issued_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    issued_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     file_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
         ForeignKey("stored_files.id"),

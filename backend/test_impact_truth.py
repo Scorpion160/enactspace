@@ -1,5 +1,6 @@
 """PR-2C impact truth, provenance, and aggregation regressions."""
 
+from app.core.time import utc_now
 import csv
 import io
 import os
@@ -66,6 +67,20 @@ class ImpactTruthTests(unittest.TestCase):
         self.db.add_all([self.user, self.project])
         self.db.flush()
 
+    def test_operational_counts_use_actual_deadlines_and_include_validated_tasks(self):
+        now = utc_now()
+        for index, (state, due) in enumerate([
+            ('valide', now-timedelta(days=3)), ('termine', now-timedelta(days=2)),
+            ('annule', now-timedelta(days=1)), ('en_cours', now-timedelta(hours=1)),
+            ('bloque', now-timedelta(hours=2)), ('a_faire', now+timedelta(days=1)),
+            ('a_faire', None),
+        ]):
+            self.db.add(Task(title=f'Task {index}', project_id=self.project.id, status=state, due_date=due))
+        self.db.flush()
+        payload = impact._project_payload(self.db, self.project)
+        self.assertEqual(payload['completed_tasks'], 2)
+        self.assertEqual(payload['late_tasks'], 2)
+
     def tearDown(self):
         self.db.rollback()
         self.db.close()
@@ -94,7 +109,7 @@ class ImpactTruthTests(unittest.TestCase):
             "status": "validated",
             "created_by_id": self.user.id,
             "validated_by_id": self.user.id,
-            "validated_at": datetime.utcnow(),
+            "validated_at": utc_now(),
         }
         defaults.update(values)
         metric = ImpactMetric(**defaults)
@@ -129,7 +144,7 @@ class ImpactTruthTests(unittest.TestCase):
 
     def test_realized_rule_excludes_every_non_measured_or_non_verified_claim(self):
         record = self.impact_project()
-        older = datetime.utcnow() - timedelta(days=1)
+        older = utc_now() - timedelta(days=1)
         self.claim(record, value=12, created_at=older, validated_at=older)
         self.claim(record, value=25)
         for claim_type in ("ESTIMATE", "PROJECTION", "HISTORICAL_CLAIM"):
@@ -160,7 +175,7 @@ class ImpactTruthTests(unittest.TestCase):
 
         self.assertEqual(payload["direct_impact"], 25)
         self.assertEqual(summary["organization"]["direct_impact_total"], 25)
-        self.assertIsNone(summary["historical_impact"])
+        self.assertEqual(summary["historical_impact"]["impacted_lives"], 150000)
         self.assertEqual(summary["claim_overview"]["by_claim_type"]["PROJECTION"], 1)
 
     def test_replacement_preserves_old_truth_through_review_and_rejection(self):
@@ -347,7 +362,7 @@ class ImpactTruthTests(unittest.TestCase):
 
     def test_overlapping_scopes_are_not_silently_summed(self):
         record = self.impact_project()
-        old = datetime.utcnow() - timedelta(days=1)
+        old = utc_now() - timedelta(days=1)
         self.claim(
             record,
             value=30,
@@ -684,18 +699,35 @@ class ImpactTruthTests(unittest.TestCase):
             dependencies = {dependency.call for dependency in route.dependant.dependencies}
             self.assertIn(require_enacchef_or_admin, dependencies)
 
-    def test_runtime_path_has_no_hard_coded_historical_or_name_fallback(self):
-        source = Path(impact.__file__).read_text(encoding="utf-8").lower()
-        self.assertNotIn("historical_impact =", source)
-        self.assertNotIn("_is_terrasen", source)
-        self.assertNotIn('"terrasen" in', source)
-        archives = Path("app/api/routes/archives.py").read_text(encoding="utf-8").lower()
-        projects_ui = Path(
-            "../frontend/lib/features/projects/screens/projects_screen.dart"
-        ).read_text(encoding="utf-8").lower()
-        self.assertNotIn("default_historical_impact_summary", archives)
-        self.assertNotIn("_isterrasenproject", projects_ui)
-        self.assertNotIn("préremplir terrasen", projects_ui)
+    def test_institutional_history_does_not_inflate_operational_project_totals(self):
+        for name in ("Terrasen", "Dimbali", "Unrelated project"):
+            with self.subTest(name=name):
+                self.project.name = name
+                self.db.flush()
+                summary = impact.get_impact_summary(
+                    db=self.db, current_user=self.user,
+                )
+                self.assertIsNone(summary["organization"]["direct_impact_total"])
+                self.assertIsNone(summary["organization"]["jobs_created_total"])
+                historical = summary["historical_impact"]
+                self.assertEqual(historical["impacted_lives"], 150000)
+                self.assertEqual(historical["people_trained"], 1597)
+                self.assertEqual(historical["planted_trees"], 1425)
+                self.assertEqual(
+                    historical["source_label"],
+                    impact.INSTITUTIONAL_IMPACT_SOURCE_LABEL,
+                )
+
+        record = self.impact_project()
+        self.claim(record, value=7)
+        report = impact.get_impact_report_summary(
+            db=self.db, current_user=self.user,
+        )
+        self.assertEqual(report["global_summary"]["direct_beneficiaries"], 7)
+        self.assertIsNone(report["global_summary"]["jobs_created"])
+        self.assertEqual(
+            report["institutional_historical_impact"]["impacted_lives"], 150000,
+        )
 
 
 if __name__ == "__main__":

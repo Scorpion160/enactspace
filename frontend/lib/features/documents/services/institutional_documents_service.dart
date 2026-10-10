@@ -166,8 +166,7 @@ class InstitutionalDocumentsService {
       '${ApiClient.baseUrl}/institutional-documents/requests/$requestId/preview',
       token: token,
     );
-    if (bytes.length < 5 ||
-        String.fromCharCodes(bytes.take(5)) != '%PDF-') {
+    if (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-') {
       throw Exception('Le serveur n’a pas retourné un aperçu PDF valide.');
     }
     return Uint8List.fromList(bytes);

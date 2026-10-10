@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/application_model.dart';
@@ -10,7 +12,8 @@ class RecruitmentService {
   final AuthService _authService;
 
   RecruitmentService({ApiClient? apiClient, AuthService? authService})
-    : _apiClient = apiClient ?? ApiClient(),
+    : _apiClient =
+          apiClient ?? ApiClient(requestTimeout: const Duration(seconds: 90)),
       _authService = authService ?? AuthService();
 
   Future<List<RecruitmentCampaignModel>> getCampaigns() async {
@@ -47,6 +50,7 @@ class RecruitmentService {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool isActive = true,
   }) async {
     final token = await _authService.getToken();
@@ -62,6 +66,7 @@ class RecruitmentService {
         'start_date': _formatDate(startDate),
         'end_date': _formatDate(endDate),
         'is_active': isActive,
+        'application_questions': ?applicationQuestions,
       },
     );
 
@@ -78,6 +83,7 @@ class RecruitmentService {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool? isActive,
   }) async {
     final token = await _authService.getToken();
@@ -89,6 +95,9 @@ class RecruitmentService {
     if (startDate != null) data['start_date'] = _formatDate(startDate);
     if (endDate != null) data['end_date'] = _formatDate(endDate);
     if (isActive != null) data['is_active'] = isActive;
+    if (applicationQuestions != null) {
+      data['application_questions'] = applicationQuestions;
+    }
     final response = await _apiClient.patchJson(
       '/recruitment/campaigns/$campaignId',
       token: token,
@@ -179,12 +188,15 @@ class RecruitmentService {
         .toList();
   }
 
-  Future<ApplicationModel> getApplication(String applicationId) async {
+  Future<ApplicationModel> getApplication(
+    String applicationId, {
+    bool anonymized = false,
+  }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
 
     final response = await _apiClient.get(
-      '/recruitment/applications/$applicationId',
+      '/recruitment/applications/$applicationId${anonymized ? '?anonymized=true' : ''}',
       token: token,
     );
 
@@ -224,6 +236,8 @@ class RecruitmentService {
   }
 
   Future<ApplicationModel> createApplication({
+    Map<String, String>? questionnaireAnswers,
+    String? questionnaireVersion,
     required String campaignId,
     required String firstName,
     required String lastName,
@@ -245,39 +259,58 @@ class RecruitmentService {
     String? associativeExperience,
     String? availability,
     String? publicComment,
+    SelectedAttachment? cvFile,
+    SelectedAttachment? motivationLetterFile,
+    SelectedAttachment? attachmentFile,
     String? cvUrl,
     String? motivationLetterUrl,
     String? attachmentUrl,
   }) async {
-    final response = await _apiClient.postJson(
-      '/recruitment/applications',
-      data: {
-        'campaign_id': campaignId,
-        'first_name': firstName.trim(),
-        'last_name': lastName.trim(),
-        'gender': _nullIfEmpty(gender),
-        'email': email.trim(),
-        'phone': _nullIfEmpty(phone),
-        'department': _nullIfEmpty(department),
-        'study_level': _nullIfEmpty(studyLevel),
-        'class_name': _nullIfEmpty(className),
-        'motivation': _nullIfEmpty(motivation),
-        'known_enactus_from': _nullIfEmpty(knownEnactusFrom),
-        'enactus_knowledge': _nullIfEmpty(enactusKnowledge),
-        'other_clubs': _nullIfEmpty(otherClubs),
-        'contribution': _nullIfEmpty(contribution),
-        'project_ideas': _nullIfEmpty(projectIdeas),
-        'leadership_profile': _nullIfEmpty(leadershipProfile),
-        'preferred_pole': _nullIfEmpty(preferredPole),
-        'project_interest': _nullIfEmpty(projectInterest),
-        'associative_experience': _nullIfEmpty(associativeExperience),
-        'availability': _nullIfEmpty(availability),
-        'public_comment': _nullIfEmpty(publicComment),
-        'cv_url': _nullIfEmpty(cvUrl),
-        'motivation_letter_url': _nullIfEmpty(motivationLetterUrl),
-        'attachment_url': _nullIfEmpty(attachmentUrl),
-      },
-    );
+    final payload = <String, dynamic>{
+      'campaign_id': campaignId,
+      'questionnaire_answers': ?questionnaireAnswers,
+      'questionnaire_version': ?questionnaireVersion,
+      'first_name': firstName.trim(),
+      'last_name': lastName.trim(),
+      'gender': _nullIfEmpty(gender),
+      'email': email.trim(),
+      'phone': _nullIfEmpty(phone),
+      'department': _nullIfEmpty(department),
+      'study_level': _nullIfEmpty(studyLevel),
+      'class_name': _nullIfEmpty(className),
+      'motivation': _nullIfEmpty(motivation),
+      'known_enactus_from': _nullIfEmpty(knownEnactusFrom),
+      'enactus_knowledge': _nullIfEmpty(enactusKnowledge),
+      'other_clubs': _nullIfEmpty(otherClubs),
+      'contribution': _nullIfEmpty(contribution),
+      'project_ideas': _nullIfEmpty(projectIdeas),
+      'leadership_profile': _nullIfEmpty(leadershipProfile),
+      'preferred_pole': _nullIfEmpty(preferredPole),
+      'project_interest': _nullIfEmpty(projectInterest),
+      'associative_experience': _nullIfEmpty(associativeExperience),
+      'availability': _nullIfEmpty(availability),
+      'public_comment': _nullIfEmpty(publicComment),
+      'cv_url': _nullIfEmpty(cvUrl),
+      'motivation_letter_url': _nullIfEmpty(motivationLetterUrl),
+      'attachment_url': _nullIfEmpty(attachmentUrl),
+    };
+    final files = <String, ({String name, List<int> bytes})>{
+      if (cvFile != null) 'cv': (name: cvFile.name, bytes: cvFile.bytes),
+      if (motivationLetterFile != null)
+        'motivation_letter': (
+          name: motivationLetterFile.name,
+          bytes: motivationLetterFile.bytes,
+        ),
+      if (attachmentFile != null)
+        'attachment': (name: attachmentFile.name, bytes: attachmentFile.bytes),
+    };
+    final response = files.isEmpty
+        ? await _apiClient.postJson('/recruitment/applications', data: payload)
+        : await _apiClient.postMultipartFiles(
+            '/recruitment/applications/with-files',
+            fields: {'payload': jsonEncode(payload)},
+            files: files,
+          );
 
     if (response is Map<String, dynamic>) {
       return ApplicationModel.fromJson(response);
@@ -328,6 +361,7 @@ class RecruitmentService {
   Future<ApplicationReviewModel> createReview({
     required String applicationId,
     required double score,
+    Map<String, dynamic>? criteriaAssessment,
     String? comment,
     String recommendation = 'reserve',
   }) async {
@@ -340,6 +374,7 @@ class RecruitmentService {
       data: {
         'application_id': applicationId,
         'score': score,
+        'criteria_assessment': ?criteriaAssessment,
         'comment': _nullIfEmpty(comment),
         'recommendation': recommendation,
       },
@@ -384,7 +419,7 @@ class RecruitmentService {
 
   Future<Map<String, dynamic>> convertToUser({
     required String applicationId,
-    required String password,
+    String? password,
     String? profileType,
     String? corePoleId,
     List<String> supportPoleIds = const [],
@@ -397,7 +432,6 @@ class RecruitmentService {
       '/recruitment/applications/$applicationId/convert-to-user',
       token: token,
       data: {
-        'password': password,
         'profile_type': _nullIfEmpty(profileType),
         'core_pole_id': _nullIfEmpty(corePoleId),
         'support_pole_ids': supportPoleIds

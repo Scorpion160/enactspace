@@ -1,0 +1,22 @@
+{
+  "lot": 7,
+  "utc": "2026-10-07T12:07:53.458838+00:00",
+  "sqlite_tests_passed": 126,
+  "postgresql16_tests_passed": 6,
+  "parallel_admin_removals": "one success, one 409; one available admin retained",
+  "resolved_linux_dependencies_audited_including_tools": 83,
+  "known_advisories_returned": 0,
+  "pip_audit": "2.10.1 strict path audit",
+  "runtime_dependency_versions_locked": false,
+  "production_changed": false,
+  "emails_sent": 0,
+  "push_sent": 0,
+  "build": false,
+  "full_manual_review_completed": false,
+  "changed_sha256": {
+    "backend/app/api/routes/users.py": "61f57accf1fc801f4929592bfa27540efdf20176e5c8462a6f3b147f4a3f700f",
+    "backend/app/services/operational_integrity.py": "aa25b240ccb453f69e592a47fd0008e0575ff79c5e14ebd7f1bf18a9519b1fcb",
+    "backend/test_prelaunch_role_integrity.py": "2793397b907fd2cdeaf8e1821a0c994438815a0f832183315f625867e9d94e9e",
+    "backend/test_prelaunch_role_integrity_postgresql.py": "8d69c076f194831f90125a4cfc2ab5a58dad9a19530e64946f640aef693972df"
+  }
+}

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/academic/esp_academic_catalog.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_form_dialog.dart';
 import '../../../shared/ui/app_components.dart';
+import '../../gamification/services/games_service.dart';
 import '../../poles/models/pole_model.dart';
 import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
@@ -60,6 +63,8 @@ class _MembersScreenState extends State<MembersScreen> {
           pendingMembers.where((member) => knownIds.add(member.id)),
         );
       }
+      members.removeWhere((member) => member.isAlumni);
+      members.sort(MemberModel.compareAlphabetically);
 
       if (!mounted) return;
 
@@ -124,7 +129,7 @@ class _MembersScreenState extends State<MembersScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Approuver le membre'),
+          title: Text('Approuver le membre'),
           content: Text(
             'Voulez-vous approuver ${member.displayName} ?\n\n'
             'Son compte passera en statut actif.',
@@ -132,12 +137,12 @@ class _MembersScreenState extends State<MembersScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
+              child: Text('Annuler'),
             ),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.check_circle_outline_rounded),
-              label: const Text('Approuver'),
+              icon: Icon(Icons.check_circle_outline_rounded),
+              label: Text('Approuver'),
             ),
           ],
         );
@@ -173,7 +178,7 @@ class _MembersScreenState extends State<MembersScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Rejeter la demande'),
+        title: Text('Rejeter la demande'),
         content: Text(
           'La demande de ${member.displayName} sera rejetée. '
           'Cette action ne supprime pas son dossier.',
@@ -181,12 +186,12 @@ class _MembersScreenState extends State<MembersScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+            child: Text('Annuler'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.close_rounded),
-            label: const Text('Rejeter'),
+            icon: Icon(Icons.close_rounded),
+            label: Text('Rejeter'),
           ),
         ],
       ),
@@ -244,7 +249,7 @@ class _MembersScreenState extends State<MembersScreen> {
             SimpleDialogOption(
               onPressed: () =>
                   Navigator.of(context).pop(_LifecycleChoice.makeAlumni),
-              child: const ListTile(
+              child: ListTile(
                 leading: Icon(Icons.workspace_premium_outlined),
                 title: Text('Passer Alumni'),
                 subtitle: Text('Clôture les affectations actives'),
@@ -256,7 +261,7 @@ class _MembersScreenState extends State<MembersScreen> {
             SimpleDialogOption(
               onPressed: () =>
                   Navigator.of(context).pop(_LifecycleChoice.suspend),
-              child: const ListTile(
+              child: ListTile(
                 leading: Icon(Icons.person_off_outlined),
                 title: Text('Suspendre le compte'),
               ),
@@ -265,7 +270,7 @@ class _MembersScreenState extends State<MembersScreen> {
             SimpleDialogOption(
               onPressed: () =>
                   Navigator.of(context).pop(_LifecycleChoice.reactivate),
-              child: const ListTile(
+              child: ListTile(
                 leading: Icon(Icons.person_add_alt_rounded),
                 title: Text('Réactiver le compte'),
               ),
@@ -278,6 +283,56 @@ class _MembersScreenState extends State<MembersScreen> {
     try {
       switch (choice) {
         case _LifecycleChoice.makeAlumni:
+          final preview = await _membersService.previewAlumni(member.id);
+          if (!mounted) return;
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(
+                'Préparer le passage Alumni de ${member.displayName}',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      preview['message'].toString(),
+                      style: const TextStyle(height: 1.6),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${(preview['poles'] as List).length} affectations de pôle · ${(preview['projects'] as List).length} affectations de projet à clôturer.',
+                    ),
+                    const SizedBox(height: 12),
+                    for (final task in (preview['pending_tasks'] as List))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text('Travail à transmettre : ${task['title']}'),
+                      ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Confirmez que cette personne a terminé ses études. Le dernier niveau d’études ne suffit pas à établir qu’elle est diplômée.',
+                      style: TextStyle(height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Préparer le relais d’abord'),
+                ),
+                FilledButton(
+                  onPressed: preview['can_convert'] == true
+                      ? () => Navigator.pop(context, true)
+                      : null,
+                  child: const Text('Confirmer le passage Alumni'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
           await _membersService.makeAlumni(member.id);
           break;
         case _LifecycleChoice.suspend:
@@ -321,7 +376,9 @@ class _MembersScreenState extends State<MembersScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Pôle cœur mis à jour pour ${member.displayName}.'),
+          content: Text(
+            'Département ESP mis à jour pour ${member.displayName}.',
+          ),
         ),
       );
     }
@@ -376,12 +433,12 @@ class _MembersScreenState extends State<MembersScreen> {
       final matchesPole =
           _poleFilter == 'all' || member.department == _poleFilter;
       return matchesSearch && matchesStatus && matchesRole && matchesPole;
-    }).toList();
+    }).toList()..sort(MemberModel.compareAlphabetically);
   }
 
   int get _activeCount {
     return _members
-        .where((m) => m.status == 'active' || m.isActive == true)
+        .where((m) => !m.isAlumni && m.status == 'active' && m.isActive == true)
         .length;
   }
 
@@ -438,7 +495,13 @@ class _MembersScreenState extends State<MembersScreen> {
                   onRefresh: _loadMembers,
                   onAdd: _openAddMemberDialog,
                 ),
-                const SizedBox(height: 18),
+                if (canManageMembers)
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/members/first-access'),
+                    icon: const Icon(Icons.key_outlined),
+                    label: const Text('Préparer les premières connexions'),
+                  ),
+                SizedBox(height: 18),
                 _SearchAndActions(
                   onChanged: (value) => setState(() => _search = value),
                   statusFilter: _statusFilter,
@@ -459,9 +522,9 @@ class _MembersScreenState extends State<MembersScreen> {
                   onReset: _resetFilters,
                   onImport: canManageMembers ? _openImportMembersPanel : null,
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 if (_loading)
-                  const Center(
+                  Center(
                     child: Padding(
                       padding: EdgeInsets.all(40),
                       child: CircularProgressIndicator(),
@@ -523,18 +586,18 @@ class _MembersHeader extends StatelessWidget {
             color: AppTheme.enactusYellow,
             borderRadius: BorderRadius.circular(18),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.people_alt_rounded,
             color: AppTheme.softBlack,
             size: 34,
           ),
         ),
-        const SizedBox(width: 18),
+        SizedBox(width: 18),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Membres',
                 style: TextStyle(
                   color: AppTheme.softBlack,
@@ -542,11 +605,11 @@ class _MembersHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 '$total membre(s) • $active actif(s) • $pending en attente',
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
@@ -580,13 +643,13 @@ class _MembersHeader extends StatelessWidget {
           if (constraints.maxWidth < 700) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [identity, const SizedBox(height: 18), actions],
+              children: [identity, SizedBox(height: 18), actions],
             );
           }
           return Row(
             children: [
               Expanded(child: identity),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               actions,
             ],
           );
@@ -629,7 +692,7 @@ class _SearchAndActions extends StatelessWidget {
       onChanged: onChanged,
       decoration: const InputDecoration(
         labelText: 'Rechercher un membre',
-        hintText: 'Nom, email, téléphone, pôle...',
+        hintText: 'Nom, email, téléphone, département...',
         prefixIcon: Icon(Icons.search_rounded),
       ),
     );
@@ -643,7 +706,6 @@ class _SearchAndActions extends StatelessWidget {
         DropdownMenuItem(value: 'pending', child: Text('En attente')),
         DropdownMenuItem(value: 'inactive', child: Text('Inactifs')),
         DropdownMenuItem(value: 'suspended', child: Text('Suspendus')),
-        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
         DropdownMenuItem(value: 'rejected', child: Text('Refusés')),
       ],
       onChanged: (value) {
@@ -660,6 +722,7 @@ class _SearchAndActions extends StatelessWidget {
         DropdownMenuItem(value: 'team_leader', child: Text('Team Leader')),
         DropdownMenuItem(value: 'secretaire_generale', child: Text('SG')),
         DropdownMenuItem(value: 'financier', child: Text('Financier')),
+        DropdownMenuItem(value: 'pole_veille', child: Text('Pôle Veille')),
         DropdownMenuItem(value: 'chef_pole', child: Text('Chef pôle')),
         DropdownMenuItem(
           value: 'adjoint_chef_pole',
@@ -670,7 +733,6 @@ class _SearchAndActions extends StatelessWidget {
           value: 'adjoint_chef_projet',
           child: Text('Adjoint projet'),
         ),
-        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
       ],
       onChanged: (value) {
         if (value != null) onRoleChanged(value);
@@ -679,9 +741,12 @@ class _SearchAndActions extends StatelessWidget {
     final poleFilterField = DropdownButtonFormField<String>(
       initialValue: poleFilter,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Pôle'),
+      decoration: const InputDecoration(labelText: 'Département ESP'),
       items: [
-        const DropdownMenuItem(value: 'all', child: Text('Tous les pôles')),
+        const DropdownMenuItem(
+          value: 'all',
+          child: Text('Tous les départements'),
+        ),
         ...poles.map(
           (pole) => DropdownMenuItem(value: pole, child: Text(pole)),
         ),
@@ -695,21 +760,21 @@ class _SearchAndActions extends StatelessWidget {
         ? null
         : OutlinedButton.icon(
             onPressed: onImport,
-            icon: const Icon(Icons.upload_file_rounded),
-            label: const Text('Importer'),
+            icon: Icon(Icons.upload_file_rounded),
+            label: Text('Importer'),
           );
 
     if (isWide && importButton != null) {
       return Row(
         children: [
           Expanded(child: searchField),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           SizedBox(width: 145, child: statusFilterField),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           SizedBox(width: 170, child: roleFilterField),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           SizedBox(width: 150, child: poleFilterField),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           importButton,
         ],
       );
@@ -722,26 +787,26 @@ class _SearchAndActions extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           searchField,
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           AppDataCard(
             padding: EdgeInsets.zero,
             child: ExpansionTile(
-              title: const Text('Filtres avancés'),
-              subtitle: const Text('Statut, rôle et pôle'),
+              title: Text('Filtres avancés'),
+              subtitle: Text('Statut, rôle et département'),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               children: [
                 statusFilterField,
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 roleFilterField,
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 poleFilterField,
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: onReset,
-                    icon: const Icon(Icons.restart_alt_rounded),
-                    label: const Text('Réinitialiser'),
+                    icon: Icon(Icons.restart_alt_rounded),
+                    label: Text('Réinitialiser'),
                   ),
                 ),
               ],
@@ -755,32 +820,32 @@ class _SearchAndActions extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         searchField,
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         AppDataCard(
           padding: EdgeInsets.zero,
           child: ExpansionTile(
-            title: const Text('Filtres avancés'),
-            subtitle: const Text('Statut, rôle et pôle'),
+            title: Text('Filtres avancés'),
+            subtitle: Text('Statut, rôle et département'),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             children: [
               statusFilterField,
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               roleFilterField,
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               poleFilterField,
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: onReset,
-                  icon: const Icon(Icons.restart_alt_rounded),
-                  label: const Text('Réinitialiser'),
+                  icon: Icon(Icons.restart_alt_rounded),
+                  label: Text('Réinitialiser'),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Wrap(spacing: 10, runSpacing: 10, children: actionButtons),
       ],
     );
@@ -839,7 +904,7 @@ class _MembersList extends StatelessWidget {
                 DataColumn(label: Text('Email')),
                 DataColumn(label: Text('Statut')),
                 DataColumn(label: Text('Rôles')),
-                DataColumn(label: Text('Pôle cœur')),
+                DataColumn(label: Text('Département ESP')),
                 DataColumn(label: Text('Actif')),
                 DataColumn(label: Text('Email vérifié')),
                 DataColumn(label: Text('Actions')),
@@ -896,14 +961,14 @@ class _MembersList extends StatelessWidget {
                             TextButton.icon(
                               onPressed: () =>
                                   _showMemberDetails(context, member),
-                              icon: const Icon(Icons.visibility_rounded),
-                              label: const Text('Profil'),
+                              icon: Icon(Icons.visibility_rounded),
+                              label: Text('Profil'),
                             ),
                             if (canManageMembers)
                               TextButton.icon(
                                 onPressed: () => onEdit(member),
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('Modifier'),
+                                icon: Icon(Icons.edit_outlined),
+                                label: Text('Modifier'),
                               ),
                             if (canManageMembers) ...[
                               IconButton(
@@ -914,9 +979,7 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onAssignRole(member),
-                                icon: const Icon(
-                                  Icons.admin_panel_settings_rounded,
-                                ),
+                                icon: Icon(Icons.admin_panel_settings_rounded),
                                 tooltip: 'Assigner rôle',
                               ),
                               IconButton(
@@ -927,8 +990,8 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onAssignDepartment(member),
-                                icon: const Icon(Icons.account_tree_rounded),
-                                tooltip: 'Assigner pôle cœur',
+                                icon: Icon(Icons.account_tree_rounded),
+                                tooltip: 'Assigner le département ESP',
                               ),
                               IconButton(
                                 visualDensity: VisualDensity.compact,
@@ -938,7 +1001,7 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onAssignPlacement(member),
-                                icon: const Icon(Icons.hub_rounded),
+                                icon: Icon(Icons.hub_rounded),
                                 tooltip: 'Affecter',
                               ),
                             ],
@@ -952,7 +1015,7 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onApprove(member),
-                                icon: const Icon(Icons.verified_user_rounded),
+                                icon: Icon(Icons.verified_user_rounded),
                                 tooltip: 'Approuver',
                                 color: Colors.green,
                               ),
@@ -964,7 +1027,7 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onReject(member),
-                                icon: const Icon(Icons.cancel_outlined),
+                                icon: Icon(Icons.cancel_outlined),
                                 tooltip: 'Rejeter',
                                 color: Colors.red,
                               ),
@@ -985,9 +1048,7 @@ class _MembersList extends StatelessWidget {
                                 ),
                                 padding: EdgeInsets.zero,
                                 onPressed: () => onManageLifecycle(member),
-                                icon: const Icon(
-                                  Icons.manage_accounts_outlined,
-                                ),
+                                icon: Icon(Icons.manage_accounts_outlined),
                                 tooltip: 'Gérer le compte',
                               ),
                           ],
@@ -1051,6 +1112,10 @@ class _MembersList extends StatelessWidget {
   }
 
   void _showMemberDetails(BuildContext context, MemberModel member) {
+    if (member.id.trim().isNotEmpty) {
+      context.go('/members/${Uri.encodeComponent(member.id)}');
+      return;
+    }
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -1076,7 +1141,7 @@ class _MembersList extends StatelessWidget {
                       name: member.displayName,
                       photoUrl: member.photoUrl,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1085,12 +1150,12 @@ class _MembersList extends StatelessWidget {
                             member.displayName,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          SizedBox(height: 6),
                           Wrap(
                             spacing: 8,
                             runSpacing: 6,
@@ -1104,14 +1169,14 @@ class _MembersList extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 const AppSectionHeader(title: 'Contact'),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _DetailLine(label: 'Email', value: member.email),
                 _DetailLine(label: 'Téléphone', value: member.phoneLabel),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 const AppSectionHeader(title: 'Organisation'),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _DetailLine(label: 'Statut', value: member.statusLabel),
                 _DetailLine(label: 'Profil', value: member.memberLabel),
                 _DetailLine(
@@ -1119,17 +1184,50 @@ class _MembersList extends StatelessWidget {
                   value: member.primaryRoleLabel,
                 ),
                 _DetailLine(label: 'Rôles', value: member.rolesLabel),
-                _DetailLine(label: 'Pôle cœur', value: member.departmentLabel),
-                const SizedBox(height: 8),
+                _DetailLine(
+                  label: 'Département ESP',
+                  value: member.departmentLabel,
+                ),
+                SizedBox(height: 8),
                 const AppSectionHeader(title: 'Parcours'),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _DetailLine(label: 'Niveau', value: member.studyLevelLabel),
                 _DetailLine(label: 'Promotion', value: member.promotionLabel),
                 _DetailLine(label: 'Adhésion', value: member.joinedAtLabel),
                 _DetailLine(label: 'Bio', value: member.bioLabel),
-                const SizedBox(height: 8),
+                SizedBox(height: 12),
+                const AppSectionHeader(title: 'Jeux du club'),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: GamesService().profile(member.id),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data;
+                    if (data == null) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${data['wins']} victoire(s) · ${data['points']} points · ${data['games']} partie(s)',
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final badge in (data['badges'] as List))
+                              Chip(
+                                avatar: Icon(
+                                  Icons.emoji_events_outlined,
+                                  size: 17,
+                                ),
+                                label: Text('$badge'),
+                              ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                SizedBox(height: 8),
                 const AppSectionHeader(title: 'État du compte'),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _DetailLine(
                   label: 'Actif',
                   value: member.isActive == true ? 'Oui' : 'Non',
@@ -1139,7 +1237,7 @@ class _MembersList extends StatelessWidget {
                   value: member.emailVerified == true ? 'Oui' : 'Non',
                 ),
                 _DetailLine(label: 'ID', value: member.id),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 OutlinedButton.icon(
                   key: const Key('member_memory_link'),
                   onPressed: () {
@@ -1148,8 +1246,8 @@ class _MembersList extends StatelessWidget {
                       '/archives?member_id=${Uri.encodeQueryComponent(member.id)}',
                     );
                   },
-                  icon: const Icon(Icons.history),
-                  label: const Text('Voir dans la mémoire'),
+                  icon: Icon(Icons.history),
+                  label: Text('Voir dans la mémoire'),
                 ),
               ],
             ),
@@ -1170,11 +1268,8 @@ class _MemberIdentity extends StatelessWidget {
     return Row(
       children: [
         _Avatar(name: member.displayName, photoUrl: member.photoUrl),
-        const SizedBox(width: 10),
-        Text(
-          member.displayName,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
+        SizedBox(width: 10),
+        Text(member.displayName, style: TextStyle(fontWeight: FontWeight.w700)),
       ],
     );
   }
@@ -1222,7 +1317,7 @@ class _MemberCard extends StatelessWidget {
             Row(
               children: [
                 _Avatar(name: member.displayName, photoUrl: member.photoUrl),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1230,7 +1325,7 @@ class _MemberCard extends StatelessWidget {
                       Text(
                         member.displayName,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
                         ),
@@ -1238,7 +1333,9 @@ class _MemberCard extends StatelessWidget {
                       Text(
                         member.email,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -1290,8 +1387,8 @@ class _MemberCard extends StatelessWidget {
                         const PopupMenuItem(
                           value: _MemberAction.assignDepartment,
                           child: ListTile(
-                            leading: Icon(Icons.account_tree_rounded),
-                            title: Text('Assigner le pôle cœur'),
+                            leading: Icon(Icons.account_balance_outlined),
+                            title: Text('Assigner le département ESP'),
                           ),
                         ),
                         const PopupMenuItem(
@@ -1336,7 +1433,7 @@ class _MemberCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 6,
@@ -1349,25 +1446,25 @@ class _MemberCard extends StatelessWidget {
                 _DepartmentChip(department: member.departmentLabel),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 TextButton.icon(
                   onPressed: onDetails,
-                  icon: const Icon(Icons.visibility_rounded),
-                  label: const Text('Voir le profil'),
+                  icon: Icon(Icons.visibility_rounded),
+                  label: Text('Voir le profil'),
                 ),
                 if (canManageMembers)
                   TextButton.icon(
                     onPressed: () => onEdit(member),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Modifier'),
+                    icon: Icon(Icons.edit_outlined),
+                    label: Text('Modifier'),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             if (!isCompact) ...[
               const Divider(height: 20),
               Wrap(
@@ -1378,29 +1475,29 @@ class _MemberCard extends StatelessWidget {
                   if (canManageMembers) ...[
                     IconButton(
                       onPressed: onAssignRole,
-                      icon: const Icon(Icons.admin_panel_settings_rounded),
+                      icon: Icon(Icons.admin_panel_settings_rounded),
                       tooltip: 'Assigner rôle',
                     ),
                     IconButton(
                       onPressed: onAssignDepartment,
-                      icon: const Icon(Icons.account_tree_rounded),
-                      tooltip: 'Assigner pôle cœur',
+                      icon: Icon(Icons.account_tree_rounded),
+                      tooltip: 'Assigner le département ESP',
                     ),
                     IconButton(
                       onPressed: onAssignPlacement,
-                      icon: const Icon(Icons.hub_rounded),
+                      icon: Icon(Icons.hub_rounded),
                       tooltip: 'Affecter pôle/projet',
                     ),
                   ],
                   if (canReviewJoinRequests && onApprove != null) ...[
                     FilledButton.icon(
                       onPressed: onApprove,
-                      icon: const Icon(Icons.verified_user_rounded),
-                      label: const Text('Approuver'),
+                      icon: Icon(Icons.verified_user_rounded),
+                      label: Text('Approuver'),
                     ),
                     IconButton(
                       onPressed: onReject,
-                      icon: const Icon(Icons.cancel_outlined),
+                      icon: Icon(Icons.cancel_outlined),
                       color: Colors.red,
                       tooltip: 'Rejeter',
                     ),
@@ -1408,7 +1505,7 @@ class _MemberCard extends StatelessWidget {
                   if (canManageLifecycle)
                     IconButton(
                       onPressed: onManageLifecycle,
-                      icon: const Icon(Icons.manage_accounts_outlined),
+                      icon: Icon(Icons.manage_accounts_outlined),
                       tooltip: 'Gérer le compte',
                     ),
                 ],
@@ -1437,7 +1534,7 @@ class _Avatar extends StatelessWidget {
       foregroundColor: AppTheme.softBlack,
       backgroundImage: imageUrl == null ? null : NetworkImage(imageUrl),
       child: imageUrl == null
-          ? Text(initial, style: const TextStyle(fontWeight: FontWeight.w900))
+          ? Text(initial, style: TextStyle(fontWeight: FontWeight.w900))
           : null,
     );
   }
@@ -1464,6 +1561,14 @@ String? _absoluteMemberPhotoUrl(String? value) {
   return '${ApiClient.serverUrl}${url.startsWith('/') ? '' : '/'}$url';
 }
 
+(Color, Color) _memberAccentColors(BuildContext context, Color accent) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return (
+    accent.withValues(alpha: dark ? 0.24 : 0.12),
+    dark ? Color.lerp(accent, Colors.white, 0.48)! : accent,
+  );
+}
+
 class _StatusChip extends StatelessWidget {
   final MemberModel member;
 
@@ -1471,22 +1576,16 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = member.status == 'active' || member.isActive == true;
+    final isActive = !member.isAlumni &&
+        member.status == 'active' && member.isActive == true;
     final isPending = member.status == 'pending';
 
-    Color background;
-    Color foreground;
-
-    if (isActive) {
-      background = Colors.green.shade50;
-      foreground = Colors.green.shade700;
-    } else if (isPending) {
-      background = Colors.orange.shade50;
-      foreground = Colors.orange.shade800;
-    } else {
-      background = Colors.grey.shade100;
-      foreground = Colors.grey.shade700;
-    }
+    final scheme = Theme.of(context).colorScheme;
+    final (background, foreground) = isActive
+        ? _memberAccentColors(context, AppTheme.success)
+        : isPending
+        ? _memberAccentColors(context, AppTheme.warning)
+        : (scheme.surfaceContainerHighest, scheme.onSurfaceVariant);
 
     return Chip(
       label: SizedBox(
@@ -1512,17 +1611,18 @@ class _BooleanChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isTrue = value == true;
+    final scheme = Theme.of(context).colorScheme;
+    final (background, foreground) = isTrue
+        ? _memberAccentColors(context, AppTheme.success)
+        : (scheme.surfaceContainerHighest, scheme.onSurfaceVariant);
 
     return Chip(
       label: SizedBox(
         width: 36,
         child: Text(isTrue ? 'Oui' : 'Non', textAlign: TextAlign.center),
       ),
-      backgroundColor: isTrue ? Colors.green.shade50 : Colors.grey.shade100,
-      labelStyle: TextStyle(
-        color: isTrue ? Colors.green.shade700 : Colors.grey.shade700,
-        fontWeight: FontWeight.w700,
-      ),
+      backgroundColor: background,
+      labelStyle: TextStyle(color: foreground, fontWeight: FontWeight.w700),
       side: BorderSide.none,
     );
   }
@@ -1545,17 +1645,14 @@ class _DetailLine extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.black54,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -1581,18 +1678,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1606,14 +1703,14 @@ class _EmptyMembersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucun membre trouvé.',
             style: TextStyle(
-              color: Colors.black54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1642,10 +1739,8 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   bool _loading = false;
-  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -1653,7 +1748,6 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -1670,7 +1764,6 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         email: _emailController.text,
-        password: _passwordController.text,
       );
 
       if (!mounted) return;
@@ -1690,9 +1783,11 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.person_add_alt_1_rounded,
+      description: 'Créez le profil d’un nouvel enacteur.',
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Ajouter un membre'),
+      title: Text('Ajouter un membre'),
       content: SizedBox(
         width: _dialogWidth(context, 460),
         child: Form(
@@ -1707,13 +1802,17 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                     child: Text(
                       _error!,
-                      style: TextStyle(color: Colors.red.shade700),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
                   ),
                 TextFormField(
@@ -1729,7 +1828,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _lastNameController,
                   decoration: const InputDecoration(
@@ -1743,7 +1842,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -1765,36 +1864,10 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe temporaire',
-                    prefixIcon: const Icon(Icons.lock_outline_rounded),
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                    ),
-                  ),
-                  validator: (value) {
-                    final password = value?.trim() ?? '';
-
-                    if (password.length < 8) {
-                      return 'Le mot de passe doit contenir au moins 8 caractères.';
-                    }
-
-                    return null;
-                  },
-                  onFieldSubmitted: (_) => _loading ? null : _submit(),
+                SizedBox(height: 14),
+                const Text(
+                  'Après validation du compte, le membre recevra un code personnel pour choisir son mot de passe.',
+                  style: TextStyle(height: 1.5),
                 ),
               ],
             ),
@@ -1804,12 +1877,12 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -1817,7 +1890,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.person_add_alt_1_rounded),
+              : Icon(Icons.person_add_alt_1_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -1833,8 +1906,9 @@ class _SoftInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Chip(
-      avatar: Icon(icon, size: 16),
+      avatar: Icon(icon, size: 16, color: scheme.onSurfaceVariant),
       label: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 150),
         child: Text(
@@ -1843,12 +1917,12 @@ class _SoftInfoChip extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ),
-      backgroundColor: Colors.blueGrey.shade50,
+      backgroundColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(
-        color: Colors.blueGrey.shade700,
+        color: scheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
       ),
-      side: BorderSide(color: Colors.blueGrey.shade100),
+      side: BorderSide(color: scheme.outlineVariant),
     );
   }
 }
@@ -1894,6 +1968,7 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
         'secretaire_generale',
         'financier',
         'faculty_advisor',
+        'pole_veille',
         'enacteur',
       ];
     }
@@ -1903,6 +1978,7 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
         'secretaire_generale',
         'financier',
         'faculty_advisor',
+        'pole_veille',
         'enacteur',
       ];
     }
@@ -1958,6 +2034,8 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
         return 'Administrateur';
       case 'financier':
         return 'Financier';
+      case 'pole_veille':
+        return 'Pôle Veille';
       case 'chef_pole':
         return 'Chef de pôle';
       case 'chef_projet':
@@ -1981,7 +2059,7 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Assigner un rôle'),
+      title: Text('Assigner un rôle'),
       content: SizedBox(
         width: _dialogWidth(context, 480),
         child: SingleChildScrollView(
@@ -1991,35 +2069,43 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
             children: [
               Text(
                 widget.member.displayName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 widget.member.email,
-                style: const TextStyle(color: Colors.black54),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-              const SizedBox(height: 18),
-              const Text(
+              SizedBox(height: 18),
+              Text(
                 'Les chefs et adjoints sont nommés depuis les modules '
                 'Pôles et Projets afin de conserver leur périmètre.',
-                style: TextStyle(color: Colors.black54, height: 1.35),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               if (_error != null)
                 Container(
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Text(
                     _error!,
-                    style: TextStyle(color: Colors.red.shade700),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
                   ),
                 ),
               Wrap(
@@ -2052,12 +2138,12 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -2065,7 +2151,7 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],
@@ -2084,6 +2170,13 @@ class _DepartmentChip extends StatelessWidget {
         department.trim().isNotEmpty &&
         !department.toLowerCase().contains('non ');
 
+    final scheme = Theme.of(context).colorScheme;
+    final background = defined
+        ? scheme.secondaryContainer
+        : scheme.surfaceContainerHighest;
+    final foreground = defined
+        ? scheme.onSecondaryContainer
+        : scheme.onSurfaceVariant;
     return Chip(
       label: SizedBox(
         width: 120,
@@ -2093,14 +2186,9 @@ class _DepartmentChip extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ),
-      backgroundColor: defined ? Colors.purple.shade50 : Colors.grey.shade100,
-      labelStyle: TextStyle(
-        color: defined ? Colors.purple.shade700 : Colors.grey.shade700,
-        fontWeight: FontWeight.w700,
-      ),
-      side: BorderSide(
-        color: defined ? Colors.purple.shade100 : Colors.grey.shade200,
-      ),
+      backgroundColor: background,
+      labelStyle: TextStyle(color: foreground, fontWeight: FontWeight.w700),
+      side: BorderSide(color: scheme.outlineVariant),
     );
   }
 }
@@ -2194,9 +2282,10 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
           if (pole == null) {
             throw Exception('Sélectionnez un pôle cœur.');
           }
-          await widget.membersService.updateMemberAdmin(
+          await widget.polesService.assignMember(
+            poleId: pole.id,
             userId: widget.member.id,
-            department: pole.name,
+            position: 'membre',
           );
           break;
         case _AssignmentMode.pole:
@@ -2255,19 +2344,18 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                   'Affecter ${widget.member.displayName}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Choisissez le type d’affectation puis la cible.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Choisissez le type d’affectation puis la cible.',
-                  style: TextStyle(color: Colors.black54),
-                ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 if (_loading)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(child: CircularProgressIndicator()),
                   )
@@ -2280,7 +2368,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                   ],
                   DropdownButtonFormField<_AssignmentMode>(
                     initialValue: _mode,
@@ -2309,7 +2397,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                             if (value != null) setState(() => _mode = value);
                           },
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   if (_mode == _AssignmentMode.corePole)
                     _PoleTargetField(
                       value: _selectedCorePoleId,
@@ -2332,7 +2420,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                               _selectedPoleId = value;
                             }),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: 14),
                     _PositionField(
                       value: _polePosition,
                       canAssignLeadership: widget.canAssignLeadership,
@@ -2356,7 +2444,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                               _selectedProjectId = value;
                             }),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: 14),
                     _PositionField(
                       value: _projectPosition,
                       canAssignLeadership: widget.canAssignLeadership,
@@ -2371,17 +2459,17 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
                             }),
                     ),
                   ],
-                  const SizedBox(height: 18),
+                  SizedBox(height: 18),
                   ElevatedButton.icon(
                     onPressed: _saving ? null : _submit,
                     icon: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.save_rounded),
-                    label: const Text('Enregistrer l’affectation'),
+                        : Icon(Icons.save_rounded),
+                    label: Text('Enregistrer l’affectation'),
                   ),
                 ],
               ],
@@ -2429,7 +2517,7 @@ class _PoleTargetField extends StatelessWidget {
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.account_tree_rounded),
+        prefixIcon: Icon(Icons.account_tree_rounded),
       ),
       items: [
         for (final pole in poles)
@@ -2538,15 +2626,7 @@ class AssignDepartmentDialog extends StatefulWidget {
 }
 
 class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
-  final List<String> _departments = const [
-    'Gestion',
-    'IT',
-    'Tech',
-    'Chimie',
-    'Génie électrique',
-    'Génie mécanique',
-    'Génie civil',
-  ];
+  static const List<String> _departments = espAcademicDepartments;
 
   String? _selectedDepartment;
   bool _loading = false;
@@ -2566,7 +2646,7 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
   Future<void> _submit() async {
     if (_selectedDepartment == null || _selectedDepartment!.trim().isEmpty) {
       setState(() {
-        _error = 'Sélectionnez un pôle cœur.';
+        _error = 'Sélectionnez un département ESP.';
       });
       return;
     }
@@ -2601,7 +2681,7 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Assigner le pôle cœur'),
+      title: Text('Assigner le département ESP'),
       content: SizedBox(
         width: _dialogWidth(context, 460),
         child: Column(
@@ -2610,33 +2690,39 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
           children: [
             Text(
               widget.member.displayName,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               widget.member.email,
-              style: const TextStyle(color: Colors.black54),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             if (_error != null)
               Container(
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Theme.of(context).colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Text(
                   _error!,
-                  style: TextStyle(color: Colors.red.shade700),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
                 ),
               ),
             DropdownButtonFormField<String>(
               initialValue: _selectedDepartment,
               decoration: const InputDecoration(
-                labelText: 'Pôle cœur',
-                prefixIcon: Icon(Icons.account_tree_rounded),
+                labelText: 'Département ESP',
+                prefixIcon: Icon(Icons.account_balance_outlined),
               ),
               items: _departments.map((department) {
                 return DropdownMenuItem<String>(
@@ -2658,12 +2744,12 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -2671,7 +2757,7 @@ class _AssignDepartmentDialogState extends State<AssignDepartmentDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],
@@ -2694,117 +2780,98 @@ class EditMemberDialog extends StatefulWidget {
 }
 
 class _EditMemberDialogState extends State<EditMemberDialog> {
-  late bool _emailVerified;
-  final _departmentController = TextEditingController();
-  final _studyLevelController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  late final Map<String, TextEditingController> _fields;
   bool _loading = false;
   String? _error;
-
+  static const _labels = {
+    'first_name': 'Prénom', 'last_name': 'Nom', 'email': 'Adresse e-mail',
+    'phone': 'Téléphone', 'department': 'Département ESP', 'cursus': 'Cursus',
+    'study_level': 'Niveau d’études', 'specialty': 'Spécialité',
+    'promotion': 'Promotion', 'enactus_join_year': 'Année d’entrée à Enactus ESP',
+    'bio': 'Présentation', 'linkedin_url': 'LinkedIn', 'github_url': 'GitHub',
+    'portfolio_url': 'Portfolio',
+  };
   @override
   void initState() {
     super.initState();
-    _emailVerified = widget.member.emailVerified ?? false;
-    _departmentController.text = widget.member.department ?? '';
-    _studyLevelController.text = widget.member.studyLevel ?? '';
+    final m = widget.member;
+    final values = {
+      'first_name': m.firstName, 'last_name': m.lastName, 'email': m.email,
+      'phone': m.phone, 'department': m.department, 'cursus': m.cursus,
+      'study_level': m.studyLevel, 'specialty': m.specialty,
+      'promotion': m.promotion, 'enactus_join_year': m.enactusJoinYear?.toString(),
+      'bio': m.bio, 'linkedin_url': m.linkedinUrl, 'github_url': m.githubUrl,
+      'portfolio_url': m.portfolioUrl,
+    };
+    _fields = values.map((key, value) => MapEntry(key, TextEditingController(text: value ?? '')));
   }
-
   @override
   void dispose() {
-    _departmentController.dispose();
-    _studyLevelController.dispose();
+    for (final controller in _fields.values) { controller.dispose(); }
     super.dispose();
   }
-
   Future<void> _submit() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_loading || !_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
     try {
-      await widget.membersService.updateMemberAdmin(
-        userId: widget.member.id,
-        emailVerified: _emailVerified,
-        department: _departmentController.text.trim(),
-        studyLevel: _studyLevelController.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
+      final data = <String, dynamic>{
+        for (final entry in _fields.entries) entry.key: entry.value.text.trim(),
+      };
+      data['enactus_join_year'] = int.tryParse(_fields['enactus_join_year']!.text.trim());
+      await widget.membersService.updateMemberAdmin(userId: widget.member.id, profileData: data);
+      if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      setState(() => _error = error.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = error.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
-
   @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_loading,
+    child: AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Modifier le membre'),
+      title: const Text('Compléter les informations'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: SingleChildScrollView(
-          child: Column(
+          child: Form(key: _formKey, child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AppIdentityCell(
-                name: widget.member.displayName,
-                subtitle: widget.member.email,
-                imageUrl: _absoluteMemberPhotoUrl(widget.member.photoUrl),
-              ),
-              const SizedBox(height: 20),
-              if (_error != null) ...[
-                AppStatusBadge(label: _error!, tone: AppStatusTone.error),
+              if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              const Text('Une nouvelle adresse e-mail devra être vérifiée par son titulaire.'),
+              const SizedBox(height: 16),
+              for (final entry in _labels.entries) ...[
+                TextFormField(
+                  controller: _fields[entry.key], enabled: !_loading,
+                  decoration: InputDecoration(labelText: entry.value),
+                  maxLines: entry.key == 'bio' ? 3 : 1,
+                  keyboardType: entry.key == 'email' ? TextInputType.emailAddress
+                    : entry.key == 'phone' ? TextInputType.phone
+                    : entry.key == 'enactus_join_year' ? TextInputType.number : TextInputType.text,
+                  validator: (value) {
+                    final text = (value ?? '').trim();
+                    if ({'first_name', 'last_name', 'email'}.contains(entry.key) && text.isEmpty) return 'Ce champ est obligatoire.';
+                    if (entry.key == 'email' && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) return 'Adresse e-mail invalide.';
+                    if (entry.key == 'enactus_join_year' && text.isNotEmpty) {
+                      final year = int.tryParse(text);
+                      if (year == null || year < 1900 || year > DateTime.now().year) return 'Indiquez une année valide.';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 12),
               ],
-              const Text(
-                'Le statut du membre se gère avec les actions dédiées '
-                'Approuver, Suspendre, Réactiver ou Passer Alumni.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _departmentController,
-                enabled: !_loading,
-                decoration: const InputDecoration(
-                  labelText: 'Pôle ou département',
-                  prefixIcon: Icon(Icons.account_tree_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _studyLevelController,
-                enabled: !_loading,
-                decoration: const InputDecoration(
-                  labelText: 'Niveau ou filière',
-                  prefixIcon: Icon(Icons.school_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Email vérifié'),
-                subtitle: const Text('Indicateur de validation du contact.'),
-                value: _emailVerified,
-                onChanged: _loading
-                    ? null
-                    : (value) => setState(() => _emailVerified = value),
-              ),
             ],
-          ),
+          )),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton.icon(
-          onPressed: _loading ? null : _submit,
-          icon: const Icon(Icons.save_rounded),
-          label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
-        ),
+        TextButton(onPressed: _loading ? null : () => Navigator.pop(context, false), child: const Text('Annuler')),
+        ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? 'Enregistrement…' : 'Enregistrer')),
       ],
-    );
-  }
+    ),
+  );
 }

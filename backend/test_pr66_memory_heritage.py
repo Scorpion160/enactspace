@@ -1,5 +1,6 @@
 """Focused PR-6.6 memory/heritage safety and lifecycle regressions."""
 
+from app.core.time import utc_now
 import os
 import secrets
 import unittest
@@ -462,7 +463,7 @@ class PR66MemoryHeritageTests(unittest.TestCase):
             source_entity_type="project",
             source_entity_id=removed_id,
             source_entity_version="termine",
-            captured_at=datetime.utcnow(),
+            captured_at=utc_now(),
         )
         self.db.add(historical)
         self.db.commit()
@@ -718,7 +719,8 @@ class PR66MemoryHeritageTests(unittest.TestCase):
                 current_user=self.reader,
             )["items"],
         ]
-        self.assertTrue(all(listing == [] for listing in listings))
+        public_media_ids = {item['id'] for item in archives.PUBLIC_HERITAGE_MEDIA}
+        self.assertTrue(all(all(row['id'] in public_media_ids for row in listing) for listing in listings))
         for child in children:
             with self.subTest(child=type(child).__name__):
                 self.assertFalse(
@@ -879,17 +881,16 @@ class PR66MemoryHeritageTests(unittest.TestCase):
                     archives._can_view_legacy_child(self.db, self.reader, child)
                 )
 
-    def test_static_legacy_is_curator_only_and_tagged(self):
-        with self.assertRaises(HTTPException):
-            archives.list_awards(
-                search=None,
-                year=None,
-                featured=None,
-                include_static=True,
-                db=self.db,
-                current_user=self.reader,
-            )
-        result = archives.list_awards(
+    def test_static_institutional_memory_is_visible_and_verified(self):
+        reader_result = archives.list_awards(
+            search=None,
+            year=None,
+            featured=None,
+            include_static=True,
+            db=self.db,
+            current_user=self.reader,
+        )
+        curator_result = archives.list_awards(
             search=None,
             year=None,
             featured=None,
@@ -897,8 +898,17 @@ class PR66MemoryHeritageTests(unittest.TestCase):
             db=self.db,
             current_user=self.curator,
         )
-        self.assertTrue(result["awards"])
-        self.assertTrue(all(item["legacy"] and not item["verified"] for item in result["awards"]))
+        self.assertTrue(reader_result["awards"])
+        self.assertEqual(reader_result["awards"], curator_result["awards"])
+        self.assertTrue(
+            all(
+                not item["legacy"]
+                and item["verified"]
+                and item["trust"] == "institutional_verified"
+                and item["source_label"]
+                for item in reader_result["awards"]
+            )
+        )
 
 
 if __name__ == "__main__":

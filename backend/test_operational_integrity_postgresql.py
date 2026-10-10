@@ -1,5 +1,6 @@
 """PR-6.5 PostgreSQL 16 locking and exactly-once acceptance tests."""
 
+from app.core.time import utc_now
 import asyncio
 import os
 import secrets
@@ -645,7 +646,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
     def test_14_last_event_seat_has_one_winner(self):
         first_id, second_id = self._user(), self._user()
         db = self.Session()
-        event_row = Event(title=f"Seat {uuid.uuid4()}", event_type="meeting", start_time=datetime.utcnow() + timedelta(days=1), requires_registration=True, max_participants=1)
+        event_row = Event(title=f"Seat {uuid.uuid4()}", event_type="meeting", start_time=utc_now() + timedelta(days=1), requires_registration=True, max_participants=1)
         db.add(event_row)
         db.commit()
         event_id = event_row.id
