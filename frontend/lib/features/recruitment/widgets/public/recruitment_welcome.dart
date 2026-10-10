@@ -28,12 +28,14 @@ class RecruitmentWelcome extends StatelessWidget {
                 style: TextStyle(height: 1.65, fontSize: 16),
               ),
               const SizedBox(height: 20),
-              const HeritagePhoto(
-                photo: HeritagePhotoData(
-                  'world-cup-2018-delegation',
-                  'Enactus ESP à la World Cup 2018 : une aventure portée par toute une équipe.',
+              LayoutBuilder(
+                builder: (context, constraints) => HeritagePhoto(
+                  photo: const HeritagePhotoData(
+                    'resources/hafe-collectif-2022',
+                    'À Haffé en 2022, Enactus ESP et les communautés réunis autour des projets et du partage.',
+                  ),
+                  height: constraints.maxWidth * 3 / 4,
                 ),
-                height: 250,
               ),
             ],
           ),
