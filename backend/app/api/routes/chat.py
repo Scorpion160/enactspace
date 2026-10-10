@@ -481,6 +481,7 @@ def list_chat_contacts(
     scope_id: str | None = Query(default=None),
 ):
     query = db.query(User).filter(
+        User.id != current_user.id,
         User.is_active.is_(True),
         User.status.in_(["active", "alumni"]),
     )

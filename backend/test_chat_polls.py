@@ -22,7 +22,7 @@ from app.db.database import Base
 from app.models.chat import ChatParticipant, ChatPollOption, ChatPollVote, ChatThread
 from app.models.stored_file import StoredFile
 from app.models.user import User
-from app.schemas.chat import ChatMessageCreate, ChatPollCreate, ChatPollVoteCreate
+from app.schemas.chat import ChatMessageCreate, ChatPollCreate, ChatPollVoteCreate, ChatThreadCreate
 
 
 class ChatPollTests(unittest.TestCase):
@@ -60,6 +60,22 @@ class ChatPollTests(unittest.TestCase):
         self.db.close()
         Base.metadata.drop_all(self.engine)
         self.engine.dispose()
+
+    def test_contacts_exclude_current_user(self):
+        contacts = chat.list_chat_contacts(
+            self.db, self.user, search=None, scope_type=None, scope_id=None
+        )
+        self.assertNotIn(self.user.id, [contact.id for contact in contacts])
+
+    def test_direct_thread_with_self_is_rejected_without_creating_thread(self):
+        before = self.db.query(ChatThread).count()
+        with self.assertRaises(HTTPException) as caught:
+            chat.create_thread(
+                ChatThreadCreate(thread_type="direct", participant_ids=[self.user.id]),
+                self.db, self.user,
+            )
+        self.assertEqual(caught.exception.status_code, 400)
+        self.assertEqual(self.db.query(ChatThread).count(), before)
 
     def _create_poll(
         self,

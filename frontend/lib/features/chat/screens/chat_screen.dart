@@ -1426,7 +1426,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _openNewThreadDialog() async {
     final created = await showDialog<ChatThreadModel>(
       context: context,
-      builder: (context) => NewChatThreadDialog(chatService: _gateway),
+      builder: (context) => NewChatThreadDialog(
+        chatService: _gateway,
+        currentUserId: _user?.id,
+      ),
     );
 
     if (created == null) return;
@@ -5542,8 +5545,13 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 
 class NewChatThreadDialog extends StatefulWidget {
   final ChatGateway chatService;
+  final String? currentUserId;
 
-  const NewChatThreadDialog({super.key, required this.chatService});
+  const NewChatThreadDialog({
+    super.key,
+    required this.chatService,
+    this.currentUserId,
+  });
 
   @override
   State<NewChatThreadDialog> createState() => _NewChatThreadDialogState();
@@ -5589,7 +5597,9 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
       ]);
       if (!mounted) return;
       setState(() {
-        _contacts = results[0] as List<ChatContactModel>;
+        _contacts = (results[0] as List<ChatContactModel>)
+            .where((contact) => contact.id != widget.currentUserId)
+            .toList();
         _poles = results[1] as List<PoleModel>;
         _projects = results[2] as List<ProjectModel>;
       });
@@ -5607,6 +5617,7 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
   }
 
   Future<void> _create() async {
+    _selectedIds.remove(widget.currentUserId);
     if (_threadType == 'direct' && _selectedIds.length != 1) {
       setState(() {
         _error = 'Choisis une seule personne pour un chat privé.';
@@ -6034,7 +6045,7 @@ ChatThreadMemberModel? _directParticipant(
     return participant.userId.isNotEmpty && participant.userId != currentUserId;
   });
 
-  return others.firstOrNull ?? thread.participantsPreview.first;
+  return others.firstOrNull;
 }
 
 bool _isDirectThreadOnline(
