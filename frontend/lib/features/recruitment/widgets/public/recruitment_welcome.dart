@@ -24,7 +24,7 @@ class RecruitmentWelcome extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'À Enactus ESP, nous partons à la rencontre des communautés, nous cherchons à comprendre leurs besoins et nous construisons des solutions avec elles. Tu peux apporter ton regard, apprendre avec une équipe et transformer une idée en action.',
+                'Une rencontre sur le terrain, une idée qui prend forme, une équipe qui avance ensemble : voilà ce que tu peux vivre à Enactus ESP. Nous construisons avec les communautés des projets qui répondent à leurs besoins. Apporte ta curiosité, partage tes idées et prends part à l’aventure.',
                 style: TextStyle(height: 1.65, fontSize: 16),
               ),
               const SizedBox(height: 20),
@@ -46,27 +46,27 @@ class RecruitmentWelcome extends StatelessWidget {
         builder: (context, constraints) {
           final stories = [
             (
-              'Rencontrer et comprendre',
-              'Une immersion commence par l’écoute. Tu apprends à poser les bonnes questions et à construire avec les personnes concernées.',
+              'Écouter pour mieux agir',
+              'Sur le terrain, tu rencontres les personnes concernées, tu écoutes leurs expériences et tu poses tes questions. Ces échanges t’aident à comprendre leurs besoins avant d’imaginer une solution avec elles.',
               const HeritagePhotoData(
                 'haffe-2025-ecoute',
-                'À Haffé, le dialogue ouvre le travail de terrain.',
+                'À Haffé, prendre le temps d’écouter et de comprendre.',
               ),
             ),
             (
-              'Créer avec les communautés',
-              'Avec Dimbali, le travail se construit au plus près des femmes du GIE FAVEC. Les projets donnent du sens à ce que tu apprends.',
+              'Donner vie aux idées',
+              'Avec Dimbali et les femmes du GIE FAVEC, les idées se construisent au contact du terrain. Tu apprends à proposer, à tester et à faire évoluer un projet avec les personnes qui l’utiliseront.',
               const HeritagePhotoData(
                 'dimbali-gie-favec',
                 'Dimbali et les femmes du GIE FAVEC.',
               ),
             ),
             (
-              'Grandir dans une équipe',
-              'Brainstorming, formations, projets et présentations : tu avances avec d’autres enacteurs et enactrices, en partageant tes idées et tes responsabilités.',
+              'Trouver ta place dans l’équipe',
+              'Une idée à partager, une présentation à préparer, un défi à relever ensemble : chacun apporte sa contribution. Au fil des formations et des projets, tu développes tes compétences et tu crées des liens avec d’autres enacteurs et enactrices.',
               const HeritagePhotoData(
-                'haffe-2025-parcelles',
-                'Le travail de terrain accompagne le développement de Terrasen.',
+                'polytech-innovation-2025',
+                'Enactus ESP réuni à Polytech Innovation en 2025.',
               ),
             ),
           ];
@@ -89,13 +89,16 @@ class RecruitmentWelcome extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          HeritagePhoto(photo: story.$3, height: 170),
-                          const SizedBox(height: 14),
                           Text(
                             story.$1,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 14),
+                          HeritagePhoto(
+                            photo: story.$3,
+                            height: (width - 36) * 3 / 4,
+                          ),
+                          const SizedBox(height: 14),
                           Text(story.$2, style: const TextStyle(height: 1.6)),
                         ],
                       ),
@@ -108,7 +111,7 @@ class RecruitmentWelcome extends StatelessWidget {
       ),
       const SizedBox(height: 20),
       const Text(
-        'Tu n’as pas besoin d’avoir déjà tout accompli. Raconte-nous ce qui t’anime, ce que tu aimerais apprendre et comment tu souhaites contribuer. Prends le temps de répondre avec tes mots.',
+        'Ta candidature commence par ton histoire. Raconte-nous ce qui te motive, une initiative dont tu es fier ou fière, et ce que tu aimerais apprendre avec nous. Des exemples simples et sincères nous aideront à mieux te connaître.',
         style: TextStyle(height: 1.6, fontSize: 16),
       ),
       const SizedBox(height: 20),
