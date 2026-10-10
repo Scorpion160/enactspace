@@ -197,6 +197,7 @@ class MembersService {
 
   Future<MemberModel> updateMemberAdmin({
     required String userId,
+    Map<String, dynamic>? profileData,
     bool? emailVerified,
     String? department,
     String? studyLevel,
@@ -207,7 +208,7 @@ class MembersService {
       throw Exception('Utilisateur non connecté.');
     }
 
-    final Map<String, dynamic> data = {};
+    final Map<String, dynamic> data = {...?profileData};
 
     if (emailVerified != null) data['email_verified'] = emailVerified;
     if (department != null) data['department'] = department;

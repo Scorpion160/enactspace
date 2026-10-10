@@ -52,6 +52,14 @@ class UserUpdate(BaseModel):
 
 
 class UserAdminUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
     enactus_join_year: Optional[int] = None
     _join_year = field_validator('enactus_join_year')(validate_join_year)
     status: Optional[str] = None

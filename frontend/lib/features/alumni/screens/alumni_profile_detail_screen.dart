@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/user_experience.dart';
 import '../models/alumni_profile_model.dart';
+import '../../members/screens/members_screen.dart' show EditMemberDialog;
+import '../../members/services/members_service.dart';
 import '../services/alumni_gateway.dart';
 import '../services/alumni_error_message.dart';
 
@@ -79,6 +81,19 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
           _AlumniEditDialog(profile: profile, gateway: _gateway),
     );
     if (updated == true) await _load();
+  }
+
+  Future<void> _editIdentity() async {
+    try {
+      final service = MembersService();
+      final member = await service.getMember(_profile!.userId);
+      if (!mounted) return;
+      final saved = await showDialog<bool>(context: context,
+        builder: (_) => EditMemberDialog(member: member, membersService: service));
+      if (saved == true) await _load();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(error))));
+    }
   }
 
   Future<void> _delete() async {
@@ -191,8 +206,10 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                         PopupMenuButton<String>(
                           tooltip: 'Gérer le profil',
                           onSelected: (value) =>
-                              value == 'edit' ? _edit() : _delete(),
-                          itemBuilder: (_) => const [
+                              value == 'edit' ? _edit() : value == 'identity' ? _editIdentity() : _delete(),
+                          itemBuilder: (_) => [
+                            if (_user?.isAdmin == true || _user?.isSecretary == true || _user?.isTeamLeader == true)
+                              const PopupMenuItem(value: 'identity', child: Text('Identité et coordonnées')),
                             PopupMenuItem(
                               value: 'edit',
                               child: Text('Modifier'),

@@ -54,8 +54,10 @@ def lock_profile_write(db, actor_id, profile_id):
         raise HTTPException(404, "Profil Alumni introuvable.")
     if actor.id != target.id and not can_manage_profiles(db, actor):
         raise HTTPException(403, "Vous ne pouvez modifier que votre propre profil Alumni.")
-    if not is_valid_alumni(target):
-        raise HTTPException(409, "Ce compte n'est pas un compte Alumni actif et vérifié.")
+    allowed_target = (is_directory_alumni(target) if can_manage_profiles(db, actor)
+                      else is_valid_alumni(target))
+    if not allowed_target:
+        raise HTTPException(409, "Ce compte Alumni est indisponible.")
     return actor, target, profile
 
 def ensure_mentorship_scope(db, actor, project_id, pole_id):

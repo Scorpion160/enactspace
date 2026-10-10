@@ -2780,117 +2780,98 @@ class EditMemberDialog extends StatefulWidget {
 }
 
 class _EditMemberDialogState extends State<EditMemberDialog> {
-  late bool _emailVerified;
-  final _departmentController = TextEditingController();
-  final _studyLevelController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  late final Map<String, TextEditingController> _fields;
   bool _loading = false;
   String? _error;
-
+  static const _labels = {
+    'first_name': 'Prénom', 'last_name': 'Nom', 'email': 'Adresse e-mail',
+    'phone': 'Téléphone', 'department': 'Département ESP', 'cursus': 'Cursus',
+    'study_level': 'Niveau d’études', 'specialty': 'Spécialité',
+    'promotion': 'Promotion', 'enactus_join_year': 'Année d’entrée à Enactus ESP',
+    'bio': 'Présentation', 'linkedin_url': 'LinkedIn', 'github_url': 'GitHub',
+    'portfolio_url': 'Portfolio',
+  };
   @override
   void initState() {
     super.initState();
-    _emailVerified = widget.member.emailVerified ?? false;
-    _departmentController.text = widget.member.department ?? '';
-    _studyLevelController.text = widget.member.studyLevel ?? '';
+    final m = widget.member;
+    final values = {
+      'first_name': m.firstName, 'last_name': m.lastName, 'email': m.email,
+      'phone': m.phone, 'department': m.department, 'cursus': m.cursus,
+      'study_level': m.studyLevel, 'specialty': m.specialty,
+      'promotion': m.promotion, 'enactus_join_year': m.enactusJoinYear?.toString(),
+      'bio': m.bio, 'linkedin_url': m.linkedinUrl, 'github_url': m.githubUrl,
+      'portfolio_url': m.portfolioUrl,
+    };
+    _fields = values.map((key, value) => MapEntry(key, TextEditingController(text: value ?? '')));
   }
-
   @override
   void dispose() {
-    _departmentController.dispose();
-    _studyLevelController.dispose();
+    for (final controller in _fields.values) { controller.dispose(); }
     super.dispose();
   }
-
   Future<void> _submit() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_loading || !_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
     try {
-      await widget.membersService.updateMemberAdmin(
-        userId: widget.member.id,
-        emailVerified: _emailVerified,
-        department: _departmentController.text.trim(),
-        studyLevel: _studyLevelController.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
+      final data = <String, dynamic>{
+        for (final entry in _fields.entries) entry.key: entry.value.text.trim(),
+      };
+      data['enactus_join_year'] = int.tryParse(_fields['enactus_join_year']!.text.trim());
+      await widget.membersService.updateMemberAdmin(userId: widget.member.id, profileData: data);
+      if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      setState(() => _error = error.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = error.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
-
   @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_loading,
+    child: AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: Text('Modifier le membre'),
+      title: const Text('Compléter les informations'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: SingleChildScrollView(
-          child: Column(
+          child: Form(key: _formKey, child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AppIdentityCell(
-                name: widget.member.displayName,
-                subtitle: widget.member.email,
-                imageUrl: _absoluteMemberPhotoUrl(widget.member.photoUrl),
-              ),
-              SizedBox(height: 20),
-              if (_error != null) ...[
-                AppStatusBadge(label: _error!, tone: AppStatusTone.error),
-                SizedBox(height: 12),
+              if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              const Text('Une nouvelle adresse e-mail devra être vérifiée par son titulaire.'),
+              const SizedBox(height: 16),
+              for (final entry in _labels.entries) ...[
+                TextFormField(
+                  controller: _fields[entry.key], enabled: !_loading,
+                  decoration: InputDecoration(labelText: entry.value),
+                  maxLines: entry.key == 'bio' ? 3 : 1,
+                  keyboardType: entry.key == 'email' ? TextInputType.emailAddress
+                    : entry.key == 'phone' ? TextInputType.phone
+                    : entry.key == 'enactus_join_year' ? TextInputType.number : TextInputType.text,
+                  validator: (value) {
+                    final text = (value ?? '').trim();
+                    if ({'first_name', 'last_name', 'email'}.contains(entry.key) && text.isEmpty) return 'Ce champ est obligatoire.';
+                    if (entry.key == 'email' && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) return 'Adresse e-mail invalide.';
+                    if (entry.key == 'enactus_join_year' && text.isNotEmpty) {
+                      final year = int.tryParse(text);
+                      if (year == null || year < 1900 || year > DateTime.now().year) return 'Indiquez une année valide.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
               ],
-              Text(
-                'Le statut du membre se gère avec les actions dédiées '
-                'Approuver, Suspendre, Réactiver ou Passer Alumni.',
-              ),
-              SizedBox(height: 12),
-              TextField(
-                controller: _departmentController,
-                enabled: !_loading,
-                decoration: const InputDecoration(
-                  labelText: 'Pôle ou département',
-                  prefixIcon: Icon(Icons.account_tree_rounded),
-                ),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                controller: _studyLevelController,
-                enabled: !_loading,
-                decoration: const InputDecoration(
-                  labelText: 'Niveau ou filière',
-                  prefixIcon: Icon(Icons.school_rounded),
-                ),
-              ),
-              SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Email vérifié'),
-                subtitle: Text('Indicateur de validation du contact.'),
-                value: _emailVerified,
-                onChanged: _loading
-                    ? null
-                    : (value) => setState(() => _emailVerified = value),
-              ),
             ],
-          ),
+          )),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: Text('Annuler'),
-        ),
-        ElevatedButton.icon(
-          onPressed: _loading ? null : _submit,
-          icon: Icon(Icons.save_rounded),
-          label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
-        ),
+        TextButton(onPressed: _loading ? null : () => Navigator.pop(context, false), child: const Text('Annuler')),
+        ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? 'Enregistrement…' : 'Enregistrer')),
       ],
-    );
-  }
+    ),
+  );
 }

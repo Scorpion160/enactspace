@@ -496,51 +496,57 @@ def admin_update_user(
             ),
         )
 
-    old_value = {
-        "status": user.status,
-        "email_verified": user.email_verified,
-        "is_active": user.is_active,
-        "department": user.department,
-        "study_level": user.study_level,
-        "promotion": user.promotion,
+    editable = {
+        "first_name", "last_name", "email", "phone", "department", "cursus",
+        "study_level", "specialty", "promotion", "enactus_join_year", "bio",
+        "linkedin_url", "github_url", "portfolio_url",
     }
-
+    changes = payload.model_dump(exclude_unset=True)
+    for field in ("first_name", "last_name"):
+        if field in changes:
+            value = (changes[field] or "").strip()
+            if not value or len(value) > 100:
+                raise HTTPException(422, "Le prénom et le nom doivent être renseignés (100 caractères maximum).")
+            changes[field] = value
+    if "email" in changes:
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            raw_email = (changes["email"] or "").strip().lower()
+            changes["email"] = (raw_email if raw_email == user.email.strip().lower()
+                                else validate_email(raw_email, check_deliverability=False).normalized.lower())
+        except EmailNotValidError:
+            raise HTTPException(422, "Adresse e-mail invalide.")
+        if db.query(User.id).filter(func.lower(User.email) == changes["email"], User.id != user.id).first():
+            raise HTTPException(409, "Cette adresse e-mail est déjà utilisée par un autre compte.")
+    old_value = {field: getattr(user, field) for field in editable}
+    old_value.update(status=user.status, is_active=user.is_active, email_verified=user.email_verified)
+    email_changed = "email" in changes and changes["email"] != user.email.strip().lower()
+    if email_changed and ADMIN_ROLE in get_user_role_names(db, user.id):
+        ensure_admin_removal_allowed(db, user.id)
     if payload.email_verified is False and user.email_verified and ADMIN_ROLE in get_user_role_names(db, user.id):
         ensure_admin_removal_allowed(db, user.id)
-    if payload.email_verified is not None:
+    for field in editable.intersection(changes):
+        setattr(user, field, changes[field])
+    if email_changed:
+        from app.services.session_service import revoke_user_sessions
+        from app.models.first_access import ActivationChallenge
+        from app.models.user import PasswordResetOtp
+        user.email_verified = False
+        revoke_user_sessions(db, user.id)
+        db.query(ActivationChallenge).filter(ActivationChallenge.user_id == user.id).delete(synchronize_session=False)
+        db.query(PasswordResetOtp).filter(PasswordResetOtp.user_id == user.id).delete(synchronize_session=False)
+    elif payload.email_verified is not None:
         user.email_verified = payload.email_verified
-
-    if payload.department is not None:
-        user.department = payload.department
-
-    if payload.study_level is not None:
-        user.study_level = payload.study_level
-
-    if payload.promotion is not None:
-        user.promotion = payload.promotion
-    if payload.enactus_join_year is not None:
-        user.enactus_join_year = payload.enactus_join_year
+    if "enactus_join_year" in changes:
         from app.services.alumni_profiles import sync_alumni_join_year
         sync_alumni_join_year(db, user)
-
     user.updated_at = utc_now()
-
+    new_value = {field: getattr(user, field) for field in editable}
+    new_value.update(status=user.status, is_active=user.is_active, email_verified=user.email_verified)
     create_audit_log(
-        db=db,
-        action="modification_admin_utilisateur",
-        user_id=current_user.id,
-        entity_type="user",
-        entity_id=user.id,
-        old_value=old_value,
-        new_value={
-            "status": user.status,
-            "email_verified": user.email_verified,
-            "is_active": user.is_active,
-            "department": user.department,
-            "study_level": user.study_level,
-            "promotion": user.promotion,
-        },
-        ip_address=get_client_ip(request),
+        db=db, action="modification_admin_utilisateur", user_id=current_user.id,
+        entity_type="user", entity_id=user.id, old_value=old_value,
+        new_value=new_value, ip_address=get_client_ip(request),
     )
 
     if (

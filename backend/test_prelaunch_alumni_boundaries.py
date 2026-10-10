@@ -17,6 +17,18 @@ class AlumniBoundaryTests(governance.GovernanceTests):
         self.db.add(mentor);self.db.flush();self.users["mentor"]=mentor
         self.profile=AlumniProfile(user_id=mentor.id,visibility="internal",available_for_mentoring=True,enactus_join_year=2020)
         self.db.add(self.profile);self.db.commit()
+    def test_secretariat_completes_unverified_alumni_without_activation(self):
+        user = self.users["mentor"]
+        user.email_verified = False
+        self.db.commit()
+        for actor in ("sg", "admin"):
+            self.as_user(actor)
+            self.call("PATCH", f"alumni/profiles/{self.profile.id}", {"current_company": "Entreprise"})
+            self.db.expire_all()
+            self.assertFalse(user.email_verified)
+        self.as_user("a")
+        self.call("PATCH", f"alumni/profiles/{self.profile.id}", {"current_company": "Interdit"}, 403)
+
     def new_mentorship(self,scope=None,code=200):
         return self.call("POST","alumni/mentorships",dict(alumni_id=str(self.users["mentor"].id),
             project_id=str((scope or self.project).id),title="Accompagnement test",started_at=str(date.today())),code)

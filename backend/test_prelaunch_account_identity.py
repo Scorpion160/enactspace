@@ -14,6 +14,24 @@ class AccountIdentityTests(lifecycle.AccountLifecycleTests):
         body = dict(first_name="Aïta", last_name="Dia", email="identity@example.test", password=_ENACTSPACE_EPHEMERAL_PASSWORD_1)
         body.update(values)
         return self.call("POST", "users/", body)
+    def test_secretariat_edits_identity_and_email_requires_verification(self):
+        target = self.users["a"]
+        self.as_user("sg")
+        self.call("PATCH", f"users/{target.id}/admin", {
+            "first_name": "Prénom corrigé", "last_name": "Nom corrigé",
+            "phone": "+221770000000", "email": "corrected@example.com",
+            "cursus": "DIC", "specialty": "Électronique", "email_verified": True,
+        })
+        self.db.expire_all()
+        self.assertEqual(target.first_name, "Prénom corrigé")
+        self.assertEqual(target.cursus, "DIC")
+        self.assertEqual(target.email, "corrected@example.com")
+        self.assertFalse(target.email_verified)
+        self.users["sg"].email = "secretary@example.com"
+        self.db.commit()
+        self.call("PATCH", f"users/{target.id}/admin", {"email": self.users["sg"].email}, 409)
+        self.call("PATCH", f"users/{target.id}/admin", {"first_name": " "}, 422)
+
     def test_username_is_generated_and_academic_fields_are_saved(self):
         data = self.create(cursus="DUT", specialty="Gestion", enactus_join_year=2020).json()
         self.assertTrue(data["username"].startswith("aita.dia."))
