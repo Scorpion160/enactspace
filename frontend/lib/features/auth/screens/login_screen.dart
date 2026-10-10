@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
         fit: StackFit.expand,
         children: [
           Image.asset(
-            'assets/heritage/niaguiss-2025-demonstration.jpg',
+            'assets/heritage/login-field-team.png',
             fit: BoxFit.cover,
             alignment: Alignment.centerLeft,
             excludeFromSemantics: true,
