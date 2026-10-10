@@ -39,13 +39,29 @@ class AlumniBoundaryTests(governance.GovernanceTests):
         self.db.expire_all();self.assertEqual(self.profile.domain,"Gestion")
     def test_pending_or_suspended_profiles_do_not_leak(self):
         self.as_user("sg")
-        for change in ({"status":"pending"},{"status":"suspended"},{"email_verified":False},{"profile_type":"enacteur"}):
+        for change in ({"status":"pending"},{"status":"suspended"},{"profile_type":"enacteur"}):
             u=self.users["mentor"];u.status="alumni";u.profile_type="alumni";u.email_verified=True
             for field,value in change.items():setattr(u,field,value)
             self.db.commit()
             ids=[row["id"] for row in self.call("GET","alumni/profiles").json()]
             self.assertNotIn(str(self.profile.id),ids)
             self.call("GET",f"alumni/profiles/{self.profile.id}",code=404)
+    def test_unverified_owner_profile_is_visible_without_activating_account(self):
+        user=self.users["mentor"];user.email_verified=False;self.db.commit()
+        for reader in ("a","sg"):
+            self.as_user(reader)
+            ids=[row["id"] for row in self.call("GET","alumni/profiles").json()]
+            self.assertIn(str(self.profile.id),ids)
+            self.call("GET",f"alumni/profiles/{self.profile.id}")
+            self.call("GET",f"alumni/profiles/user/{user.id}")
+            self.assertEqual(self.call("GET","alumni/profiles?available_for_mentoring=true").json(),[])
+        self.assertFalse(user.email_verified)
+        self.as_user("sg");self.new_mentorship(code=409)
+        self.profile.visibility="private";self.db.commit();self.as_user("a")
+        self.assertEqual(self.call("GET","alumni/profiles").json(),[])
+        self.call("GET",f"alumni/profiles/{self.profile.id}",code=403)
+        self.call("GET",f"alumni/profiles/user/{user.id}",code=403)
+        self.as_user("mentor");self.call("GET","alumni/profiles",code=403)
     def test_private_visibility_protects_profile_and_mentorship(self):
         self.as_user("sg");row=self.new_mentorship().json()
         self.profile.visibility="private";self.db.commit();self.as_user("a")

@@ -13,6 +13,11 @@ def is_operational(user):
     return (user.status == "active" and user.is_active and user.email_verified
             and user.profile_type in {"enacteur", "enactrice"})
 
+def is_directory_alumni(user):
+    """Directory visibility is independent from account activation."""
+    return (user.status == "alumni" and user.is_active
+            and user.profile_type == "alumni")
+
 def is_valid_alumni(user):
     return (user.status == "alumni" and user.is_active and user.email_verified
             and user.profile_type == "alumni")

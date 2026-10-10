@@ -11,7 +11,7 @@ from app.models.alumni import AlumniProfile, Mentorship
 from app.models.user import User
 from app.services.operational_integrity import lock_row
 from app.services.alumni_integrity import (
-    is_valid_alumni, assert_valid_reader, can_manage_profiles, is_enacchef,
+    is_directory_alumni, is_valid_alumni, assert_valid_reader, can_manage_profiles, is_enacchef,
     lock_people, lock_profile_write, ensure_mentorship_scope,
     assert_available_mentor, assert_mentorship_dates,
 )
@@ -176,7 +176,7 @@ def list_alumni_profiles(
         db.query(AlumniProfile)
         .join(User, User.id == AlumniProfile.user_id)
         .filter(User.status == "alumni", User.profile_type == "alumni",
-                User.is_active.is_(True), User.email_verified.is_(True))
+                User.is_active.is_(True))
         .options(joinedload(AlumniProfile.user))
     )
 
@@ -216,6 +216,9 @@ def list_alumni_profiles(
             AlumniProfile.available_for_mentoring == available_for_mentoring
         )
 
+    if available_for_mentoring is True:
+        query = query.filter(User.email_verified.is_(True))
+
     return query.order_by(
         AlumniProfile.graduation_year.desc().nullslast(),
         AlumniProfile.created_at.desc(),
@@ -241,7 +244,7 @@ def get_alumni_profile_by_user(
             detail="Profil alumni introuvable pour cet utilisateur",
         )
 
-    if not is_valid_alumni(profile.user):
+    if not is_directory_alumni(profile.user):
         raise HTTPException(404, "Profil Alumni indisponible.")
     ensure_profile_access(db, current_user, profile)
     return profile
@@ -254,7 +257,7 @@ def get_alumni_profile(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     profile = get_alumni_profile_or_404(db, profile_id)
-    if not is_valid_alumni(profile.user):
+    if not is_directory_alumni(profile.user):
         raise HTTPException(404, "Profil Alumni indisponible.")
     ensure_profile_access(db, current_user, profile)
     return profile
