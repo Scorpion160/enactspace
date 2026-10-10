@@ -142,8 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 980;
 
-    return Scaffold(
-      body: Row(
+    final content = Row(
         children: [
           if (isWide) Expanded(flex: 4, child: _BrandPanel()),
           Expanded(
@@ -164,6 +163,29 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ],
+    );
+    if (!isWide) return Scaffold(body: content);
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/heritage/niaguiss-2025-demonstration.jpg',
+            fit: BoxFit.cover,
+            alignment: Alignment.centerLeft,
+            excludeFromSemantics: true,
+            errorBuilder: (_, error, stackTrace) =>
+                const ColoredBox(color: AppTheme.softBlack),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0x880F1820), Color(0xE60F1820)],
+              ),
+            ),
+          ),
+          Theme(data: AppTheme.darkTheme, child: content),
+        ],
       ),
     );
   }
@@ -173,76 +195,39 @@ class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppTheme.softBlack,
-    child: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          _BrandMark(size: 48, onDark: true),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              'Enactus ESP',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const _LoginPhotoMosaic(),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Ensemble, donnons\nvie aux idées.',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Apprendre, entreprendre et agir avec les communautés.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 15,
-                          height: 1.55,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Une équipe. Des projets. Un impact partagé.',
-                        style: TextStyle(
-                          color: AppTheme.enactusYellow,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Photothèque Enactus ESP',
-                        style: TextStyle(color: Colors.white60, fontSize: 11),
-                      ),
-                    ],
-                  ),
+  Widget build(BuildContext context) => SafeArea(
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.all(36),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _BrandMark(size: 88, onDark: true),
+                    SizedBox(height: 20),
+                    Text('Enactus ESP',
+                      style: TextStyle(color: AppTheme.enactusYellow,
+                        fontSize: 22, fontWeight: FontWeight.w700)),
+                    SizedBox(height: 14),
+                    Text('Ensemble, donnons\nvie aux idées.',
+                      style: TextStyle(color: Colors.white, fontSize: 38,
+                        fontWeight: FontWeight.w800, height: 1.15)),
+                    SizedBox(height: 16),
+                    Text('Apprendre, entreprendre et agir avec les communautés.',
+                      style: TextStyle(color: Colors.white, fontSize: 17,
+                        height: 1.5)),
+                    SizedBox(height: 20),
+                    Text('Une équipe. Des projets. Un impact partagé.',
+                      style: TextStyle(color: AppTheme.enactusYellow,
+                        fontSize: 15, fontWeight: FontWeight.w600)),
+                  ],
                 ),
               ),
             ),
@@ -251,110 +236,6 @@ class _BrandPanel extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _LoginPhotoMosaic extends StatelessWidget {
-  const _LoginPhotoMosaic();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      const _LoginStoryPhoto(
-        asset: 'world-cup-2022-delegation',
-        label: 'L’équipe Enactus ESP réunie à la World Cup 2022.',
-        aspectRatio: 2.4,
-      ),
-      const SizedBox(height: 10),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Expanded(
-            child: _LoginStoryPhoto(
-              asset: 'haffe-2025-rencontre',
-              label: 'Enactus ESP à la rencontre des communautés à Haffé.',
-              aspectRatio: 1.8,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _LoginStoryPhoto(
-                    asset: 'niaguiss-2025-demonstration',
-                    label: 'Une démonstration de projet sur le terrain à Niaguiss.',
-                    aspectRatio: 1.8,
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(height: 2, color: AppTheme.enactusYellow),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: AppTheme.enactusYellow,
-                        size: 22,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
-
-class _LoginStoryPhoto extends StatelessWidget {
-  final String asset;
-  final String label;
-  final double aspectRatio;
-  const _LoginStoryPhoto({
-    required this.asset,
-    required this.label,
-    required this.aspectRatio,
-  });
-
-  @override
-  Widget build(BuildContext context) => ClipPath(
-    clipper: const _LoginPhotoClipper(),
-    child: AspectRatio(
-      aspectRatio: aspectRatio,
-      child: ColoredBox(
-        color: const Color(0xFF1C2933),
-        child: Image.asset(
-          'assets/heritage/$asset.jpg',
-          fit: BoxFit.contain,
-          semanticLabel: label,
-          errorBuilder: (context, error, stackTrace) => const Center(
-            child: Icon(Icons.groups_rounded, color: Colors.white60, size: 42),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _LoginPhotoClipper extends CustomClipper<Path> {
-  const _LoginPhotoClipper();
-
-  @override
-  Path getClip(Size size) => Path()
-    ..moveTo(14, 0)
-    ..lineTo(size.width, 0)
-    ..lineTo(size.width, size.height - 14)
-    ..lineTo(size.width - 14, size.height)
-    ..lineTo(0, size.height)
-    ..lineTo(0, 14)
-    ..close();
-
-  @override
-  bool shouldReclip(_LoginPhotoClipper oldClipper) => false;
 }
 
 class _LoginPanel extends StatelessWidget {
@@ -493,6 +374,10 @@ class _LoginPanel extends StatelessWidget {
                         SizedBox(height: 14),
                       ],
                       ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.enactusYellow,
+                          foregroundColor: AppTheme.softBlack,
+                        ),
                         onPressed: loading ? null : onLogin,
                         icon: loading
                             ? SizedBox(
