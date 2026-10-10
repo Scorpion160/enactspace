@@ -1,5 +1,15 @@
 # Architecture
 
+## État de production — 10 octobre 2026
+
+Le client web, l’APK installé et l’API déclarent `1.0.13`; les clients portent le build `16`. Le schéma PostgreSQL est à `20261007_0031`. Quatre services partagent l’image backend : API, email-worker, push-worker et veille-worker. Le dernier correctif de première connexion est conservé dans le checkpoint `b152677372ded22d63b544b1336240902613b559`.
+
+Les membres et leurs statistiques concernent les enacteurs, séparément des alumni. Les profils alumni internes précréés restent consultables selon les permissions de l’annuaire sans exiger leur activation. Les conversations directes avec soi-même sont refusées. Le parcours disciplinaire distingue proposition, approbations et exécution datée, avec révocation des accès et conservation de l’historique.
+
+Voir [l’état détaillé de la release](releases/20261010-release-1.0.13.md).
+
+## Procédures générales et contexte antérieur
+
 ## System boundary
 
 EnactSpace consists of a Flutter client, a FastAPI backend, PostgreSQL 16, persistent file storage, and external notification/payment providers. The repository contains application code and safe templates; production infrastructure, secrets, signing identities, and provider consoles remain outside source control.
@@ -16,7 +26,7 @@ Authentication uses short-lived access tokens and rotating, single-use refresh s
 
 ## Data and migrations
 
-PostgreSQL 16 is the production database and the authority for concurrency-sensitive behavior. SQLite is used only for safe application-engine unit tests where supported. Alembic owns production schema evolution. The current single head is `20260913_0009`; production starts with `AUTO_CREATE_TABLES=false`, and migrations run before application rollout.
+PostgreSQL 16 is the production database and the authority for concurrency-sensitive behavior. SQLite is used only for safe application-engine unit tests where supported. Alembic owns production schema evolution. The current single head is `20261007_0031`; production starts with `AUTO_CREATE_TABLES=false`, and migrations run before application rollout.
 
 The migration chain covers account/privacy/legal controls, impact truth and provenance, institutional memory, product services, push lifecycle, operational integrity, and memory/heritage operational capture. Do not infer data provenance or verification from presentation-layer values.
 

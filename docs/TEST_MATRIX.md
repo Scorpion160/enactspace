@@ -1,5 +1,21 @@
 # Test matrix
 
+## Résultats observés pour la release du 10 octobre
+
+| Vérification | Résultat constaté | Limite |
+|---|---|---|
+| Aide et première connexion Flutter | 25 tests réussis | Avant le dernier correctif administratrice |
+| Recrutement public Flutter | 19 tests réussis | Pas un parcours réel de candidature |
+| Acceptation UI finale | 39 tests réussis | Pas une validation de toutes les fonctions métier |
+| Publication web | 5 tests d’extraction sûre réussis | Tests du publieur |
+| Backend candidat | pip check, import API, catalogue Alembic, lecture PostgreSQL réussis | Suite backend complète après résolution des dépendances à relancer |
+| Correctif de première connexion | Syntaxe et 7 cas de politique réussis | Tests ciblés de la fonction, sans activation réelle |
+| Déploiement | API publique 1.0.13, version web 1.0.13+16, APK installé 1.0.13+16 | Réception des mails/push et parcours utilisateurs restent à confirmer |
+
+Les anciens rapports restent datés; ils ne constituent pas une nouvelle exécution complète sur le checkpoint final. Ne pas additionner ces compteurs comme une mesure de couverture. Voir [la liste des contrôles restants](RELEASE_CHECKLIST.md).
+
+## Procédures générales et contexte antérieur
+
 CI and release evidence are based on behavior families, not fixed test counts.
 
 | Family | Primary evidence | PostgreSQL required |
@@ -17,7 +33,7 @@ CI and release evidence are based on behavior families, not fixed test counts.
 
 ## Shared backend gate
 
-Run backend compilation, OpenAPI generation, assert the single Alembic head `20260913_0009`, and run `python -m unittest discover -v` with the safe split configuration: SQLite application engine plus an isolated PostgreSQL 16 `TEST_DATABASE_URL`. PostgreSQL-dependent suites must not skip because the test URL is absent or invalid.
+Run backend compilation, OpenAPI generation, assert the single Alembic head `20261007_0031`, and run `python -m unittest discover -v` with the safe split configuration: SQLite application engine plus an isolated PostgreSQL 16 `TEST_DATABASE_URL`. PostgreSQL-dependent suites must not skip because the test URL is absent or invalid.
 
 ## Shared Flutter gate
 

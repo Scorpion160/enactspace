@@ -1,5 +1,27 @@
 # V1.0.0 release checklist
 
+## Situation actuelle — 10 octobre 2026
+
+- [x] Web 1.0.13 build 16 publié; version publique contrôlée.
+- [x] APK 1.0.13 build 16 compilé et installé sur le téléphone de validation.
+- [x] API 1.0.13 et quatre services backend basculés; santé et configuration contrôlées.
+- [x] Schéma PostgreSQL `20261007_0031` confirmé.
+- [x] Sauvegarde fraîche avec répétition de restauration réussie avant la bascule.
+- [x] Redirection des mails désactivée; mail et push activés.
+- [x] Correctif administratrice conservé dans les sources et le checkpoint b152677.
+- [ ] Confirmer l’activation réelle de Mariama et la réception de son code.
+- [ ] Confirmer réception mail et push sur plusieurs comptes/appareils.
+- [ ] Valider à l’écran annuaire alumni, compteurs membres, droits admin/SG et absence d’auto-conversation.
+- [ ] Rejouer les tests backend pertinents après la résolution finale des dépendances; vérifier les limites PostgreSQL et disciplinaires.
+- [ ] Examiner les anciennes auto-conversations et le traitement d’une cible disciplinaire invalide dans un lot.
+- [ ] Remplacer l’exception nominative de première connexion par un mécanisme d’autorisation audité.
+- [ ] Vérifier les restrictions Firebase, la garde des clés et les paramètres de distribution.
+- [ ] Terminer les gates iOS, stores, gouvernance GitHub et validation de reprise/RPO/RTO.
+
+La publication technique ne signifie pas que tous les parcours sont validés. Les checklists historiques ci-dessous restent des exigences; ne pas les cocher sur la seule base de la santé API.
+
+## Procédures générales et contexte antérieur
+
 This checklist governs EnactSpace V1.0.0 release execution. It does not by itself create a tag, GitHub Release, signed artifact, deployment, or merge.
 
 Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md). Store preparation uses [store release metadata](STORE_RELEASE_METADATA.md), the [privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md), and [artifact provenance](ARTIFACT_PROVENANCE.md). These records do not close a gate by themselves.

@@ -1,5 +1,13 @@
 # Artifact provenance
 
+## Provenance actuelle
+
+La [release 1.0.13](releases/20261010-release-1.0.13.md) relie le checkpoint source, les images, les deux artefacts clients et leurs SHA256 aux comptes rendus opérateur. Le dernier checkpoint est b152677; la version produit n’a pas changé lors du correctif backend de première connexion.
+
+Le label OCI hérité de l’image hotfix peut encore désigner 8372960. Distinguer le commit de l’image de base, le patch ajouté et le snapshot contenant ce patch. Une empreinte valide confirme l’identité d’un fichier, pas sa qualité fonctionnelle ni la totalité de ses tests.
+
+## Procédures générales et contexte antérieur
+
 This document defines the evidence record for future EnactSpace release artifacts. It does not claim that a signed release artifact, store upload, tag, deployment, or public release exists.
 
 ## One record per artifact

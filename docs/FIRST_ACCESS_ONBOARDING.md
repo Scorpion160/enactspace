@@ -1,5 +1,17 @@
 # Premières connexions et préparation des accès
 
+## Correctif déployé et conservé — 10 octobre 2026
+
+Une tentative concernant une administratrice sans identifiants activés n’avait créé aucun challenge. Le seul mail trouvé était une notification « Responsabilités mises à jour », pas un code. Le statut SMTP sent ne permettait donc pas de conclure à l’envoi d’un code.
+
+Le correctif `administrator_activation_blocked` autorise exceptionnellement le compte Mariama identifié dans le service, uniquement si son identité/adresse correspondent, que `credential_setup_required` est vrai, que `credential_activated_at` est nul et que `already_signed_in` est faux. Il s’applique à l’émission et à la confirmation. Les autres administrateurs restent bloqués par la politique existante; les responsabilités de Mariama sont conservées.
+
+Cette exception nominative est un correctif ciblé, pas une politique générale d’activation administrateur. Syntaxe et sept cas ciblés ont réussi; la réception et l’activation réelle restent à confirmer. Le patch est inclus dans b152677 et doit être conservé dans les prochains builds. Remplacer ultérieurement cette exception par une autorisation explicite et auditée.
+
+Les mots de passe sont personnels. Ne jamais communiquer un mot de passe collectif ou extraire un code depuis la base pour le transmettre.
+
+## Procédures générales et contexte antérieur
+
 Statut : parcours implémenté dans le code source le 7 octobre 2026, non encore déployé. Le déploiement final et la sortie de la redirection des courriels restent des étapes distinctes.
 
 ## Stratégie

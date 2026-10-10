@@ -1,5 +1,15 @@
 # Copie chiffrée hors du VPS et récupération Windows
 
+## Dernière sauvegarde et règle de capture
+
+La bascule backend du 10 octobre a été précédée de la sauvegarde vérifiée `20261010T205427Z_750046`. Une tentative précédente a été rejetée parce que la source avait changé pendant la capture. Arrêter l’API et les trois workers pendant la capture cohérente, vérifier la fraîcheur du rapport de restauration puis redémarrer les services.
+
+Une copie chiffrée et son empreinte ont été vérifiées sur un support Windows externe lors des opérations antérieures. La garde par un second dépositaire et les objectifs RPO/RTO restent à confirmer. La sauvegarde de configuration Compose ne remplace pas une sauvegarde de données et fichiers.
+
+Voir [le dossier de release](releases/20261010-release-1.0.13.md) et conserver les clés de déchiffrement hors du dépôt.
+
+## Procédures générales et contexte antérieur
+
 ## Périmètre vérifié
 
 Les archives chiffrées de PostgreSQL, du schéma de référence, des fichiers persistants et du manifeste du point de récupération sont conservées sous %LOCALAPPDATA%\EnactSpace\PrivateBackups\<identifiant>. Le reçu de capture et les résultats agrégés des essais sont également présents. Aucun contenu de fiche ni fichier métier déchiffré n’est conservé dans ce dossier.

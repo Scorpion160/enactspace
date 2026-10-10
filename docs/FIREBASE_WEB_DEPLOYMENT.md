@@ -1,5 +1,15 @@
 # Configuration Firebase du navigateur
 
+## État et compilation actuels
+
+Le web public est en 1.0.13 build 16. La compilation doit passer par `tools/build_web_with_firebase.ps1` avec un fichier de defines privé complet : API HTTPS, projet Firebase, sender ID, clé/app ID web et clé publique VAPID. Le worker généré est exclu de la sauvegarde Git; ne pas le remplacer par un fichier obsolète après build.
+
+Les restrictions de clé API ne sont pas encore attestées. La présence de `firebase-messaging-sw.js` et l’activation backend des push ne prouvent pas la réception sur navigateur : vérifier permission, enregistrement, réception et déconnexion.
+
+Le publieur historique contient des constantes de version et de SHA256. Une copie opérationnelle a été adaptée pour chaque release; ne pas publier un nouveau build avec les anciennes constantes. Vérifier les trois changements, l’intégrité du script transféré, l’archive et les tests avant exécution. Voir [la procédure actuelle](releases/20261010-release-1.0.13.md).
+
+## Procédures générales et contexte antérieur
+
 Le worker `frontend/web/firebase-messaging-sw.js` est un fichier généré pour le déploiement. Il reste sur le PC, mais ne fait pas partie du code publié. Son modèle et son générateur sont versionnés dans `tools/`. Cette séparation ne sécurise pas Firebase à elle seule : la configuration cliente devient accessible au navigateur lors du déploiement.
 
 La migration conserve le worker local et une copie privée de sa configuration dans `%LOCALAPPDATA%\EnactSpace\FirebaseWeb\<identifiant>\firebase-web-client-defines.json`. Cette copie contient seulement les six paramètres Firebase du worker. Elle ne remplace pas la configuration complète d'une release et ne contient ni URL API ni clé publique VAPID.

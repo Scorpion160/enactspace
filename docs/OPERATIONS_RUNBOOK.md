@@ -1,5 +1,17 @@
 # Operations runbook
 
+## Procédure en vigueur — release 1.0.13
+
+La référence opérationnelle actuelle est [le runbook de release du 10 octobre](releases/20261010-release-1.0.13.md). Les anciens exemples 1.0.0 ci-dessous sont des exemples de procédure, pas l’état de production.
+
+Avant toute bascule : contrôler l’image et son identité, le schéma courant, la configuration effective des quatre services et l’état de santé; prendre le verrou de publication; sauvegarder la configuration. Pour une capture cohérente, arrêter l’API et les trois workers puis lancer la sauvegarde vérifiée. Contrôler un rapport frais, son succès et le nettoyage de l’environnement de restauration. Redémarrer les anciens services si cette étape échoue.
+
+Le dernier déploiement n’a effectué aucune migration : la base était déjà au head attendu. Ne pas lancer systématiquement une migration sans comparer le schéma et examiner le changement. Un retour à une image précédente ne restaure pas le schéma ou les données : vérifier la compatibilité avant restauration.
+
+Lancer les sondes candidates avec Docker Compose et un override temporaire, `run --rm -T --no-deps --entrypoint python backend -`. Le lancement brut avec `docker run --env-file` a mal interprété une URL de base entourée de guillemets. Ne pas réécrire les secrets pour contourner ce problème.
+
+## Procédures générales et contexte antérieur
+
 This is the canonical V1.0.0 production operations sequence. It records required controls, not evidence that a deployment has occurred.
 
 ## Prerequisites

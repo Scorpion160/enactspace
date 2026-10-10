@@ -1,5 +1,13 @@
 # Release evidence index
 
+## Référence la plus récente
+
+[L’état de release du 10 octobre 2026](releases/20261010-release-1.0.13.md) synthétise les comptes rendus PowerShell transmis par l’opérateur : publications web/API, installation Android, sauvegarde, configuration normale des notifications et correctif de première connexion. Ces constats ne proviennent pas d’une nouvelle inspection distante exécutée lors de cette mise à jour documentaire.
+
+Les éléments ci-dessous restent des preuves historiques. La réception du code, les invitations aux responsables et la validation complète des parcours ne sont pas attestées par les comptes rendus disponibles.
+
+## Procédures générales et contexte antérieur
+
 This matrix links every unchecked gate in [the V1.0.0 release checklist](RELEASE_CHECKLIST.md) to its evidence contract. It does not close the checklist or authorize a release. Product baseline: `3445160e7af4ea592c1c340cb52f35514b4d05f9`; validated compliance head: `af3cbd263410090f9f29b9ceac0c5327820aee97`; Flutter target `1.0.0+1`; backend `1.0.0`.
 
 Allowed states are `NOT_RUN`, `LOCAL_PASS`, `EXTERNAL_GATE_OPEN`, `BLOCKED`, `APPROVED_EXCEPTION`, and `FINAL_PASS`. `LOCAL_PASS` records validated local evidence. Application CI and repository security are `FINAL_PASS` on the validated compliance head; replay is required if application, dependency, workflow, security-sensitive, or build inputs change.
@@ -14,7 +22,7 @@ Allowed states are `NOT_RUN`, `LOCAL_PASS`, `EXTERNAL_GATE_OPEN`, `BLOCKED`, `AP
 | 6 | Merge and stale-branch policy | EXTERNAL_GATE_OPEN | Repository | Approved governance decision | [Pôle IT handoff](POLE_IT_HANDOFF.md) | — | — | — | Repository owner | Approval required |
 | 7 | Backend compile, OpenAPI and full suite without PostgreSQL skips | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / 1.0.0 | Exact-head local Docker validation plus GitHub Actions | 227 backend tests passed locally without PostgreSQL skips; Application CI run `35879715499` passed | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Backend maintainer | Replay if backend, dependency, workflow, or build inputs change |
 | 8 | PostgreSQL 16 migration/reversal/concurrency | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / PostgreSQL 16.15 / schema 0009 | Isolated PostgreSQL migration, reversal, and concurrency validation | Local 227-test suite passed; Application CI PostgreSQL 16 job passed; production backup and migration remain external gates | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Database maintainer | Replay before production migration if database or migration inputs change |
-| 9 | One Alembic head | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / 1.0.0 | Local and GitHub Actions command results | Exactly `20260913_0009 (head)` | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Backend maintainer | Replay if migration inputs change |
+| 9 | One Alembic head | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / 1.0.0 | Local and GitHub Actions command results | Exactly `20261007_0031 (head)` | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Backend maintainer | Replay if migration inputs change |
 | 10 | Flutter lock, analysis and full tests | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / 1.0.0+1 | Exact-head local validation plus GitHub Actions | Lock preserved, analysis clean, 623 tests passed locally; Application CI run `35879715499` passed | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Mobile maintainer | Replay if Flutter, dependency, workflow, or build inputs change |
 | 11 | Web release and Android debug compile | LOCAL_PASS | Compliance head `af3cbd263410090f9f29b9ceac0c5327820aee97` / 1.0.0+1 | Exact-head local builds plus GitHub Actions | Web release and Android debug passed locally and in run `35879715499`; debug APK SHA-256 `44061AB219E654368673C291C384CBDDD1CAC7C973D5E8D6126670AAA4524A0E` | 2026-09-23 | Release compliance validation | GitHub Actions corroboration | Mobile maintainer | Debug APK is not a distributable release artifact; signed release remains external |
 | 12 | Backup and accepted restore rehearsal | EXTERNAL_GATE_OPEN | Production candidate | Backup/restore record | [Operations runbook](OPERATIONS_RUNBOOK.md) | — | — | — | Database/operations owner | Infrastructure and approval required |
