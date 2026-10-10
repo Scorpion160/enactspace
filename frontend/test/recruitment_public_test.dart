@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:frontend/app/app_router.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -97,19 +100,33 @@ Future<void> _fillIdentity(WidgetTester tester) async {
     find.byKey(const ValueKey('field-email')),
     'awa.audit@example.com',
   );
+  await tester.enterText(
+    find.byKey(const ValueKey('field-phone')),
+    '+221770000000',
+  );
+  await tester.tap(find.byKey(const ValueKey('field-gender')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Femme').last);
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('application-next')));
   await tester.pump();
 }
 
 Future<void> _reachReview(WidgetTester tester) async {
   await _fillIdentity(tester);
+  await tester.tap(find.byKey(const ValueKey('field-studyLevel')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Master1').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('field-department')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Génie Informatique').last);
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('field-preferredPole')), findsNothing);
+  expect(find.byKey(const ValueKey('field-projectInterest')), findsNothing);
   await tester.enterText(
-    find.byKey(const ValueKey('field-studyLevel')),
-    'Master 1',
-  );
-  await tester.enterText(
-    find.byKey(const ValueKey('field-department')),
-    'Génie informatique',
+    find.byKey(const ValueKey('field-knownEnactusFrom')),
+    'Une présentation à l’ESP et Instagram.',
   );
   await tester.tap(find.byKey(const ValueKey('application-next')));
   await tester.pump();
@@ -117,6 +134,21 @@ Future<void> _reachReview(WidgetTester tester) async {
     find.byKey(const ValueKey('field-motivation')),
     'Je souhaite contribuer à des projets utiles et apprendre en équipe.',
   );
+  for (final field in [
+    'question-social-problem',
+    'projectIdeas',
+    'question-community',
+    'question-teamwork-example',
+    'question-learning-example',
+  ]) {
+    final finder = find.byKey(ValueKey('field-$field'));
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      finder,
+      'Un exemple concret, une écoute des personnes concernées et une première action à améliorer ensemble.',
+    );
+  }
   await tester.tap(find.byKey(const ValueKey('application-next')));
   await tester.pump();
   await tester.enterText(
@@ -130,6 +162,164 @@ Future<void> _reachReview(WidgetTester tester) async {
 }
 
 void main() {
+  for (final dark in [false, true]) {
+    testWidgets(
+      'duplicate preserves draft and opens tracking with return dark=$dark',
+      (tester) async {
+        final gateway = _FakeGateway(
+          submit: (_) async => throw const PublicRecruitmentFailure(
+            PublicRecruitmentFailureKind.duplicateApplication,
+          ),
+        );
+        final router = GoRouter(
+          initialLocation: '/apply',
+          routes: [
+            GoRoute(
+              path: '/apply',
+              builder: (_, _) => PublicApplicationFlowScreen(
+                campaignId: _campaign.id,
+                campaign: _campaign,
+                gateway: gateway,
+              ),
+            ),
+            GoRoute(
+              path: '/recruitment/track',
+              builder: (_, _) => ApplicationTrackingScreen(gateway: gateway),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          MaterialApp.router(
+            routerConfig: router,
+            theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+          ),
+        );
+        await _reachReview(tester);
+        await tester.ensureVisible(find.byType(CheckboxListTile));
+        await tester.tap(find.byType(CheckboxListTile));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('application-submit')));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Une candidature a déjà été reçue'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Vérifie ta connexion'), findsNothing);
+        expect(find.textContaining('awa.audit@example.com'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('duplicate-application-tracking')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('duplicate-application-tracking')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ApplicationTrackingScreen), findsOneWidget);
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Une candidature a déjà été reçue'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('awa.audit@example.com'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final kind in [
+    PublicRecruitmentFailureKind.network,
+    PublicRecruitmentFailureKind.server,
+    PublicRecruitmentFailureKind.invalidApplication,
+    PublicRecruitmentFailureKind.fileTooLarge,
+  ]) {
+    testWidgets('submission shows actual failure $kind', (tester) async {
+      final gateway = _FakeGateway(
+        submit: (_) async => throw PublicRecruitmentFailure(kind),
+      );
+      await tester.pumpWidget(
+        _app(
+          PublicApplicationFlowScreen(
+            campaignId: _campaign.id,
+            campaign: _campaign,
+            gateway: gateway,
+          ),
+        ),
+      );
+      await _reachReview(tester);
+      await tester.ensureVisible(find.byType(CheckboxListTile));
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('application-submit')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(PublicRecruitmentFailure(kind).submissionMessage),
+        findsOneWidget,
+      );
+      if (kind != PublicRecruitmentFailureKind.network) {
+        expect(find.textContaining('Vérifie ta connexion'), findsNothing);
+      }
+      expect(find.text('Envoyer ma candidature'), findsOneWidget);
+    });
+  }
+  testWidgets(
+    'selected CV survives submission failure and return to documents',
+    (tester) async {
+      final gateway = _FakeGateway(
+        submit: (_) async => throw const PublicRecruitmentFailure(
+          PublicRecruitmentFailureKind.server,
+        ),
+      );
+      await tester.pumpWidget(
+        _app(
+          PublicApplicationFlowScreen(
+            campaignId: _campaign.id,
+            campaign: _campaign,
+            gateway: gateway,
+          ),
+        ),
+      );
+      await _reachReview(tester);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Retour'));
+      await tester.pump();
+      final attachment = SelectedAttachment(
+        name: 'cv-awa.pdf',
+        bytes: Uint8List.fromList([37, 80, 68, 70]),
+      );
+      tester
+          .widget<AttachmentPickerField>(
+            find.byType(AttachmentPickerField).first,
+          )
+          .onChanged(attachment);
+      await tester.pump();
+      expect(find.textContaining('cv-awa.pdf'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('application-next')));
+      await tester.pump();
+      await tester.ensureVisible(find.byType(CheckboxListTile));
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('application-submit')));
+      await tester.pumpAndSettle();
+      expect(
+        gateway.lastDraft?.knownEnactusFrom,
+        'Une présentation à l’ESP et Instagram.',
+      );
+      expect(gateway.lastDraft?.preferredPole, isNull);
+      expect(gateway.lastDraft?.projectInterest, isNull);
+      expect(gateway.lastDraft?.cvFile?.name, 'cv-awa.pdf');
+      expect(gateway.lastDraft?.cvFile?.bytes, attachment.bytes);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Retour'));
+      await tester.pump();
+      expect(
+        tester
+            .widget<AttachmentPickerField>(
+              find.byType(AttachmentPickerField).first,
+            )
+            .value
+            ?.name,
+        'cv-awa.pdf',
+      );
+    },
+  );
   test('public recruitment routes bypass authentication redirects', () {
     expect(AppRouter.isPublicPath('/recruitment/apply'), isTrue);
     expect(AppRouter.isPublicPath('/recruitment/apply/campaign-open'), isTrue);
@@ -210,7 +400,7 @@ void main() {
     expect(find.text('Étape 1 sur 6'), findsOneWidget);
     expect(
       find.text('Ce champ est nécessaire pour continuer.'),
-      findsNWidgets(2),
+      findsNWidgets(3),
     );
   });
 
@@ -313,7 +503,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('application-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('n’a pas pu être envoyée'), findsOneWidget);
+    expect(find.textContaining('n’a pas pu traiter ton envoi'), findsOneWidget);
     expect(find.text('Envoyer ma candidature'), findsOneWidget);
     final editIdentity = find.widgetWithText(TextButton, 'Modifier').at(1);
     await tester.ensureVisible(editIdentity);

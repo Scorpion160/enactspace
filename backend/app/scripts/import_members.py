@@ -517,6 +517,8 @@ def upsert_user(db: Session, member: MemberRow, report: ImportReport, update_exi
         gender=member.gender,
         profile_type=profile_type,
         password_hash=hash_password(secrets.token_urlsafe(24)),
+        credential_setup_required=True,
+        onboarding_required=True,
         department=member.core_pole,
         study_level=member.study_level,
         status=member.status,

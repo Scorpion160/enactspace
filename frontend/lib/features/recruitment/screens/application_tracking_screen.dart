@@ -56,7 +56,7 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
         _error = switch (error.kind) {
           PublicRecruitmentFailureKind.notFound => TrackingErrorKind.notFound,
           PublicRecruitmentFailureKind.network => TrackingErrorKind.network,
-          PublicRecruitmentFailureKind.server => TrackingErrorKind.server,
+          _ => TrackingErrorKind.server,
         };
       });
     } catch (_) {
@@ -156,14 +156,17 @@ class _TrackingSearchFormState extends State<TrackingSearchForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Suivre ma candidature',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Saisis le code reçu après l’envoi et la même adresse e-mail.',
-                style: TextStyle(color: AppTheme.secondaryText, height: 1.5),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 22),
               TextFormField(
@@ -204,11 +207,11 @@ class _TrackingSearchFormState extends State<TrackingSearchForm> {
                 },
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Code perdu ? Consulte le message affiché après ton envoi. Aucun mécanisme de récupération automatique n’est disponible actuellement.',
+              Text(
+                'Retrouve ton code dans l’e-mail de confirmation ou le message affiché après l’envoi de ta candidature. Si tu ne l’as plus, contacte l’équipe recrutement.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.secondaryText,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
@@ -266,10 +269,7 @@ class _TrackingError extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: AppTheme.error,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -286,7 +286,7 @@ class _TrackingIntroduction extends StatelessWidget {
         color: AppTheme.softBlack,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.route_rounded, color: AppTheme.enactusYellow, size: 44),
@@ -332,24 +332,20 @@ class TrackingResultView extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 presentation.title,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 6),
-              Text(
-                presentation.explanation,
-                style: const TextStyle(height: 1.5),
-              ),
+              Text(presentation.explanation, style: TextStyle(height: 1.5)),
               const SizedBox(height: 16),
               Text(
                 tracking.campaignTitle,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               Text(
                 tracking.candidateName,
-                style: const TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 6),
               Semantics(
@@ -391,16 +387,16 @@ class TrackingResultView extends StatelessWidget {
               const SizedBox(height: 18),
               Text(
                 'Dernière mise à jour : ${_formatDate(tracking.updatedAt)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.secondaryText,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 14),
               TextButton.icon(
                 onPressed: () => context.go('/recruitment/apply'),
                 icon: const Icon(Icons.campaign_outlined),
-                label: const Text('Voir les campagnes ouvertes'),
+                label: Text('Voir les campagnes ouvertes'),
               ),
             ],
           ),
@@ -437,9 +433,9 @@ class _InformationPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              Text(text, style: const TextStyle(height: 1.4)),
+              Text(text, style: TextStyle(height: 1.4)),
             ],
           ),
         ),

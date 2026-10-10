@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -616,7 +617,7 @@ def _season_reference_slug(name: str) -> str:
     normalized = unicodedata.normalize("NFKD", name)
     ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
     slug = re.sub(r"[^A-Za-z0-9]+", "-", ascii_text).strip("-")
-    return slug or "SAISON"
+    return slug or "ANNEE"
 
 
 def allocate_official_reference(db: Session, request: InstitutionalDocumentRequest) -> str:
@@ -625,7 +626,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
     if request.season_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Impossible d’officialiser sans saison.",
+            detail="Impossible d’officialiser sans année.",
         )
     rule = get_template_rule(request.template_code)
     if db.get_bind().dialect.name == "postgresql":
@@ -635,7 +636,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
         )
     season = db.query(Season).filter(Season.id == request.season_id).first()
     if season is None:
-        raise HTTPException(status_code=409, detail="Saison introuvable.")
+        raise HTTPException(status_code=409, detail="Année introuvable.")
 
     sequence = (
         db.query(InstitutionalDocumentSequence)
@@ -656,7 +657,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
         db.flush()
 
     sequence.last_number += 1
-    sequence.updated_at = datetime.utcnow()
+    sequence.updated_at = utc_now()
     request.sequence_number = sequence.last_number
     request.official_reference = (
         f"EESP/{rule.reference_prefix}/{_season_reference_slug(season.name)}/"

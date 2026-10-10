@@ -1,4 +1,8 @@
+import '../../../shared/attachments/attachment_picker.dart';
+
 class PublicApplicationDraft {
+  final Map<String, String>? questionnaireAnswers;
+  final String? questionnaireVersion;
   final String campaignId;
   final String firstName;
   final String lastName;
@@ -20,11 +24,16 @@ class PublicApplicationDraft {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final SelectedAttachment? cvFile;
+  final SelectedAttachment? motivationLetterFile;
+  final SelectedAttachment? attachmentFile;
   final String? cvUrl;
   final String? motivationLetterUrl;
   final String? attachmentUrl;
 
   const PublicApplicationDraft({
+    this.questionnaireAnswers,
+    this.questionnaireVersion,
     required this.campaignId,
     required this.firstName,
     required this.lastName,
@@ -46,6 +55,9 @@ class PublicApplicationDraft {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.cvFile,
+    this.motivationLetterFile,
+    this.attachmentFile,
     this.cvUrl,
     this.motivationLetterUrl,
     this.attachmentUrl,

@@ -1,7 +1,11 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import '../../../../shared/attachments/attachment_picker.dart';
 
+import '../../../../core/academic/esp_academic_catalog.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../models/application_model.dart';
+import '../../models/recruitment_question_model.dart';
 import '../../models/public_application_draft.dart';
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/public_recruitment_gateway.dart';
@@ -46,7 +50,9 @@ class _PublicApplicationFlowScreenState
   bool _submitting = false;
   bool _confirmed = false;
   String? _submitError;
+  PublicRecruitmentFailureKind? _submitFailureKind;
   String? _gender;
+  SelectedAttachment? _cvFile, _motivationLetterFile, _attachmentFile;
 
   TextEditingController _controller(String key) =>
       _controllers.putIfAbsent(key, TextEditingController.new);
@@ -109,11 +115,16 @@ class _PublicApplicationFlowScreenState
 
   PublicApplicationDraft _draft() => PublicApplicationDraft(
     campaignId: widget.campaignId,
+    questionnaireAnswers: {
+      for (final q in _campaign!.applicationQuestions)
+        q.id: _text(_questionKey(q)),
+    },
+    questionnaireVersion: _campaign!.questionnaireVersion,
     firstName: _text('firstName'),
     lastName: _text('lastName'),
     email: _text('email'),
     gender: _gender,
-    phone: _optional('phone'),
+    phone: _text('phone'),
     department: _optional('department'),
     studyLevel: _optional('studyLevel'),
     className: _optional('className'),
@@ -124,14 +135,12 @@ class _PublicApplicationFlowScreenState
     contribution: _optional('contribution'),
     projectIdeas: _optional('projectIdeas'),
     leadershipProfile: _optional('leadershipProfile'),
-    preferredPole: _optional('preferredPole'),
-    projectInterest: _optional('projectInterest'),
     associativeExperience: _optional('associativeExperience'),
     availability: _optional('availability'),
     publicComment: _optional('publicComment'),
-    cvUrl: _optional('cvUrl'),
-    motivationLetterUrl: _optional('motivationLetterUrl'),
-    attachmentUrl: _optional('attachmentUrl'),
+    cvFile: _cvFile,
+    motivationLetterFile: _motivationLetterFile,
+    attachmentFile: _attachmentFile,
   );
 
   void _next() {
@@ -149,15 +158,40 @@ class _PublicApplicationFlowScreenState
     setState(() {
       _submitting = true;
       _submitError = null;
+      _submitFailureKind = null;
     });
     try {
       final application = await _gateway.submitApplication(_draft());
       if (mounted) setState(() => _submitted = application);
+    } on PublicRecruitmentFailure catch (error) {
+      if (error.kind == PublicRecruitmentFailureKind.questionnaireChanged) {
+        var campaigns = <RecruitmentCampaignModel>[];
+        try {
+          campaigns = await _gateway.loadCampaigns();
+        } catch (_) {}
+        if (mounted) {
+          setState(() {
+            for (final campaign in campaigns) {
+              if (campaign.id == _campaign?.id) _campaign = campaign;
+            }
+            _step = 2;
+            _confirmed = false;
+            _submitError =
+                'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.';
+          });
+        }
+      } else if (mounted) {
+        setState(() {
+          _submitFailureKind = error.kind;
+          _submitError = error.submissionMessage;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _submitError =
-              'La candidature n’a pas pu être envoyée. Vérifie ta connexion puis réessaie.';
+          _submitError = const PublicRecruitmentFailure(
+            PublicRecruitmentFailureKind.server,
+          ).submissionMessage;
         });
       }
     } finally {
@@ -169,19 +203,16 @@ class _PublicApplicationFlowScreenState
   Widget build(BuildContext context) {
     if (_campaignLoading) {
       return const PublicRecruitmentShell(
-        backPath: '/recruitment/apply',
         child: Center(child: CircularProgressIndicator()),
       );
     }
     if (_campaignFailed || _campaign == null) {
       return PublicRecruitmentShell(
-        backPath: '/recruitment/apply',
         child: PublicRecruitmentErrorState(onRetry: _loadCampaign),
       );
     }
     if (_submitted != null) {
       return PublicRecruitmentShell(
-        backPath: null,
         child: ApplicationSuccessView(
           campaignTitle: _campaign!.title,
           email: _text('email'),
@@ -191,7 +222,6 @@ class _PublicApplicationFlowScreenState
     }
 
     return PublicRecruitmentShell(
-      backPath: '/recruitment/apply',
       child: Column(
         children: [
           Expanded(
@@ -210,8 +240,10 @@ class _PublicApplicationFlowScreenState
                       children: [
                         Text(
                           _campaign!.title,
-                          style: const TextStyle(
-                            color: AppTheme.secondaryText,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -282,13 +314,15 @@ class _PublicApplicationFlowScreenState
       ),
       _field(
         'phone',
-        'Téléphone — facultatif',
+        'Téléphone',
+        required: true,
         keyboardType: TextInputType.phone,
         autofillHints: const [AutofillHints.telephoneNumber],
       ),
       DropdownButtonFormField<String>(
+        key: const ValueKey('field-gender'),
         initialValue: _gender,
-        decoration: const InputDecoration(labelText: 'Genre — facultatif'),
+        decoration: const InputDecoration(labelText: 'Genre *'),
         items: const [
           DropdownMenuItem(value: 'femme', child: Text('Femme')),
           DropdownMenuItem(value: 'homme', child: Text('Homme')),
@@ -297,6 +331,7 @@ class _PublicApplicationFlowScreenState
             child: Text('Préfère ne pas préciser'),
           ),
         ],
+        validator: (value) => value == null ? 'Champ obligatoire' : null,
         onChanged: (value) => setState(() => _gender = value),
       ),
     ],
@@ -308,8 +343,12 @@ class _PublicApplicationFlowScreenState
     children: [
       _ResponsiveFields(
         children: [
-          _field('studyLevel', 'Formation ou niveau d’études', required: true),
-          _field('department', 'Département ou filière', required: true),
+          _choiceField('studyLevel', 'Niveau d’études *', espAcademicLevels),
+          _choiceField(
+            'department',
+            'Département ESP *',
+            espAcademicDepartments,
+          ),
         ],
       ),
       _field('className', 'Classe ou promotion — facultatif'),
@@ -318,112 +357,93 @@ class _PublicApplicationFlowScreenState
         'Expérience associative — facultatif',
         'Tu peux citer une responsabilité, un projet ou une expérience bénévole.',
       ),
-      _ResponsiveFields(
-        children: [
-          _field('preferredPole', 'Pôle préféré — facultatif'),
-          _field('projectInterest', 'Projet d’intérêt — facultatif'),
-        ],
-      ),
+      if (!_campaign!.applicationQuestions.any(
+        (q) => q.legacyField == 'known_enactus_from',
+      ))
+        _longField(
+          'knownEnactusFrom',
+          'Comment as-tu connu Enactus ESP ?',
+          'Un ami, les réseaux sociaux, un événement, un cours… raconte-nous.',
+        ),
     ],
   );
 
-  Widget _motivationStep() => _StepBody(
-    introduction:
-        'Prends le temps de nous raconter ce qui te motive. Tes réponses restent en place si tu reviens en arrière.',
-    children: [
-      _longField(
-        'motivation',
-        'Pourquoi souhaites-tu rejoindre Enactus ESP ?',
-        'Parle de ton envie d’agir, d’apprendre ou de contribuer.',
-        required: true,
-      ),
-      _longField(
-        'knownEnactusFrom',
-        'Comment as-tu découvert Enactus ?',
-        'Un événement, une personne, les réseaux sociaux…',
-      ),
-      _longField(
-        'enactusKnowledge',
-        'Que connais-tu du mouvement Enactus ?',
-        'Explique simplement avec tes propres mots.',
-      ),
-      _longField(
-        'contribution',
-        'Quelle contribution souhaites-tu apporter ?',
-        'Compétences, énergie, idées ou expérience.',
-      ),
-      _longField(
-        'projectIdeas',
-        'As-tu une idée de projet ?',
-        'Une piste suffit, elle n’a pas besoin d’être finalisée.',
-      ),
-      _longField(
-        'leadershipProfile',
-        'Comment travailles-tu avec une équipe ?',
-        'Décris ta manière d’écouter, décider et avancer.',
-      ),
-      _longField(
-        'otherClubs',
-        'Autres engagements — facultatif',
-        'Clubs, associations ou activités personnelles.',
-      ),
-    ],
+  String _questionKey(RecruitmentApplicationQuestion question) {
+    const legacy = {
+      'motivation': 'motivation',
+      'known_enactus_from': 'knownEnactusFrom',
+      'enactus_knowledge': 'enactusKnowledge',
+      'other_clubs': 'otherClubs',
+      'contribution': 'contribution',
+      'project_ideas': 'projectIdeas',
+      'leadership_profile': 'leadershipProfile',
+      'availability': 'availability',
+      'public_comment': 'publicComment',
+      'associative_experience': 'associativeExperience',
+    };
+    return legacy[question.legacyField] ?? 'question-${question.id}';
+  }
+
+  Widget _questionStep(String section, String introduction) {
+    final questions = _campaign!.applicationQuestions
+        .where((q) => q.section == section)
+        .toList();
+    return _StepBody(
+      introduction: introduction,
+      children: [
+        if (questions.isEmpty)
+          const Text(
+            'Cette campagne ne demande pas de réponse dans cette rubrique.',
+          ),
+        for (final q in questions)
+          _longField(_questionKey(q), q.label, q.hint, required: q.required),
+        if (section == 'availability')
+          const Text(
+            'Décris un engagement réaliste. Tes études et tes contraintes personnelles comptent aussi.',
+            style: TextStyle(height: 1.5),
+          ),
+      ],
+    );
+  }
+
+  Widget _motivationStep() => _questionStep(
+    'motivation',
+    'Parle-nous de toi et de ce qui te donne envie d’agir. Tes réponses restent en place si tu reviens en arrière.',
   );
 
-  Widget _availabilityStep() => _StepBody(
-    introduction:
-        'L’engagement demande de la régularité. Indique honnêtement ce qui est possible pour toi.',
-    children: [
-      _longField(
-        'availability',
-        'Quelles sont tes disponibilités ?',
-        'Jours, horaires et périodes importantes de ton calendrier.',
-        required: true,
-      ),
-      _longField(
-        'publicComment',
-        'Contraintes ou précision — facultatif',
-        'Ajoute ici une information utile pour comprendre ta disponibilité.',
-      ),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.enactusYellow.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        ),
-        child: const Text(
-          'L’équipe recherche un engagement réaliste et régulier. Il ne s’agit pas d’être disponible tout le temps.',
-          style: TextStyle(height: 1.5),
-        ),
-      ),
-    ],
+  Widget _availabilityStep() => _questionStep(
+    'availability',
+    'Explique la place que tu peux donner à l’équipe, aux rencontres et aux missions de terrain.',
   );
 
   Widget _documentsStep() => _StepBody(
     introduction:
-        'Ajoute un lien accessible vers ton document, par exemple depuis ton espace de stockage en ligne.',
+        'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
     children: [
-      _field(
-        'cvUrl',
-        'Lien vers le CV — facultatif',
-        keyboardType: TextInputType.url,
-        validator: _urlValidator,
+      AttachmentPickerField(
+        label: 'Ton CV',
+        value: _cvFile,
+        application: true,
+        enabled: !_submitting,
+        onChanged: (file) => setState(() => _cvFile = file),
       ),
-      _field(
-        'motivationLetterUrl',
-        'Lien vers la lettre de motivation — facultatif',
-        keyboardType: TextInputType.url,
-        validator: _urlValidator,
+      AttachmentPickerField(
+        label: 'Ta lettre de motivation',
+        value: _motivationLetterFile,
+        application: true,
+        enabled: !_submitting,
+        onChanged: (file) => setState(() => _motivationLetterFile = file),
       ),
-      _field(
-        'attachmentUrl',
-        'Lien vers un document complémentaire — facultatif',
-        keyboardType: TextInputType.url,
-        validator: _urlValidator,
+      AttachmentPickerField(
+        label: 'Une réalisation ou un document complémentaire',
+        value: _attachmentFile,
+        application: true,
+        enabled: !_submitting,
+        onChanged: (file) => setState(() => _attachmentFile = file),
       ),
       const Text(
-        'Les documents sont facultatifs. Vérifie que les liens peuvent être consultés par l’équipe.',
-        style: TextStyle(color: AppTheme.secondaryText, height: 1.5),
+        'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
+        style: TextStyle(height: 1.5),
       ),
     ],
   );
@@ -452,30 +472,40 @@ class _PublicApplicationFlowScreenState
           _text('studyLevel'),
           _text('department'),
           _text('className'),
-          _text('preferredPole'),
+          if (!_campaign!.applicationQuestions.any(
+            (q) => q.legacyField == 'known_enactus_from',
+          ))
+            'Découverte d’Enactus ESP : ${_text('knownEnactusFrom').isEmpty ? 'Non renseigné' : _text('knownEnactusFrom')}',
         ],
         onEdit: () => setState(() => _step = 1),
       ),
       ApplicationReviewSection(
         title: 'Motivations',
         lines: [
-          _text('motivation'),
-          _text('contribution'),
-          _text('projectIdeas'),
+          for (final q in _campaign!.applicationQuestions.where(
+            (q) => q.section == 'motivation',
+          ))
+            '${q.label}\n${_text(_questionKey(q)).isEmpty ? 'Non renseigné' : _text(_questionKey(q))}',
         ],
         onEdit: () => setState(() => _step = 2),
       ),
       ApplicationReviewSection(
         title: 'Disponibilités',
-        lines: [_text('availability'), _text('publicComment')],
+        lines: [
+          for (final q in _campaign!.applicationQuestions.where(
+            (q) => q.section == 'availability',
+          ))
+            '${q.label}\n${_text(_questionKey(q)).isEmpty ? 'Non renseigné' : _text(_questionKey(q))}',
+        ],
         onEdit: () => setState(() => _step = 3),
       ),
       ApplicationReviewSection(
         title: 'Documents',
         lines: [
-          _text('cvUrl'),
-          _text('motivationLetterUrl'),
-          _text('attachmentUrl'),
+          _cvFile?.name ?? 'CV : aucun fichier joint',
+          _motivationLetterFile?.name ?? 'Lettre : aucun fichier joint',
+          _attachmentFile?.name ??
+              'Document complémentaire : aucun fichier joint',
         ],
         onEdit: () => setState(() => _step = 4),
       ),
@@ -484,22 +514,43 @@ class _PublicApplicationFlowScreenState
         value: _confirmed,
         onChanged: (value) => setState(() => _confirmed = value == true),
         controlAffinity: ListTileControlAffinity.leading,
-        title: const Text('J’ai vérifié les informations de ma candidature.'),
-        subtitle: const Text('L’envoi sera définitif pour cette campagne.'),
+        title: Text('J’ai vérifié les informations de ma candidature.'),
+        subtitle: Text('L’envoi sera définitif pour cette campagne.'),
       ),
       if (_submitError != null)
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.error.withValues(alpha: 0.08),
+            color: Theme.of(context).colorScheme.errorContainer,
             borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
           ),
-          child: Text(
-            _submitError!,
-            style: const TextStyle(
-              color: AppTheme.error,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _submitError!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                  fontWeight: FontWeight.w700,
+                  height: 1.5,
+                ),
+              ),
+              if (_submitFailureKind ==
+                  PublicRecruitmentFailureKind.duplicateApplication) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  key: const ValueKey('duplicate-application-tracking'),
+                  onPressed: () => context.push('/recruitment/track'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onErrorContainer,
+                  ),
+                  icon: const Icon(Icons.track_changes_rounded),
+                  label: const Text('Suivre ma candidature'),
+                ),
+              ],
+            ],
           ),
         ),
     ],
@@ -522,6 +573,25 @@ class _PublicApplicationFlowScreenState
       decoration: InputDecoration(labelText: label),
       validator:
           validator ?? (required ? (value) => _required(value, label) : null),
+    );
+  }
+
+  Widget _choiceField(String key, String label, List<String> options) {
+    final controller = _controller(key);
+    final current = controller.text.trim();
+    return DropdownButtonFormField<String>(
+      key: ValueKey('field-$key'),
+      initialValue: options.contains(current) ? current : null,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final option in options)
+          DropdownMenuItem(value: option, child: Text(option)),
+      ],
+      onChanged: (value) => controller.text = value ?? '',
+      validator: (value) => value == null || value.trim().isEmpty
+          ? 'Ce champ est nécessaire pour continuer.'
+          : null,
     );
   }
 
@@ -560,18 +630,6 @@ class _PublicApplicationFlowScreenState
     }
     return null;
   }
-
-  String? _urlValidator(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return null;
-    final uri = Uri.tryParse(text);
-    if (uri == null ||
-        !uri.hasAuthority ||
-        !{'http', 'https'}.contains(uri.scheme)) {
-      return 'Utilise un lien complet commençant par http:// ou https://.';
-    }
-    return null;
-  }
 }
 
 class _StepBody extends StatelessWidget {
@@ -585,7 +643,10 @@ class _StepBody extends StatelessWidget {
     children: [
       Text(
         introduction,
-        style: const TextStyle(color: AppTheme.secondaryText, height: 1.5),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          height: 1.5,
+        ),
       ),
       const SizedBox(height: 22),
       for (var index = 0; index < children.length; index++) ...[
@@ -649,9 +710,11 @@ class _NavigationBar extends StatelessWidget {
       MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
       12 + MediaQuery.paddingOf(context).bottom,
     ),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: AppTheme.border)),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     child: Center(
       child: ConstrainedBox(
@@ -665,7 +728,7 @@ class _NavigationBar extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: submitting ? null : onBack,
                   icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Retour'),
+                  label: Text('Retour'),
                 ),
               ),
             const Spacer(),
@@ -678,7 +741,7 @@ class _NavigationBar extends StatelessWidget {
                   onPressed: onNext,
                   iconAlignment: IconAlignment.end,
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Suivant'),
+                  label: Text('Suivant'),
                 ),
               )
             else

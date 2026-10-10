@@ -1,9 +1,13 @@
-from datetime import datetime
+from app.core.time import utc_now
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import HTTPException, Request, status
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
+from app.core.config import settings
+from starlette.concurrency import run_in_threadpool
 
 from app.models.finance import (
     ClubTransaction,
@@ -18,8 +22,9 @@ from app.models.mobile_money import (
 )
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
-from app.services.payments import get_payment_provider
+from app.services.payments import get_payment_provider, PaymentProviderError
 from app.services.operational_integrity import lock_row
+from app.services.finance_integrity import ensure_financial_account
 
 
 ACTIVE_MOBILE_MONEY_STATUSES = {"created", "pending", "processing"}
@@ -45,7 +50,7 @@ def amount_to_int(value) -> int | None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Montant provider invalide",
         ) from exc
-    if amount != amount.to_integral_value():
+    if not amount.is_finite() or amount <= 0 or amount != amount.to_integral_value():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Montant provider non entier",
@@ -78,8 +83,8 @@ def update_fee_status(fee: Fee) -> None:
     else:
         fee.status = "paid"
         if fee.paid_at is None:
-            fee.paid_at = datetime.utcnow()
-    fee.updated_at = datetime.utcnow()
+            fee.paid_at = utc_now()
+    fee.updated_at = utc_now()
 
 
 def create_event(
@@ -108,7 +113,7 @@ def create_event(
         old_status=old_status,
         new_status=new_status,
         provider_event_id=provider_event_id,
-        processed_at=datetime.utcnow(),
+        processed_at=utc_now(),
         is_duplicate=is_duplicate,
         error_message=error_message,
         metadata_json=metadata_json or {},
@@ -147,6 +152,26 @@ def can_access_transaction(db: Session, user, transaction: MobileMoneyTransactio
     from app.api.routes.finance import is_finance_manager
 
     return transaction.member_id == user.id or is_finance_manager(db, user)
+
+
+def validate_provider_result(transaction, result) -> None:
+    if result.provider != transaction.provider:
+        raise HTTPException(status_code=400, detail="Prestataire incohérent")
+    if not transaction.provider_invoice_token or result.provider_token != transaction.provider_invoice_token:
+        raise HTTPException(status_code=400, detail="Référence du prestataire incohérente")
+    custom_data = (result.metadata or {}).get("custom_data") or {}
+    if not isinstance(custom_data, dict):
+        raise HTTPException(status_code=400, detail="Confirmation du paiement invalide")
+    internal_id = custom_data.get("enactspace_transaction_id")
+    if internal_id is not None and str(internal_id) != str(transaction.id):
+        raise HTTPException(status_code=400, detail="Référence interne du paiement incohérente")
+    if result.status == "successful":
+        metadata = result.metadata or {}
+        amount = amount_to_int(metadata.get("amount"))
+        if amount is None or amount != transaction.amount:
+            raise HTTPException(status_code=400, detail="Montant du prestataire incohérent")
+        if not metadata.get("currency") or normalize_currency(metadata["currency"]) != transaction.currency:
+            raise HTTPException(status_code=400, detail="Devise du prestataire incohérente")
 
 
 def find_transaction(
@@ -188,24 +213,17 @@ def selected_fees(db: Session, transaction: MobileMoneyTransaction) -> list[Fee]
         return []
     fees = (
         db.query(Fee)
-        .filter(Fee.id.in_(fee_ids))
+        .filter(
+            Fee.id.in_(fee_ids),
+            Fee.user_id == transaction.member_id,
+            Fee.status.in_(["unpaid", "partial"]),
+        )
         .order_by(Fee.id.asc())
         .with_for_update()
         .all()
     )
     fee_by_id = {str(fee.id): fee for fee in fees}
     return [fee_by_id[str(fee_id)] for fee_id in fee_ids if str(fee_id) in fee_by_id]
-
-
-def ensure_financial_account(db: Session, user_id) -> FinancialAccount:
-    account = db.query(FinancialAccount).filter(
-        FinancialAccount.user_id == user_id
-    ).populate_existing().with_for_update().first()
-    if not account:
-        account = FinancialAccount(user_id=user_id, balance_due=0, total_paid=0)
-        db.add(account)
-        db.flush()
-    return account
 
 
 def allocate_payment(
@@ -216,12 +234,12 @@ def allocate_payment(
 ) -> int:
     remaining = int(transaction.amount or 0)
     allocated_total = 0
+    final_plan = []
     fees = selected_fees(db, transaction)
     if not fees:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucune dette liee a la transaction",
-        )
+        payment.allocation_plan = []
+        payment.unallocated_amount = remaining
+        return 0
     for fee in fees:
         if remaining <= 0:
             break
@@ -241,11 +259,12 @@ def allocate_payment(
         update_fee_status(fee)
         remaining -= allocation_amount
         allocated_total += allocation_amount
-    if allocated_total != int(transaction.amount or 0):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le montant confirme ne correspond pas aux dettes selectionnees",
-        )
+        final_plan.append({
+            "fee_id": str(fee.id),
+            "amount": allocation_amount,
+        })
+    payment.allocation_plan = final_plan
+    payment.unallocated_amount = max(0, remaining)
     return allocated_total
 
 
@@ -266,10 +285,10 @@ def mark_not_successful(
     old_status = transaction.status
     transaction.status = new_status
     transaction.provider_status = provider_status
-    transaction.last_verified_at = datetime.utcnow()
-    transaction.updated_at = datetime.utcnow()
+    transaction.last_verified_at = utc_now()
+    transaction.updated_at = utc_now()
     if new_status == "cancelled":
-        transaction.cancelled_at = datetime.utcnow()
+        transaction.cancelled_at = utc_now()
     if new_status in {"failed", "cancelled", "expired"}:
         notify_user(
             db,
@@ -325,7 +344,7 @@ def confirm_transaction(
             if provider_transaction_id
             else f"MobileMoney:{str(transaction.id)[-12:]}"
         ),
-        validated_at=datetime.utcnow(),
+        validated_at=utc_now(),
     )
     db.add(payment)
     db.flush()
@@ -335,7 +354,7 @@ def confirm_transaction(
     account = ensure_financial_account(db, transaction.member_id)
     account.total_paid = float(account.total_paid or 0) + transaction.amount
     account.balance_due = max(0, float(account.balance_due or 0) - allocated_total)
-    account.updated_at = datetime.utcnow()
+    account.updated_at = utc_now()
 
     db.add(
         ClubTransaction(
@@ -352,9 +371,9 @@ def confirm_transaction(
     transaction.provider_transaction_id = (
         provider_transaction_id or transaction.provider_transaction_id
     )
-    transaction.completed_at = datetime.utcnow()
-    transaction.last_verified_at = datetime.utcnow()
-    transaction.updated_at = datetime.utcnow()
+    transaction.completed_at = utc_now()
+    transaction.last_verified_at = utc_now()
+    transaction.updated_at = utc_now()
     create_event(
         db,
         transaction,
@@ -398,22 +417,27 @@ async def refresh_transaction(
     transaction: MobileMoneyTransaction,
     request: Request | None = None,
 ) -> MobileMoneyTransaction:
-    now = datetime.utcnow()
+    transaction = await run_in_threadpool(lock_row, db, MobileMoneyTransaction, transaction.id)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction Mobile Money introuvable")
+    now = utc_now()
     if transaction.status == "successful":
         return transaction
-    if transaction.expires_at and transaction.expires_at <= now:
-        mark_not_successful(
-            db,
-            transaction=transaction,
-            new_status="expired",
-            provider_status=transaction.provider_status,
+    # A local checkout deadline cannot prove whether the provider received money.
+    transaction.last_verification_attempt_at = now
+    try:
+        provider = get_payment_provider(transaction.provider)
+        provider_result = await provider.get_payment_status(
+            provider_token=transaction.provider_invoice_token,
+            provider_transaction_id=transaction.provider_transaction_id,
         )
-        return transaction
-    provider = get_payment_provider(transaction.provider)
-    provider_result = await provider.get_payment_status(
-        provider_token=transaction.provider_invoice_token,
-        provider_transaction_id=transaction.provider_transaction_id,
-    )
+    except (PaymentProviderError, ValueError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Le paiement ne peut pas être vérifié pour le moment. Réessayez dans quelques instants.",
+            headers={"Retry-After": "30"},
+        ) from exc
+    validate_provider_result(transaction, provider_result)
     provider_event_id = (
         provider_result.metadata or {}
     ).get("event_id") or provider_result.provider_token
@@ -443,23 +467,73 @@ async def reconcile_pending_transactions(
     request: Request | None = None,
     limit: int = 50,
 ) -> dict:
-    transactions = (
-        db.query(MobileMoneyTransaction)
-        .filter(MobileMoneyTransaction.status.in_(ACTIVE_MOBILE_MONEY_STATUSES))
-        .order_by(MobileMoneyTransaction.created_at.asc())
-        .limit(limit)
+    # Persist each verification separately: one invoice cannot undo prior results.
+    transaction_ids = [
+        row[0]
+        for row in db.query(MobileMoneyTransaction.id)
+        .filter(
+            MobileMoneyTransaction.payment_id.is_(None),
+            or_(
+                MobileMoneyTransaction.status.in_(ACTIVE_MOBILE_MONEY_STATUSES),
+                and_(
+                    MobileMoneyTransaction.status.in_({"expired", "cancelled", "failed"}),
+                    MobileMoneyTransaction.provider_invoice_token.is_not(None),
+                    MobileMoneyTransaction.created_at >= utc_now() - timedelta(
+                        days=settings.PAYMENT_RECONCILIATION_LOOKBACK_DAYS),
+                ),
+            ),
+            or_(
+                MobileMoneyTransaction.last_verification_attempt_at.is_(None),
+                MobileMoneyTransaction.last_verification_attempt_at <= utc_now() - timedelta(
+                    seconds=settings.PAYMENT_RECONCILIATION_RETRY_SECONDS),
+            ),
+        )
+        .order_by(
+            MobileMoneyTransaction.last_verification_attempt_at.asc().nullsfirst(),
+            MobileMoneyTransaction.created_at.asc(),
+            MobileMoneyTransaction.id.asc(),
+        )
+        .limit(min(max(limit, 1), 100))
         .all()
-    )
+    ]
     summary = {
         "checked": 0,
         "successful": 0,
         "expired": 0,
         "failed": 0,
         "pending": 0,
+        "cancelled": 0,
+        "refunded": 0,
+        "deferred": 0,
+        "unavailable": 0,
+        "needs_review": 0,
     }
-    for transaction in transactions:
+    for transaction_id in transaction_ids:
         summary["checked"] += 1
-        await refresh_transaction(db, transaction=transaction, request=request)
-        if transaction.status in summary:
-            summary[transaction.status] += 1
+        try:
+            transaction = db.get(MobileMoneyTransaction, transaction_id)
+            if transaction is None:
+                raise HTTPException(status_code=404, detail="Transaction Mobile Money introuvable")
+            transaction = await refresh_transaction(db, transaction=transaction, request=request)
+            outcome = transaction.status
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            if exc.status_code not in {400, 404, 503}:
+                raise
+            # Rollback may undo a partially built payment. Record only the attempt.
+            attempted = await run_in_threadpool(lock_row, db, MobileMoneyTransaction, transaction_id)
+            if attempted is not None:
+                attempted.last_verification_attempt_at = utc_now()
+                db.commit()
+            summary["deferred"] += 1
+            summary["unavailable" if exc.status_code == 503 else "needs_review"] += 1
+            continue
+        except Exception:
+            db.rollback()
+            raise
+        if outcome in ACTIVE_MOBILE_MONEY_STATUSES:
+            summary["pending"] += 1
+        elif outcome in {"successful", "expired", "failed", "cancelled", "refunded"}:
+            summary[outcome] += 1
     return summary

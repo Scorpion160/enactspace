@@ -23,6 +23,11 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
         SECRET_KEY="unit-test-secret-not-for-production",
         REFRESH_TOKEN_HMAC_KEY="unit-test-refresh-hmac-key-distinct",
         ENABLE_SEED=enable_seed,
+        MEET_SERVER_URL="https://meet.enactspace.test",
+        MEET_REQUIRE_JWT=True,
+        MEET_JWT_APP_ID="enactspace-unit-test",
+        MEET_JWT_SECRET="unit-test-meet-secret-distinct",
+        MEET_JWT_SUBJECT="meet.enactspace.test",
         ATTENDANCE_QR_ENABLED=False,
         ATTENDANCE_NFC_ENABLED=False,
     )
@@ -56,6 +61,26 @@ class JwtAlgorithmConfigTests(unittest.TestCase):
     def test_rs256_algorithm_is_rejected_during_settings_validation(self):
         with self.assertRaisesRegex(ValueError, "ALGORITHM must be HS256"):
             self.make_settings(algorithm="RS256")
+
+
+class PaymentProviderProductionTests(unittest.TestCase):
+    def settings(self, *, app_env, provider, enabled):
+        values = make_settings(app_env=app_env, enable_seed=False).model_dump()
+        values.update(MOBILE_MONEY_PROVIDER=provider, MOBILE_MONEY_ENABLED=enabled)
+        return Settings(_env_file=None, **values)
+
+    def test_enabled_mock_is_rejected_in_production(self):
+        with self.assertRaisesRegex(ValueError, "Mock payment provider cannot be enabled in production"):
+            self.settings(app_env="production", provider="mock", enabled=True)
+
+    def test_mock_remains_available_only_for_enabled_test_environment(self):
+        self.assertTrue(self.settings(app_env="test", provider="mock", enabled=True).MOBILE_MONEY_ENABLED)
+
+    def test_disabled_mock_does_not_block_production_startup(self):
+        self.assertFalse(self.settings(app_env="production", provider="mock", enabled=False).MOBILE_MONEY_ENABLED)
+
+    def test_manual_proof_remains_available_in_production(self):
+        self.assertEqual(self.settings(app_env="production", provider="manual_proof", enabled=True).MOBILE_MONEY_PROVIDER, "manual_proof")
 
 
 class SeedRouteSecurityTests(unittest.TestCase):

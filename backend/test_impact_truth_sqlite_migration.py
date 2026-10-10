@@ -1,5 +1,6 @@
 """PR-2C Alembic acceptance against an isolated SQLite database."""
 
+from app.core.time import utc_now
 import tempfile
 import unittest
 import uuid
@@ -24,7 +25,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
             heads = ScriptDirectory.from_config(config).get_heads()
-            self.assertEqual(heads, ["20260913_0009"])
+            self.assertEqual(heads, ["20261004_0022"])
 
             def migrate(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -43,7 +44,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
             impact_id = str(uuid.uuid4())
             user_claim_id = str(uuid.uuid4())
             explicit_zero_id = str(uuid.uuid4())
-            now = datetime.utcnow()
+            now = utc_now()
             with engine.begin() as connection:
                 connection.execute(
                     text(
@@ -248,7 +249,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
                 regenerated_ids,
                 {str(user_claim_id), str(generated_claim_id)},
             )
-            self.assertEqual(final_revision, "20260913_0009")
+            self.assertEqual(final_revision, "20261004_0022")
             self.assertEqual(final_active_index_count, 1)
             engine.dispose()
 

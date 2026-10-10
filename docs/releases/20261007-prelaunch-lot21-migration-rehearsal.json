@@ -1,0 +1,33 @@
+{
+  "lot": 21,
+  "date_utc": "2026-10-07T19:13:30.900615+00:00",
+  "results": {
+    "baseline_tables_checked": 110,
+    "downgrade_preserves_baseline_data": true,
+    "failed_transaction_rolls_back": true,
+    "fresh_install_exit": 0,
+    "new_constraints_enforced": 3,
+    "new_security_fields_reset_after_downgrade": true,
+    "orm_reads_and_writes_new_fields": true,
+    "repeat_upgrade_noop": true,
+    "reupgrade_preserves_baseline_data": true,
+    "upgrade_preserves_all_baseline_tables": true
+  },
+  "schema_sha256": "652eb2861bf6a2ae48ac187a2520c2888ea647570526264764703f29dd848056",
+  "schema_source_revision": "20261006_0025",
+  "source_head": "20261007_0028",
+  "resources_absent": true,
+  "git_diff_check": true,
+  "production_changed": false,
+  "production_rows_copied": false,
+  "synthetic_data_only": true,
+  "reviewed_files": [
+    "backend/alembic/versions/20261007_0026_password_reset_attempts.py",
+    "backend/alembic/versions/20261007_0027_security_rate_limits.py",
+    "backend/alembic/versions/20261007_0028_mobile_money_verification_attempt.py",
+    "backend/test_prelaunch_migration_rehearsal.py"
+  ],
+  "whole_manual_review_complete": false,
+  "build_performed": false,
+  "git_push": false
+}

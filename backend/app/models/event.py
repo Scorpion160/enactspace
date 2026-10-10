@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -69,8 +70,8 @@ class Event(Base):
 
     report_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("end_time IS NULL OR end_time > start_time", name="ck_events_time_order"),
@@ -102,7 +103,7 @@ class EventParticipant(Base):
     )
     registered_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now,
     )
 
     __table_args__ = (

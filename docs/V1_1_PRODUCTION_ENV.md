@@ -36,11 +36,20 @@ chmod 600 .env
 
 - `EMAIL_ENABLED`: interrupteur production simple.
 - `NOTIFICATION_EMAIL_ENABLED`: ancien nom conserve pour compatibilite.
-- `NOTIFICATION_EMAIL_FROM`: adresse expediteur.
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_TLS`: configuration SMTP.
+- `NOTIFICATION_EMAIL_FROM`: adresse expéditeur ; pour EnactSpace, utiliser `enactus@esp.sn`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_TLS`: configuration SMTP. Pour le compte institutionnel Google Workspace : `smtp.gmail.com`, port `587`, utilisateur `enactus@esp.sn`, TLS activé et mot de passe d’application stocké uniquement dans l’environnement secret.
 - `PUSH_ENABLED`: interrupteur production simple.
 - `NOTIFICATION_PUSH_ENABLED`: ancien nom conserve pour compatibilite.
 - `FCM_SERVER_KEY`: cle push si Firebase Cloud Messaging est active.
+
+## EnactMeet
+
+- `MEET_SERVER_URL`: endpoint Jitsi/JaaS prive en HTTPS. `https://meet.jit.si` est reserve aux essais et refuse en production.
+- `MEET_REQUIRE_JWT`: doit etre `true` en production afin que l'acces Jitsi reste aligne sur les invitations et roles EnactSpace.
+- `MEET_JWT_APP_ID`, `MEET_JWT_SECRET`, `MEET_JWT_SUBJECT`: identite et secret du serveur Jitsi/JaaS. Le secret reste exclusivement cote backend et doit differer des secrets JWT EnactSpace.
+- `MEET_JWT_AUDIENCE`: audience attendue par le serveur Jitsi, `jitsi` par defaut.
+- `MEET_JWT_TTL_MINUTES`: duree de validite du jeton de conference.
+- `MEET_RECORDING_ENABLED`: laisser `false` tant qu'un service d'enregistrement serveur (par exemple Jibri) n'est pas reellement configure et teste.
 
 ## Paiements
 

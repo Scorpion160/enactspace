@@ -47,6 +47,7 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
   final ApiClient _apiClient;
   final AuthService _authService;
   Future<String>? _token;
+  Future<UserExperience>? _currentUser;
   Future<List<ProjectModel>>? _projects;
   Future<List<ProjectSeasonOption>>? _seasons;
   Future<Map<String, ProjectImpactSnapshot>>? _impact;
@@ -62,7 +63,9 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
       _authService = authService ?? AuthService();
 
   @override
-  Future<UserExperience> loadCurrentUser() async =>
+  Future<UserExperience> loadCurrentUser() =>
+      _currentUser ??= _fetchCurrentUser();
+  Future<UserExperience> _fetchCurrentUser() async =>
       UserExperience.fromJson(await _authService.getCurrentUser());
 
   @override
@@ -76,6 +79,9 @@ class ApiProjectsPortfolioGateway implements ProjectsPortfolioGateway {
   @override
   Future<Map<String, ProjectImpactSnapshot>> loadImpact() {
     return _impact ??= () async {
+      if (!(await loadCurrentUser()).canViewImpact) {
+        return <String, ProjectImpactSnapshot>{};
+      }
       final snapshots = await _getList(
         '/impact/projects',
         ProjectImpactSnapshot.fromJson,

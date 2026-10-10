@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
@@ -327,7 +328,7 @@ def promote_document_file(stored_file: StoredFile | None) -> None:
     stored_file.expires_at = None
     stored_file.storage_scope = "official"
     stored_file.visibility = "internal"
-    stored_file.updated_at = datetime.utcnow()
+    stored_file.updated_at = utc_now()
 
 
 def active_document_users(db: Session) -> list[User]:
@@ -503,7 +504,7 @@ def create_document(
         is_template=payload.is_template,
         is_official=False,
         is_permanent=False,
-        expires_at=datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS),
+        expires_at=utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS),
     )
     sync_document_file(document, linked_file)
 
@@ -513,7 +514,7 @@ def create_document(
         linked_file.entity_type = "document"
         linked_file.entity_id = document.id
         linked_file.visibility = payload.visibility
-        linked_file.updated_at = datetime.utcnow()
+        linked_file.updated_at = utc_now()
     notify_users(
         db,
         user_ids=document_validator_user_ids(
@@ -684,7 +685,7 @@ def update_document(
         linked_file.entity_type = "document"
         linked_file.entity_id = document.id
         linked_file.visibility = document.visibility
-        linked_file.updated_at = datetime.utcnow()
+        linked_file.updated_at = utc_now()
 
     if payload.file_type is not None:
         document.file_type = payload.file_type
@@ -704,7 +705,7 @@ def update_document(
     if payload.is_template is not None:
         document.is_template = payload.is_template
 
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     db.commit()
     db.refresh(document)
@@ -730,12 +731,12 @@ def validate_document(
     document.is_permanent = True
     document.status = "validated"
     document.validated_by = current_user.id
-    document.validated_at = datetime.utcnow()
+    document.validated_at = utc_now()
     document.rejected_by = None
     document.rejected_at = None
     document.rejection_reason = None
     document.expires_at = None
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
     linked_file = (
         db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
         if document.file_id
@@ -808,8 +809,8 @@ def submit_document(
     document.rejected_by = None
     document.rejected_at = None
     document.rejection_reason = None
-    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
-    document.updated_at = datetime.utcnow()
+    document.expires_at = utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
+    document.updated_at = utc_now()
     db.flush()
     notify_users(
         db,
@@ -848,8 +849,8 @@ def unvalidate_document(
     document.status = "pending_validation"
     document.validated_by = None
     document.validated_at = None
-    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
-    document.updated_at = datetime.utcnow()
+    document.expires_at = utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
+    document.updated_at = utc_now()
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
             db,
@@ -895,9 +896,9 @@ def reject_document(
     document.validated_by = None
     document.validated_at = None
     document.rejected_by = current_user.id
-    document.rejected_at = datetime.utcnow()
+    document.rejected_at = utc_now()
     document.rejection_reason = reason
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
@@ -931,7 +932,7 @@ def archive_document(
 
     document.status = "archived"
     document.is_official = False
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     db.commit()
     db.refresh(document)

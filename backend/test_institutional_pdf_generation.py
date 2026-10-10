@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import os
 import shutil
 import unittest
@@ -99,11 +100,11 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
             payload_json=payload,
             requested_by=(requested_by or self.member).id,
             submitted_by=(requested_by or self.member).id,
-            submitted_at=datetime.utcnow(),
+            submitted_at=utc_now(),
             sg_validated_by=self.sg.id,
-            sg_validated_at=datetime.utcnow(),
+            sg_validated_at=utc_now(),
             approved_by=self.tl.id,
-            approved_at=datetime.utcnow(),
+            approved_at=utc_now(),
             pole_id=pole_id,
             project_id=project_id,
             season_id=self.season.id,

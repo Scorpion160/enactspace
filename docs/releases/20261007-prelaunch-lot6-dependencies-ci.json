@@ -1,0 +1,43 @@
+{
+  "lot": 6,
+  "utc": "2026-10-07T11:48:25.041715+00:00",
+  "tests": 115,
+  "tests_result": "PASS",
+  "jwt_legacy_compatibility": "PASS both directions, same signature",
+  "mandatory_claims_and_algorithms": "PASS",
+  "alembic_unique_head": "20261007_0027",
+  "openapi": "PASS",
+  "repository_guards": [
+    "PASS",
+    "PASS"
+  ],
+  "installed_python_packages_audited": 67,
+  "installed_pub_packages_audited": 122,
+  "installed_python_packages_with_advisories": [
+    "python-jose",
+    "ecdsa",
+    "pip"
+  ],
+  "pub_advisories_returned": 0,
+  "new_pins": {
+    "PyJWT": "2.15.1",
+    "pip": "26.2.1"
+  },
+  "candidate_pins_osv_advisories": 0,
+  "production_changed": false,
+  "smtp_sent": 0,
+  "build": false,
+  "full_manual_review_completed": false,
+  "fresh_full_dependency_resolution_audit": "PENDING",
+  "github_ci_execution": "PENDING push authorization",
+  "changed_sha256": {
+    ".github/workflows/ci.yml": "307fdd4cbe2225d0c11d4990549f99f3bf561be2a64db2509cfd468c14504b0f",
+    ".github/workflows/security.yml": "a49c06e02091bb104f43bf203203733e1cad8ff095ddb5f56592b20d61f0c3cf",
+    "backend/requirements.txt": "a70a9c7b9afd97a78cf726f625614aff7ecb92ba7639dad21d9a88f8032f9508",
+    "deploy/Dockerfile.backend": "5ccfcf993ced9521e51bd76cf11804fce848a67f7c5bea234a64584637fc1d88",
+    "backend/app/core/security.py": "757a44ca909a000958b0ac26d70f47c145b8190ddc51109f516a455d9ecc95a1",
+    "backend/app/api/routes/meetings.py": "0260895d629c508832c0d31c3a56666d0f8cdc56d5d4549ad3d4726692a63d20",
+    "backend/test_meetings.py": "c2013cb1ce8f248ac2cc6850218826c5c944cb3945f541fcbc280a490609bdc5",
+    "backend/test_prelaunch_security_boundaries.py": "84ae5f7815b6d1b536ce2927fd4e5e3d110ddd1ef511b13193def94e1508ece5"
+  }
+}

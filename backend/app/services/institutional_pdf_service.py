@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import shutil
 import subprocess
 import tempfile
@@ -306,7 +307,7 @@ def _project_name(db: Session, project_id) -> str:
 
 def _season_name(db: Session, season_id) -> str:
     season = db.query(Season).filter(Season.id == season_id).first() if season_id else None
-    return latex_text(season.name if season else "Saison non renseignée")
+    return latex_text(season.name if season else "Année non renseignée")
 
 
 def _role_label_for_pole_lead(db: Session, user_id, pole_id) -> str:
@@ -367,7 +368,7 @@ def _common_lines(db: Session, request: InstitutionalDocumentRequest) -> list[st
         _cmd("DocStatus", "OFFICIEL", renew=True),
         _cmd("DocVersion", latex_escape(request.template_version), renew=True),
         _cmd("Season", _season_name(db, request.season_id), renew=True),
-        _cmd("GeneratedDate", datetime.utcnow().strftime("%d/%m/%Y"), renew=True),
+        _cmd("GeneratedDate", utc_now().strftime("%d/%m/%Y"), renew=True),
         _cmd("GeneratedBy", "EnactSpace", renew=True),
     ]
 
@@ -554,7 +555,7 @@ def _parental_data(db: Session, request: InstitutionalDocumentRequest, p: dict[s
     if p.get("additional_information"):
         logistics.append(latex_text(p.get("additional_information")))
     return [
-        _cmd("LetterDate", format_long_date(datetime.utcnow())),
+        _cmd("LetterDate", format_long_date(utc_now())),
         _cmd("ParentRecipient", recipient),
         _cmd("ParticipantName", user_name(db, p.get("member_id"))),
         _cmd("ParticipantClass", latex_text(class_name, "classe / niveau non renseigné")),
@@ -591,7 +592,7 @@ def _bus_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, A
     if p.get("observations"):
         logistics.append(f"Observations : {latex_text(p.get('observations'))}")
     return [
-        _cmd("LetterDate", format_long_date(datetime.utcnow())),
+        _cmd("LetterDate", format_long_date(utc_now())),
         _cmd("RecipientTitle", latex_text(recipient_name)),
         _cmd("RecipientOrganization", latex_text(p.get("recipient_organization"))),
         _cmd("PassengerCount", latex_text(p.get("passenger_count"))),
@@ -623,7 +624,7 @@ def _rse_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str, A
     if isinstance(sdgs, list):
         sdgs = ", ".join(str(item) for item in sdgs)
     return [
-        _cmd("LetterDate", format_long_date(datetime.utcnow())),
+        _cmd("LetterDate", format_long_date(utc_now())),
         _cmd("RecipientName", latex_text(p.get("recipient_name"), "Madame, Monsieur")),
         _cmd("RecipientRole", latex_text(p.get("recipient_role"), "Responsable RSE")),
         _cmd("RecipientAddress", latex_text(p.get("recipient_address"), "")),
@@ -667,7 +668,7 @@ def _renvoi_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str
     if p.get("internal_notes"):
         procedure_parts.append(f"Observation interne : {latex_text(p.get('internal_notes'))}")
     return [
-        _cmd("LetterDate", format_long_date(datetime.utcnow())),
+        _cmd("LetterDate", format_long_date(utc_now())),
         _cmd("IssuingScope", _pole_name(db, request.pole_id)),
         _cmd("MemberName", user_name(db, p.get("member_id"))),
         _cmd("MemberFirstName", latex_text(member.first_name if member else "Membre")),
@@ -826,7 +827,7 @@ def persist_official_pdf(
             is_ephemeral=False,
         )
         validator_id = request.approved_by or request.sg_validated_by
-        validated_at = request.approved_at or request.sg_validated_at or datetime.utcnow()
+        validated_at = request.approved_at or request.sg_validated_at or utc_now()
         document = Document(
             title=f"{rule.label} - {request.official_reference}",
             description=(
@@ -855,11 +856,11 @@ def persist_official_pdf(
         db.flush()
         stored_file.entity_type = "document"
         stored_file.entity_id = document.id
-        stored_file.updated_at = datetime.utcnow()
+        stored_file.updated_at = utc_now()
         request.generated_document_id = document.id
-        request.generated_at = datetime.utcnow()
+        request.generated_at = utc_now()
         request.status = "generated"
-        request.updated_at = datetime.utcnow()
+        request.updated_at = utc_now()
         return document
     except Exception:
         if stored_file is not None:

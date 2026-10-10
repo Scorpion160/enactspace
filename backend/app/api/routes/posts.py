@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import re
 from datetime import datetime
 
@@ -397,7 +398,7 @@ def attach_media_to_post(
     stored_file.is_temporary = False
     stored_file.is_ephemeral = False
     stored_file.expires_at = None
-    stored_file.updated_at = datetime.utcnow()
+    stored_file.updated_at = utc_now()
 
     post.media_file_id = stored_file.id
     post.media_url = f"/api/files/{stored_file.id}/preview"
@@ -646,7 +647,7 @@ def update_post(
             ).first()
             if stored_file:
                 stored_file.visibility = post.visibility
-                stored_file.updated_at = datetime.utcnow()
+                stored_file.updated_at = utc_now()
 
     if payload.title is not None:
         post.title = payload.title
@@ -674,7 +675,7 @@ def update_post(
         ensure_can_pin_post(db, current_user, post)
         post.is_pinned = payload.is_pinned
 
-    post.updated_at = datetime.utcnow()
+    post.updated_at = utc_now()
     db.flush()
     if post.is_official and not was_official:
         notify_post_audience(
@@ -712,7 +713,7 @@ def pin_post(
     was_pinned = post.is_pinned
 
     post.is_pinned = True
-    post.updated_at = datetime.utcnow()
+    post.updated_at = utc_now()
     db.flush()
     if not was_pinned:
         notify_post_audience(
@@ -740,7 +741,7 @@ def unpin_post(
     ensure_can_pin_post(db, current_user, post)
 
     post.is_pinned = False
-    post.updated_at = datetime.utcnow()
+    post.updated_at = utc_now()
 
     db.commit()
     db.refresh(post)

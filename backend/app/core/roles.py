@@ -29,10 +29,8 @@ RESPONSIBILITY_ROLES = {
     *SCOPED_RESPONSIBILITY_ROLES,
 }
 
-ENACCHEF_ROLES = RESPONSIBILITY_ROLES | {
-    ADMIN_ROLE,
-    "faculty_advisor",
-}
+# Administration retains its override; EnacChef comprises the active responsibilities.
+ENACCHEF_ROLES = RESPONSIBILITY_ROLES | {ADMIN_ROLE}
 
 GLOBAL_MANAGEMENT_ROLES = {
     ADMIN_ROLE,
@@ -76,6 +74,7 @@ JOIN_REQUEST_REVIEWER_ROLES = {
 }
 
 ADMIN_MANAGED_ROLES = {
+    "pole_veille",
     ADMIN_ROLE,
     TEAM_LEADER_ROLE,
     SECRETARY_ROLE,
@@ -85,6 +84,7 @@ ADMIN_MANAGED_ROLES = {
 }
 
 TEAM_LEADER_MANAGED_ROLES = {
+    "pole_veille",
     SECRETARY_ROLE,
     FINANCE_ROLE,
     "faculty_advisor",
@@ -108,3 +108,7 @@ def normalize_role_name(value: str) -> str:
 
 def normalize_role_names(values) -> set[str]:
     return {normalize_role_name(value) for value in values if value}
+
+
+def is_veille_pole_name(value: str) -> bool:
+    return normalize_role_name(value) in {"veille", "pole_veille", "pole_de_veille"}

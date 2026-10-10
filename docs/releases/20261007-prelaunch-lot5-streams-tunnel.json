@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-07",
+  "runs": [
+    {
+      "tests": 108,
+      "seconds": 45.96
+    },
+    {
+      "tests": 5,
+      "seconds": 6.892
+    }
+  ],
+  "diff_check_exit": 0,
+  "whole_review_complete": false,
+  "production_changed": false,
+  "emails_sent": 0,
+  "builds": 0,
+  "sources": [
+    {
+      "file": "backend/app/main.py",
+      "lines": 170,
+      "sha256": "9f3b34bb45570d33249fa8efcf097a94dc22d149c3c43dd69d5a68af811affd4",
+      "manual_review": "REVIEWED_LOT5"
+    },
+    {
+      "file": "backend/app/services/request_rate_limit.py",
+      "lines": 94,
+      "sha256": "9ec6a9288b187f5f10b2f71212973fddf507909f2d6261c7272768eff4484f08",
+      "manual_review": "REVIEWED_LOT5"
+    },
+    {
+      "file": "backend/app/services/public_request_protection.py",
+      "lines": 67,
+      "sha256": "b0e15bebeac6cbdfbdd9d40921fcbc0bbd89d78e61a295921a5194a2611580b2",
+      "manual_review": "REVIEWED_LOT5"
+    },
+    {
+      "file": "backend/test_public_request_protection.py",
+      "lines": 107,
+      "sha256": "9c7c2bfc08beea422531b93f241c59e1bd8d44f939b4f8b4a080166fc556424c",
+      "manual_review": "REVIEWED_LOT5"
+    }
+  ],
+  "route_audit": {
+    "application_hosts": {
+      "configured_api_host": "api-enactspace.kerunjombor.net",
+      "cors_hosts": [
+        "enactspace.kerunjombor.net"
+      ]
+    },
+    "configuration_log_present": true,
+    "api_hostname_in_tunnel_log": true,
+    "port_18002_in_tunnel_log": true,
+    "port_18080_in_tunnel_log": true,
+    "public_error_type": "HTTPError",
+    "public_status": 403,
+    "cloudflare_ray_present": true,
+    "egress_filter_reason": null,
+    "windows_probe": {
+      "error_type": "HTTPError",
+      "status": 403
+    }
+  },
+  "public_agents": [
+    {
+      "probe": "browser_agent",
+      "status": 200,
+      "cloudflare": true
+    },
+    {
+      "probe": "app_agent",
+      "status": 200,
+      "cloudflare": true
+    }
+  ],
+  "public_peer": {
+    "public_status": 200,
+    "cloudflare_ray_present": true,
+    "probe_seen_in_backend": true,
+    "local_proxy_peer": "172.20.0.1",
+    "audit_exit": 0
+  }
+}

@@ -8,6 +8,7 @@ import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
+import '../../members/widgets/searchable_member_picker.dart';
 import '../models/project_member_model.dart';
 import '../models/project_model.dart';
 import '../services/projects_service.dart';
@@ -305,7 +306,7 @@ class _HeaderIcon extends StatelessWidget {
         color: AppTheme.enactusYellow,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.rocket_launch_rounded,
         color: AppTheme.softBlack,
         size: 36,
@@ -325,7 +326,7 @@ class _HeaderText extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Projets',
           style: TextStyle(
             color: Colors.white,
@@ -334,7 +335,7 @@ class _HeaderText extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Idées, prototypes, impact et déploiement sur un seul tableau.',
           style: TextStyle(color: Colors.white70, height: 1.4),
         ),
@@ -366,13 +367,13 @@ class _HeaderActions extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          icon: Icon(Icons.refresh_rounded),
+          label: Text('Actualiser'),
         ),
         ElevatedButton.icon(
           onPressed: onCreate,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Créer un projet'),
+          icon: Icon(Icons.add_rounded),
+          label: Text('Créer un projet'),
         ),
       ],
     );
@@ -390,7 +391,7 @@ class _HeaderChip extends StatelessWidget {
       label: Text(label),
       backgroundColor: Colors.white.withValues(alpha: 0.10),
       side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
-      labelStyle: const TextStyle(color: Colors.white),
+      labelStyle: TextStyle(color: Colors.white),
     );
   }
 }
@@ -565,7 +566,7 @@ class _ProjectCard extends StatelessWidget {
                     color: AppTheme.enactusYellow,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.rocket_launch_rounded,
                     color: AppTheme.softBlack,
                   ),
@@ -578,7 +579,7 @@ class _ProjectCard extends StatelessWidget {
                       Text(
                         project.name,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                         ),
@@ -586,7 +587,9 @@ class _ProjectCard extends StatelessWidget {
                       Text(
                         'Créé le $createdAt',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -625,7 +628,7 @@ class _ProjectCard extends StatelessWidget {
               ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(height: 1.4),
+              style: TextStyle(height: 1.4),
             ),
             const SizedBox(height: 16),
             _ProgressLine(progress: 0, color: statusColor),
@@ -652,7 +655,7 @@ class _ProjectCard extends StatelessWidget {
             const Divider(height: 26),
             Row(
               children: [
-                const Icon(Icons.public_rounded, size: 18),
+                Icon(Icons.public_rounded, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -662,8 +665,8 @@ class _ProjectCard extends StatelessWidget {
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.black54,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -680,7 +683,9 @@ class _ProjectCard extends StatelessWidget {
                         : 'Adjoint : ${deputy.displayName}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -694,8 +699,8 @@ class _ProjectCard extends StatelessWidget {
                     onProjectChanged,
                     onProjectMembersChanged,
                   ),
-                  icon: const Icon(Icons.open_in_new_rounded),
-                  label: const Text('Détail'),
+                  icon: Icon(Icons.open_in_new_rounded),
+                  label: Text('Détail'),
                 ),
               ],
             ),
@@ -718,16 +723,13 @@ class _ProgressLine extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Avancement estimé',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
-            Text(
-              '$progress%',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
+            Text('$progress%', style: TextStyle(fontWeight: FontWeight.w900)),
           ],
         ),
         const SizedBox(height: 8),
@@ -757,25 +759,22 @@ class _ProjectReadinessBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.fact_check_rounded, size: 18),
+              Icon(Icons.fact_check_rounded, size: 18),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Préparation compétition',
                   style: TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
-              Text(
-                '$score/100',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+              Text('$score/100', style: TextStyle(fontWeight: FontWeight.w900)),
             ],
           ),
           const SizedBox(height: 8),
@@ -1019,7 +1018,7 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                         radius: 30,
                         backgroundColor: AppTheme.enactusYellow,
                         foregroundColor: AppTheme.softBlack,
-                        child: const Icon(Icons.rocket_launch_rounded),
+                        child: Icon(Icons.rocket_launch_rounded),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -1028,14 +1027,18 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                           children: [
                             Text(
                               project.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
                             Text(
                               '${project.statusLabel} · ${_money(project.budgetEstimated)} · préparation $readiness/100',
-                              style: const TextStyle(color: Colors.black54),
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
@@ -1048,8 +1051,8 @@ class _ProjectDetailsSheetState extends State<_ProjectDetailsSheet> {
                       alignment: Alignment.centerRight,
                       child: OutlinedButton.icon(
                         onPressed: _openEditProjectSheet,
-                        icon: const Icon(Icons.edit_rounded),
-                        label: const Text('Modifier'),
+                        icon: Icon(Icons.edit_rounded),
+                        label: Text('Modifier'),
                       ),
                     ),
                   ],
@@ -1188,14 +1191,17 @@ class _ProjectStatusPanel extends StatelessWidget {
           final summary = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Pilotage projet',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 6),
               Text(
                 '${project.statusLabel} · Progression non disponible · $started · $ended',
-                style: const TextStyle(color: Colors.black54, height: 1.35),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
               ),
               if (updating) ...[
                 const SizedBox(height: 10),
@@ -1255,9 +1261,10 @@ class _ProjectTeamPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sortedMembers = [...allMembers]
-      ..sort((a, b) => a.displayName.compareTo(b.displayName));
     final activeIds = projectMembers.map((member) => member.userId).toSet();
+    final availableMembers = allMembers
+        .where((member) => !activeIds.contains(member.id))
+        .toList();
 
     return Container(
       width: double.infinity,
@@ -1275,7 +1282,7 @@ class _ProjectTeamPanel extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.groups_rounded, color: AppTheme.enactusYellow),
                   SizedBox(width: 10),
@@ -1294,7 +1301,7 @@ class _ProjectTeamPanel extends StatelessWidget {
               if (loading)
                 const LinearProgressIndicator(minHeight: 4)
               else if (projectMembers.isEmpty)
-                const Text(
+                Text(
                   'Aucun membre projet rattaché.',
                   style: TextStyle(color: Colors.white70),
                 )
@@ -1329,7 +1336,7 @@ class _ProjectTeamPanel extends StatelessWidget {
                         onDeleted: !canManage || saving
                             ? null
                             : () => onRemove(member),
-                        backgroundColor: Colors.white,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
                       ),
                   ],
                 ),
@@ -1340,28 +1347,13 @@ class _ProjectTeamPanel extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: fieldWidth,
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey(selectedUserId),
-                      initialValue: selectedUserId,
-                      isExpanded: true,
-                      dropdownColor: Colors.white,
-                      decoration: const InputDecoration(
-                        labelText: 'Membre',
-                        prefixIcon: Icon(Icons.person_add_rounded),
-                      ),
-                      items: [
-                        for (final member in sortedMembers)
-                          DropdownMenuItem(
-                            value: member.id,
-                            child: Text(
-                              activeIds.contains(member.id)
-                                  ? '${member.displayName} · déjà dans l’équipe'
-                                  : member.displayName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: !canManage || saving ? null : onUserChanged,
+                    child: SearchableMemberPickerField(
+                      members: availableMembers,
+                      value: selectedUserId,
+                      label: 'Membre',
+                      icon: Icons.person_add_rounded,
+                      enabled: canManage && !saving,
+                      onChanged: onUserChanged,
                     ),
                   ),
                   SizedBox(
@@ -1369,7 +1361,7 @@ class _ProjectTeamPanel extends StatelessWidget {
                     child: DropdownButtonFormField<String>(
                       initialValue: selectedPosition,
                       isExpanded: true,
-                      dropdownColor: Colors.white,
+                      dropdownColor: Theme.of(context).colorScheme.surface,
                       decoration: const InputDecoration(
                         labelText: 'Position',
                         prefixIcon: Icon(Icons.admin_panel_settings_rounded),
@@ -1410,8 +1402,8 @@ class _ProjectTeamPanel extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.save_rounded),
-                  label: const Text('Mettre à jour l’équipe'),
+                      : Icon(Icons.save_rounded),
+                  label: Text('Mettre à jour l’équipe'),
                 ),
               ),
             ],
@@ -1455,12 +1447,9 @@ class _ProjectDetailBlock extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
                   const SizedBox(height: 4),
-                  Text(body, style: const TextStyle(height: 1.35)),
+                  Text(body, style: TextStyle(height: 1.35)),
                 ],
               ),
             ),
@@ -1536,9 +1525,9 @@ class _ProjectActionChip extends StatelessWidget {
         Navigator.of(context).pop();
         router.go(route);
       },
-      backgroundColor: Colors.white,
-      side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -1569,7 +1558,7 @@ class _ProjectLogPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Journal de bord',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
           ),
@@ -1580,17 +1569,14 @@ class _ProjectLogPreview extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
                     color: AppTheme.enactusYellow,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      item,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
+                    child: Text(item, style: TextStyle(color: Colors.white70)),
                   ),
                 ],
               ),
@@ -1617,27 +1603,26 @@ class _ProjectInfoBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F0),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppTheme.softBlack),
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
                 Text(
                   value,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.black54),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1813,7 +1798,7 @@ class _EditProjectSheetState extends State<_EditProjectSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Modifier le projet',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                   ),
@@ -1915,7 +1900,7 @@ class _EditProjectSheetState extends State<_EditProjectSheet> {
                         onPressed: _saving
                             ? null
                             : () => _pickDate(start: true),
-                        icon: const Icon(Icons.event_rounded),
+                        icon: Icon(Icons.event_rounded),
                         label: Text(
                           _startedAt == null
                               ? 'Début'
@@ -1926,7 +1911,7 @@ class _EditProjectSheetState extends State<_EditProjectSheet> {
                         onPressed: _saving
                             ? null
                             : () => _pickDate(start: false),
-                        icon: const Icon(Icons.event_available_rounded),
+                        icon: Icon(Icons.event_available_rounded),
                         label: Text(
                           _endedAt == null
                               ? 'Fin'
@@ -1938,8 +1923,8 @@ class _EditProjectSheetState extends State<_EditProjectSheet> {
                           onPressed: _saving
                               ? null
                               : () => setState(() => _endedAt = null),
-                          icon: const Icon(Icons.close_rounded),
-                          label: const Text('Retirer fin'),
+                          icon: Icon(Icons.close_rounded),
+                          label: Text('Retirer fin'),
                         ),
                     ],
                   ),
@@ -1955,8 +1940,8 @@ class _EditProjectSheetState extends State<_EditProjectSheet> {
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.save_rounded),
-                    label: const Text('Enregistrer'),
+                        : Icon(Icons.save_rounded),
+                    label: Text('Enregistrer'),
                   ),
                 ],
               ),
@@ -2080,7 +2065,7 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Créer un projet',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                   ),
@@ -2178,7 +2163,7 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                     children: [
                       OutlinedButton.icon(
                         onPressed: () => _pickDate(start: true),
-                        icon: const Icon(Icons.event_rounded),
+                        icon: Icon(Icons.event_rounded),
                         label: Text(
                           _startedAt == null
                               ? 'Début'
@@ -2187,7 +2172,7 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                       ),
                       OutlinedButton.icon(
                         onPressed: () => _pickDate(start: false),
-                        icon: const Icon(Icons.event_available_rounded),
+                        icon: Icon(Icons.event_available_rounded),
                         label: Text(
                           _endedAt == null
                               ? 'Fin'
@@ -2208,8 +2193,8 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.add_rounded),
-                    label: const Text('Créer le projet'),
+                        : Icon(Icons.add_rounded),
+                    label: Text('Créer le projet'),
                   ),
                 ],
               ),
@@ -2254,7 +2239,7 @@ class _ErrorCard extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Erreur de chargement des projets',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
@@ -2263,8 +2248,8 @@ class _ErrorCard extends StatelessWidget {
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../models/campaign_state_presentation.dart';
 import '../../models/recruitment_campaign_model.dart';
 
@@ -194,7 +193,11 @@ class CampaignManagementState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 44, color: AppTheme.secondaryText),
+              Icon(
+                icon,
+                size: 44,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(height: 12),
               Text(title, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
@@ -229,7 +232,11 @@ class _InfoLine extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppTheme.secondaryText),
+          Icon(
+            icon,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Expanded(child: Text(label)),
         ],

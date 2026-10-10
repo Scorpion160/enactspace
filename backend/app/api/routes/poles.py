@@ -1,3 +1,4 @@
+from uuid import UUID
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,7 +24,7 @@ from app.models.role import Role, UserRole
 from app.models.user import User
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
-from app.services.operational_integrity import assert_active_operational_member, lock_row
+from app.services.operational_integrity import assert_active_operational_member, assert_operational_actor, lock_row, lock_structure_write, assert_existing_year, assert_project_dates, get_or_create_role
 
 
 router = APIRouter(prefix="/poles", tags=["Pôles"])
@@ -38,7 +39,7 @@ GLOBAL_POLE_MANAGERS = {
 POLE_LEADERSHIP_POSITIONS = {"chef_pole", "adjoint_chef_pole"}
 
 
-def get_pole_or_404(db: Session, pole_id: str) -> Pole:
+def get_pole_or_404(db: Session, pole_id: UUID) -> Pole:
     pole = db.query(Pole).filter(Pole.id == pole_id).first()
     if pole is None:
         raise HTTPException(
@@ -48,7 +49,7 @@ def get_pole_or_404(db: Session, pole_id: str) -> Pole:
     return pole
 
 
-def get_user_or_404(db: Session, user_id: str) -> User:
+def get_user_or_404(db: Session, user_id: UUID) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(
@@ -61,8 +62,9 @@ def get_user_or_404(db: Session, user_id: str) -> User:
 def require_pole_manager(
     db: Session,
     current_user: User,
-    pole_id: str,
+    pole_id: UUID,
 ) -> bool:
+    assert_operational_actor(current_user)
     roles = get_user_role_names(db, current_user.id)
     if roles.intersection(GLOBAL_POLE_MANAGERS):
         return True
@@ -92,11 +94,7 @@ def sync_pole_responsibility_role(
     user_id,
     role_name: str,
 ) -> None:
-    role = db.query(Role).filter(Role.name == role_name).first()
-    if role is None:
-        role = Role(name=role_name, description="Responsabilité de pôle")
-        db.add(role)
-        db.flush()
+    role = get_or_create_role(db, role_name)
 
     should_have_role = (
         db.query(PoleMember.id)
@@ -130,6 +128,11 @@ def create_pole(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
+    current_user, _, _ = lock_structure_write(db, current_user.id, Pole)
+    if not get_user_role_names(db, current_user.id).intersection(GLOBAL_POLE_MANAGERS):
+        raise HTTPException(403, "Gestion réservée à la direction du club.")
+    assert_existing_year(db, payload.season_id)
+
     pole = Pole(
         season_id=payload.season_id,
         name=payload.name,
@@ -148,15 +151,21 @@ def create_pole(
 
 @router.patch("/{pole_id}", response_model=PoleRead)
 def update_pole(
-    pole_id: str,
+    pole_id: UUID,
     payload: PoleUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    pole = get_pole_or_404(db, pole_id)
-    require_pole_manager(db, current_user, pole_id)
+    current_user, _, pole = lock_structure_write(db, current_user.id, Pole, pole_id)
+    global_manager = require_pole_manager(db, current_user, pole_id)
 
     updates = payload.model_dump(exclude_unset=True)
+    if "name" in updates:
+        if not updates["name"] or not updates["name"].strip():
+            raise HTTPException(400, "Le nom du pôle est obligatoire.")
+        from app.core.roles import is_veille_pole_name
+        if (is_veille_pole_name(pole.name) or is_veille_pole_name(updates["name"])) and not global_manager:
+            raise HTTPException(403, "La désignation du Pôle Veille relève de la direction du club.")
     for field, value in updates.items():
         setattr(pole, field, value)
 
@@ -179,7 +188,7 @@ def list_poles(
     response_model=list[PoleMemberDirectoryRead],
 )
 def list_pole_members(
-    pole_id: str,
+    pole_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -217,18 +226,13 @@ def list_pole_members(
 
 @router.post("/{pole_id}/members", response_model=PoleMemberRead)
 def assign_pole_member(
-    pole_id: str,
+    pole_id: UUID,
     payload: PoleMemberAssign,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    pole = lock_row(db, Pole, pole_id)
-    if pole is None:
-        raise HTTPException(status_code=404, detail="Pôle introuvable")
-    target_user = lock_row(db, User, payload.user_id)
-    if target_user is None:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    current_user, target_user, pole = lock_structure_write(db, current_user.id, Pole, pole_id, payload.user_id)
     is_global_manager = require_pole_manager(db, current_user, pole_id)
 
     if payload.position not in VALID_POLE_POSITIONS:
@@ -249,6 +253,9 @@ def assign_pole_member(
         .with_for_update()
         .first()
     )
+    if membership is not None and membership.position in POLE_LEADERSHIP_POSITIONS and not is_global_manager:
+        raise HTTPException(403, "La modification d'une responsabilité relève de la direction du club.")
+
     previous_position = None
     membership_created = membership is None
     old_value = None
@@ -257,7 +264,7 @@ def assign_pole_member(
         membership = PoleMember(
             pole_id=pole_id,
             user_id=payload.user_id,
-            position=payload.position,
+            position="membre",
         )
         db.add(membership)
     else:
@@ -271,10 +278,11 @@ def assign_pole_member(
             if membership.left_at
             else None,
         }
-        membership.position = payload.position
+        membership.position = "membre"
         membership.is_active = True
         membership.left_at = None
 
+    db.flush()
     if payload.position in POLE_LEADERSHIP_POSITIONS:
         existing_leaders = (
             db.query(PoleMember)
@@ -283,6 +291,7 @@ def assign_pole_member(
                 PoleMember.user_id != payload.user_id,
                 PoleMember.position == payload.position,
                 PoleMember.is_active.is_(True),
+                PoleMember.left_at.is_(None),
             )
             .order_by(PoleMember.id.asc())
             .with_for_update()
@@ -291,6 +300,7 @@ def assign_pole_member(
         for existing_leader in existing_leaders:
             previous_leader_position = existing_leader.position
             existing_leader.position = "membre"
+            db.flush()
             sync_pole_responsibility_role(
                 db,
                 existing_leader.user_id,
@@ -324,6 +334,8 @@ def assign_pole_member(
                 ip_address=get_client_ip(request),
             )
 
+    membership.position = payload.position
+    db.flush()
     if previous_position in POLE_LEADERSHIP_POSITIONS:
         sync_pole_responsibility_role(db, payload.user_id, previous_position)
     if payload.position in POLE_LEADERSHIP_POSITIONS:
@@ -371,17 +383,18 @@ def assign_pole_member(
 
 @router.delete("/{pole_id}/members/{user_id}", response_model=PoleMemberRead)
 def remove_pole_member(
-    pole_id: str,
-    user_id: str,
+    pole_id: UUID,
+    user_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    pole = get_pole_or_404(db, pole_id)
+    current_user, _, pole = lock_structure_write(db, current_user.id, Pole, pole_id, user_id)
     is_global_manager = require_pole_manager(db, current_user, pole_id)
     membership = (
         db.query(PoleMember)
         .filter(PoleMember.pole_id == pole_id, PoleMember.user_id == user_id)
+        .with_for_update()
         .first()
     )
 
@@ -409,6 +422,7 @@ def remove_pole_member(
     }
     membership.is_active = False
     membership.left_at = date.today()
+    db.flush()
     if previous_position in POLE_LEADERSHIP_POSITIONS:
         sync_pole_responsibility_role(db, membership.user_id, previous_position)
     notify_user(

@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+from app.services.payments.base import MAX_MOBILE_MONEY_AMOUNT
 
 
 MOBILE_MONEY_STATUSES = {
@@ -40,6 +41,7 @@ class MobileMoneyTransactionRead(BaseModel):
     cancelled_at: datetime | None
     refunded_at: datetime | None
     last_verified_at: datetime | None
+    last_verification_attempt_at: datetime | None = None
     metadata_json: dict = Field(default_factory=dict)
 
     class Config:
@@ -51,6 +53,7 @@ class MobileMoneyInitiateRequest(BaseModel):
     finance_item_ids: list[UUID] = Field(default_factory=list)
     member_id: UUID | None = None
     channel: str | None = None
+    amount: int | None = Field(default=None, gt=0, le=MAX_MOBILE_MONEY_AMOUNT)
 
     @model_validator(mode="after")
     def validate_finance_items(self):

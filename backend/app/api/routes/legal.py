@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -61,7 +62,7 @@ def publish_legal_document(
     )
     if document is None:
         raise HTTPException(status_code=404, detail="Document juridique introuvable")
-    now = datetime.utcnow()
+    now = utc_now()
     previous_documents = (
         db.query(LegalDocument)
         .filter(

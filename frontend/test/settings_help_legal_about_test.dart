@@ -31,16 +31,24 @@ void main() {
 
   group('routes utilitaires', () {
     test(
-      'settings/help sont authentifiés sans modifier les modules métier',
+      'profil/settings/help sont authentifiés sans modifier les modules métier',
       () {
         final member = _user();
         final alumni = _user(status: 'alumni', roles: const {'alumni'});
+        expect(AppRouter.isPublicPath('/profile'), isFalse);
         expect(AppRouter.isPublicPath('/settings'), isFalse);
         expect(AppRouter.isPublicPath('/help'), isFalse);
+        expect(UserExperience.canAccessPath(null, '/profile'), isFalse);
         expect(UserExperience.canAccessPath(null, '/settings'), isFalse);
+        expect(UserExperience.canAccessPath(member, '/profile'), isTrue);
         expect(UserExperience.canAccessPath(member, '/settings'), isTrue);
         expect(UserExperience.canAccessPath(member, '/help'), isTrue);
+        expect(UserExperience.canAccessPath(alumni, '/profile'), isTrue);
         expect(UserExperience.canAccessPath(alumni, '/settings'), isTrue);
+        expect(
+          UserExperience.visibleRoutesFor(member),
+          isNot(contains('/profile')),
+        );
         expect(
           UserExperience.visibleRoutesFor(member),
           isNot(contains('/settings')),
@@ -212,6 +220,11 @@ void main() {
       expect(find.text('Français'), findsOneWidget);
       expect(find.text('Notifications push'), findsOneWidget);
       expect(find.text('Indisponibles sur cette version.'), findsOneWidget);
+      final appearanceControl = tester.widget<SegmentedButton<AppAppearance>>(
+        find.byKey(const Key('appearance-segmented-control')),
+      );
+      expect(appearanceControl.expandedInsets, EdgeInsets.zero);
+      expect(appearanceControl.showSelectedIcon, isFalse);
       expect(tester.takeException(), isNull);
     });
 
@@ -575,7 +588,11 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('Confidentialité EnactSpace'), findsWidgets);
-        expect(find.textContaining('Contenu officiel'), findsOneWidget);
+        expect(find.textContaining('Contenu officiel'), findsWidgets);
+        expect(
+          find.text('Document officiel · Validé par Enactus ESP'),
+          findsOneWidget,
+        );
         expect(find.byKey(const Key('legal-document-scroll')), findsOneWidget);
         expect(tester.takeException(), isNull);
 
@@ -592,34 +609,42 @@ void main() {
       },
     );
 
-    testWidgets('absence et erreur ont des états explicites avec retry', (
-      tester,
-    ) async {
-      final empty = _LegalGateway();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PublicLegalScreen(
-            documentType: 'privacy_policy',
-            gateway: empty,
+    testWidgets(
+      'absence ou erreur serveur utilise la copie officielle locale',
+      (tester) async {
+        final empty = _LegalGateway();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PublicLegalScreen(
+              documentType: 'privacy_policy',
+              gateway: empty,
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Aucun document actif'), findsOneWidget);
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Copie officielle embarquée'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Aucun document actif'), findsNothing);
 
-      final failing = _LegalGateway()..failDocuments = true;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: PublicLegalScreen(
-            documentType: 'terms_of_use',
-            gateway: failing,
+        final failing = _LegalGateway()..failDocuments = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PublicLegalScreen(
+              documentType: 'terms_of_use',
+              gateway: failing,
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Réessayer'), findsOneWidget);
-      expect(find.textContaining('Impossible de charger'), findsOneWidget);
-    });
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Copie officielle embarquée'),
+          findsOneWidget,
+        );
+        expect(find.text('Réessayer'), findsNothing);
+      },
+    );
 
     testWidgets('un document actif différent ne peut jamais être accepté', (
       tester,
@@ -931,10 +956,12 @@ Future<void> _scrollTo(
   await tester.scrollUntilVisible(
     target,
     300,
-    scrollable: find.descendant(
-      of: find.byKey(scrollKey),
-      matching: find.byType(Scrollable),
-    ),
+    scrollable: find
+        .descendant(
+          of: find.byKey(scrollKey),
+          matching: find.byType(Scrollable),
+        )
+        .first,
   );
   await tester.pumpAndSettle();
 }
@@ -1112,6 +1139,7 @@ class _HelpGateway implements HelpGateway {
     required String category,
     required String priority,
     required String message,
+    String? clientRequestId,
   }) async {
     createdTickets++;
     final ticket = SupportTicket(
@@ -1127,14 +1155,26 @@ class _HelpGateway implements HelpGateway {
   }
 
   @override
-  Future<SupportMessage> replyToTicket(String id, String message) async {
+  Future<SupportMessage> replyToTicket(
+    String id,
+    String message, {
+    String? clientRequestId,
+  }) async {
     replies++;
-    return SupportMessage(
+    final reply = SupportMessage(
       id: 'm2',
       authorId: 'u1',
       message: message,
       createdAt: DateTime(2026, 9, 6),
     );
+    tickets = tickets
+        .map(
+          (ticket) => ticket.id == id
+              ? ticket.withMessages([...ticket.messages, reply])
+              : ticket,
+        )
+        .toList();
+    return reply;
   }
 
   @override
@@ -1153,6 +1193,7 @@ class _HelpGateway implements HelpGateway {
     String? platform,
     String? appVersion,
     int? buildNumber,
+    String? clientRequestId,
   }) async {
     createdFeedback++;
     lastRating = rating;

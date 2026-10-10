@@ -4,12 +4,14 @@ on:
   pull_request:
     branches:
       - main
+      - recovery/final-20260927
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
   push:
     branches:
       - main
+      - recovery/final-20260927
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -31,6 +33,8 @@ jobs:
       APP_ENV: test
       APP_DEBUG: "false"
       AUTO_CREATE_TABLES: "false"
+      EMAIL_ENABLED: "false"
+      PUSH_ENABLED: "false"
       DATABASE_URL: sqlite://
       TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
     services:
@@ -64,7 +68,7 @@ jobs:
       - name: Install LaTeX renderer
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended
+          sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended gnupg
           pdflatex --version | head -n 1
 
       - name: Generate an ephemeral application secret
@@ -111,7 +115,10 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20260913_0009 (head)"
+          test "$output" = "20261007_0031 (head)"
+
+      - name: Verify host-only backup encryption integrity
+        run: python -m unittest ops_checks.backup_integrity_checks -v
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
@@ -124,7 +131,7 @@ jobs:
           fi
 
   flutter:
-    name: Flutter 3.44.9 / analyze, test, web, Android debug
+    name: Flutter 3.47.5 / analyze, test, web, Android debug
     runs-on: ubuntu-latest
     timeout-minutes: 50
     defaults:
@@ -137,7 +144,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
-          flutter-version: "3.44.9"
+          flutter-version: "3.47.5"
           channel: stable
           cache: true
 

@@ -265,7 +265,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
                 if (doc.seasonId != null)
                   _Datum(
-                    'Saison',
+                    'Année',
                     _references.seasonName(doc.seasonId) ??
                         'Référence indisponible',
                   ),

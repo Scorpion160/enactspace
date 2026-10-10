@@ -54,7 +54,12 @@ const Set<String> _recruitmentRoles = {
 };
 
 class UserExperience {
-  static const Set<String> authenticatedUtilityRoutes = {'/settings', '/help'};
+  static const Set<String> authenticatedUtilityRoutes = {
+    '/profile',
+    '/settings',
+    '/help',
+    '/welcome-help',
+  };
 
   final String id;
   final String email;
@@ -64,6 +69,7 @@ class UserExperience {
   final String profileType;
   final Set<String> roles;
   final bool canReviewJoinRequests;
+  final bool canAccessRecruitment;
 
   const UserExperience({
     required this.id,
@@ -74,6 +80,7 @@ class UserExperience {
     required this.profileType,
     required this.roles,
     required this.canReviewJoinRequests,
+    this.canAccessRecruitment = false,
   });
 
   factory UserExperience.fromJson(Map<String, dynamic> json) {
@@ -96,6 +103,7 @@ class UserExperience {
           (json['status']?.toString() == 'alumni' ? 'alumni' : 'enacteur'),
       roles: _parseRoles(json['roles']),
       canReviewJoinRequests: json['can_review_join_requests'] == true,
+      canAccessRecruitment: json['can_access_recruitment'] == true,
     );
   }
 
@@ -140,11 +148,11 @@ class UserExperience {
         isTeamLeader ||
         isSecretary ||
         isFinance ||
-        hasRole('faculty_advisor') ||
         isProjectOrPoleLead;
   }
 
-  bool get canManageMembers => isAdmin || isTeamLeader || isSecretary;
+  bool get canManageMembers =>
+      isActiveMember && (isAdmin || isTeamLeader || isSecretary);
 
   /// Active members can only reach their own Finance endpoints. Management
   /// capabilities remain reserved for the financial leadership roles below.
@@ -154,7 +162,12 @@ class UserExperience {
       (isActiveMember && (isAdmin || isTeamLeader || isFinance));
   bool get canManageFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
-      isAdmin || isTeamLeader || isSecretary || isRecruitmentLead || isEnacchef;
+      isActiveMember &&
+      (canAccessRecruitment ||
+          isAdmin ||
+          isTeamLeader ||
+          isSecretary ||
+          isRecruitmentLead);
   bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
   bool get canCreateTasks =>
@@ -178,7 +191,7 @@ class UserExperience {
     if (isTeamLeader) return 'Team Leader';
     if (isSecretary) return 'Secrétariat général';
     if (isFinance) return 'Finance';
-    if (isProjectOrPoleLead) return 'Enacchef';
+    if (isProjectOrPoleLead) return 'EnacChef';
     if (isAlumni) return 'Alumni';
     return 'Espace $memberLabel';
   }
@@ -216,6 +229,7 @@ class UserExperience {
         '/notifications',
         '/posts',
         '/chat',
+        '/meetings',
         '/events',
         '/academy',
         '/archives',
@@ -228,7 +242,9 @@ class UserExperience {
       '/notifications',
       '/posts',
       '/chat',
+      '/meetings',
       '/tasks',
+      if (user.status == 'active') '/veille',
       '/documents',
       '/gamification',
       '/academy',
@@ -249,7 +265,7 @@ class UserExperience {
       routes.add('/attendance');
     }
 
-    if (user.isEnacchef) {
+    if (user.isActiveMember) {
       routes.addAll({'/poles', '/projects', '/events'});
     } else {
       routes.add('/events');
@@ -277,6 +293,13 @@ class UserExperience {
     if (user == null) return false;
 
     final normalizedPath = path.split('?').first;
+    if (normalizedPath == '/help/manage' ||
+        normalizedPath.startsWith('/help/manage/')) {
+      return user.canManageMembers;
+    }
+    if (normalizedPath == '/members/first-access') {
+      return user.isActiveMember && user.canManageMembers;
+    }
     if (authenticatedUtilityRoutes.any(
       (route) =>
           normalizedPath == route || normalizedPath.startsWith('$route/'),

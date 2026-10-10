@@ -1,4 +1,6 @@
 import '../../../core/auth/auth_service.dart';
+import 'dart:typed_data';
+
 import '../../../core/auth/user_experience.dart';
 import '../../../core/realtime/realtime_service.dart';
 import '../../poles/models/pole_model.dart';
@@ -65,6 +67,20 @@ abstract interface class ChatGateway {
     required String threadId,
     required List<ChatMessageModel> messages,
   });
+  Future<List<Map<String, dynamic>>> getPendingMessages({
+    required String userId,
+    required String threadId,
+  });
+  Future<void> cachePendingMessage({
+    required String userId,
+    required String threadId,
+    required Map<String, dynamic> message,
+  });
+  Future<void> removePendingMessage({
+    required String userId,
+    required String threadId,
+    required String clientMessageId,
+  });
   Future<ChatMediaCacheSettings> getMediaCacheSettings({
     required String userId,
   });
@@ -74,6 +90,7 @@ abstract interface class ChatGateway {
   });
   Future<int> estimateLocalMediaCacheBytes({required String userId});
   Future<int> clearLocalMediaCache({required String userId});
+  Future<Uint8List> loadMediaBytes(String url);
   Future<ChatMessageModel> sendMessage({
     required String threadId,
     required String content,
@@ -86,6 +103,7 @@ abstract interface class ChatGateway {
     int? durationSeconds,
     String? thumbnailUrl,
     String? stickerPack,
+    String? clientMessageId,
   });
   Future<void> reactToMessage({
     required String threadId,
@@ -95,6 +113,21 @@ abstract interface class ChatGateway {
   Future<void> deleteMessageReaction({
     required String threadId,
     required String messageId,
+  });
+  Future<ChatMessageModel> createPoll({
+    required String threadId,
+    required String question,
+    required List<String> options,
+    bool allowsMultiple = false,
+  });
+  Future<ChatPollModel> votePoll({
+    required String threadId,
+    required String pollId,
+    required List<String> optionIds,
+  });
+  Future<ChatPollModel> clearPollVote({
+    required String threadId,
+    required String pollId,
   });
   Future<void> addParticipants({
     required String threadId,
@@ -240,6 +273,31 @@ class ApiChatGateway implements ChatGateway {
     messages: messages,
   );
   @override
+  Future<List<Map<String, dynamic>>> getPendingMessages({
+    required String userId,
+    required String threadId,
+  }) => _chat.getPendingMessages(userId: userId, threadId: threadId);
+  @override
+  Future<void> cachePendingMessage({
+    required String userId,
+    required String threadId,
+    required Map<String, dynamic> message,
+  }) => _chat.cachePendingMessage(
+    userId: userId,
+    threadId: threadId,
+    message: message,
+  );
+  @override
+  Future<void> removePendingMessage({
+    required String userId,
+    required String threadId,
+    required String clientMessageId,
+  }) => _chat.removePendingMessage(
+    userId: userId,
+    threadId: threadId,
+    clientMessageId: clientMessageId,
+  );
+  @override
   Future<ChatMediaCacheSettings> getMediaCacheSettings({
     required String userId,
   }) => _chat.getMediaCacheSettings(userId: userId);
@@ -255,6 +313,8 @@ class ApiChatGateway implements ChatGateway {
   Future<int> clearLocalMediaCache({required String userId}) =>
       _chat.clearLocalMediaCache(userId: userId);
   @override
+  Future<Uint8List> loadMediaBytes(String url) => _chat.loadMediaBytes(url);
+  @override
   Future<ChatMessageModel> sendMessage({
     required String threadId,
     required String content,
@@ -267,6 +327,7 @@ class ApiChatGateway implements ChatGateway {
     int? durationSeconds,
     String? thumbnailUrl,
     String? stickerPack,
+    String? clientMessageId,
   }) => _chat.sendMessage(
     threadId: threadId,
     content: content,
@@ -279,6 +340,7 @@ class ApiChatGateway implements ChatGateway {
     durationSeconds: durationSeconds,
     thumbnailUrl: thumbnailUrl,
     stickerPack: stickerPack,
+    clientMessageId: clientMessageId,
   );
   @override
   Future<void> reactToMessage({
@@ -295,6 +357,30 @@ class ApiChatGateway implements ChatGateway {
     required String threadId,
     required String messageId,
   }) => _chat.deleteMessageReaction(threadId: threadId, messageId: messageId);
+  @override
+  Future<ChatMessageModel> createPoll({
+    required String threadId,
+    required String question,
+    required List<String> options,
+    bool allowsMultiple = false,
+  }) => _chat.createPoll(
+    threadId: threadId,
+    question: question,
+    options: options,
+    allowsMultiple: allowsMultiple,
+  );
+  @override
+  Future<ChatPollModel> votePoll({
+    required String threadId,
+    required String pollId,
+    required List<String> optionIds,
+  }) =>
+      _chat.votePoll(threadId: threadId, pollId: pollId, optionIds: optionIds);
+  @override
+  Future<ChatPollModel> clearPollVote({
+    required String threadId,
+    required String pollId,
+  }) => _chat.clearPollVote(threadId: threadId, pollId: pollId);
   @override
   Future<void> addParticipants({
     required String threadId,

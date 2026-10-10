@@ -35,26 +35,23 @@ class ModulePlaceholder extends StatelessWidget {
                 ),
                 child: Icon(icon, color: AppTheme.softBlack, size: 34),
               ),
-              const SizedBox(width: 18),
+              SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(color: Colors.white70, height: 1.4),
                     ),
                   ],
                 ),
@@ -62,21 +59,24 @@ class ModulePlaceholder extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Module en cours d’intégration',
+                  'Module en cours dâ€™intÃ©gration',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'La navigation est prête. Nous allons maintenant connecter cette page aux routes backend correspondantes.',
-                  style: TextStyle(color: Colors.black54, height: 1.5),
+                  'Cet espace n’est pas accessible pour le moment. Reviens à l’accueil pour continuer.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),

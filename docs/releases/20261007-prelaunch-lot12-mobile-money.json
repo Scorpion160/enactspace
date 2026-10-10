@@ -1,0 +1,45 @@
+{
+  "lot": 12,
+  "date_utc": "2026-10-07T14:33:26.968353+00:00",
+  "tests": {
+    "final_sqlite": {
+      "passed": 52,
+      "seconds": 18.669,
+      "skipped": 0
+    },
+    "final_postgresql": {
+      "passed": 9,
+      "seconds": 29.398,
+      "skipped": 0
+    }
+  },
+  "suite_counts_overlap": true,
+  "reviewed_files": [
+    "backend/app/api/routes/payments.py",
+    "backend/app/api/routes/finance.py",
+    "backend/app/services/mobile_money_service.py",
+    "backend/app/services/payments/paydunya_provider.py",
+    "backend/app/services/payments/base.py",
+    "backend/app/services/payments/mock_provider.py",
+    "backend/app/services/paydunya_callback.py",
+    "backend/app/models/mobile_money.py",
+    "backend/app/schemas/mobile_money.py",
+    "backend/test_prelaunch_mobile_money_boundaries.py",
+    "backend/test_prelaunch_mobile_money_boundaries_postgresql.py"
+  ],
+  "whole_manual_review_complete": false,
+  "resources_absent": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "real_payment_or_email_sent": false,
+  "provider_requests_in_tests": "mocked",
+  "source_reference": "https://developers.paydunya.com/doc/FR/http_json",
+  "remaining": [
+    "Real provider sandbox acceptance after credentials configuration",
+    "Remote error handling and bounded responses/checkout URL validation",
+    "Callback quotas and middleware body integration",
+    "Invoice customer/channel payload and legacy helper cleanup",
+    "Other role and module audits, actual Android/web checks and targeted recruitment cleanup"
+  ]
+}

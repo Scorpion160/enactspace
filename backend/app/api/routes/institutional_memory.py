@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import base64
 import json
 import re
@@ -254,7 +255,7 @@ def _update_entity(
     _ensure_source(db, validated.get("source_id"), current_user)
     for field, value in validated.items():
         setattr(entity, field, value)
-    entity.updated_at = datetime.utcnow()
+    entity.updated_at = utc_now()
     _commit(db, conflict_detail=conflict_detail)
     db.refresh(entity)
     return entity
@@ -1297,8 +1298,8 @@ def validate_memory_entity(
         )
     entity.validation_status = "VERIFIED"
     entity.validated_by_id = current_user.id
-    entity.validated_at = datetime.utcnow()
-    entity.updated_at = datetime.utcnow()
+    entity.validated_at = utc_now()
+    entity.updated_at = utc_now()
     create_audit_log(
         db,
         "institutional_memory_verified",
@@ -1335,8 +1336,8 @@ def reject_memory_entity(
         )
     entity.validation_status = "REJECTED"
     entity.validated_by_id = current_user.id
-    entity.validated_at = datetime.utcnow()
-    entity.updated_at = datetime.utcnow()
+    entity.validated_at = utc_now()
+    entity.updated_at = utc_now()
     create_audit_log(
         db,
         "institutional_memory_rejected",

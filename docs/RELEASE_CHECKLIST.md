@@ -17,7 +17,7 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 
 - [ ] Backend compile, OpenAPI import, and full tests pass without PostgreSQL suite skips.
 - [ ] PostgreSQL 16 migration/reversal/concurrency evidence is current.
-- [ ] Exactly one Alembic head: `20260913_0009`.
+- [ ] Exactly one Alembic head: `20261007_0031`.
 - [ ] Flutter lock file is unchanged; analysis and full tests pass.
 - [ ] Web release and Android debug compile checks pass.
 - [ ] Backup is complete and restore rehearsal evidence is accepted.
@@ -52,3 +52,30 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 - [ ] Evidence location:
 - [ ] Remaining exceptions, owner, expiry:
 - [ ] Go / no-go decision and timestamp:
+
+## Première connexion — lot 24, source non déployée
+
+- [x] Activation individuelle, profil obligatoire, parcours Alumni et confirmation de l'année implémentés et testés sur données synthétiques.
+- [x] Migration 0030 répétée sur schéma isolé ; anciens états et historique d'accueil conservés.
+- [ ] Confirmer individuellement les contacts manquants et les situations d'accès avec la SG et les membres.
+- [ ] Recette réelle Android/web du build final : activation, accueil, consentement légal, récupération et accès selon les rôles.
+- [ ] Vérifier invitation et notifications avec la redirection de test, puis examiner la file avant toute bascule des destinataires.
+- [ ] Après validation de la mise en service et livraison cohérente backend/app/web, préparer les invitations individuelles au moment de l'ouverture.
+
+Guide : [Premières connexions](FIRST_ACCESS_ONBOARDING.md). Preuves : [Lot 24](releases/20261007-prelaunch-lot24-first-access.md).
+
+## Centre d’aide — lot 25, source non déployée
+
+- [x] Guide, FAQ, aide pendant l’accueil et traitement sécurisé implémentés.
+- [x] 88 tests SQLite, 32 PostgreSQL et 105 Flutter réussis ; migration 0031 répétée.
+- [ ] Recette finale téléphone/web : aide pendant l’accueil, envoi, réponse, suivi, droits, mode sombre et textes agrandis.
+- [ ] Vérifier la réception des alertes en redirection et le lien de navigation sur téléphone.
+- [ ] Confirmer les personnes chargées du traitement à l’ouverture et contrôler leurs accès actifs.
+
+Guide : [Centre d’aide](HELP_SUPPORT_OPERATIONS.md). Preuves : [Lot 25](releases/20261007-prelaunch-lot25-help.md).
+
+## Sauvegarde et restauration — lot 26
+
+Restauration locale isolée vérifiée : 19 tests de protection, 111 tables et 721 lignes comparées, schéma complet contrôlé, 14 fichiers et leurs références intacts. Les modifications synthétiques de contrainte, d’index et de colonne sont détectées. La copie Windows et la récupération depuis sa clé DPAPI sont vérifiées. Restent le second secours de clé, la reprise sur un hôte neuf, la planification, la conservation et les objectifs RPO/RTO. Voir [les preuves](releases/20261008-prelaunch-lot26-backup-restore.md) et [la procédure](V1_1_BACKUP_RESTORE.md).
+
+Sauvegardes planifiées : timer actif à 03 h 00 UTC et premier lancement systemd validé, quatre tests de garde réussis. La copie automatique hors du VPS, le secours de clé remis à un second détenteur et la reprise sur un hôte neuf restent à terminer. Voir les preuves du lot 26.

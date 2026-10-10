@@ -1,3 +1,4 @@
+import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -211,12 +212,12 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Fermer la fiche candidat',
-      barrierColor: Colors.black45,
+      barrierColor: Colors.black.withValues(alpha: .55),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
         alignment: Alignment.centerRight,
         child: SizedBox(
-          width: math.min(760, width * .62),
+          width: math.min(880, width * .78),
           height: double.infinity,
           child: ApplicationDetailPanel(
             summary: application,
@@ -284,7 +285,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                 setState(() => _filtersExpanded = !_filtersExpanded),
             onManageCampaigns: _openCampaignManagement,
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           InternalFilterBar(
             searchController: _search,
             poleController: _pole,
@@ -327,14 +328,14 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             }),
             onReset: _resetFilters,
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (_refreshing)
             const LinearProgressIndicator(minHeight: 3)
           else
-            const SizedBox(height: 3),
-          const SizedBox(height: 10),
+            SizedBox(height: 3),
+          SizedBox(height: 10),
           if (_loading)
-            const Card(
+            Card(
               child: Padding(
                 padding: EdgeInsets.all(48),
                 child: Center(child: CircularProgressIndicator()),
@@ -348,7 +349,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               title: _isAccessDenied(_error!)
                   ? 'Accès refusé'
                   : 'Erreur de chargement',
-              message: _error.toString().replaceAll('Exception: ', ''),
+              message: recruitmentMessage(
+                _error!,
+                fallback:
+                    'Impossible de charger les candidatures. Réessaie dans un instant.',
+              ),
               actionLabel: 'Réessayer',
               onAction: () => _load(initial: true),
             )

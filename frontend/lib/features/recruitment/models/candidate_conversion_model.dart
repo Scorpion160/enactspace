@@ -13,7 +13,6 @@ class CandidateConversionCatalog {
 
 class CandidateConversionRequest {
   final String applicationId;
-  final String password;
   final String profileType;
   final String? corePoleId;
   final List<String> supportPoleIds;
@@ -21,7 +20,6 @@ class CandidateConversionRequest {
 
   const CandidateConversionRequest({
     required this.applicationId,
-    required this.password,
     required this.profileType,
     this.corePoleId,
     this.supportPoleIds = const [],
