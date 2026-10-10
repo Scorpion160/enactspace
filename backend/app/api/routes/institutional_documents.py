@@ -567,6 +567,9 @@ def approve_institutional_document_request(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     item = _get_accessible_request(db, current_user, request_id)
+    item = db.query(InstitutionalDocumentRequest).filter(
+        InstitutionalDocumentRequest.id == request_id
+    ).populate_existing().with_for_update().one()
     roles = get_user_role_names(db, current_user.id)
     if TEAM_LEADER_ROLE not in roles:
         raise HTTPException(status_code=403, detail="Approbation réservée au Team Leader.")
@@ -586,6 +589,13 @@ def approve_institutional_document_request(
     item.approved_at = now
     item.status = "validated"
     item.updated_at = now
+    if item.template_code == "notification_renvoi":
+        from app.services.disciplinary_execution import apply_approved_dismissal
+        payload = dict(item.payload_json or {})
+        payload.pop("dismissal_executed_at", None)
+        payload["dismissal_execution_enabled"] = True
+        item.payload_json = payload
+        apply_approved_dismissal(db, item)
     allocate_official_reference(db, item)
     _audit(
         db,

@@ -63,6 +63,7 @@ class _MembersScreenState extends State<MembersScreen> {
           pendingMembers.where((member) => knownIds.add(member.id)),
         );
       }
+      members.removeWhere((member) => member.isAlumni);
       members.sort(MemberModel.compareAlphabetically);
 
       if (!mounted) return;
@@ -437,7 +438,7 @@ class _MembersScreenState extends State<MembersScreen> {
 
   int get _activeCount {
     return _members
-        .where((m) => m.status == 'active' || m.isActive == true)
+        .where((m) => !m.isAlumni && m.status == 'active' && m.isActive == true)
         .length;
   }
 
@@ -705,7 +706,6 @@ class _SearchAndActions extends StatelessWidget {
         DropdownMenuItem(value: 'pending', child: Text('En attente')),
         DropdownMenuItem(value: 'inactive', child: Text('Inactifs')),
         DropdownMenuItem(value: 'suspended', child: Text('Suspendus')),
-        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
         DropdownMenuItem(value: 'rejected', child: Text('Refusés')),
       ],
       onChanged: (value) {
@@ -733,7 +733,6 @@ class _SearchAndActions extends StatelessWidget {
           value: 'adjoint_chef_projet',
           child: Text('Adjoint projet'),
         ),
-        DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
       ],
       onChanged: (value) {
         if (value != null) onRoleChanged(value);
@@ -1577,7 +1576,8 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = member.status == 'active' || member.isActive == true;
+    final isActive = !member.isAlumni &&
+        member.status == 'active' && member.isActive == true;
     final isPending = member.status == 'pending';
 
     final scheme = Theme.of(context).colorScheme;

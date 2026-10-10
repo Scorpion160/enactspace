@@ -94,10 +94,12 @@ def get_dashboard_summary(
 
     if flags["can_view_global_members"]:
         summary["counts"]["members_active"] = _count(
-            db.query(User.id).filter(User.status == "active", User.is_active.is_(True))
+            db.query(User.id).filter(User.status == "active", User.is_active.is_(True),
+                User.profile_type.in_(("enacteur", "enactrice")))
         )
         summary["counts"]["members_inactive"] = _count(
             db.query(User.id).filter(
+                User.profile_type.in_(("enacteur", "enactrice")),
                 or_(User.status != "active", User.is_active.is_(False))
             )
         )

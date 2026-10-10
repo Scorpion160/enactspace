@@ -18,6 +18,8 @@ def main():
     while True:
         try:
             with SessionLocal() as db:
+                from app.services.disciplinary_execution import execute_due_dismissals
+                execute_due_dismissals(db)
                 result=run_cycle(db)
                 log.info("Veille cycle: %s",result)
         except Exception:
