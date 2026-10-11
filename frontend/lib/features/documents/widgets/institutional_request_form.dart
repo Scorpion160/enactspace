@@ -26,6 +26,7 @@ Future<InstitutionalRequestFormResult?> showInstitutionalRequestFormDialog(
   required InstitutionalDocumentsGateway gateway,
   required InstitutionalTemplateModel template,
   InstitutionalDocumentRequestModel? request,
+  InstitutionalRequestFormResult? initialDraft,
 }) {
   return showDialog<InstitutionalRequestFormResult>(
     context: context,
@@ -38,6 +39,7 @@ Future<InstitutionalRequestFormResult?> showInstitutionalRequestFormDialog(
           gateway: gateway,
           template: template,
           request: request,
+          initialDraft: initialDraft,
         ),
       ),
     ),
@@ -48,12 +50,14 @@ class InstitutionalRequestForm extends StatefulWidget {
   final InstitutionalDocumentsGateway gateway;
   final InstitutionalTemplateModel template;
   final InstitutionalDocumentRequestModel? request;
+  final InstitutionalRequestFormResult? initialDraft;
 
   const InstitutionalRequestForm({
     super.key,
     required this.gateway,
     required this.template,
     this.request,
+    this.initialDraft,
   });
 
   @override
@@ -81,10 +85,18 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   void initState() {
     super.initState();
     final request = widget.request;
-    _poleId = request?.poleId;
-    _projectId = request?.projectId;
-    _eventId = request?.eventId;
-    _seasonId = request?.seasonId;
+    _poleId = widget.initialDraft != null
+        ? widget.initialDraft!.poleId
+        : request?.poleId;
+    _projectId = widget.initialDraft != null
+        ? widget.initialDraft!.projectId
+        : request?.projectId;
+    _eventId = widget.initialDraft != null
+        ? widget.initialDraft!.eventId
+        : request?.eventId;
+    _seasonId = widget.initialDraft != null
+        ? widget.initialDraft!.seasonId
+        : request?.seasonId;
     if (_poleId != null) {
       _optionalScope = 'pole';
     } else if (_projectId != null) {
@@ -95,7 +107,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   }
 
   void _initializeFieldValues() {
-    final payload = widget.request?.payload ?? const <String, dynamic>{};
+    final payload = widget.initialDraft?.payload ??
+        widget.request?.payload ?? const <String, dynamic>{};
     for (final field in widget.template.fields) {
       final value = payload[field.name];
       if (field.type == 'user') {
@@ -453,10 +466,23 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
           icon: const Icon(Icons.clear_rounded),
         ),
       ),
-      validator: (value) =>
-          field.required && (value == null || value.trim().isEmpty)
-          ? 'Ce champ est obligatoire.'
-          : null,
+      validator: (value) {
+        final raw = value?.trim() ?? '';
+        if (field.required && raw.isEmpty) return 'Ce champ est obligatoire.';
+        if (raw.isEmpty) return null;
+        if (field.type == 'number') {
+          final number = num.tryParse(raw);
+          if (number == null || !number.isFinite || number < 0) {
+            return 'Saisissez un nombre valide et positif.';
+          }
+          if (field.name == 'passenger_count' || field.name == 'requested_capacity') {
+            if (number <= 0 || number != number.roundToDouble()) {
+              return 'Saisissez un nombre entier supérieur à zéro.';
+            }
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -488,10 +514,23 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         alignLabelWithHint: rich,
         helperText: _helper(field.type),
       ),
-      validator: (value) =>
-          field.required && (value == null || value.trim().isEmpty)
-          ? 'Ce champ est obligatoire.'
-          : null,
+      validator: (value) {
+        final raw = value?.trim() ?? '';
+        if (field.required && raw.isEmpty) return 'Ce champ est obligatoire.';
+        if (raw.isEmpty) return null;
+        if (field.type == 'number') {
+          final number = num.tryParse(raw);
+          if (number == null || !number.isFinite || number < 0) {
+            return 'Saisissez un nombre valide et positif.';
+          }
+          if (field.name == 'passenger_count' || field.name == 'requested_capacity') {
+            if (number <= 0 || number != number.roundToDouble()) {
+              return 'Saisissez un nombre entier supérieur à zéro.';
+            }
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -638,8 +677,11 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
       return;
     }
 
-    final payload = <String, dynamic>{};
+    final original = widget.initialDraft?.payload ?? widget.request?.payload ??
+        const <String, dynamic>{};
+    final payload = Map<String, dynamic>.from(original);
     for (final field in widget.template.fields) {
+      payload.remove(field.name);
       if (field.type == 'user') {
         final value = _singleUsers[field.name];
         if (value != null && value.isNotEmpty) payload[field.name] = value;
@@ -649,7 +691,10 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
       } else {
         final raw = _controllers[field.name]?.text.trim() ?? '';
         if (raw.isNotEmpty) {
-          payload[field.name] = _parseFieldValue(field.type, raw);
+          // Keep structured data exactly as stored when the field was not edited.
+          payload[field.name] = raw == _serializeFieldValue(field.type, original[field.name]).trim()
+              ? original[field.name]
+              : _parseFieldValue(field.type, raw);
         }
       }
     }

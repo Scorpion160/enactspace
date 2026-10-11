@@ -132,8 +132,15 @@ def _get_accessible_request(
     db: Session,
     current_user: User,
     request_id: UUID,
+    *, lock: bool = False,
 ) -> InstitutionalDocumentRequest:
     item = _get_request_or_404(db, request_id)
+    if lock:
+        item = db.query(InstitutionalDocumentRequest).filter(
+            InstitutionalDocumentRequest.id == request_id
+        ).populate_existing().with_for_update().first()
+        if item is None:
+            raise HTTPException(status_code=404, detail="Demande institutionnelle introuvable.")
     if not can_access_request(db, current_user, item):
         raise HTTPException(status_code=404, detail="Demande institutionnelle introuvable.")
     return item
@@ -403,7 +410,7 @@ def update_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     if item.requested_by != current_user.id or item.status not in {"draft", "rejected"}:
         raise HTTPException(
             status_code=403,
@@ -469,7 +476,7 @@ def submit_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     if item.status not in {"draft", "rejected"}:
         raise HTTPException(
             status_code=409,
@@ -523,7 +530,7 @@ def sg_validate_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     roles = get_user_role_names(db, current_user.id)
     if SECRETARY_ROLE not in roles:
         raise HTTPException(
@@ -566,10 +573,7 @@ def approve_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
-    item = db.query(InstitutionalDocumentRequest).filter(
-        InstitutionalDocumentRequest.id == request_id
-    ).populate_existing().with_for_update().one()
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     roles = get_user_role_names(db, current_user.id)
     if TEAM_LEADER_ROLE not in roles:
         raise HTTPException(status_code=403, detail="Approbation réservée au Team Leader.")
@@ -619,7 +623,7 @@ def reject_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     roles = get_user_role_names(db, current_user.id)
     if item.requested_by == current_user.id:
         raise HTTPException(
@@ -678,7 +682,7 @@ def cancel_institutional_document_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    item = _get_accessible_request(db, current_user, request_id)
+    item = _get_accessible_request(db, current_user, request_id, lock=True)
     if item.requested_by != current_user.id:
         raise HTTPException(status_code=403, detail="Seul l’auteur peut annuler sa demande.")
     if item.status not in {"draft", "rejected", "pending_sg_validation"}:

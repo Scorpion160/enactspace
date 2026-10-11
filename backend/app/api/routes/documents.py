@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.document import Document
+from app.models.institutional_document import InstitutionalDocumentRequest
 from app.models.event import Event
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
@@ -258,11 +259,27 @@ def is_scope_lead(db: Session, current_user: User, document: Document) -> bool:
     return False
 
 
+def is_generated_institutional_document(db: Session, document: Document) -> bool:
+    return db.query(InstitutionalDocumentRequest.id).filter(
+        InstitutionalDocumentRequest.generated_document_id == document.id
+    ).first() is not None
+
+
+def ensure_document_mutable(db: Session, document: Document) -> None:
+    if is_generated_institutional_document(db, document):
+        raise HTTPException(status_code=409, detail=(
+            "Ce PDF institutionnel est figé. Pour le corriger, créez une nouvelle "
+            "demande et conservez l'original et sa référence."
+        ))
+
+
 def can_manage_document(
     db: Session,
     current_user: User,
     document: Document,
 ) -> bool:
+    if is_generated_institutional_document(db, document):
+        return False
     roles = get_user_role_names(db, current_user.id)
     return (
         bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS))
@@ -279,6 +296,8 @@ def can_validate_document(
     current_user: User,
     document: Document,
 ) -> bool:
+    if is_generated_institutional_document(db, document):
+        return False
     roles = get_user_role_names(db, current_user.id)
     return bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS))
 
@@ -641,6 +660,7 @@ def update_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -721,6 +741,7 @@ def validate_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -797,6 +818,7 @@ def submit_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -838,6 +860,7 @@ def unvalidate_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -877,6 +900,7 @@ def reject_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -924,6 +948,7 @@ def archive_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -946,6 +971,7 @@ def delete_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

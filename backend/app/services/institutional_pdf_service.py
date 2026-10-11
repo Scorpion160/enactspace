@@ -386,6 +386,8 @@ def _pv_pole_data(db: Session, request: InstitutionalDocumentRequest, p: dict[st
             discussions.append({"title": "Décisions / remarques", "details": decisions})
 
     miscellaneous_parts = []
+    if p.get("meeting_type"):
+        miscellaneous_parts.append(f"Type de réunion : {latex_text(p.get('meeting_type'))}")
     if p.get("escalations"):
         miscellaneous_parts.append(
             f"Points à remonter : {latex_text(p.get('escalations'))}"
@@ -403,8 +405,9 @@ def _pv_pole_data(db: Session, request: InstitutionalDocumentRequest, p: dict[st
         _cmd("MeetingSecretary", user_name(db, secretary)),
         _cmd("ApprovalText", f"Validé par {_sg_name(db, request)}"),
         _cmd("Attendees", _names(db, present)),
-        _cmd("ExcusedAbsentees", _names(db, p.get("excused_absentees") or p.get("absentees"))),
+        _cmd("ExcusedAbsentees", _names(db, p.get("excused_absentees"))),
         _cmd("UnexcusedAbsentees", _names(db, p.get("unexcused_absentees"))),
+        _cmd("UnspecifiedAbsentees", _names(db, p.get("absentees"))),
         _cmd("Agenda", _list_items(p.get("agenda"), numbered=True)),
         _cmd("Reminders", _list_items(p.get("reminders"), fallback="Aucun rappel particulier")),
         _cmd("DiscussionRows", _rows_two(discussions)),
@@ -484,8 +487,9 @@ def _pv_general_data(db: Session, request: InstitutionalDocumentRequest, p: dict
         _cmd("MeetingSecretary", user_name(db, secretary)),
         _cmd("ApprovalText", "Les Enacteurs présents"),
         _cmd("Attendees", _names(db, present)),
-        _cmd("ExcusedAbsentees", _names(db, p.get("excused_absentees") or p.get("absentees"))),
+        _cmd("ExcusedAbsentees", _names(db, p.get("excused_absentees"))),
         _cmd("UnexcusedAbsentees", _names(db, p.get("unexcused_absentees"))),
+        _cmd("UnspecifiedAbsentees", _names(db, p.get("absentees"))),
         _cmd("Agenda", _list_items(p.get("agenda"), numbered=True)),
         _cmd("Reminders", _list_items(p.get("reminders") or p.get("announcements"), fallback="Aucune annonce particulière")),
         _cmd("DiscussionRows", _rows_two(discussions)),
@@ -560,7 +564,7 @@ def _parental_data(db: Session, request: InstitutionalDocumentRequest, p: dict[s
         _cmd("ParticipantName", user_name(db, p.get("member_id"))),
         _cmd("ParticipantClass", latex_text(class_name, "classe / niveau non renseigné")),
         _cmd("ParticipantDepartment", latex_text(department, "département non renseigné")),
-        _cmd("TripPurpose", latex_text(p.get("trip_type") or p.get("trip_purpose"))),
+        _cmd("TripPurpose", latex_text(" — ".join(str(p[key]) for key in ("trip_type", "trip_purpose") if p.get(key)))),
         _cmd("TravelPeriod", period),
         _cmd("TravelLocations", latex_text(p.get("destination"))),
         _cmd("TravelFunding", latex_text(p.get("coverage"), "La prise en charge sera assurée conformément aux modalités communiquées par Enactus ESP")),
@@ -655,18 +659,18 @@ def _renvoi_data(db: Session, request: InstitutionalDocumentRequest, p: dict[str
     issuer_name = latex_text(f"{issuer.first_name} {issuer.last_name}" if issuer else "Responsable Pôle Veille")
     approval_name = latex_text(f"{approver.first_name} {approver.last_name}" if approver else "Team Leader")
     procedure_parts = []
-    if p.get("prior_warnings"):
-        procedure_parts.append(f"Rappels / avertissements antérieurs : {latex_text(p.get('prior_warnings'))}")
-    if p.get("procedure_history"):
-        procedure_parts.append(f"Éléments de procédure : {latex_text(p.get('procedure_history'))}")
-    if p.get("consequences"):
-        procedure_parts.append(f"Conséquences administratives : {latex_text(p.get('consequences'))}")
-    if p.get("return_instructions"):
-        procedure_parts.append(f"Restitution : {latex_text(p.get('return_instructions'))}")
-    if p.get("review_process"):
-        procedure_parts.append(f"Réexamen : {latex_text(p.get('review_process'))}")
-    if p.get("internal_notes"):
-        procedure_parts.append(f"Observation interne : {latex_text(p.get('internal_notes'))}")
+    for key, legacy, label in (
+        ("prior_steps", "prior_warnings", "Rappels / avertissements antérieurs"),
+        ("procedure", "procedure_history", "Éléments de procédure"),
+        ("decision", None, "Décision"),
+        ("administrative_consequences", "consequences", "Conséquences administratives"),
+        ("return_instructions", None, "Restitution"),
+        ("review_process", None, "Réexamen"),
+    ):
+        value = p.get(key) or (p.get(legacy) if legacy else None)
+        if value:
+            procedure_parts.append(f"{label} : {_structured_text(value)}")
+    # Internal notes stay in the restricted request, never in the recipient's letter.
     return [
         _cmd("LetterDate", format_long_date(utc_now())),
         _cmd("IssuingScope", _pole_name(db, request.pole_id)),

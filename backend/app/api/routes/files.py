@@ -92,6 +92,14 @@ def ensure_file_access(
     *,
     manage: bool = False,
 ) -> None:
+    if manage:
+        from app.models.document import Document
+        from app.models.institutional_document import InstitutionalDocumentRequest
+        generated = db.query(InstitutionalDocumentRequest.id).join(
+            Document, Document.id == InstitutionalDocumentRequest.generated_document_id
+        ).filter(Document.file_id == stored_file.id).first()
+        if generated is not None:
+            raise HTTPException(409, "Le fichier d'un PDF institutionnel généré doit être conservé.")
     from app.models.finance import Payment
     payment = db.query(Payment).filter(or_(
         Payment.proof_file_id == stored_file.id,

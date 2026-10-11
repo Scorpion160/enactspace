@@ -118,6 +118,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
   List<InstitutionalTemplateModel> _templates = const [];
   bool _loading = true;
   bool _saving = false;
+  final Map<String, InstitutionalRequestFormResult> _newDrafts = {};
   String? _error;
 
   @override
@@ -153,9 +154,11 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
       context,
       gateway: widget.gateway,
       template: template,
+      initialDraft: _newDrafts[template.code],
     );
     if (result == null || !mounted) return;
 
+    _newDrafts[template.code] = result;
     setState(() => _saving = true);
     try {
       await widget.gateway.createRequest(
@@ -166,6 +169,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
         eventId: result.eventId,
         seasonId: result.seasonId,
       );
+      _newDrafts.remove(template.code);
       if (!mounted) return;
       _notice(
         'Brouillon créé. Relisez-le, téléchargez son aperçu PDF puis soumettez-le.',
@@ -351,6 +355,7 @@ class _InstitutionalRequestsPanelState
   String _status = 'all';
   String _template = 'all';
   String? _busyId;
+  final Map<String, InstitutionalRequestFormResult> _unsavedEdits = {};
 
   bool get _canGenerate =>
       _currentUser?.isAdmin == true ||
@@ -415,6 +420,7 @@ class _InstitutionalRequestsPanelState
   }
 
   void _replace(InstitutionalDocumentRequestModel updated) {
+    _unsavedEdits.remove(updated.id);
     setState(() {
       _requests = _requests
           .map((item) => item.id == updated.id ? updated : item)
@@ -430,12 +436,15 @@ class _InstitutionalRequestsPanelState
       gateway: widget.gateway,
       template: template,
       request: request,
+      initialDraft: _unsavedEdits[request.id],
     );
     if (result == null || !mounted) return;
+    _unsavedEdits[request.id] = result;
     await _perform(
       request,
       () => widget.gateway.updateRequest(
         request: request,
+      initialDraft: _unsavedEdits[request.id],
         payload: result.payload,
         poleId: result.poleId,
         projectId: result.projectId,
@@ -447,6 +456,10 @@ class _InstitutionalRequestsPanelState
   }
 
   Future<void> _preview(InstitutionalDocumentRequestModel request) async {
+    if (_unsavedEdits.containsKey(request.id)) {
+      _notice('Vos modifications ne sont pas encore enregistrées. Rouvrez « Modifier » puis enregistrez avant de demander un nouvel aperçu.', error: true);
+      return;
+    }
     if (_busyId != null) return;
     setState(() => _busyId = request.id);
     try {
@@ -464,7 +477,7 @@ class _InstitutionalRequestsPanelState
       if (!mounted) return;
       if (kIsWeb || result != null) {
         _notice(
-          'Aperçu PDF enregistré. Il est marqué « BROUILLON — NON OFFICIEL ».',
+          'Aperçu PDF enregistré, marqué « BROUILLON — NON OFFICIEL ». Utilisez « Modifier » sur cette demande pour reprendre les informations déjà saisies.',
         );
       } else {
         _notice('Enregistrement de l’aperçu annulé.');
@@ -731,6 +744,16 @@ class _InstitutionalRequestsPanelState
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text('Correction demandée : ${request.rejectionReason}'),
+              ),
+            ],
+            if (request.generatedDocumentId != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'PDF officiel conservé : pour une correction, créez une nouvelle demande. '
+                'La validation dans EnactSpace ne constitue pas une signature électronique. '
+                'Téléchargez le PDF, recueillez les signatures nécessaires et transmettez-le au destinataire. '
+                'La génération ne déclenche aucun envoi externe.',
+                style: theme.textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 12),
