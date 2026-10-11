@@ -1,5 +1,6 @@
 """PR-2C acceptance tests against an isolated local PostgreSQL 16 schema."""
 
+from app.core.time import utc_now
 import os
 import secrets
 import unittest
@@ -327,7 +328,7 @@ class PostgreSQLLegacyImpactMigrationTests(IsolatedPostgreSQLSchema):
         project_id = uuid.uuid4()
         impact_id = uuid.uuid4()
         user_claim_id = uuid.uuid4()
-        now = datetime.utcnow()
+        now = utc_now()
         with self.engine.begin() as connection:
             connection.execute(
                 text(

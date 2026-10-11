@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -81,17 +82,21 @@ class MobileMoneyTransaction(Base):
     failure_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     failure_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now,
+        onupdate=utc_now,
     )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    last_verification_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True,
+    )
 
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
@@ -122,7 +127,7 @@ class MobileMoneyTransactionEvent(Base):
     old_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     new_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     provider_event_id: Mapped[str | None] = mapped_column(String(180), nullable=True)
-    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_duplicate: Mapped[bool] = mapped_column(default=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

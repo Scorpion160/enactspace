@@ -256,29 +256,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             const Text('Thème'),
                             const SizedBox(height: 10),
-                            SegmentedButton<AppAppearance>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: AppAppearance.system,
-                                  icon: Icon(Icons.brightness_auto_rounded),
-                                  label: Text('Système'),
-                                ),
-                                ButtonSegment(
-                                  value: AppAppearance.light,
-                                  icon: Icon(Icons.light_mode_rounded),
-                                  label: Text('Clair'),
-                                ),
-                                ButtonSegment(
-                                  value: AppAppearance.dark,
-                                  icon: Icon(Icons.dark_mode_rounded),
-                                  label: Text('Sombre'),
-                                ),
-                              ],
-                              selected: {_controller.appearance.appearance},
-                              onSelectionChanged: _controller.saving
-                                  ? null
-                                  : (values) =>
-                                        _controller.setTheme(values.first),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final compact = constraints.maxWidth < 520;
+                                Widget oneLineLabel(String value) => FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    value,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                  ),
+                                );
+                                return SegmentedButton<AppAppearance>(
+                                  key: const Key(
+                                    'appearance-segmented-control',
+                                  ),
+                                  expandedInsets: EdgeInsets.zero,
+                                  showSelectedIcon: !compact,
+                                  segments: [
+                                    ButtonSegment(
+                                      value: AppAppearance.system,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(
+                                              Icons.brightness_auto_rounded,
+                                            ),
+                                      label: oneLineLabel('Système'),
+                                    ),
+                                    ButtonSegment(
+                                      value: AppAppearance.light,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(
+                                              Icons.light_mode_rounded,
+                                            ),
+                                      label: oneLineLabel('Clair'),
+                                    ),
+                                    ButtonSegment(
+                                      value: AppAppearance.dark,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(Icons.dark_mode_rounded),
+                                      label: oneLineLabel('Sombre'),
+                                    ),
+                                  ],
+                                  selected: {_controller.appearance.appearance},
+                                  onSelectionChanged: _controller.saving
+                                      ? null
+                                      : (values) =>
+                                            _controller.setTheme(values.first),
+                                );
+                              },
                             ),
                             const Divider(height: 32),
                             const ListTile(
@@ -288,6 +316,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               subtitle: Text('Français'),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.school_outlined),
+                          title: const Text('Profil académique'),
+                          subtitle: const Text(
+                            'Confirmer mon cursus pour l’année',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.go('/settings/academic'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.calendar_month_outlined),
+                          title: const Text('Années de l’équipe'),
+                          subtitle: const Text(
+                            'Année courante, préparation et historique',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.go('/settings/years'),
                         ),
                       ),
                       const SizedBox(height: 16),

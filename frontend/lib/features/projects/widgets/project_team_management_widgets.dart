@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_form_dialog.dart';
+
 import '../../members/models/member_model.dart';
 import '../models/project_member_model.dart';
 import '../models/project_team_management_models.dart';
@@ -205,7 +207,9 @@ class _ProjectMemberDialogState extends State<ProjectMemberDialog> {
               member.email.toLowerCase().contains(query),
         )
         .toList();
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.group_add_rounded,
+      description: 'Invitez une personne à rejoindre l’équipe du projet.',
       title: const Text('Ajouter un membre'),
       content: SizedBox(
         width: 580,
@@ -328,28 +332,45 @@ class ProjectLeadChangeDialog extends StatefulWidget {
 }
 
 class _ProjectLeadChangeDialogState extends State<ProjectLeadChangeDialog> {
+  final _search = TextEditingController();
   MemberModel? _selected;
   bool _sending = false;
   String? _error;
 
   @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final query = _search.text.trim().toLowerCase();
     final isLead = widget.targetPosition == ProjectPositionPresentation.lead;
-    final eligible = widget.directory
-        .where(
-          (member) =>
-              member.status == 'active' &&
-              !member.isAlumni &&
-              member.id != widget.currentHolder?.userId,
-        )
-        .toList();
+    final eligible =
+        widget.directory
+            .where(
+              (member) =>
+                  member.status == 'active' &&
+                  !member.isAlumni &&
+                  member.id != widget.currentHolder?.userId,
+            )
+            .where(
+              (member) =>
+                  query.isEmpty ||
+                  member.displayName.toLowerCase().contains(query) ||
+                  member.email.toLowerCase().contains(query),
+            )
+            .toList()
+          ..sort(MemberModel.compareAlphabetically);
     final title = widget.currentHolder == null
         ? (isLead ? 'Nommer un chef de projet' : 'Nommer un adjoint')
         : (isLead ? 'Changer de chef de projet' : 'Changer d’adjoint');
     final action = isLead
         ? 'Nommer comme chef de projet'
         : 'Nommer comme adjoint';
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.workspace_premium_rounded,
       title: Text(title),
       content: SizedBox(
         width: 540,
@@ -362,6 +383,15 @@ class _ProjectLeadChangeDialogState extends State<ProjectLeadChangeDialog> {
               'Responsabilité dans le projet · ${ProjectPositionPresentation.label(widget.targetPosition)}',
             ),
             const SizedBox(height: 14),
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() => _selected = null),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                labelText: 'Rechercher un Enacteur',
+              ),
+            ),
+            const SizedBox(height: 10),
             DropdownButtonFormField<MemberModel>(
               initialValue: _selected,
               decoration: InputDecoration(

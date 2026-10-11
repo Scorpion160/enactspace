@@ -155,6 +155,36 @@ class DocumentModel {
     );
   }
 
+  Map<String, dynamic> toJson({bool includeCapabilities = true}) => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'file_url': fileUrl,
+    'file_id': fileId,
+    'file_type': fileType,
+    'status': status,
+    'category': category,
+    'visibility': visibility,
+    'uploaded_by': uploadedBy,
+    'pole_id': poleId,
+    'project_id': projectId,
+    'event_id': eventId,
+    'season_id': seasonId,
+    'is_template': isTemplate,
+    'is_official': isOfficial,
+    'can_manage': includeCapabilities ? canManage : false,
+    'can_validate': includeCapabilities ? canValidate : false,
+    'validated_by': validatedBy,
+    'validated_at': validatedAt,
+    'rejected_by': rejectedBy,
+    'rejected_at': rejectedAt,
+    'rejection_reason': rejectionReason,
+    'is_permanent': isPermanent,
+    'expires_at': expiresAt,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
+
   static String categoryTitle(String value) {
     return categoryOptions
         .firstWhere(

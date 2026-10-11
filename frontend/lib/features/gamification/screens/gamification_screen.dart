@@ -1,11 +1,14 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, unused_element
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_form_dialog.dart';
 import '../../members/models/member_model.dart';
+import '../../members/widgets/searchable_member_picker.dart';
 import '../../poles/models/pole_model.dart';
 import '../models/gamification_models.dart';
 import '../services/gamification_gateway.dart';
@@ -208,9 +211,20 @@ class _GamificationScreenState extends State<GamificationScreen> {
                       _GamificationHeader(
                         monthLabel: _monthLabel(_month, _year),
                         personal: !_canManage,
-                        onRefresh: _loadGamification,
                         onAwardPoints: _openAwardPointsDialog,
                         onManageBadges: _openBadgeManagement,
+                      ),
+                      const SizedBox(height: 18),
+                      Card(
+                        child: ListTile(
+                          leading: Icon(Icons.sports_esports_rounded),
+                          title: Text('Jeux du club'),
+                          subtitle: Text(
+                            'Créez ou rejoignez une session, jouez et grimpez au classement.',
+                          ),
+                          trailing: Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.push('/gamification/games'),
+                        ),
                       ),
                       const SizedBox(height: 18),
                       if (_loading)
@@ -267,14 +281,12 @@ class _GamificationScreenState extends State<GamificationScreen> {
 class _GamificationHeader extends StatelessWidget {
   final String monthLabel;
   final bool personal;
-  final VoidCallback onRefresh;
   final VoidCallback onAwardPoints;
   final VoidCallback onManageBadges;
 
   const _GamificationHeader({
     required this.monthLabel,
     required this.personal,
-    required this.onRefresh,
     required this.onAwardPoints,
     required this.onManageBadges,
   });
@@ -303,7 +315,7 @@ class _GamificationHeader extends StatelessWidget {
                   ),
                   child: Text(
                     monthLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.softBlack,
                       fontWeight: FontWeight.w900,
                     ),
@@ -312,7 +324,7 @@ class _GamificationHeader extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   personal ? 'Mon parcours' : 'Engagement et reconnaissance',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
@@ -323,7 +335,7 @@ class _GamificationHeader extends StatelessWidget {
                   personal
                       ? 'Tes points, badges et progrès au sein de Enactus ESP.'
                       : 'Badges, points positifs et classements pour valoriser les contributions des Enacteurs.',
-                  style: const TextStyle(color: Colors.white70, height: 1.45),
+                  style: TextStyle(color: Colors.white70, height: 1.45),
                 ),
               ],
             );
@@ -332,29 +344,20 @@ class _GamificationHeader extends StatelessWidget {
               spacing: 10,
               runSpacing: 10,
               children: [
-                OutlinedButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Actualiser'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
-                  ),
-                ),
                 if (!personal) ...[
                   OutlinedButton.icon(
                     onPressed: onManageBadges,
-                    icon: const Icon(Icons.workspace_premium_rounded),
-                    label: const Text('Gérer les badges'),
+                    icon: Icon(Icons.workspace_premium_rounded),
+                    label: Text('Gérer les badges'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white24),
+                      side: BorderSide(color: Colors.white24),
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: onAwardPoints,
-                    icon: const Icon(Icons.add_reaction_rounded),
-                    label: const Text('Attribuer points'),
+                    icon: Icon(Icons.add_reaction_rounded),
+                    label: Text('Attribuer points'),
                   ),
                 ],
               ],
@@ -483,7 +486,7 @@ class _GamificationStats extends StatelessWidget {
                           Text(
                             item.value,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
                             ),
@@ -491,7 +494,11 @@ class _GamificationStats extends StatelessWidget {
                           Text(
                             item.label,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.black54),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
@@ -590,21 +597,20 @@ class _WinnerCard extends StatelessWidget {
                   Text(
                     title,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     name,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$points point(s)',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -744,33 +750,29 @@ class _RankingRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: highlight
             ? AppTheme.enactusYellow.withValues(alpha: 0.16)
-            : Colors.black.withValues(alpha: 0.03),
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: highlight ? AppTheme.enactusYellow : Colors.white,
+            backgroundColor: highlight
+                ? AppTheme.enactusYellow
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
             foregroundColor: AppTheme.softBlack,
-            child: Text(
-              '$rank',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
+            child: Text('$rank', style: TextStyle(fontWeight: FontWeight.w900)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            '$points pts',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
+          Text('$points pts', style: TextStyle(fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -864,7 +866,7 @@ class _BadgeCard extends StatelessWidget {
           Text(
             badge.label,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            style: TextStyle(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 4),
           Expanded(
@@ -872,7 +874,10 @@ class _BadgeCard extends StatelessWidget {
               badge.description ?? 'Badge de reconnaissance EnactSpace.',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -949,7 +954,7 @@ class _PointTile extends StatelessWidget {
       title: Text(
         memberName,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(fontWeight: FontWeight.w800),
       ),
       subtitle: Text(
         [
@@ -1048,9 +1053,11 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.stars_rounded,
+      description: 'Valorisez une contribution avec un motif explicite.',
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Attribuer des points'),
+      title: Text('Attribuer des points'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: Form(
@@ -1059,28 +1066,15 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
             child: Column(
               children: [
                 if (_error != null) _DialogError(message: _error!),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedUserId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Membre',
-                    prefixIcon: Icon(Icons.person_rounded),
-                  ),
-                  items: widget.members.map((member) {
-                    return DropdownMenuItem(
-                      value: member.id,
-                      child: Text(member.displayName),
-                    );
-                  }).toList(),
-                  onChanged: _loading
-                      ? null
-                      : (value) => setState(() => _selectedUserId = value),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Sélectionnez un membre.';
-                    }
-                    return null;
-                  },
+                SearchableMemberPickerField(
+                  members: widget.members,
+                  value: _selectedUserId,
+                  label: 'Membre',
+                  enabled: !_loading,
+                  onChanged: (value) => setState(() => _selectedUserId = value),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Sélectionnez un membre.'
+                      : null,
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String?>(
@@ -1162,7 +1156,7 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
@@ -1175,7 +1169,7 @@ class _AwardPointsDialogState extends State<AwardPointsDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.add_rounded),
+              : Icon(Icons.add_rounded),
           label: Text(_loading ? 'Attribution...' : 'Attribuer'),
         ),
       ],
@@ -1235,11 +1229,11 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text('Annuler'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Enregistrer'),
+            child: Text('Enregistrer'),
           ),
         ],
       ),
@@ -1274,24 +1268,19 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(
-          title: const Text('Attribuer un badge'),
+          title: Text('Attribuer un badge'),
           content: SizedBox(
             width: 480,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField(
-                  initialValue: userId,
-                  decoration: const InputDecoration(labelText: 'Membre'),
-                  items: widget.members
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m.id,
-                          child: Text(m.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setLocal(() => userId = v!),
+                SearchableMemberPickerField(
+                  members: widget.members,
+                  value: userId,
+                  label: 'Membre',
+                  onChanged: (value) {
+                    if (value != null) setLocal(() => userId = value);
+                  },
                 ),
                 DropdownButtonFormField(
                   initialValue: badgeId,
@@ -1310,11 +1299,11 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler'),
+              child: Text('Annuler'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Attribuer'),
+              child: Text('Attribuer'),
             ),
           ],
         ),
@@ -1329,7 +1318,7 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Gestion des badges'),
+    title: Text('Gestion des badges'),
     content: SizedBox(
       width: 680,
       height: 500,
@@ -1341,18 +1330,18 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
             children: [
               FilledButton.icon(
                 onPressed: busy ? null : () => _createOrEdit(),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Créer badge'),
+                icon: Icon(Icons.add_rounded),
+                label: Text('Créer badge'),
               ),
               OutlinedButton.icon(
                 onPressed: busy ? null : _award,
-                icon: const Icon(Icons.person_add_rounded),
-                label: const Text('Attribuer badge'),
+                icon: Icon(Icons.person_add_rounded),
+                label: Text('Attribuer badge'),
               ),
               OutlinedButton.icon(
                 onPressed: busy ? null : widget.onInitDefaults,
-                icon: const Icon(Icons.settings_rounded),
-                label: const Text('Initialiser les badges par défaut'),
+                icon: Icon(Icons.settings_rounded),
+                label: Text('Initialiser les badges par défaut'),
               ),
             ],
           ),
@@ -1367,7 +1356,7 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
                   IconButton(
                     tooltip: 'Modifier le badge',
                     onPressed: busy ? null : () => _createOrEdit(badge),
-                    icon: const Icon(Icons.edit_rounded),
+                    icon: Icon(Icons.edit_rounded),
                   ),
                   IconButton(
                     tooltip: 'Supprimer le badge',
@@ -1378,17 +1367,14 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
                             await widget.gateway.deleteBadge(badge.id);
                             if (mounted) setState(() => busy = false);
                           },
-                    icon: const Icon(Icons.delete_outline_rounded),
+                    icon: Icon(Icons.delete_outline_rounded),
                   ),
                 ],
               ),
             ),
           if (widget.userBadges.isNotEmpty) ...[
             const Divider(),
-            const Text(
-              'Attributions',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
+            Text('Attributions', style: TextStyle(fontWeight: FontWeight.w900)),
             for (final award in widget.userBadges)
               ListTile(
                 title: Text(
@@ -1414,7 +1400,7 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
                           await widget.gateway.removeUserBadge(award.id);
                           if (mounted) setState(() => busy = false);
                         },
-                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                  icon: Icon(Icons.remove_circle_outline_rounded),
                 ),
               ),
           ],
@@ -1424,7 +1410,7 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
     actions: [
       FilledButton(
         onPressed: busy ? null : () => Navigator.pop(context),
-        child: const Text('Fermer'),
+        child: Text('Fermer'),
       ),
     ],
   );
@@ -1446,7 +1432,7 @@ class _SectionTitle extends StatelessWidget {
           child: Text(
             title,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
           ),
         ),
       ],
@@ -1487,8 +1473,8 @@ class _ErrorCard extends StatelessWidget {
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1504,16 +1490,17 @@ class _DialogError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: colors.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: colors.error.withValues(alpha: 0.35)),
       ),
-      child: Text(message, style: TextStyle(color: Colors.red.shade700)),
+      child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }
@@ -1530,8 +1517,8 @@ class _EmptyText extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.black54,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w600,
         ),
       ),

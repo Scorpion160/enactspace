@@ -85,7 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         loading: _loading,
                         onRefresh: _loadDashboard,
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       if (_loading)
                         const _DashboardLoading()
                       else if (_error != null)
@@ -126,12 +126,12 @@ class _DashboardBody extends StatelessWidget {
           children: [
             if (isAdmin) ...[
               _AttentionPanel(items: _attentionItems(summary)),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
             _SummaryGrid(cards: _metricCards(summary), compactMobile: !isAdmin),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             _RoleCardsGrid(cards: _roleCards(summary, userExperience)),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             _QuickActionsPanel(
               userExperience: userExperience,
               summary: summary,
@@ -142,10 +142,10 @@ class _DashboardBody extends StatelessWidget {
           children: [
             if (!isAdmin) ...[
               _AttentionPanel(items: _attentionItems(summary)),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
             _RoleFocusPanel(summary: summary, userExperience: userExperience),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             _ActivityPanel(items: summary.recentActivity),
           ],
         );
@@ -155,13 +155,13 @@ class _DashboardBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(flex: 8, child: main),
-              const SizedBox(width: 18),
+              SizedBox(width: 18),
               Expanded(flex: 5, child: side),
             ],
           );
         }
 
-        return Column(children: [main, const SizedBox(height: 18), side]);
+        return Column(children: [main, SizedBox(height: 18), side]);
       },
     );
   }
@@ -226,9 +226,9 @@ class _DashboardHero extends StatelessWidget {
                 label: userExperience?.audienceLabel ?? 'Enactus ESP',
                 tone: AppStatusTone.info,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Container(width: 34, height: 3, color: AppTheme.enactusYellow),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
                 'Bonjour, $displayName',
                 style: TextStyle(
@@ -236,15 +236,15 @@ class _DashboardHero extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.35,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 statusText,
                 style: TextStyle(
@@ -259,13 +259,13 @@ class _DashboardHero extends StatelessWidget {
           return compact
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [heading, const SizedBox(height: 16), actions],
+                  children: [heading, SizedBox(height: 16), actions],
                 )
               : Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(child: heading),
-                    const SizedBox(width: 24),
+                    SizedBox(width: 24),
                     actions,
                   ],
                 );
@@ -292,9 +292,7 @@ class _SummaryGrid extends StatelessWidget {
             ? 4
             : constraints.maxWidth >= 700
             ? 3
-            : constraints.maxWidth >= 480 || compactMobile
-            ? 2
-            : 1;
+            : 2;
         final compact = compactMobile && constraints.maxWidth < 480;
         const spacing = 12.0;
         final width = (constraints.maxWidth - spacing * (count - 1)) / count;
@@ -430,7 +428,13 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = data.color ?? AppTheme.softBlack;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final baseColor =
+        data.color ?? (isDark ? AppTheme.enactusYellow : AppTheme.softBlack);
+    final color = isDark && baseColor.computeLuminance() < 0.34
+        ? Color.lerp(baseColor, Colors.white, 0.48)!
+        : baseColor;
 
     return InkWell(
       onTap: () => context.go(data.route),
@@ -452,18 +456,18 @@ class _RoleCard extends StatelessWidget {
                   foregroundColor: color,
                   child: Icon(data.icon),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     data.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               data.value,
               maxLines: 1,
@@ -474,12 +478,15 @@ class _RoleCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               data.subtitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, height: 1.25),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.25,
+              ),
             ),
           ],
         ),
@@ -512,13 +519,11 @@ class _QuickActionsPanel extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
-          final count = largeText
-              ? 1
-              : constraints.maxWidth >= 820
+          final count = constraints.maxWidth >= 820
               ? 4
-              : constraints.maxWidth >= 560
-              ? 2
-              : 1;
+              : constraints.maxWidth < 330 || largeText
+              ? 1
+              : 2;
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -527,7 +532,7 @@ class _QuickActionsPanel extends StatelessWidget {
               crossAxisCount: count,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              mainAxisExtent: largeText ? 136 : 84,
+              mainAxisExtent: largeText ? 136 : 92,
             ),
             itemBuilder: (context, index) {
               return _QuickActionTile(action: actions[index]);
@@ -582,7 +587,7 @@ class _QuickActionTile extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              radius: 18,
+              radius: 16,
               backgroundColor: action.primary
                   ? AppTheme.softBlack
                   : AppTheme.enactusYellow,
@@ -591,7 +596,7 @@ class _QuickActionTile extends StatelessWidget {
                   : AppTheme.softBlack,
               child: Icon(action.icon, size: 19),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -601,18 +606,22 @@ class _QuickActionTile extends StatelessWidget {
                     action.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                   Text(
                     action.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded),
+            if (MediaQuery.sizeOf(context).width >= 560)
+              Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
@@ -669,7 +678,8 @@ class _AttentionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = item.danger ? Colors.red.shade700 : AppTheme.softBlack;
+    final colors = Theme.of(context).colorScheme;
+    final color = item.danger ? colors.onErrorContainer : colors.onSurface;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -679,14 +689,14 @@ class _AttentionTile extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: item.danger
-                ? Colors.red.shade50
-                : Colors.black.withValues(alpha: 0.04),
+                ? colors.errorContainer
+                : colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             children: [
               Icon(item.icon, color: color),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,12 +714,14 @@ class _AttentionTile extends StatelessWidget {
                       item.message,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.black54),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded),
+              Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
@@ -763,10 +775,10 @@ class _ActivityTile extends StatelessWidget {
         item.title,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(fontWeight: FontWeight.w800),
       ),
       subtitle: Text(_relativeTime(item.createdAt)),
-      trailing: const Icon(Icons.chevron_right_rounded),
+      trailing: Icon(Icons.chevron_right_rounded),
       onTap: () => context.go(item.route),
     );
   }
@@ -814,17 +826,17 @@ class _SoftMetric extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           Icon(icon),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Flexible(
             child: Align(
               alignment: Alignment.centerRight,
@@ -832,7 +844,7 @@ class _SoftMetric extends StatelessWidget {
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
           ),
@@ -864,16 +876,13 @@ class _DashboardSection extends StatelessWidget {
             Row(
               children: [
                 Icon(icon),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
@@ -904,14 +913,20 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: Colors.black38),
-          const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
+          Icon(
+            icon,
+            size: 40,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          SizedBox(height: 10),
+          Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
+          SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -924,7 +939,7 @@ class _DashboardLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(42),
         child: Center(child: CircularProgressIndicator()),
@@ -951,18 +966,18 @@ class _DashboardError extends StatelessWidget {
               color: Colors.red.shade700,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement du dashboard',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

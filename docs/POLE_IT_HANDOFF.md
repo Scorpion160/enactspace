@@ -1,5 +1,17 @@
 # Pôle IT handoff
 
+## Transmission actuelle
+
+Source de reprise : checkpoint `b152677372ded22d63b544b1336240902613b559`, contenant le correctif de première connexion déployé après l’image release-8372960. Construire depuis l’ancien commit ferait perdre ce correctif.
+
+Consulter [le dossier release](releases/20261010-release-1.0.13.md) pour les images, sauvegardes, empreintes et retours arrière; [le diagnostic mail](MESSAGING_TROUBLESHOOTING.md) pour distinguer activation et notification de rôle; [la checklist](RELEASE_CHECKLIST.md) pour les validations restantes. Ne pas transférer de secrets par Git.
+
+Les informations de huit comptes existants ont été corrigées sans création de compte; Aïcha a été exclue car sans compte. Ramatoulaye est cheffe Communication, Thierno son adjoint. L’année d’intégration d’Elisabeth n’a pas été fournie. Les détails personnels restent dans l’application, pas dans ce dossier.
+
+Les droits de gestion et le parcours disciplinaire doivent être validés avec les rôles concernés; conserver leurs responsabilités et l’historique plutôt que supprimer des comptes pour contourner une restriction.
+
+## Procédures générales et contexte antérieur
+
 This runbook enables a maintainer to rehearse ownership without undocumented Chicodev knowledge. Complete it with sanitized evidence; never record secret values.
 
 ## RACI by role
@@ -36,7 +48,7 @@ Access evidence should identify the role and successful authorized check, never 
 - [ ] Local backend setup completed from canonical requirements.
 - [ ] Isolated PostgreSQL 16 full backend suite passes without skips.
 - [ ] Flutter 3.44.9 lock, analysis, full tests, web build, and Android debug build pass.
-- [ ] A maintainer can explain current Alembic head `20260913_0009` and migration rules.
+- [ ] A maintainer can explain current Alembic head `20261007_0031` and migration rules.
 
 Evidence/date/maintainer/reviewer:
 

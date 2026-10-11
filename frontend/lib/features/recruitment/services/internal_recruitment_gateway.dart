@@ -14,6 +14,7 @@ abstract interface class InternalRecruitmentGateway {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool isActive,
   });
 
@@ -23,6 +24,7 @@ abstract interface class InternalRecruitmentGateway {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool? isActive,
   });
 
@@ -30,9 +32,19 @@ abstract interface class InternalRecruitmentGateway {
 
   Future<List<ApplicationModel>> loadApplications();
 
-  Future<ApplicationModel> loadApplication(String applicationId);
+  Future<ApplicationModel> loadApplication(
+    String applicationId, {
+    bool anonymized = false,
+  });
 
   Future<List<ApplicationReviewModel>> loadReviews(String applicationId);
+
+  Future<ApplicationReviewModel> createReview({
+    required String applicationId,
+    required Map<String, dynamic> criteriaAssessment,
+    String? comment,
+    String recommendation = 'reserve',
+  });
 
   Future<ApplicationModel> changeStatus({
     required String applicationId,
@@ -78,12 +90,14 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool isActive = true,
   }) => service.createCampaign(
     title: title,
     description: description,
     startDate: startDate,
     endDate: endDate,
+    applicationQuestions: applicationQuestions,
     isActive: isActive,
   );
 
@@ -94,6 +108,7 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
+    List<Map<String, dynamic>>? applicationQuestions,
     bool? isActive,
   }) => service.updateCampaign(
     campaignId: campaignId,
@@ -101,6 +116,7 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
     description: description,
     startDate: startDate,
     endDate: endDate,
+    applicationQuestions: applicationQuestions,
     isActive: isActive,
   );
 
@@ -113,12 +129,31 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
       service.getApplications();
 
   @override
-  Future<ApplicationModel> loadApplication(String applicationId) =>
-      service.getApplication(applicationId);
+  Future<ApplicationModel> loadApplication(
+    String applicationId, {
+    bool anonymized = false,
+  }) => service.getApplication(applicationId, anonymized: anonymized);
 
   @override
   Future<List<ApplicationReviewModel>> loadReviews(String applicationId) =>
       service.getApplicationReviews(applicationId);
+
+  @override
+  Future<ApplicationReviewModel> createReview({
+    required String applicationId,
+    required Map<String, dynamic> criteriaAssessment,
+    String? comment,
+    String recommendation = 'reserve',
+  }) => service.createReview(
+    applicationId: applicationId,
+    score: (criteriaAssessment['ratings'] as List).fold<double>(
+      0,
+      (sum, row) => sum + (row['rating'] as int),
+    ),
+    criteriaAssessment: criteriaAssessment,
+    comment: comment,
+    recommendation: recommendation,
+  );
 
   @override
   Future<ApplicationModel> changeStatus({
@@ -164,7 +199,6 @@ class RecruitmentServiceGateway implements InternalRecruitmentGateway {
   ) async {
     final response = await service.convertToUser(
       applicationId: request.applicationId,
-      password: request.password,
       profileType: request.profileType,
       corePoleId: request.corePoleId,
       supportPoleIds: request.supportPoleIds,

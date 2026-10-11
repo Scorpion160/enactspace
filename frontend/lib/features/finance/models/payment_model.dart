@@ -6,6 +6,12 @@ class PaymentModel {
   final String status;
   final String? reference;
   final String? proofUrl;
+  final String? proofFileId;
+  final String? proofFileName;
+  final String? proofMimeType;
+  final Map<String, dynamic>? receiptDetails;
+  final List<dynamic>? allocationPlan;
+  final double unallocatedAmount;
   final String? createdAt;
   final String? validatedAt;
   final String? rejectedAt;
@@ -22,6 +28,12 @@ class PaymentModel {
     required this.status,
     this.reference,
     this.proofUrl,
+    this.proofFileId,
+    this.proofFileName,
+    this.proofMimeType,
+    this.receiptDetails,
+    this.allocationPlan,
+    this.unallocatedAmount = 0,
     this.createdAt,
     this.validatedAt,
     this.rejectedAt,
@@ -39,7 +51,20 @@ class PaymentModel {
       method: json['method']?.toString() ?? '',
       status: json['status']?.toString() ?? 'pending',
       reference: json['reference']?.toString(),
-      proofUrl: json['proof_url']?.toString(),
+      proofUrl:
+          json['proof_url']?.toString() ??
+          (json['proof_file_id'] == null
+              ? null
+              : '/api/files/${json['proof_file_id']}/preview'),
+      proofFileId: json['proof_file_id']?.toString(),
+      proofFileName: json['proof_file_name']?.toString(),
+      proofMimeType: json['proof_mime_type']?.toString(),
+      receiptDetails: json['receipt_details'] is Map
+          ? Map<String, dynamic>.from(json['receipt_details'])
+          : null,
+      allocationPlan: json['allocation_plan'] as List<dynamic>?,
+      unallocatedAmount:
+          double.tryParse(json['unallocated_amount']?.toString() ?? '0') ?? 0,
       createdAt: json['created_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
       rejectedAt: json['rejected_at']?.toString(),

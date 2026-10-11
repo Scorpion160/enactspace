@@ -76,7 +76,7 @@ class PoleModel {
       case 'projet':
         return 'Projet';
       case 'bureau':
-        return 'Bureau';
+        return 'EnacChef';
       default:
         return 'Pôle';
     }

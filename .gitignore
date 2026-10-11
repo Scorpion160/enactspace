@@ -49,3 +49,5 @@ build/
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
+# Generated Firebase web deployment configuration; see docs/FIREBASE_WEB_DEPLOYMENT.md.
+/frontend/web/firebase-messaging-sw.js

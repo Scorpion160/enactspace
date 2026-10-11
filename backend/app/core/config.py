@@ -26,18 +26,24 @@ class Settings(BaseSettings):
 
     EMAIL_ENABLED: bool | None = None
     NOTIFICATION_EMAIL_ENABLED: bool = False
-    NOTIFICATION_EMAIL_FROM: str = "noreply@enactspace.local"
-    SMTP_HOST: str | None = None
+    NOTIFICATION_EMAIL_FROM: str = "enactus@esp.sn"
+    SMTP_HOST: str | None = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USERNAME: str | None = None
+    SMTP_USERNAME: str | None = "enactus@esp.sn"
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 20
+    EMAIL_RESTRICT_TO_TEST_RECIPIENT: bool = False
+    EMAIL_TEST_RECIPIENT: str | None = None
 
     PUSH_ENABLED: bool | None = None
     NOTIFICATION_PUSH_ENABLED: bool = False
     FCM_SERVER_KEY: str | None = None
     FIREBASE_PROJECT_ID: str | None = None
     PUSH_TOKEN_ENCRYPTION_KEY: str | None = None
+    PUSH_RESTRICT_TO_TEST_USER_EMAIL: bool = False
+    PUSH_TEST_USER_EMAIL: str | None = None
 
     PAYMENT_PROVIDER_ENABLED: bool = False
     PAYMENT_PROVIDER: str = "manual_proof"
@@ -57,6 +63,17 @@ class Settings(BaseSettings):
     PAYMENT_CURRENCY: str = "XOF"
     PAYMENT_TRANSACTION_TTL_MINUTES: int = 30
     PAYMENT_RECONCILIATION_ENABLED: bool = True
+    PAYMENT_RECONCILIATION_LOOKBACK_DAYS: int = 7
+    PAYMENT_RECONCILIATION_RETRY_SECONDS: int = 60
+
+    MEET_SERVER_URL: str = "https://meet.jit.si"
+    MEET_REQUIRE_JWT: bool = False
+    MEET_JWT_APP_ID: str | None = None
+    MEET_JWT_SECRET: str | None = None
+    MEET_JWT_AUDIENCE: str = "jitsi"
+    MEET_JWT_SUBJECT: str | None = None
+    MEET_JWT_TTL_MINUTES: int = 180
+    MEET_RECORDING_ENABLED: bool = False
 
     ATTENDANCE_QR_ENABLED: bool = True
     ATTENDANCE_QR_SECRET: str | None = None
@@ -80,6 +97,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_attendance_qr_settings(self):
+        if not 1 <= self.PAYMENT_RECONCILIATION_LOOKBACK_DAYS <= 365:
+            raise ValueError("PAYMENT_RECONCILIATION_LOOKBACK_DAYS must be between 1 and 365")
+        if not 1 <= self.PAYMENT_RECONCILIATION_RETRY_SECONDS <= 3600:
+            raise ValueError("PAYMENT_RECONCILIATION_RETRY_SECONDS must be between 1 and 3600")
         if self.ALGORITHM != "HS256":
             raise ValueError("ALGORITHM must be HS256")
         if self.ATTENDANCE_QR_TTL_SECONDS < 15:
@@ -90,12 +111,32 @@ class Settings(BaseSettings):
             raise ValueError("ATTENDANCE_QR_RATE_LIMIT_PER_MINUTE must be positive")
         if self.ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE < 1:
             raise ValueError("ATTENDANCE_NFC_RATE_LIMIT_PER_MINUTE must be positive")
+        if self.SMTP_TIMEOUT_SECONDS < 1:
+            raise ValueError("SMTP_TIMEOUT_SECONDS must be positive")
+        if self.SMTP_USE_SSL and self.SMTP_USE_TLS:
+            raise ValueError("SMTP_USE_SSL and SMTP_USE_TLS cannot both be true")
+        if self.EMAIL_RESTRICT_TO_TEST_RECIPIENT:
+            recipient = (self.EMAIL_TEST_RECIPIENT or "").strip()
+            if not recipient or "@" not in recipient:
+                raise ValueError(
+                    "EMAIL_TEST_RECIPIENT is required when email restriction is enabled"
+                )
+        if self.PUSH_RESTRICT_TO_TEST_USER_EMAIL:
+            test_email = (self.PUSH_TEST_USER_EMAIL or "").strip()
+            if not test_email or "@" not in test_email:
+                raise ValueError(
+                    "PUSH_TEST_USER_EMAIL is required when push restriction is enabled"
+                )
         if self.PAYMENT_TRANSACTION_TTL_MINUTES < 1:
             raise ValueError("PAYMENT_TRANSACTION_TTL_MINUTES must be positive")
         if self.PAYDUNYA_TIMEOUT_SECONDS < 1:
             raise ValueError("PAYDUNYA_TIMEOUT_SECONDS must be positive")
         if self.REFRESH_TOKEN_EXPIRE_DAYS < 1:
             raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS must be positive")
+        if self.MEET_JWT_TTL_MINUTES < 5:
+            raise ValueError("MEET_JWT_TTL_MINUTES must be at least 5")
+        if not self.MEET_SERVER_URL.startswith(("https://", "http://")):
+            raise ValueError("MEET_SERVER_URL must be an absolute HTTP(S) URL")
         if self.APP_ENV == "production":
             if not self.REFRESH_TOKEN_HMAC_KEY:
                 raise ValueError("REFRESH_TOKEN_HMAC_KEY is required in production")
@@ -113,6 +154,22 @@ class Settings(BaseSettings):
                 }
                 if self.PUSH_TOKEN_ENCRYPTION_KEY in auth_secrets:
                     raise ValueError("PUSH_TOKEN_ENCRYPTION_KEY must differ from auth secrets")
+            if not self.MEET_SERVER_URL.startswith("https://"):
+                raise ValueError("MEET_SERVER_URL must use HTTPS in production")
+            if self.MEET_SERVER_URL.rstrip("/").lower() == "https://meet.jit.si":
+                raise ValueError(
+                    "MEET_SERVER_URL must use a private Jitsi/JaaS endpoint in production"
+                )
+            if not self.MEET_REQUIRE_JWT:
+                raise ValueError("MEET_REQUIRE_JWT must be enabled in production")
+            if not (
+                self.MEET_JWT_APP_ID and self.MEET_JWT_SECRET and self.MEET_JWT_SUBJECT
+            ):
+                raise ValueError(
+                    "MEET_JWT_APP_ID, MEET_JWT_SECRET and MEET_JWT_SUBJECT are required in production"
+                )
+            if self.MEET_JWT_SECRET == self.signing_secret:
+                raise ValueError("MEET_JWT_SECRET must differ from the EnactSpace JWT secret")
         if self.PAYDUNYA_MODE not in {"test", "live"}:
             raise ValueError("PAYDUNYA_MODE must be test or live")
         if self.MOBILE_MONEY_PROVIDER not in {
@@ -126,6 +183,8 @@ class Settings(BaseSettings):
         if self.PAYMENT_CURRENCY != "XOF":
             raise ValueError("PAYMENT_CURRENCY must be XOF for Mobile Money V1.1")
         if self.APP_ENV == "production" and self.MOBILE_MONEY_ENABLED:
+            if self.MOBILE_MONEY_PROVIDER == "mock":
+                raise ValueError("Mock payment provider cannot be enabled in production")
             if self.PAYDUNYA_MODE == "live" and self.MOBILE_MONEY_PROVIDER == "paydunya":
                 required_keys = [
                     self.PAYDUNYA_MASTER_KEY,

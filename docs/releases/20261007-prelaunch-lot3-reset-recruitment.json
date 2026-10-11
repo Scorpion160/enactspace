@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-07",
+  "runs": [
+    {
+      "tests": 93,
+      "seconds": 43.075,
+      "log": "enactspace-prelaunch-lot3-tests.log"
+    },
+    {
+      "tests": 3,
+      "seconds": 6.233,
+      "log": "enactspace-prelaunch-lot3-pg-tests.log"
+    }
+  ],
+  "network_isolated": true,
+  "production_changed": false,
+  "emails_sent": 0,
+  "builds": 0,
+  "diff_check_exit": 0,
+  "whole_review_complete": false,
+  "migration_applied_production": false,
+  "proxy_audit": {
+    "nginx_dump_exit": 0,
+    "api_domain_found": false,
+    "backend_loopback_found": false,
+    "limit_req_directives_total": 0,
+    "limit_req_zones_total": 0,
+    "included_config_files": [
+      "/etc/nginx/nginx.conf",
+      "/etc/nginx/mime.types",
+      "/etc/nginx/sites-enabled/enactspace-jitsi",
+      "/etc/letsencrypt/options-ssl-nginx.conf",
+      "/etc/nginx/sites-enabled/hydropilot",
+      "/etc/nginx/sites-enabled/ker_Njomboor",
+      "/etc/nginx/sites-enabled/mqtt-hydropilot-acme",
+      "/etc/nginx/sites-enabled/vescope",
+      "/etc/nginx/sites-enabled/vescope-mqtt"
+    ]
+  },
+  "sources": [
+    {
+      "file": "backend/app/models/user.py",
+      "lines": 98,
+      "sha256": "0494d39966e2fef01312a3c850205c021f9131c23704dad483d95faa3ace671f",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/app/schemas/auth.py",
+      "lines": 75,
+      "sha256": "4891335776a5485be9e97c179b3a73cf5ba1e956fade845452dfbb471da8e140",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/app/api/routes/auth.py",
+      "lines": 518,
+      "sha256": "34495e067d2a9eaf5473abca73602747dd41eff9cf1f62c910e748a62f47d144",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/alembic/versions/20261007_0026_password_reset_attempts.py",
+      "lines": 21,
+      "sha256": "9493d99212883621e3c3134f811226f69ea6013dc111e1b8cc1b51da872bd565",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/test_password_reset_guard.py",
+      "lines": 127,
+      "sha256": "1b43c342919b7ad7eeca1bc689bd62c9b815b0b69e4a34b53576c805ada56294",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/test_password_reset_guard_postgresql.py",
+      "lines": 82,
+      "sha256": "331173dd1551cf0b5659886ffa40c6a06d1360007682776ae0b3dc9c30e6b907",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "backend/test_prelaunch_security_boundaries.py",
+      "lines": 164,
+      "sha256": "90bd7e7f1f993455aca92540a02badc655b27e92a24d920a34a85a64785e2394",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "deploy/docker-compose.vps.yml",
+      "lines": 149,
+      "sha256": "eb684b8bc58cdf9a2a94e080c8e8e94100a3c15ddcdaef003b1d70271f74e2f3",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "deploy/Dockerfile.backend",
+      "lines": 31,
+      "sha256": "7bd934c3e85e91ddedd93d13a31a0e0f4c25ae0cfe391d66b657e05c2f58eee0",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    },
+    {
+      "file": "deploy/nginx-enactspace.conf",
+      "lines": 74,
+      "sha256": "fa75b9e76d4afcedfa40f045d9a191fe854ddb61ca0aefd339000fd826bea459",
+      "manual_review": "REVIEWED_LOT3",
+      "scope": "Reviewed source; whole application security approval pending"
+    }
+  ]
+}

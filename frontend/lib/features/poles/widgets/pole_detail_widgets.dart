@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/ui/team_workspace_tools.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
@@ -64,6 +65,11 @@ class PoleDetailView extends StatelessWidget {
                           const SizedBox(height: 10),
                           management!,
                         ],
+                        const SizedBox(height: 14),
+                        TeamWorkspaceTools(
+                          name: item.pole.name,
+                          poleId: item.pole.id,
+                        ),
                         const SizedBox(height: 14),
                         Semantics(
                           header: true,

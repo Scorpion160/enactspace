@@ -12,12 +12,15 @@ import '../widgets/institutional_request_form.dart';
 import 'documents_screen.dart';
 
 class InstitutionalDocumentsHubScreen extends StatefulWidget {
+  final String? initialPoleId, initialProjectId;
   final DocumentsGateway? documentsGateway;
   final InstitutionalDocumentsGateway? institutionalGateway;
 
   const InstitutionalDocumentsHubScreen({
     super.key,
     this.documentsGateway,
+    this.initialPoleId,
+    this.initialProjectId,
     this.institutionalGateway,
   });
 
@@ -75,7 +78,11 @@ class _InstitutionalDocumentsHubScreenState
             child: TabBarView(
               controller: _tabs,
               children: [
-                DocumentsScreen(gateway: _documentsGateway),
+                DocumentsScreen(
+                  gateway: _documentsGateway,
+                  initialPoleId: widget.initialPoleId,
+                  initialProjectId: widget.initialProjectId,
+                ),
                 _InstitutionalRequestsPanel(
                   key: ValueKey(_requestRefreshVersion),
                   gateway: _institutionalGateway,
@@ -111,6 +118,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
   List<InstitutionalTemplateModel> _templates = const [];
   bool _loading = true;
   bool _saving = false;
+  final Map<String, InstitutionalRequestFormResult> _newDrafts = {};
   String? _error;
 
   @override
@@ -146,9 +154,11 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
       context,
       gateway: widget.gateway,
       template: template,
+      initialDraft: _newDrafts[template.code],
     );
     if (result == null || !mounted) return;
 
+    _newDrafts[template.code] = result;
     setState(() => _saving = true);
     try {
       await widget.gateway.createRequest(
@@ -159,6 +169,7 @@ class _InstitutionalCreatePanelState extends State<_InstitutionalCreatePanel> {
         eventId: result.eventId,
         seasonId: result.seasonId,
       );
+      _newDrafts.remove(template.code);
       if (!mounted) return;
       _notice(
         'Brouillon créé. Relisez-le, téléchargez son aperçu PDF puis soumettez-le.',
@@ -325,10 +336,7 @@ class _TemplateCard extends StatelessWidget {
 class _InstitutionalRequestsPanel extends StatefulWidget {
   final InstitutionalDocumentsGateway gateway;
 
-  const _InstitutionalRequestsPanel({
-    super.key,
-    required this.gateway,
-  });
+  const _InstitutionalRequestsPanel({super.key, required this.gateway});
 
   @override
   State<_InstitutionalRequestsPanel> createState() =>
@@ -347,6 +355,7 @@ class _InstitutionalRequestsPanelState
   String _status = 'all';
   String _template = 'all';
   String? _busyId;
+  final Map<String, InstitutionalRequestFormResult> _unsavedEdits = {};
 
   bool get _canGenerate =>
       _currentUser?.isAdmin == true ||
@@ -367,10 +376,7 @@ class _InstitutionalRequestsPanelState
     try {
       final values = await Future.wait([
         widget.gateway.loadTemplates(),
-        widget.gateway.loadRequests(
-          status: _status,
-          templateCode: _template,
-        ),
+        widget.gateway.loadRequests(status: _status, templateCode: _template),
         widget.gateway.loadReferences(),
         widget.gateway.loadCurrentUser(),
         widget.gateway.rendererAvailable(),
@@ -414,6 +420,7 @@ class _InstitutionalRequestsPanelState
   }
 
   void _replace(InstitutionalDocumentRequestModel updated) {
+    _unsavedEdits.remove(updated.id);
     setState(() {
       _requests = _requests
           .map((item) => item.id == updated.id ? updated : item)
@@ -429,8 +436,10 @@ class _InstitutionalRequestsPanelState
       gateway: widget.gateway,
       template: template,
       request: request,
+      initialDraft: _unsavedEdits[request.id],
     );
     if (result == null || !mounted) return;
+    _unsavedEdits[request.id] = result;
     await _perform(
       request,
       () => widget.gateway.updateRequest(
@@ -446,6 +455,13 @@ class _InstitutionalRequestsPanelState
   }
 
   Future<void> _preview(InstitutionalDocumentRequestModel request) async {
+    if (_unsavedEdits.containsKey(request.id)) {
+      _notice(
+        'Vos modifications ne sont pas encore enregistrées. Rouvrez « Modifier » puis enregistrez avant de demander un nouvel aperçu.',
+        error: true,
+      );
+      return;
+    }
     if (_busyId != null) return;
     setState(() => _busyId = request.id);
     try {
@@ -463,7 +479,7 @@ class _InstitutionalRequestsPanelState
       if (!mounted) return;
       if (kIsWeb || result != null) {
         _notice(
-          'Aperçu PDF enregistré. Il est marqué « BROUILLON — NON OFFICIEL ».',
+          'Aperçu PDF enregistré, marqué « BROUILLON — NON OFFICIEL ». Utilisez « Modifier » sur cette demande pour reprendre les informations déjà saisies.',
         );
       } else {
         _notice('Enregistrement de l’aperçu annulé.');
@@ -541,8 +557,7 @@ class _InstitutionalRequestsPanelState
               sliver: SliverList.separated(
                 itemCount: _requests.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) =>
-                    _requestCard(_requests[index]),
+                itemBuilder: (context, index) => _requestCard(_requests[index]),
               ),
             ),
         ],
@@ -564,9 +579,8 @@ class _InstitutionalRequestsPanelState
                   children: [
                     Text(
                       'Demandes institutionnelles',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 5),
                     const Text(
@@ -589,7 +603,7 @@ class _InstitutionalRequestsPanelState
                 leading: Icon(Icons.warning_amber_rounded),
                 title: Text('Moteur PDF indisponible'),
                 subtitle: Text(
-                  'Les formulaires et validations restent disponibles, mais pdflatex doit être installé sur le backend pour les aperçus et PDF officiels.',
+                  'La génération des PDF est momentanément indisponible. Tu peux toujours remplir les formulaires et les faire valider.',
                 ),
               ),
             ),
@@ -605,7 +619,10 @@ class _InstitutionalRequestsPanelState
                   initialValue: _status,
                   decoration: const InputDecoration(labelText: 'Statut'),
                   items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Tous les statuts')),
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Tous les statuts'),
+                    ),
                     DropdownMenuItem(value: 'draft', child: Text('Brouillons')),
                     DropdownMenuItem(
                       value: 'pending_sg_validation',
@@ -615,13 +632,22 @@ class _InstitutionalRequestsPanelState
                       value: 'pending_approval',
                       child: Text('À approuver par le TL'),
                     ),
-                    DropdownMenuItem(value: 'validated', child: Text('Validés')),
+                    DropdownMenuItem(
+                      value: 'validated',
+                      child: Text('Validés'),
+                    ),
                     DropdownMenuItem(
                       value: 'generated',
                       child: Text('PDF générés'),
                     ),
-                    DropdownMenuItem(value: 'rejected', child: Text('À corriger')),
-                    DropdownMenuItem(value: 'cancelled', child: Text('Annulés')),
+                    DropdownMenuItem(
+                      value: 'rejected',
+                      child: Text('À corriger'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'cancelled',
+                      child: Text('Annulés'),
+                    ),
                   ],
                   onChanged: (value) {
                     if (value == null) return;
@@ -633,8 +659,12 @@ class _InstitutionalRequestsPanelState
               SizedBox(
                 width: 310,
                 child: DropdownButtonFormField<String>(
-                  initialValue: _templates.containsKey(_template) ? _template : 'all',
-                  decoration: const InputDecoration(labelText: 'Type de document'),
+                  initialValue: _templates.containsKey(_template)
+                      ? _template
+                      : 'all',
+                  decoration: const InputDecoration(
+                    labelText: 'Type de document',
+                  ),
                   items: [
                     const DropdownMenuItem(
                       value: 'all',
@@ -715,9 +745,17 @@ class _InstitutionalRequestsPanelState
                   color: theme.colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  'Correction demandée : ${request.rejectionReason}',
-                ),
+                child: Text('Correction demandée : ${request.rejectionReason}'),
+              ),
+            ],
+            if (request.generatedDocumentId != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'PDF officiel conservé : pour une correction, créez une nouvelle demande. '
+                'La validation dans EnactSpace ne constitue pas une signature électronique. '
+                'Téléchargez le PDF, recueillez les signatures nécessaires et transmettez-le au destinataire. '
+                'La génération ne déclenche aucun envoi externe.',
+                style: theme.textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 12),

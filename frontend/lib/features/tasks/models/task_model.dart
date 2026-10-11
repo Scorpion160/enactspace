@@ -9,6 +9,8 @@ class TaskModel {
   final String? dueDate;
   final bool proofRequired;
   final String? proofUrl;
+  final String? proofFilename;
+  final bool? canValidate;
   final String? createdAt;
   final String? completedAt;
   final String? validatedAt;
@@ -30,6 +32,8 @@ class TaskModel {
     this.dueDate,
     required this.proofRequired,
     this.proofUrl,
+    this.proofFilename,
+    this.canValidate,
     this.createdAt,
     this.completedAt,
     this.validatedAt,
@@ -53,6 +57,8 @@ class TaskModel {
       dueDate: json['due_date']?.toString(),
       proofRequired: json['proof_required'] == true,
       proofUrl: json['proof_url']?.toString(),
+      proofFilename: json['proof_filename']?.toString(),
+      canValidate: json['can_validate'] as bool?,
       createdAt: json['created_at']?.toString(),
       completedAt: json['completed_at']?.toString(),
       validatedAt: json['validated_at']?.toString(),
@@ -72,7 +78,7 @@ class TaskModel {
       case 'en_cours':
         return 'En cours';
       case 'termine':
-        return 'Terminé';
+        return 'Terminé · à valider';
       case 'valide':
         return 'Validé';
       case 'bloque':
@@ -116,12 +122,16 @@ class TaskModel {
 
   bool get isTerminal => const {'termine', 'valide', 'annule'}.contains(status);
 
+  bool get canReview => (canValidate ?? canManage) && !currentUserAssigned;
+
   List<String> get allowedStatusTransitions {
     final base = <String, List<String>>{
       'a_faire': ['en_cours', 'bloque'],
       'en_cours': ['bloque', 'termine'],
       'bloque': ['en_cours', 'termine'],
-      'termine': canManage ? ['en_cours', 'valide'] : const [],
+      'termine': canManage
+          ? (canReview ? ['en_cours', 'valide'] : ['en_cours'])
+          : const [],
       'valide': const [],
       'annule': const [],
     };

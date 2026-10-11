@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
@@ -59,9 +60,9 @@ class InstitutionalSource(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -100,9 +101,9 @@ class Territory(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -149,9 +150,9 @@ class InstitutionalGeneration(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -195,9 +196,9 @@ class CanonicalProject(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -246,9 +247,9 @@ class LeadershipTerm(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -300,9 +301,9 @@ class ProjectAlias(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -354,9 +355,9 @@ class ProjectYear(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -398,9 +399,9 @@ class ProjectRelationship(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -471,9 +472,9 @@ class InstitutionalEvent(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -533,9 +534,9 @@ class InstitutionalFramework(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (
@@ -584,9 +585,9 @@ class CompetitionParticipation(Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utc_now, onupdate=utc_now
     )
 
     __table_args__ = (

@@ -1,0 +1,161 @@
+{
+  "date": "2026-10-07",
+  "runs": [
+    {
+      "tests": 100,
+      "seconds": 43.496
+    },
+    {
+      "tests": 5,
+      "seconds": 8.336
+    }
+  ],
+  "diff_check_exit": 0,
+  "whole_review_complete": false,
+  "production_changed": false,
+  "migration_applied_production": false,
+  "emails_sent": 0,
+  "builds": 0,
+  "public_proxy_probe": "NOT_VALIDATED",
+  "sources": [
+    {
+      "file": "backend/app/models/security_rate_limit.py",
+      "lines": 12,
+      "sha256": "445a6bb0ce2511993cf2cb33669bb35fed5b4b07e1581c35080e6363313c140d",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/app/services/request_rate_limit.py",
+      "lines": 85,
+      "sha256": "fe05ed48b1c284c7a1d58ad17603f5e8997205d7197a049853af284ea4c39fa8",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/app/models/base.py",
+      "lines": 114,
+      "sha256": "805f79bee8f084047fc7a698240e0d0ca7e2e1842d3033dd1fd0cc717c4f97fb",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/app/api/routes/auth.py",
+      "lines": 519,
+      "sha256": "46c30f58354e950cd74f4e3c3baf5a8a7733d17aa0b4b0fa6cf2b943788694d8",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/app/api/routes/recruitment.py",
+      "lines": 1681,
+      "sha256": "536617d44632ba0d756106721ec0b1fd530454d780fb3ea55ac690d39d4cfeb1",
+      "manual_review": "PARTIAL_LOT4"
+    },
+    {
+      "file": "backend/alembic/versions/20261007_0027_security_rate_limits.py",
+      "lines": 19,
+      "sha256": "f7ee26e278113401fc8feacc270957310496aa43513c499fba20d6449ec3987c",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/test_request_rate_limit.py",
+      "lines": 93,
+      "sha256": "d30a3eb13cb76a0cfd54129f9ab10fbba525848c25a6c8edd2d788beadef0ea8",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "backend/test_request_rate_limit_postgresql.py",
+      "lines": 41,
+      "sha256": "b10d5e1031b86870dbb19972b824de958fe64a1b0b1925f78ac39b60d3cbf6b2",
+      "manual_review": "REVIEWED_LOT4"
+    },
+    {
+      "file": "deploy/docker-compose.vps.yml",
+      "lines": 151,
+      "sha256": "a56130bfd3710fc1e744fbea933f7994fc5165fc057b5051d47af39e01cae7f8",
+      "manual_review": "REVIEWED_LOT4"
+    }
+  ],
+  "entrypoint_audit": {
+    "containers": [
+      {
+        "Names": "enactspace_push_worker",
+        "Image": "enactspace-backend:local",
+        "Ports": "8000/tcp"
+      },
+      {
+        "Names": "enactspace_email_worker",
+        "Image": "enactspace-backend:local",
+        "Ports": "8000/tcp"
+      },
+      {
+        "Names": "enactspace_veille_worker",
+        "Image": "enactspace-backend:local",
+        "Ports": "8000/tcp"
+      },
+      {
+        "Names": "enactspace_backend",
+        "Image": "enactspace-backend:local",
+        "Ports": "127.0.0.1:18002->8000/tcp"
+      },
+      {
+        "Names": "enactspace_web",
+        "Image": "nginx:1.27-alpine",
+        "Ports": "127.0.0.1:18080->80/tcp"
+      },
+      {
+        "Names": "enactspace_postgres",
+        "Image": "postgres:16",
+        "Ports": "5432/tcp"
+      },
+      {
+        "Names": "jitsi-enactspace-web-1",
+        "Image": "ghcr.io/jitsi/web:stable-11248",
+        "Ports": "127.0.0.1:18090->8000/tcp, 127.0.0.1:18443->8443/tcp"
+      },
+      {
+        "Names": "jitsi-enactspace-jvb-1",
+        "Image": "ghcr.io/jitsi/jvb:stable-11248",
+        "Ports": "0.0.0.0:10000->10000/udp, [::]:10000->10000/udp, 127.0.0.1:18091->8080/tcp"
+      },
+      {
+        "Names": "jitsi-enactspace-jicofo-1",
+        "Image": "ghcr.io/jitsi/jicofo:stable-11248",
+        "Ports": "127.0.0.1:8888->8888/tcp"
+      },
+      {
+        "Names": "jitsi-enactspace-prosody-1",
+        "Image": "ghcr.io/jitsi/prosody:stable-11248",
+        "Ports": "5222/tcp, 5269/tcp, 5280/tcp, 5347/tcp"
+      }
+    ],
+    "backend_networks": {
+      "enactspace_network": {
+        "gateway": "172.20.0.1",
+        "address": "172.20.0.3"
+      }
+    },
+    "forwarded_allow_ips_configured": false,
+    "cloudflared_active": "active",
+    "traefik_active": "inactive",
+    "caddy_active": "inactive"
+  },
+  "tunnel_units": {
+    "tunnel_units": [
+      {
+        "unit": "cloudflared-enactspace.service",
+        "config_paths": [],
+        "remote_token_mode": true
+      },
+      {
+        "unit": "cloudflared-hydropilot.service",
+        "config_paths": [
+          "/etc/cloudflared/config.yml"
+        ],
+        "remote_token_mode": false
+      },
+      {
+        "unit": "cloudflared.service",
+        "config_paths": [],
+        "remote_token_mode": true
+      }
+    ]
+  }
+}

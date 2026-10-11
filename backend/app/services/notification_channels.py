@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.user import User
+from app.services.email_delivery_service import enqueue_notification_email
 from app.services.push_lifecycle import enqueue_push_deliveries
 
 
@@ -17,10 +18,11 @@ def dispatch_notification_channels(
     notification: Notification,
     recipient: User | None,
     preference: UserPreference | None = None,
+    *, send_email: bool = True,
 ) -> dict[str, bool]:
-    """Prepare external delivery without making network calls by default."""
+    """Prepare durable external deliveries without making network calls."""
     return {
-        "email": _dispatch_email(notification, recipient, preference),
+        "email": send_email and _dispatch_email(db, notification, recipient, preference),
         "push": bool(
             recipient is not None
             and enqueue_push_deliveries(db, notification, preference)
@@ -29,6 +31,7 @@ def dispatch_notification_channels(
 
 
 def _dispatch_email(
+    db: Session,
     notification: Notification,
     recipient: User | None,
     preference: UserPreference | None = None,
@@ -37,21 +40,16 @@ def _dispatch_email(
         preference is not None and not preference.notification_email_enabled
     ):
         return False
-
     if not recipient or not recipient.email:
         logger.info("Notification email skipped: recipient email missing")
         return False
-
-    if not settings.SMTP_HOST:
-        logger.warning("Notification email enabled but SMTP_HOST is not set")
-        return False
-
-    logger.info(
-        "Notification email queued for user %s: %s",
-        recipient.id,
-        notification.title,
+    delivery = enqueue_notification_email(
+        db,
+        notification,
+        recipient.email,
+        user_id=recipient.id,
     )
-    return True
+    return delivery is not None
 
 
 def _dispatch_push(

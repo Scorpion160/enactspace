@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../shared/attachments/attachment_picker.dart';
+
+import '../../../core/widgets/app_form_dialog.dart';
 import 'package:intl/intl.dart';
 
 import '../models/event_center_models.dart';
@@ -52,6 +55,7 @@ class _EventFormDialogState extends State<EventFormDialog> {
   late bool _registration = widget.event?.requiresRegistration ?? true;
   late bool _attendance = widget.event?.attendanceEnabled ?? true;
   bool _submitting = false;
+  SelectedAttachment? _reportFile;
 
   @override
   void initState() {
@@ -102,7 +106,7 @@ class _EventFormDialogState extends State<EventFormDialog> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_submitting || !_formKey.currentState!.validate()) return;
     if (_end != null && _end!.isBefore(_start)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,6 +115,26 @@ class _EventFormDialogState extends State<EventFormDialog> {
       return;
     }
     setState(() => _submitting = true);
+    try {
+      if (_reportFile != null && widget.event != null) {
+        final result = await AttachmentService().upload(
+          '/events/${widget.event!.id}/report-file',
+          _reportFile!,
+        );
+        _report.text = result['report_url']?.toString() ?? _report.text;
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
     Navigator.of(context).pop(
       EventMutationDraft(
         seasonId: widget.event?.seasonId,
@@ -152,9 +176,13 @@ class _EventFormDialogState extends State<EventFormDialog> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        editing ? 'Modifier l’événement' : 'Créer un événement',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                      child: AppFormHeader(
+                        icon: Icons.event_rounded,
+                        title: Text(
+                          editing
+                              ? 'Modifier l’événement'
+                              : 'Créer un événement',
+                        ),
                       ),
                     ),
                     IconButton(
@@ -333,11 +361,12 @@ class _EventFormDialogState extends State<EventFormDialog> {
                             setState(() => _attendance = value),
                       ),
                       if (editing)
-                        TextFormField(
-                          controller: _report,
-                          decoration: const InputDecoration(
-                            labelText: 'Lien du rapport',
-                          ),
+                        AttachmentPickerField(
+                          label: 'Rapport de l’événement',
+                          value: _reportFile,
+                          enabled: !_submitting,
+                          onChanged: (file) =>
+                              setState(() => _reportFile = file),
                         ),
                     ],
                   ),

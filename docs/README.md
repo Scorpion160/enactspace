@@ -4,13 +4,17 @@ Use this page to distinguish maintained operating instructions from historical e
 
 ## Canonical
 
-These documents define the current V1.0.0 target and should be updated with operational changes:
+These documents describe the current 1.0.13 deployment and maintained procedures. The dated release record takes precedence for actual deployed versions and verified results:
+
+- [Release 1.0.13 — current state, build and rollback](releases/20261010-release-1.0.13.md)
+- [Mail, activation and push diagnostics](MESSAGING_TROUBLESHOOTING.md)
 
 - [Repository overview](../README.md)
 - [Architecture](ARCHITECTURE.md)
 - [Development](DEVELOPMENT.md)
 - [Test matrix](TEST_MATRIX.md)
 - [Operations runbook](OPERATIONS_RUNBOOK.md)
+- [First access and onboarding](FIRST_ACCESS_ONBOARDING.md)
 - [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md)
 - [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md)
 - [Release checklist](RELEASE_CHECKLIST.md)
@@ -32,4 +36,10 @@ All non-canonical `V1_*` and `v1_*` documents are retained for historical contex
 
 `V1_INSTALLATION_GUIDE.md`, `V1_RELEASE_NOTES.md`, `V1_KNOWN_LIMITATIONS.md`, `v1_test_accounts.md`, and operational `V1_1_*` guides are deprecated as authoritative instructions. They remain only to explain earlier decisions and must not override the canonical documents above.
 
-If documents conflict, stop and use the canonical V1.0.0 documentation. Record any unresolved operational decision in the release checklist instead of guessing.
+If documents conflict, stop and use the current canonical documentation and latest dated release record. Record any unresolved operational decision in the release checklist instead of guessing.
+
+- [Centre d’aide et traitement des retours](HELP_SUPPORT_OPERATIONS.md)
+
+- [Sauvegarde et restauration des données](V1_1_BACKUP_RESTORE.md)
+
+- [Copie chiffrée et récupération Windows](BACKUP_RECOVERY_WINDOWS.md)

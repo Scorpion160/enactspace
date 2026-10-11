@@ -9,7 +9,13 @@ import '../widgets/document_widgets.dart';
 
 class DocumentsScreen extends StatefulWidget {
   final DocumentsGateway? gateway;
-  const DocumentsScreen({super.key, this.gateway});
+  final String? initialPoleId, initialProjectId;
+  const DocumentsScreen({
+    super.key,
+    this.gateway,
+    this.initialPoleId,
+    this.initialProjectId,
+  });
   @override
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
@@ -23,11 +29,19 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   String _category = 'all', _status = 'all', _visibility = 'all';
   String _pole = 'all', _project = 'all', _event = 'all';
   bool _templates = false, _officials = false, _loading = true;
+  bool _usingOfflineCache = false;
   String? _error;
+
+  bool get _gatewayUsesOfflineCache => switch (_gateway) {
+    ApiDocumentsGateway gateway => gateway.usingOfflineCache,
+    _ => false,
+  };
 
   @override
   void initState() {
     super.initState();
+    _pole = widget.initialPoleId ?? 'all';
+    _project = widget.initialProjectId ?? 'all';
     _initialLoad();
   }
 
@@ -51,6 +65,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       setState(() {
         _documents = values[0] as List<DocumentModel>;
         _references = values[1] as DocumentReferenceData;
+        _usingOfflineCache = _gatewayUsesOfflineCache;
         _loading = false;
       });
     } catch (error) {
@@ -85,6 +100,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       if (mounted) {
         setState(() {
           _documents = values;
+          _usingOfflineCache = _gatewayUsesOfflineCache;
           _loading = false;
         });
       }
@@ -208,6 +224,39 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       ],
                     ),
                     const SizedBox(height: 18),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.menu_book_rounded),
+                        title: const Text('Règlement intérieur Enactus ESP'),
+                        subtitle: const Text(
+                          '13 articles · lecture disponible hors connexion',
+                        ),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                        ),
+                        onTap: () =>
+                            context.push('/documents/reglement-interieur'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_usingOfflineCache) ...[
+                      Card(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        child: const ListTile(
+                          leading: Icon(Icons.offline_bolt_rounded),
+                          title: Text('Mode hors connexion'),
+                          subtitle: Text(
+                            'La dernière liste sécurisée de documents reste consultable. '
+                            'Les filtres fonctionnent localement ; un fichier distant non '
+                            'déjà disponible sur l’appareil nécessite une connexion.',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     TextField(
                       controller: _search,
                       onSubmitted: (_) => _applyFilters(),

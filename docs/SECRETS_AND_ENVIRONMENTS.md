@@ -1,5 +1,15 @@
 # Secrets and environments
 
+## Configuration effective — 10 octobre 2026
+
+Les mails et push sont activés; `EMAIL_RESTRICT_TO_TEST_RECIPIENT=false`. L’expéditeur institutionnel est `enactus@esp.sn`, via SMTP Gmail port 587. `MOBILE_MONEY_ENABLED=false` reste la valeur attendue. La présence d’identifiants ne prouve ni la réception finale d’un mail ni la livraison de chaque push.
+
+Le fichier VPS `/etc/enactspace/enactspace.env`, les defines Flutter, les fichiers Firebase natifs, la signature Android et les clés de sauvegarde restent privés. Le worker Firebase web généré est exclu des checkpoints et doit être régénéré lors du build. Les restrictions de la clé API Firebase n’ont pas encore été vérifiées.
+
+Ne jamais copier les codes d’activation, mots de passe, tokens, corps de messages ou fichiers d’environnement dans les rapports. Voir [le diagnostic des notifications](MESSAGING_TROUBLESHOOTING.md).
+
+## Procédures générales et contexte antérieur
+
 This document names configuration classes only. Never add values, fingerprints, private URLs, credentials, provider files, or signing material to Git, CI YAML, tickets, or review bundles.
 
 | Names / class | Purpose and environment | Responsible role and storage | Rotation and exposure response |

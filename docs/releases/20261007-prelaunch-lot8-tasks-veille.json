@@ -1,0 +1,21 @@
+{
+  "lot": 8,
+  "utc": "2026-10-07T12:42:32.767082+00:00",
+  "main_backend_tests_passed": 201,
+  "focused_final_file_tests_passed": 54,
+  "postgresql16_tests_passed": null,
+  "postgresql_extended_status": "TIMEOUT — NOT VALIDATED",
+  "test_counts_not_cumulative": true,
+  "production_changed": false,
+  "build": false,
+  "messages_sent": 0,
+  "full_manual_review_completed": false,
+  "changed_sha256": {
+    "backend/app/api/routes/tasks.py": "8490f8a3e66886e49d00d83bf9b78ea65a6d8c93f9ff345a17a13d782fa235f1",
+    "backend/app/services/veille_service.py": "e3c8532837a5f08a92318fb026ad89637c4127bca0b78c8606753200708a5e72",
+    "backend/app/api/routes/files.py": "128e88c093152bcc40856229984a29f28c5f4652fe3ba0a7d19d8c7408ab852f",
+    "backend/test_prelaunch_security_boundaries.py": "195baadb6cb2769a698ee2d1169a8eff95feb87d7540259c518de10b9fb84f2d",
+    "backend/test_prelaunch_task_boundaries.py": "2a76a7423586ee680875a692e68cb082af9c004c64abc52d25f1ab941fd77b45",
+    "backend/test_veille_postgresql.py": "23996ead73ca441daedef488952ff076cb12bdd10bab0f36b819e2e43a735096"
+  }
+}

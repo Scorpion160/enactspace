@@ -1,0 +1,48 @@
+{
+  "lot": 22,
+  "date_utc": "2026-10-07T19:19:19.506943+00:00",
+  "tests": {
+    "sqlite": {
+      "passed": 74,
+      "seconds": 31.24,
+      "skipped": 0
+    },
+    "postgresql_real_schema": {
+      "account_creation_on_real_schema": true,
+      "baseline_tables_checked": 110,
+      "case_insensitive_username_collision_refused": true,
+      "downgrade_preserves_baseline_data": true,
+      "failed_transaction_rolls_back": true,
+      "fresh_install_exit": 0,
+      "join_year_saved_and_preserved_for_alumni": true,
+      "new_constraints_enforced": 3,
+      "new_security_fields_reset_after_downgrade": true,
+      "orm_reads_and_writes_new_fields": true,
+      "repeat_upgrade_noop": true,
+      "reupgrade_preserves_baseline_data": true,
+      "upgrade_preserves_all_baseline_tables": true
+    }
+  },
+  "resources_absent": true,
+  "git_diff_check": true,
+  "whole_manual_review_complete": false,
+  "build_performed": false,
+  "production_changed": false,
+  "production_rows_copied": false,
+  "git_push": false,
+  "real_email_or_payment_sent": false,
+  "source_head": "20261007_0029",
+  "production_revision": "20261006_0025",
+  "reviewed_files": [
+    "backend/app/core/account_identity.py",
+    "backend/app/models/user.py",
+    "backend/app/schemas/user.py",
+    "backend/app/schemas/auth.py",
+    "backend/app/api/routes/users.py",
+    "backend/app/api/routes/auth.py",
+    "backend/app/services/alumni_profiles.py",
+    "backend/alembic/versions/20261007_0029_user_join_year.py",
+    "backend/test_prelaunch_account_identity.py",
+    "backend/test_prelaunch_migration_rehearsal.py"
+  ]
+}

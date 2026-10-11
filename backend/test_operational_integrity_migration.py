@@ -47,14 +47,14 @@ class OperationalIntegrityMigrationTests(unittest.TestCase):
     def test_fresh_upgrade_downgrade_reupgrade_and_single_head(self):
         self.assertEqual(
             ScriptDirectory.from_config(self.config).get_heads(),
-            ["20260913_0009"],
+            ["20261004_0022"],
         )
         self._upgrade("head")
         engine = create_engine(self.url)
         with engine.connect() as connection:
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                "20260913_0009",
+                "20261004_0022",
             )
         inspector = inspect(engine)
         self.assertIn(
@@ -71,6 +71,15 @@ class OperationalIntegrityMigrationTests(unittest.TestCase):
                     text(
                         "SELECT COUNT(*) FROM sqlite_master "
                         "WHERE type = 'index' AND name = 'ux_users_lower_email'"
+                    )
+                ).scalar_one(),
+                1,
+            )
+            self.assertEqual(
+                connection.execute(
+                    text(
+                        "SELECT COUNT(*) FROM sqlite_master "
+                        "WHERE type = 'index' AND name = 'ux_users_lower_username'"
                     )
                 ).scalar_one(),
                 1,

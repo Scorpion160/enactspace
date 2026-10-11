@@ -1,0 +1,47 @@
+{
+  "date_utc": "2026-10-07T13:11:31.973476+00:00",
+  "lot": 9,
+  "postgresql": {
+    "version_family": "16",
+    "tests_passed": 51,
+    "test_runtime_seconds": 117.985,
+    "skipped": 0,
+    "exit": 0,
+    "lock_timeout_ms": 8000,
+    "statement_timeout_ms": 15000,
+    "whole_run_timeout_seconds": 180
+  },
+  "isolation": {
+    "disposable_database": true,
+    "internal_network": true,
+    "remaining_owned_containers": [],
+    "remaining_owned_networks": [],
+    "email_enabled": false,
+    "push_enabled": false
+  },
+  "changes": [
+    "PostgreSQL Veille fixture creates its owned schema once per class and truncates all owned tables between tests",
+    "Diagnostic runner persists streamed logs and timeout output"
+  ],
+  "reviewed_files": [
+    "backend/app/services/veille_scheduler.py",
+    "backend/test_veille.py",
+    "backend/test_veille_postgresql.py"
+  ],
+  "partial_files": [
+    "backend/app/api/routes/finance.py"
+  ],
+  "whole_manual_review_complete": false,
+  "application_deployed": false,
+  "build_performed": false,
+  "git_push": false,
+  "club_data_cleanup_performed": false,
+  "warning": "SQLAlchemy reports a dependency sorting cycle between attendance_records and fees while listing tables; all owned tables are passed together to TRUNCATE CASCADE and all tests passed.",
+  "remaining": [
+    "Finance permission review and tests for legacy roles after Alumni transition",
+    "Remaining manual source review and role boundaries",
+    "Real Android and web end-to-end checks",
+    "Targeted removal of proven test recruitment records",
+    "Final documentation and deployment preparation"
+  ]
+}

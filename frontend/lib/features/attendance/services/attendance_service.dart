@@ -1,4 +1,5 @@
 import '../../../core/api/api_client.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/attendance_nfc_model.dart';
 import '../models/attendance_session_model.dart';
@@ -517,6 +518,7 @@ class AttendanceService {
     required String reason,
     String? fileId,
     String? fileUrl,
+    SelectedAttachment? file,
   }) async {
     final token = await _authService.getToken();
 
@@ -524,11 +526,23 @@ class AttendanceService {
       throw Exception('Utilisateur non connecté.');
     }
 
-    final response = await _apiClient.postJson(
-      '/attendance/records/$recordId/justify',
-      token: token,
-      data: {'reason': reason.trim(), 'file_id': fileId, 'file_url': fileUrl},
-    );
+    final response = file == null
+        ? await _apiClient.postJson(
+            '/attendance/records/$recordId/justify',
+            token: token,
+            data: {
+              'reason': reason.trim(),
+              'file_id': fileId,
+              'file_url': fileUrl,
+            },
+          )
+        : await _apiClient.postMultipart(
+            '/attendance/records/$recordId/justify-with-file',
+            token: token,
+            fields: {'reason': reason.trim()},
+            bytes: file.bytes,
+            fileName: file.name,
+          );
 
     if (response is Map<String, dynamic>) {
       return AttendanceRecordModel.fromJson(response);

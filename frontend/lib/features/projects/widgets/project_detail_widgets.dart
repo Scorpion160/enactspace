@@ -1,4 +1,10 @@
+import '../../../shared/ui/project_photo_gallery.dart';
 import 'package:flutter/material.dart';
+import '../../../shared/ui/team_workspace_tools.dart';
+import '../../../shared/models/project_presentation.dart';
+import '../../../shared/ui/project_reference_documents.dart';
+import '../../../shared/ui/reading_blocks.dart';
+import '../../archives/screens/archive_visuals.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../documents/models/document_model.dart';
@@ -26,7 +32,7 @@ class ProjectDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final project = data.item.project;
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Column(
         children: [
           Material(
@@ -76,6 +82,7 @@ class ProjectDetailView extends StatelessWidget {
               tabAlignment: TabAlignment.start,
               tabs: [
                 Tab(text: 'Résumé'),
+                Tab(text: 'Outils'),
                 Tab(text: 'Équipe'),
                 Tab(text: 'Travail'),
                 Tab(text: 'Activité'),
@@ -89,6 +96,15 @@ class ProjectDetailView extends StatelessWidget {
             child: TabBarView(
               children: [
                 ProjectOverviewSection(item: data.item),
+                SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TeamWorkspaceTools(
+                      name: data.item.project.name,
+                      projectId: data.item.project.id,
+                    ),
+                  ),
+                ),
                 teamSection ?? ProjectTeamSection(item: data.item),
                 ProjectWorkSection(
                   item: data.item,
@@ -99,6 +115,8 @@ class ProjectDetailView extends StatelessWidget {
                   unavailable: data.eventsUnavailable,
                 ),
                 ProjectDocumentsSection(
+                  referenceDocuments:
+                      data.item.project.presentation?.documents ?? const [],
                   documents: data.documents,
                   unavailable: data.documentsUnavailable,
                 ),
@@ -146,9 +164,38 @@ class ProjectOverviewSection extends StatelessWidget {
             _InfoCard(label: 'Fin', value: _date(project.endedAt)),
           ],
         ),
+        if (project.presentation?.originYear != null)
+          _InfoCard(
+            label: 'Origine du projet',
+            value: 'En ${project.presentation!.originYear}',
+          ),
+        _NarrativeCard(label: 'Présentation', value: project.description),
+        if (project.presentation?.imageAsset != null)
+          HeritageImage(
+            asset: project.presentation!.imageAsset!,
+            title: project.name,
+          ),
+        if (project.presentation != null) ...[
+          _PresentationText(
+            title: 'L’aventure du projet',
+            body: project.presentation!.description,
+          ),
+          if (project.presentation!.gallery.isNotEmpty)
+            ProjectPhotoGallery(photos: project.presentation!.gallery),
+          for (final section in project.presentation!.sections)
+            _PresentationText(title: section.title, body: section.body),
+          _PresentationText(
+            title: 'Résultats et perspectives',
+            body: project.presentation!.impactSummary,
+          ),
+        ],
         _NarrativeCard(label: 'Problème', value: project.problemStatement),
         _NarrativeCard(label: 'Solution', value: project.solution),
         _NarrativeCard(label: 'Objectifs', value: project.objectives),
+        _NarrativeCard(
+          label: 'Impact recherché',
+          value: project.expectedImpact,
+        ),
         _NextActionCard(item: item),
         _AlertsCard(item: item),
       ],
@@ -326,16 +373,18 @@ class ProjectActivitySection extends StatelessWidget {
 }
 
 class ProjectDocumentsSection extends StatelessWidget {
+  final List<ProjectReferenceDocument> referenceDocuments;
   final List<DocumentModel>? documents;
   final bool unavailable;
   const ProjectDocumentsSection({
+    this.referenceDocuments = const [],
     super.key,
     required this.documents,
     required this.unavailable,
   });
   @override
   Widget build(BuildContext context) {
-    if (unavailable) {
+    if (unavailable && referenceDocuments.isEmpty) {
       return const _SectionMessage(
         semanticsLabel: 'Section Documents indisponible',
         icon: Icons.folder_off_rounded,
@@ -343,7 +392,8 @@ class ProjectDocumentsSection extends StatelessWidget {
         message: 'Les documents liés n’ont pas pu être chargés.',
       );
     }
-    if (documents == null || documents!.isEmpty) {
+    if (referenceDocuments.isEmpty &&
+        (documents == null || documents!.isEmpty)) {
       return const _SectionMessage(
         semanticsLabel: 'Section Documents vide',
         icon: Icons.folder_open_rounded,
@@ -354,29 +404,34 @@ class ProjectDocumentsSection extends StatelessWidget {
     return _SectionPage(
       semanticsLabel: 'Section Documents du projet',
       title: 'Documents',
-      children: documents!
-          .map<Widget>(
-            (document) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.description_outlined),
-                title: Text(document.title),
-                subtitle: Text(
-                  '${document.statusLabel} · ${document.createdAtLabel}',
-                ),
-                trailing: TextButton(
-                  onPressed:
-                      document.fileUrl == null || document.fileUrl!.isEmpty
-                      ? null
-                      : () async {
-                          final uri = Uri.tryParse(document.fileUrl!);
-                          if (uri != null) await launchUrl(uri);
-                        },
-                  child: const Text('Consulter'),
-                ),
+      children: [
+        if (referenceDocuments.isNotEmpty)
+          ProjectReferenceDocuments(documents: referenceDocuments),
+        if (unavailable)
+          const Text(
+            'Les autres documents du projet n’ont pas pu être chargés.',
+          ),
+        ...(documents ?? const <DocumentModel>[]).map<Widget>(
+          (document) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(document.title),
+              subtitle: Text(
+                '${document.statusLabel} · ${document.createdAtLabel}',
+              ),
+              trailing: TextButton(
+                onPressed: document.fileUrl == null || document.fileUrl!.isEmpty
+                    ? null
+                    : () async {
+                        final uri = Uri.tryParse(document.fileUrl!);
+                        if (uri != null) await launchUrl(uri);
+                      },
+                child: const Text('Consulter'),
               ),
             ),
-          )
-          .toList(),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -386,6 +441,15 @@ class ProjectImpactSection extends StatelessWidget {
   const ProjectImpactSection({super.key, required this.item});
   @override
   Widget build(BuildContext context) {
+    if (item.impactRestricted) {
+      return const _SectionMessage(
+        semanticsLabel: 'Suivi d’impact réservé aux responsables',
+        icon: Icons.insights_rounded,
+        title: 'Des résultats à construire ensemble',
+        message:
+            'Les responsables renseignent les indicateurs et leurs justificatifs dans Impact. Partage tes observations et tes résultats avec eux ; retrouve les actions de l’équipe dans Archives.',
+      );
+    }
     if (item.impactUnavailable) {
       return const _SectionMessage(
         semanticsLabel: 'Section Impact indisponible',
@@ -560,19 +624,22 @@ class _OverviewGrid extends StatelessWidget {
   const _OverviewGrid({required this.children});
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => GridView.count(
-      crossAxisCount: constraints.maxWidth >= 800
+    builder: (context, constraints) {
+      final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.4;
+      final columns = constraints.maxWidth >= (largeText ? 1000 : 800)
           ? 3
-          : constraints.maxWidth >= 520
+          : constraints.maxWidth >= (largeText ? 700 : 520)
           ? 2
-          : 1,
-      childAspectRatio: constraints.maxWidth >= 800 ? 2.6 : 3.1,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: children,
-    ),
+          : 1;
+      final width = (constraints.maxWidth - 10 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
   );
 }
 
@@ -586,19 +653,14 @@ class _InfoCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
         ],
       ),
     ),
@@ -640,21 +702,25 @@ class _SectionPage extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     container: true,
     label: semanticsLabel,
-    child: ListView(
-      padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.sizeOf(context).width >= 900 ? 28 : 16,
-        vertical: 20,
-      ),
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+    child: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        padding: EdgeInsets.symmetric(
+          horizontal: constraints.maxWidth > 1040
+              ? (constraints.maxWidth - 980) / 2
+              : 16,
+          vertical: 20,
         ),
-        const SizedBox(height: 12),
-        ...children,
-      ],
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
     ),
   );
 }
@@ -745,4 +811,29 @@ String _date(DateTime? value) {
 String _dateTime(DateTime value) {
   final local = value.toLocal();
   return '${_date(local)} à ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
+
+class _PresentationText extends StatelessWidget {
+  final String title;
+  final String body;
+  const _PresentationText({required this.title, required this.body});
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          ReadingBlocks(body),
+        ],
+      ),
+    ),
+  );
 }

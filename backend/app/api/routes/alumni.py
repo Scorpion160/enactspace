@@ -1,4 +1,6 @@
+from app.core.time import utc_now
 from datetime import date, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
@@ -7,6 +9,12 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.database import get_db
 from app.models.alumni import AlumniProfile, Mentorship
 from app.models.user import User
+from app.services.operational_integrity import lock_row
+from app.services.alumni_integrity import (
+    is_directory_alumni, is_valid_alumni, assert_valid_reader, can_manage_profiles, is_enacchef,
+    lock_people, lock_profile_write, ensure_mentorship_scope,
+    assert_available_mentor, assert_mentorship_dates,
+)
 from app.core.roles import ENACCHEF_ROLES, SECRETARIAT_ROLES
 from app.schemas.alumni import (
     AlumniProfileCreate,
@@ -45,21 +53,20 @@ ALUMNI_ENACCHEF_ROLES = ENACCHEF_ROLES
 
 
 def can_manage_alumni(db: Session, user: User) -> bool:
-    return bool(get_user_role_names(db, user.id).intersection(ALUMNI_MANAGER_ROLES))
+    return can_manage_profiles(db, user)
 
 
 def can_view_profile(db: Session, user: User, profile: AlumniProfile) -> bool:
+    assert_valid_reader(user)
     if profile.user_id == user.id or can_manage_alumni(db, user):
         return True
     if profile.visibility == "private":
         return False
     if profile.visibility == "enacchef_only":
-        return bool(
-            get_user_role_names(db, user.id).intersection(ALUMNI_ENACCHEF_ROLES)
-        )
+        return is_enacchef(db, user)
     if profile.visibility == "alumni_only":
         return user.status == "alumni"
-    return True
+    return profile.visibility == "internal"
 
 
 def ensure_profile_access(
@@ -81,7 +88,7 @@ def ensure_profile_access(
         )
 
 
-def get_alumni_profile_or_404(db: Session, profile_id: str) -> AlumniProfile:
+def get_alumni_profile_or_404(db: Session, profile_id: UUID) -> AlumniProfile:
     profile = db.query(AlumniProfile).filter(
         AlumniProfile.id == profile_id
     ).first()
@@ -95,7 +102,7 @@ def get_alumni_profile_or_404(db: Session, profile_id: str) -> AlumniProfile:
     return profile
 
 
-def get_mentorship_or_404(db: Session, mentorship_id: str) -> Mentorship:
+def get_mentorship_or_404(db: Session, mentorship_id: UUID) -> Mentorship:
     mentorship = db.query(Mentorship).filter(
         Mentorship.id == mentorship_id
     ).first()
@@ -115,26 +122,11 @@ def create_alumni_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    if payload.visibility not in VALID_ALUMNI_VISIBILITIES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Visibilité invalide",
-        )
-
-    if str(current_user.id) != str(payload.user_id) and not can_manage_alumni(
-        db, current_user
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez créer que votre propre profil alumni",
-        )
-
-    target_user = db.query(User).filter(User.id == payload.user_id).first()
-    if not target_user or target_user.status != "alumni":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le profil doit être rattaché à un compte Alumni validé",
-        )
+    current_user, target_user = lock_people(db, current_user.id, payload.user_id)
+    if current_user.id != target_user.id and not can_manage_alumni(db, current_user):
+        raise HTTPException(403, "Vous ne pouvez créer que votre propre profil Alumni.")
+    if not is_valid_alumni(target_user):
+        raise HTTPException(409, "Le profil exige un compte Alumni actif et vérifié.")
 
     existing = db.query(AlumniProfile).filter(
         AlumniProfile.user_id == payload.user_id
@@ -148,6 +140,7 @@ def create_alumni_profile(
 
     profile = AlumniProfile(
         user_id=payload.user_id,
+        enactus_join_year=payload.enactus_join_year if payload.enactus_join_year is not None else target_user.enactus_join_year,
         graduation_year=payload.graduation_year,
         current_company=payload.current_company,
         current_position=payload.current_position,
@@ -160,6 +153,8 @@ def create_alumni_profile(
         visibility=payload.visibility,
     )
 
+    if payload.enactus_join_year is not None:
+        target_user.enactus_join_year = payload.enactus_join_year
     db.add(profile)
     db.commit()
     db.refresh(profile)
@@ -176,9 +171,12 @@ def list_alumni_profiles(
     graduation_year: int | None = Query(default=None),
     available_for_mentoring: bool | None = Query(default=None),
 ):
+    assert_valid_reader(current_user)
     query = (
         db.query(AlumniProfile)
         .join(User, User.id == AlumniProfile.user_id)
+        .filter(User.status == "alumni", User.profile_type == "alumni",
+                User.is_active.is_(True))
         .options(joinedload(AlumniProfile.user))
     )
 
@@ -186,9 +184,7 @@ def list_alumni_profiles(
         visible = ["internal"]
         if current_user.status == "alumni":
             visible.append("alumni_only")
-        if get_user_role_names(db, current_user.id).intersection(
-            ALUMNI_ENACCHEF_ROLES
-        ):
+        if is_enacchef(db, current_user):
             visible.append("enacchef_only")
         query = query.filter(
             or_(
@@ -220,6 +216,9 @@ def list_alumni_profiles(
             AlumniProfile.available_for_mentoring == available_for_mentoring
         )
 
+    if available_for_mentoring is True:
+        query = query.filter(User.email_verified.is_(True))
+
     return query.order_by(
         AlumniProfile.graduation_year.desc().nullslast(),
         AlumniProfile.created_at.desc(),
@@ -228,7 +227,7 @@ def list_alumni_profiles(
 
 @router.get("/profiles/user/{user_id}", response_model=AlumniProfileRead)
 def get_alumni_profile_by_user(
-    user_id: str,
+    user_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -245,57 +244,38 @@ def get_alumni_profile_by_user(
             detail="Profil alumni introuvable pour cet utilisateur",
         )
 
+    if not is_directory_alumni(profile.user):
+        raise HTTPException(404, "Profil Alumni indisponible.")
     ensure_profile_access(db, current_user, profile)
     return profile
 
 
 @router.get("/profiles/{profile_id}", response_model=AlumniProfileRead)
 def get_alumni_profile(
-    profile_id: str,
+    profile_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
     profile = get_alumni_profile_or_404(db, profile_id)
+    if not is_directory_alumni(profile.user):
+        raise HTTPException(404, "Profil Alumni indisponible.")
     ensure_profile_access(db, current_user, profile)
     return profile
 
 
 @router.patch("/profiles/{profile_id}", response_model=AlumniProfileRead)
 def update_alumni_profile(
-    profile_id: str,
+    profile_id: UUID,
     payload: AlumniProfileUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    profile = get_alumni_profile_or_404(db, profile_id)
-    ensure_profile_access(db, current_user, profile, manage=True)
-
-    if payload.visibility is not None:
-        if payload.visibility not in VALID_ALUMNI_VISIBILITIES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Visibilité invalide",
-            )
-        profile.visibility = payload.visibility
-
-    fields = [
-        "graduation_year",
-        "current_company",
-        "current_position",
-        "domain",
-        "skills",
-        "experience_summary",
-        "available_for_mentoring",
-        "linkedin_url",
-        "portfolio_url",
-    ]
-
-    for field in fields:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(profile, field, value)
-
-    profile.updated_at = datetime.utcnow()
+    current_user, target_user, profile = lock_profile_write(db, current_user.id, profile_id)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(profile, field, value)
+    if "enactus_join_year" in payload.model_fields_set:
+        target_user.enactus_join_year = profile.enactus_join_year
+    profile.updated_at = utc_now()
 
     db.commit()
     db.refresh(profile)
@@ -305,13 +285,13 @@ def update_alumni_profile(
 
 @router.delete("/profiles/{profile_id}")
 def delete_alumni_profile(
-    profile_id: str,
+    profile_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    profile = get_alumni_profile_or_404(db, profile_id)
-    ensure_profile_access(db, current_user, profile, manage=True)
-
+    current_user, target_user, profile = lock_profile_write(db, current_user.id, profile_id)
+    if db.query(Mentorship.id).filter(Mentorship.alumni_id == target_user.id).first():
+        raise HTTPException(409, "Ce profil porte un historique de mentorat. Modifiez sa visibilité ou sa disponibilité.")
     db.delete(profile)
     db.commit()
 
@@ -321,32 +301,37 @@ def delete_alumni_profile(
     }
 
 
+def lock_mentorship_write(db, actor_id, mentorship_id, payload=None):
+    reference = db.query(Mentorship.alumni_id).filter(Mentorship.id == mentorship_id).first()
+    if reference is None:
+        raise HTTPException(404, "Mentorat introuvable.")
+    actor, mentor = lock_people(db, actor_id, reference[0])
+    mentorship = lock_row(db, Mentorship, mentorship_id)
+    if mentorship is None:
+        raise HTTPException(404, "Mentorat introuvable.")
+    ensure_mentorship_scope(db, actor, mentorship.project_id, mentorship.pole_id)
+    profile = db.query(AlumniProfile).filter(AlumniProfile.user_id == mentor.id).first()
+    if profile is None:
+        raise HTTPException(409, "Le profil du mentor doit être rétabli avant cette action.")
+    ensure_profile_access(db, actor, profile)
+    if payload is not None:
+        values = payload.model_dump(exclude_unset=True)
+        ensure_mentorship_scope(db, actor, values.get("project_id", mentorship.project_id),
+                                values.get("pole_id", mentorship.pole_id))
+    return actor, mentor, mentorship
+
+
 @router.post("/mentorships", response_model=MentorshipRead)
 def create_mentorship(
     payload: MentorshipCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    if payload.status not in VALID_MENTORSHIP_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Statut de mentorat invalide",
-        )
-
-    if not payload.project_id and not payload.pole_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le mentorat doit être lié à un projet ou à un pôle",
-        )
-
-    alumni_profile = db.query(AlumniProfile).filter(
-        AlumniProfile.user_id == payload.alumni_id
-    ).first()
-    if not alumni_profile:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Le mentor doit posséder un profil Alumni validé",
-        )
+    current_user, mentor = lock_people(db, current_user.id, payload.alumni_id)
+    ensure_mentorship_scope(db, current_user, payload.project_id, payload.pole_id)
+    profile = assert_available_mentor(db, mentor)
+    ensure_profile_access(db, current_user, profile)
+    assert_mentorship_dates(payload.started_at or date.today(), payload.ended_at)
 
     mentorship = Mentorship(
         alumni_id=payload.alumni_id,
@@ -371,12 +356,21 @@ def create_mentorship(
 def list_mentorships(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
-    alumni_id: str | None = Query(default=None),
-    project_id: str | None = Query(default=None),
-    pole_id: str | None = Query(default=None),
+    alumni_id: UUID | None = Query(default=None),
+    project_id: UUID | None = Query(default=None),
+    pole_id: UUID | None = Query(default=None),
     status_filter: str | None = Query(default=None),
 ):
-    query = db.query(Mentorship)
+    assert_valid_reader(current_user)
+    query = db.query(Mentorship).join(AlumniProfile, AlumniProfile.user_id == Mentorship.alumni_id)
+    if not can_manage_alumni(db, current_user):
+        visible = ["internal"]
+        if current_user.status == "alumni":
+            visible.append("alumni_only")
+        if is_enacchef(db, current_user):
+            visible.append("enacchef_only")
+        query = query.filter(or_(Mentorship.alumni_id == current_user.id,
+                                 AlumniProfile.visibility.in_(visible)))
 
     if alumni_id:
         query = query.filter(Mentorship.alumni_id == alumni_id)
@@ -395,49 +389,35 @@ def list_mentorships(
 
 @router.get("/mentorships/{mentorship_id}", response_model=MentorshipRead)
 def get_mentorship(
-    mentorship_id: str,
+    mentorship_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    return get_mentorship_or_404(db, mentorship_id)
+    mentorship = get_mentorship_or_404(db, mentorship_id)
+    profile = db.query(AlumniProfile).filter(AlumniProfile.user_id == mentorship.alumni_id).first()
+    if profile is None:
+        raise HTTPException(404, "Profil du mentor indisponible.")
+    ensure_profile_access(db, current_user, profile)
+    return mentorship
 
 
 @router.patch("/mentorships/{mentorship_id}", response_model=MentorshipRead)
 def update_mentorship(
-    mentorship_id: str,
+    mentorship_id: UUID,
     payload: MentorshipUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    mentorship = get_mentorship_or_404(db, mentorship_id)
-
-    if payload.status is not None:
-        if payload.status not in VALID_MENTORSHIP_STATUSES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Statut de mentorat invalide",
-            )
-        mentorship.status = payload.status
-
-    if payload.project_id is not None:
-        mentorship.project_id = payload.project_id
-
-    if payload.pole_id is not None:
-        mentorship.pole_id = payload.pole_id
-
-    if payload.title is not None:
-        mentorship.title = payload.title
-
-    if payload.objective is not None:
-        mentorship.objective = payload.objective
-
-    if payload.started_at is not None:
-        mentorship.started_at = payload.started_at
-
-    if payload.ended_at is not None:
-        mentorship.ended_at = payload.ended_at
-
-    mentorship.updated_at = datetime.utcnow()
+    current_user, mentor, mentorship = lock_mentorship_write(db, current_user.id, mentorship_id, payload)
+    values = payload.model_dump(exclude_unset=True)
+    assert_mentorship_dates(values.get("started_at", mentorship.started_at),
+                            values.get("ended_at", mentorship.ended_at))
+    if values.get("status", mentorship.status) == "active":
+        profile = assert_available_mentor(db, mentor)
+        ensure_profile_access(db, current_user, profile)
+    for field, value in values.items():
+        setattr(mentorship, field, value)
+    mentorship.updated_at = utc_now()
 
     db.commit()
     db.refresh(mentorship)
@@ -447,15 +427,16 @@ def update_mentorship(
 
 @router.post("/mentorships/{mentorship_id}/complete", response_model=MentorshipRead)
 def complete_mentorship(
-    mentorship_id: str,
+    mentorship_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    mentorship = get_mentorship_or_404(db, mentorship_id)
+    current_user, mentor, mentorship = lock_mentorship_write(db, current_user.id, mentorship_id)
 
+    assert_mentorship_dates(mentorship.started_at, date.today())
     mentorship.status = "completed"
     mentorship.ended_at = date.today()
-    mentorship.updated_at = datetime.utcnow()
+    mentorship.updated_at = utc_now()
 
     db.commit()
     db.refresh(mentorship)
@@ -465,11 +446,11 @@ def complete_mentorship(
 
 @router.delete("/mentorships/{mentorship_id}")
 def delete_mentorship(
-    mentorship_id: str,
+    mentorship_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_enacchef_or_admin),
 ):
-    mentorship = get_mentorship_or_404(db, mentorship_id)
+    current_user, mentor, mentorship = lock_mentorship_write(db, current_user.id, mentorship_id)
 
     db.delete(mentorship)
     db.commit()

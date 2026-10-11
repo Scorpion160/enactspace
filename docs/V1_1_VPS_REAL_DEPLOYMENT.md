@@ -94,6 +94,21 @@ FILE_STORAGE_PATH=/app/uploads
 AUTO_CREATE_TABLES=false
 EMAIL_ENABLED=false
 NOTIFICATION_EMAIL_ENABLED=false
+NOTIFICATION_EMAIL_FROM=enactus@esp.sn
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=enactus@esp.sn
+SMTP_PASSWORD=SECRET_MOT_DE_PASSE_APPLICATION_GOOGLE
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+MEET_SERVER_URL="https://meet.enactspace.kerunjombor.net"
+MEET_REQUIRE_JWT=true
+MEET_JWT_APP_ID=enactspace
+MEET_JWT_SECRET=SECRET_UNIQUE_JITSI
+MEET_JWT_AUDIENCE=jitsi
+MEET_JWT_SUBJECT=meet.enactspace.kerunjombor.net
+MEET_JWT_TTL_MINUTES=180
+MEET_RECORDING_ENABLED=false
 MOBILE_MONEY_ENABLED=false
 PAYMENT_PROVIDER_ENABLED=false
 ATTENDANCE_QR_ENABLED=true
@@ -111,8 +126,8 @@ chown root:enactspace /etc/enactspace/enactspace.env
 chmod 640 /etc/enactspace/enactspace.env
 ```
 
-Ne jamais afficher ce fichier, ni le placer dans Git. Desactiver SMTP et
-PayDunya durant cette release candidate.
+Ne jamais afficher ce fichier, ni le placer dans Git. Garder `EMAIL_ENABLED=false`
+tant que le mot de passe d’application Google n’a pas été installé sur l’hôte et qu’un test SMTP avec `enactus@esp.sn` n’a pas réussi. Le backend de production exige aussi une instance Jitsi/JaaS privée en HTTPS avec JWT réellement configuré avant démarrage ; `meet.jit.si` reste réservé aux essais. PayDunya reste désactivé tant que ses identifiants marchands ne sont pas configurés.
 
 ## 4. Frontend Flutter Web
 

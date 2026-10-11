@@ -1,5 +1,6 @@
 """PR-6.5 operational integrity rules on the portable SQLite test database."""
 
+from app.core.time import utc_now
 import asyncio
 import unittest
 import uuid
@@ -403,6 +404,7 @@ class OperationalIntegrityTests(unittest.TestCase):
     def test_generic_admin_patch_cannot_bypass_lifecycle(self):
         target = self._user()
         admin = self._user()
+        self._role(admin, "administrateur")
         with self.assertRaises(HTTPException) as caught:
             users.admin_update_user(
                 str(target.id),
@@ -771,7 +773,7 @@ class OperationalIntegrityTests(unittest.TestCase):
         event_row = Event(
             title="Community",
             event_type="meeting",
-            start_time=datetime.utcnow() + timedelta(days=1),
+            start_time=utc_now() + timedelta(days=1),
             requires_registration=True,
             max_participants=1,
         )
@@ -788,7 +790,7 @@ class OperationalIntegrityTests(unittest.TestCase):
         event_row = Event(
             title="Scoped event",
             event_type="meeting",
-            start_time=datetime.utcnow() + timedelta(days=1),
+            start_time=utc_now() + timedelta(days=1),
             created_by=creator.id,
         )
         self.db.add(event_row)

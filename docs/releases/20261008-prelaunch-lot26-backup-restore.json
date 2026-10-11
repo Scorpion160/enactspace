@@ -1,0 +1,538 @@
+{
+  "lot": 26,
+  "status": "SCHEDULED_CAPTURE_VERIFIED_CLEAN_HOST_AND_KEY_HANDOFF_PENDING",
+  "generated_at": "2026-10-08T10:32:35.983647+00:00",
+  "source_alembic_head": "20261007_0031",
+  "build_performed": false,
+  "deployment_performed": false,
+  "production_changed": false,
+  "safety_tests_passed": 19,
+  "safety_test_seconds": 2.166,
+  "rehearsal": {
+    "backup_id": "20261008T094513Z_fcf746",
+    "production_changed": false,
+    "application_or_workers_started": false,
+    "real_emails_sent": 0,
+    "real_push_sent": 0,
+    "real_payments": 0,
+    "backup_scope": "PostgreSQL and persistent application uploads; not full VPS or release artifacts",
+    "encrypted": true,
+    "offsite_copy_verified": false,
+    "key_recovery_offsite_verified": false,
+    "source_stable_during_capture": true,
+    "synthetic_schema_changes_detected": [
+      "constraints",
+      "indexes",
+      "columns"
+    ],
+    "schema_comparison_method": "Independent source schema-only capture reparsed by the same isolated PostgreSQL server",
+    "restore_image_id": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+    "encrypted_point_in_time_verification_manifest": true,
+    "comparison_diagnostic": {
+      "tables_different": 0,
+      "tables_order_only": 0,
+      "tables_with_content_difference": [],
+      "different_components": [],
+      "schema_order_only": []
+    },
+    "database_tables": 111,
+    "database_rows": 721,
+    "database_content_equal": true,
+    "sequences_equal": true,
+    "constraints_equal": true,
+    "indexes_equal": true,
+    "columns_equal": true,
+    "enums_equal": true,
+    "views_equal": true,
+    "functions_equal": true,
+    "triggers_equal": true,
+    "files_count": 14,
+    "files_bytes": 6435699,
+    "files_content_equal": true,
+    "stored_file_check": {
+      "records": 14,
+      "missing": 0,
+      "wrong_size": 0,
+      "wrong_hash": 0,
+      "unsafe_path": 0
+    },
+    "production_revision": "20261006_0025",
+    "schema_backup_restored": true,
+    "restore_seconds": 94.723,
+    "passed": true,
+    "encrypted_archives": {
+      "database.dump.gpg": {
+        "bytes": 185328,
+        "sha256": "90302aafd7fa86aafedb486c07fe00851749f6c76025aa6161b23291d087b3c8"
+      },
+      "schema-reference.dump.gpg": {
+        "bytes": 40743,
+        "sha256": "23f67864a71fc6886d25273b83f9791d73b8a269e7c335db883cfe0e08823db7"
+      },
+      "uploads.tar.gz.gpg": {
+        "bytes": 5862909,
+        "sha256": "5d1de09cb1fa58c11b8d6cc15884c37c206c1ba943565338d64e69a19f35eafd"
+      },
+      "verification.json.gpg": {
+        "bytes": 5003,
+        "sha256": "b0b40c40020fcb8517e37f627af6ac7002b7bed13ccfd9add12b98f3e5f8e6e4"
+      }
+    },
+    "owned_test_resources_removed": true,
+    "decrypted_staging_removed": true,
+    "finished_at": "2026-10-08T09:46:50.214411+00:00"
+  },
+  "manual_entire_repository_review_complete": false,
+  "next_actions": [
+    "Resolve or provide isolated clean-host runtime and test recovery",
+    "Finish and hand off an independent key escrow with a user-entered secret",
+    "Automate offsite transfer and approve retention plus RPO/RTO",
+    "Continue full source review and final application acceptance"
+  ],
+  "backup_scope": [
+    "PostgreSQL",
+    "persistent application uploads"
+  ],
+  "full_vps_recovery_validated": false,
+  "real_mail_or_push_sent": 0,
+  "test_email_redirection_preserved": true,
+  "previous_rehearsals": [
+    {
+      "backup_id": "20261008T091643Z_1d6fa4",
+      "production_changed": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "backup_scope": "PostgreSQL and persistent application uploads; not full VPS or release artifacts",
+      "encrypted": true,
+      "offsite_copy_verified": false,
+      "key_recovery_offsite_verified": false,
+      "source_stable_during_capture": true,
+      "passed": false,
+      "failure": "Restored database differs",
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T09:18:17.149015+00:00"
+    },
+    {
+      "backup_id": "20261008T092723Z_fa792a",
+      "production_changed": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "backup_scope": "PostgreSQL and persistent application uploads; not full VPS or release artifacts",
+      "encrypted": true,
+      "offsite_copy_verified": false,
+      "key_recovery_offsite_verified": false,
+      "source_stable_during_capture": true,
+      "comparison_diagnostic": {
+        "tables_different": 0,
+        "tables_order_only": 0,
+        "tables_with_content_difference": [],
+        "different_components": [
+          "constraints",
+          "indexes"
+        ],
+        "schema_order_only": []
+      },
+      "passed": false,
+      "failure": "Restored database differs",
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T09:28:48.363042+00:00"
+    },
+    {
+      "backup_id": "20261008T094201Z_a2ff64",
+      "production_changed": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "backup_scope": "PostgreSQL and persistent application uploads; not full VPS or release artifacts",
+      "encrypted": true,
+      "offsite_copy_verified": false,
+      "key_recovery_offsite_verified": false,
+      "source_stable_during_capture": true,
+      "schema_comparison_method": "Independent source schema-only capture reparsed by the same isolated PostgreSQL server",
+      "comparison_diagnostic": {
+        "tables_different": 0,
+        "tables_order_only": 0,
+        "tables_with_content_difference": [],
+        "different_components": [],
+        "schema_order_only": []
+      },
+      "database_tables": 111,
+      "database_rows": 721,
+      "database_content_equal": true,
+      "sequences_equal": true,
+      "constraints_equal": true,
+      "indexes_equal": true,
+      "columns_equal": true,
+      "enums_equal": true,
+      "views_equal": true,
+      "functions_equal": true,
+      "triggers_equal": true,
+      "files_count": 14,
+      "files_bytes": 6435699,
+      "files_content_equal": true,
+      "stored_file_check": {
+        "records": 14,
+        "missing": 0,
+        "wrong_size": 0,
+        "wrong_hash": 0,
+        "unsafe_path": 0
+      },
+      "production_revision": "20261006_0025",
+      "schema_backup_restored": true,
+      "restore_seconds": 112.601,
+      "passed": true,
+      "encrypted_archives": {
+        "database.dump.gpg": {
+          "bytes": 185329,
+          "sha256": "ff6ba2ae3b8c22148c2d157f6554318ca1a9a25548103e264aed051b1e69c8bc"
+        },
+        "schema-reference.dump.gpg": {
+          "bytes": 40743,
+          "sha256": "0196c04af30c7a6a5e8b784dd8800bfd4c8f7f240ca200fb7124e5f2472a6f04"
+        },
+        "uploads.tar.gz.gpg": {
+          "bytes": 5862909,
+          "sha256": "5014f721d341496531bd601f4f19d2268a636a4f4d9a2baaf830840a2f3ddc34"
+        }
+      },
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T09:43:56.597656+00:00"
+    }
+  ],
+  "schema_diagnostic": [
+    {
+      "component": "constraints",
+      "source_count": 576,
+      "restored_count": 576,
+      "changed": 54
+    },
+    {
+      "component": "indexes",
+      "source_count": 254,
+      "restored_count": 254,
+      "changed": 3
+    },
+    {
+      "diagnostic_resources_removed": true,
+      "private_staging_removed": true
+    }
+  ],
+  "root_cause_observed": "Source DDL deparsing differs after restore. Independently captured schema-only reference is restored into the same isolated server; full catalog definitions are compared without regex normalization or skipped checks.",
+  "cleanup_partial_start_failure_protected": true,
+  "preexisting_resources_protected": true,
+  "application_test_discovery_requires_gpg": false,
+  "host_gpg_integrity_test_explicit": true,
+  "ci_expected_alembic_head": "20261007_0031",
+  "ci_executed": false,
+  "restore_local_verified": true,
+  "offsite_recovery_verified": true,
+  "lot26_reviewed_source_files": [
+    {
+      "file": "backend/app/scripts/prelaunch_backup_restore.py",
+      "lines": 335,
+      "sha256": "cd7e88c2ab52e71ccab56c55538c070fdddcb5336a87141c632e4bd46ae3be24",
+      "manual_review": "LOT26_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T09:46:57.267588+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_backup_restore.py",
+      "lines": 140,
+      "sha256": "44a86193021ed15558fd7cb5bc6d2b5979fb23de3dabf7287e690eb6fe23dd18",
+      "manual_review": "LOT26_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T09:46:57.267588+00:00"
+    },
+    {
+      "file": "backend/ops_checks/__init__.py",
+      "lines": 1,
+      "sha256": "cbe0072b255ec8ba6e80af1a49a0c3d7b4c087c1a1cc938cd23eed61fa64d04f",
+      "manual_review": "LOT26_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T09:46:57.267588+00:00"
+    },
+    {
+      "file": "backend/ops_checks/backup_integrity_checks.py",
+      "lines": 23,
+      "sha256": "cdcb1b99c5e040977439b5dae3c87637ffff2a1276016cac99305528fb5410b8",
+      "manual_review": "LOT26_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T09:46:57.267588+00:00"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "lines": 169,
+      "sha256": "b68407c1094dec03c52aa935a358c188c142a551b5f33b0b7a8286f068a3736e",
+      "manual_review": "LOT26_CHANGED_SECTIONS_REVIEWED",
+      "review_history": [
+        {
+          "status": "LOT15_CHANGED_SECTIONS_REVIEWED",
+          "reviewed_at": null,
+          "sha256": "208aac821e8489106babc17dbac9c444b31c92d3824e81f8fd3cc07155ff0170"
+        }
+      ],
+      "reviewed_at": "2026-10-08T09:46:57.267588+00:00"
+    }
+  ],
+  "final_readonly_state_check": {
+    "production_revision": "20261006_0025",
+    "production_backend_running": true,
+    "owned_lot26_resources_remaining": {
+      "pg": 0,
+      "net": 0,
+      "volume": 0
+    },
+    "private_backup_directory": true,
+    "private_key_directory": true,
+    "private_key_file": true,
+    "backup_file_permissions": {
+      "database.dump.gpg": "0o600",
+      "schema-reference.dump.gpg": "0o600",
+      "uploads.tar.gz.gpg": "0o600",
+      "verification.json.gpg": "0o600",
+      "rehearsal.json": "0o600"
+    },
+    "last_plaintext_stage_absent": true
+  },
+  "offsite_restore_verified": true,
+  "second_key_custodian_verified": false,
+  "new_server_infrastructure_recovery_verified": false,
+  "offsite_rehearsal": {
+    "backup_id": "20261008T094513Z_fcf746",
+    "offsite_copy_verified": true,
+    "offsite_location": "authorized Windows PC",
+    "restored_existing_copy": true,
+    "original_vps_key_read_this_run": false,
+    "windows_file_acls_verified": true,
+    "windows_archive_acl_verified": true,
+    "windows_key_directory_acl_verified": true,
+    "windows_profile_key_roundtrip_verified": true,
+    "key_protection": "Windows DPAPI CurrentUser",
+    "second_key_custodian_verified": false,
+    "production_changed": false,
+    "build_performed": false,
+    "deployment_performed": false,
+    "restoration": {
+      "backup_id": "20261008T094513Z_fcf746",
+      "production_changed": false,
+      "production_data_queried": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "original_vps_key_used_for_restore": false,
+      "offsite_archives_hash_verified": true,
+      "comparison_diagnostic": {
+        "tables_different": 0,
+        "tables_order_only": 0,
+        "tables_with_content_difference": [],
+        "different_components": [],
+        "schema_order_only": []
+      },
+      "database_tables": 111,
+      "database_rows": 721,
+      "files_count": 14,
+      "files_bytes": 6435699,
+      "stored_file_check": {
+        "records": 14,
+        "missing": 0,
+        "wrong_size": 0,
+        "wrong_hash": 0,
+        "unsafe_path": 0
+      },
+      "database_schema_and_files_equal": true,
+      "production_revision_at_capture": "20261006_0025",
+      "restore_seconds": 37.973,
+      "passed": true,
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T10:03:10.104195+00:00"
+    },
+    "offsite_restore_verified": true,
+    "private_return_staging_removed": true,
+    "finished_at": "2026-10-08T10:02:19.671875+00:00"
+  },
+  "first_offsite_rehearsal": {
+    "backup_id": "20261008T094513Z_fcf746",
+    "offsite_copy_verified": true,
+    "offsite_location": "authorized Windows PC",
+    "windows_archive_acl_verified": true,
+    "windows_key_directory_acl_verified": true,
+    "windows_profile_key_roundtrip_verified": true,
+    "key_protection": "Windows DPAPI CurrentUser",
+    "second_key_custodian_verified": false,
+    "production_changed": false,
+    "build_performed": false,
+    "deployment_performed": false,
+    "restoration": {
+      "backup_id": "20261008T094513Z_fcf746",
+      "production_changed": false,
+      "production_data_queried": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "original_vps_key_used_for_restore": false,
+      "offsite_archives_hash_verified": true,
+      "comparison_diagnostic": {
+        "tables_different": 0,
+        "tables_order_only": 0,
+        "tables_with_content_difference": [],
+        "different_components": [],
+        "schema_order_only": []
+      },
+      "database_tables": 111,
+      "database_rows": 721,
+      "files_count": 14,
+      "files_bytes": 6435699,
+      "stored_file_check": {
+        "records": 14,
+        "missing": 0,
+        "wrong_size": 0,
+        "wrong_hash": 0,
+        "unsafe_path": 0
+      },
+      "database_schema_and_files_equal": true,
+      "production_revision_at_capture": "20261006_0025",
+      "restore_seconds": 31.437,
+      "passed": true,
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T10:00:49.981562+00:00"
+    },
+    "offsite_restore_verified": true,
+    "private_return_staging_removed": true,
+    "finished_at": "2026-10-08T09:59:59.536370+00:00"
+  },
+  "offsite_safety_tests_passed": 23,
+  "offsite_safety_test_seconds": 2.124,
+  "windows_dpapi_synthetic_roundtrip_passed": true,
+  "altered_dpapi_key_rejected": true,
+  "automatic_backup_schedule_enabled": true,
+  "retention_purge_enabled": false,
+  "offsite_reviewed_source_files": [
+    {
+      "file": "backend/app/scripts/prelaunch_offsite_restore.py",
+      "lines": 99,
+      "sha256": "f32657ef98b409a6ea82dbfebc8c23a7e256c7bd1dd217a58ec302f22cfb0582",
+      "manual_review": "LOT26_OFFSITE_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T10:03:38.942190+00:00"
+    },
+    {
+      "file": "backend/test_prelaunch_offsite_safety.py",
+      "lines": 46,
+      "sha256": "c743c63260438f6de9d2778512cf31a0cd60f1f93926a0e50b04a69482f3d864",
+      "manual_review": "LOT26_OFFSITE_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T10:03:38.942190+00:00"
+    },
+    {
+      "file": "tools/prelaunch_offsite_recovery.py",
+      "lines": 140,
+      "sha256": "2ce621492daabd5ab5aa7c3a681728f97992ccfe4608138a8407eb2d7bcbc042",
+      "manual_review": "LOT26_OFFSITE_CHANGED_SECTIONS_REVIEWED",
+      "reviewed_at": "2026-10-08T10:03:38.942190+00:00"
+    }
+  ],
+  "automatic_offsite_copy_enabled": false,
+  "host_operations_configuration_changed": true,
+  "production_application_changed": false,
+  "scheduled_backup": {
+    "daily_utc": "03:00",
+    "next_utc": "2026-10-09T03:00:00Z",
+    "service_result": "success",
+    "tests_passed": 4,
+    "manual_first_capture": {
+      "backup_id": "20261008T102855Z_a26e70",
+      "production_changed": false,
+      "application_or_workers_started": false,
+      "real_emails_sent": 0,
+      "real_push_sent": 0,
+      "real_payments": 0,
+      "backup_scope": "PostgreSQL and persistent application uploads; not full VPS or release artifacts",
+      "encrypted": true,
+      "offsite_copy_verified": false,
+      "key_recovery_offsite_verified": false,
+      "source_stable_during_capture": true,
+      "synthetic_schema_changes_detected": [
+        "constraints",
+        "indexes",
+        "columns"
+      ],
+      "schema_comparison_method": "Independent source schema-only capture reparsed by the same isolated PostgreSQL server",
+      "restore_image_id": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+      "encrypted_point_in_time_verification_manifest": true,
+      "comparison_diagnostic": {
+        "tables_different": 0,
+        "tables_order_only": 0,
+        "tables_with_content_difference": [],
+        "different_components": [],
+        "schema_order_only": []
+      },
+      "database_tables": 111,
+      "database_rows": 721,
+      "database_content_equal": true,
+      "sequences_equal": true,
+      "constraints_equal": true,
+      "indexes_equal": true,
+      "columns_equal": true,
+      "enums_equal": true,
+      "views_equal": true,
+      "functions_equal": true,
+      "triggers_equal": true,
+      "files_count": 14,
+      "files_bytes": 6435699,
+      "files_content_equal": true,
+      "stored_file_check": {
+        "records": 14,
+        "missing": 0,
+        "wrong_size": 0,
+        "wrong_hash": 0,
+        "unsafe_path": 0
+      },
+      "production_revision": "20261006_0025",
+      "schema_backup_restored": true,
+      "restore_seconds": 107.325,
+      "passed": true,
+      "encrypted_archives": {
+        "database.dump.gpg": {
+          "bytes": 185327,
+          "sha256": "62c1d71ecd12b233257e58ff7ad18e9e7e50d63c54e188b89aa861740f98c1b5"
+        },
+        "schema-reference.dump.gpg": {
+          "bytes": 40745,
+          "sha256": "b74e46d28350638053bb03b3735f66e2e9e31ee9e564ddacc89ad25fb12049fd"
+        },
+        "uploads.tar.gz.gpg": {
+          "bytes": 5862909,
+          "sha256": "264b2b9c8c2d02a2128027c48681861a26af97b9632577f7b8d692661e4c2b85"
+        },
+        "verification.json.gpg": {
+          "bytes": 5014,
+          "sha256": "bf4ca8f0d2d833be53714092d7820e1b01e99c3764a81d41b531a75db50ef52d"
+        }
+      },
+      "owned_test_resources_removed": true,
+      "decrypted_staging_removed": true,
+      "finished_at": "2026-10-08T10:30:44.627341+00:00"
+    },
+    "permissions": {
+      "operations_source_permissions_verified": true,
+      "installed_units_root_owned_and_not_writable_by_others": true,
+      "systemd_verification_clean": true
+    }
+  },
+  "key_escrow": {
+    "synthetic_roundtrip_passed": false,
+    "actual_key_exported": false,
+    "second_custodian_or_support_confirmed": false
+  },
+  "clean_host_test": {
+    "passed": false,
+    "blocker": "Windows Docker engine unavailable; Ubuntu WSL virtual disk path missing",
+    "registry_image_reference_verified": "postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
+  }
+}
