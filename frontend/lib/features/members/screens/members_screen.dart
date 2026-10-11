@@ -2264,7 +2264,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) { setState(() => _loading = false); }
     }
   }
 
@@ -2322,7 +2322,7 @@ class _MemberAssignmentSheetState extends State<_MemberAssignmentSheet> {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) { setState(() => _saving = false); }
     }
   }
 
@@ -2826,9 +2826,9 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
       await widget.membersService.updateMemberAdmin(userId: widget.member.id, profileData: data);
       if (mounted) { Navigator.of(context).pop(true); }
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceAll('Exception: ', ''));
+      if (mounted) { setState(() => _error = error.toString().replaceAll('Exception: ', '')); }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) { setState(() => _loading = false); }
     }
   }
   @override
