@@ -22,6 +22,7 @@ import '../widgets/composer.dart';
 import '../widgets/conversation_header.dart';
 import '../widgets/conversation_list.dart';
 import '../widgets/media_ui.dart';
+import '../widgets/chat_attachment_card.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_list.dart';
 import '../widgets/new_conversation_dialog.dart';
@@ -2867,95 +2868,15 @@ class _MessageBody extends StatelessWidget {
       return _AudioMessageBody(gateway: gateway, message: message);
     }
 
-    if (message.messageType == 'image' || message.messageType == 'sticker') {
-      final url = message.absoluteAttachmentUrl;
-      if (message.messageType == 'sticker' &&
-          (url == null || url.isEmpty) &&
-          message.content.trim().isNotEmpty) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            message.content.trim(),
-            style: TextStyle(fontSize: 64, height: 1.05),
-          ),
-        );
-      }
-      if (url == null || url.isEmpty) {
-        return _MediaFallback(message: message, unavailable: true);
-      }
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final targetWidth = message.messageType == 'sticker'
-                  ? 150.0
-                  : 260.0;
-              final width =
-                  constraints.maxWidth.isFinite &&
-                      constraints.maxWidth < targetWidth
-                  ? constraints.maxWidth
-                  : targetWidth;
-              final height = message.messageType == 'sticker' ? 150.0 : 170.0;
-
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.network(
-                      url,
-                      width: width,
-                      height: height,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return _MediaLoadingBox(width: width, height: height);
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return _MediaFallback(
-                          message: message,
-                          unavailable: true,
-                        );
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: _AttachmentActionButton(message: message),
-                  ),
-                ],
-              );
-            },
-          ),
-          if (message.attachmentSizeBytes != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              _formatBytes(message.attachmentSizeBytes!),
-              style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.54),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-          if (message.isEphemeralMedia) ...[
-            const SizedBox(height: 6),
-            _EphemeralMediaBadge(duration: message.ephemeralDuration!),
-          ],
-          if (message.content.trim().isNotEmpty &&
-              message.content != message.attachmentLabel) ...[
-            const SizedBox(height: 8),
-            Text(message.content, style: TextStyle(height: 1.35)),
-          ],
-        ],
-      );
+    if (message.messageType == 'sticker' &&
+        message.absoluteAttachmentUrl == null) {
+      return Text(message.content, style: const TextStyle(fontSize: 64));
     }
-
-    return _MediaFallback(message: message);
+    return ChatAttachmentCard(
+      key: ValueKey(message.id),
+      gateway: gateway,
+      message: message,
+    );
   }
 }
 
@@ -3411,158 +3332,6 @@ class _AudioMessageBodyState extends State<_AudioMessageBody> {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _MediaFallback extends StatelessWidget {
-  final ChatMessageModel message;
-  final bool unavailable;
-
-  const _MediaFallback({required this.message, this.unavailable = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (message.messageType) {
-      'audio' => Icons.graphic_eq_rounded,
-      'video' => Icons.play_circle_fill_rounded,
-      'document' => Icons.description_rounded,
-      'sticker' => Icons.emoji_emotions_rounded,
-      'image' => Icons.image_rounded,
-      _ => Icons.attach_file_rounded,
-    };
-    final details = [
-      _messageTypeLabel(message.messageType),
-      if (message.attachmentSizeBytes != null)
-        _formatBytes(message.attachmentSizeBytes!),
-      if (message.durationSeconds != null)
-        _formatDuration(message.durationSeconds!),
-      if (message.isEphemeralMedia)
-        'Éphémère ${_ephemeralDurationLabel(message.ephemeralDuration!)}',
-    ].join(' · ');
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 320),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            backgroundColor: AppTheme.softBlack,
-            foregroundColor: Colors.white,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  unavailable
-                      ? 'Pièce jointe indisponible'
-                      : message.attachmentLabel,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-                if (message.content.trim().isNotEmpty &&
-                    message.content != message.attachmentLabel)
-                  Text(
-                    message.content,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (details.isNotEmpty)
-                  Text(
-                    details,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.54),
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _AttachmentActionButton(message: message, compact: true),
-        ],
-      ),
-    );
-  }
-}
-
-class _EphemeralMediaBadge extends StatelessWidget {
-  final String duration;
-
-  const _EphemeralMediaBadge({required this.duration});
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-      avatar: Icon(Icons.timer_outlined, size: 16),
-      label: Text('Éphémère ${_ephemeralDurationLabel(duration)}'),
-    );
-  }
-}
-
-class _MediaLoadingBox extends StatelessWidget {
-  final double width;
-  final double height;
-
-  const _MediaLoadingBox({required this.width, required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
-    );
-  }
-}
-
-class _AttachmentActionButton extends StatelessWidget {
-  final ChatMessageModel message;
-  final bool compact;
-
-  const _AttachmentActionButton({required this.message, this.compact = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasUrl = message.absoluteAttachmentUrl?.isNotEmpty == true;
-    final icon = compact ? Icons.file_open_rounded : Icons.download_rounded;
-
-    return Tooltip(
-      message: hasUrl ? 'Copier le lien' : 'Pièce jointe indisponible',
-      child: IconButton.filledTonal(
-        visualDensity: VisualDensity.compact,
-        onPressed: hasUrl ? () => _copyAttachmentLink(context, message) : null,
-        icon: Icon(icon, size: compact ? 18 : 20),
       ),
     );
   }
@@ -6268,34 +6037,6 @@ String _formatDuration(int seconds) {
   return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
 }
 
-String _ephemeralDurationLabel(String duration) {
-  switch (duration) {
-    case '24h':
-      return '24 h';
-    case '7d':
-      return '7 j';
-    case '30d':
-      return '30 j';
-    default:
-      return duration;
-  }
-}
-
-void _copyAttachmentLink(BuildContext context, ChatMessageModel message) {
-  final url = message.absoluteAttachmentUrl;
-  if (url == null || url.isEmpty) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Pièce jointe indisponible.')));
-    return;
-  }
-
-  Clipboard.setData(ClipboardData(text: url));
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Lien de la pièce jointe copié.')),
-  );
-}
-
 String _inferMessageTypeFromFileName(String fileName) {
   final extension = _fileExtension(fileName);
 
@@ -6370,3 +6111,4 @@ String _fileExtension(String fileName) {
   final parts = fileName.toLowerCase().split('.');
   return parts.length > 1 ? parts.last : '';
 }
+

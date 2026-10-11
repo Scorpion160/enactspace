@@ -8,7 +8,7 @@ from app.core.time import utc_now
 from app.models.account import UserPreference
 from app.models.email_delivery import EmailDelivery
 from app.models.notification import Notification
-from app.services.email_templates import render_email_html
+from app.services.email_templates import render_email_html, APP_URL
 from app.services.email_provider import (
     EmailFailureKind,
     EmailProvider,
@@ -84,11 +84,20 @@ def enqueue_notification_email(
     user_id=None,
 ) -> EmailDelivery | None:
     db.flush()
+    private_chat = notification.type in {
+        "chat_message", "chat_poll", "chat_reaction"
+    }
+    body = (
+        "Vous avez reçu une nouvelle notification dans votre conversation.\n\n"
+        "Ouvrez EnactSpace pour consulter le message et ses pièces jointes : "
+        + APP_URL + "/chat"
+        if private_chat else notification.message
+    )
     return enqueue_email_delivery(
         db,
         recipient_email=recipient_email,
-        subject=notification.title,
-        text_body=notification.message,
+        subject="Nouveau message sur EnactSpace" if private_chat else notification.title,
+        text_body=body,
         user_id=user_id,
         notification_id=notification.id,
         dedupe_key=f"notification:{notification.id}",
@@ -228,3 +237,4 @@ def drain_email_deliveries(
     for delivery_id in delivery_ids:
         process_email_delivery(db, delivery_id, selected_provider)
     return len(delivery_ids)
+

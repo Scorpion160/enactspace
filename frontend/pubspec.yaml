@@ -52,6 +52,8 @@ dependencies:
   firebase_messaging: ^16.1.0
   uuid: ^4.5.2
   audioplayers: ^6.8.1
+  video_player: 2.14.1
+  path_provider: ^2.1.5
   jitsi_meet_flutter_sdk: ^13.2.0
   web: ^1.1.1
   local_auth: ^3.0.2
@@ -116,3 +118,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+

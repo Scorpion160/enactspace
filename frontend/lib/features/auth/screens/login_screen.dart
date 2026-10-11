@@ -5,7 +5,7 @@ import '../../../core/academic/esp_academic_catalog.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/biometric_authenticator.dart';
 import '../../../core/auth/login_preferences.dart';
-import '../../../core/brand/brand_assets.dart';
+import '../../../core/brand/enact_brand_lockup.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
 
@@ -210,26 +210,7 @@ class _BrandPanel extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 220,
-                      height: 144,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Color(0xBFFFFFFF),
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Image(
-                            image: AssetImage(
-                              'assets/brand/logo/enactspace_logo_full_transparent.png',
-                            ),
-                            fit: BoxFit.contain,
-                            semanticLabel: 'EnactSpace',
-                          ),
-                        ),
-                      ),
-                    ),
+                    EnactBrandLockup(translucent: true),
                     SizedBox(height: 20),
                     Text(
                       'Enactus ESP',
@@ -1292,34 +1273,7 @@ class _PublicInlineHeader extends StatelessWidget {
   const _PublicInlineHeader();
 
   @override
-  Widget build(BuildContext context) {
-    final scaledBodySize = MediaQuery.textScalerOf(context).scale(16);
-    final showLabel = scaledBodySize < 24;
-    return Row(
-      children: [
-        Image.asset(
-          BrandAssets.logoFull,
-          width: 112,
-          height: 46,
-          fit: BoxFit.contain,
-        ),
-        if (showLabel) ...[
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'EnactSpace',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+  Widget build(BuildContext context) => const EnactBrandLockup();
 }
 
 class _PublicDialogTitle extends StatelessWidget {
@@ -1356,3 +1310,4 @@ class _ErrorBanner extends StatelessWidget {
     );
   }
 }
+

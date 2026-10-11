@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/biometric_authenticator.dart';
-import '../../../core/brand/brand_assets.dart';
+import '../../../core/brand/enact_brand_lockup.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -73,11 +73,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    BrandAssets.logoFull,
-                    width: logoWidth,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(width: logoWidth, child: const EnactBrandLockup()),
                   SizedBox(height: isCompact ? 18 : 28),
                   const Text(
                     'Gestion interne Enactus ESP',
@@ -113,3 +109,4 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+
