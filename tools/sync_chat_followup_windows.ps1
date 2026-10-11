@@ -30,6 +30,7 @@ function Get-CanonicalHash([string]$Path) {
 $temp = Join-Path $env:TEMP ('EnactSpace-ChatSuite-' + [guid]::NewGuid().ToString('N'))
 $candidate = Join-Path $temp 'candidate'
 $baseline = Join-Path $temp 'baseline'
+$localComparison = Join-Path $temp 'local-comparison'
 $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\chat-suite-' + [guid]::NewGuid().ToString('N'))
 try {
     foreach ($item in $files) {
@@ -48,10 +49,39 @@ try {
             }
         }
     }
+    # Format all three copies in the same project context; never format the original here.
+    foreach ($root in @($candidate, $baseline, $localComparison)) {
+        $front = Join-Path $root 'frontend'
+        New-Item -ItemType Directory -Path $front -Force | Out-Null
+        foreach ($name in @('pubspec.yaml', 'analysis_options.yaml')) {
+            $contextFile = Join-Path $Repo "frontend/$name"
+            if ((Test-Path -LiteralPath $contextFile) -and
+                ($name -ne 'pubspec.yaml' -or !(Test-Path -LiteralPath (Join-Path $front $name)))) {
+                Copy-Item -LiteralPath $contextFile -Destination (Join-Path $front $name) -Force
+            }
+        }
+    }
+    # Restore the candidate pubspec after copying formatter context.
+    $pubspec = $files | Where-Object { $_.Path -eq 'frontend/pubspec.yaml' }
+    $candidatePubspec = Join-Path $candidate 'frontend/pubspec.yaml'
+    Invoke-WebRequest "https://raw.githubusercontent.com/Scorpion160/enactspace/$Commit/frontend/pubspec.yaml" -OutFile $candidatePubspec -UseBasicParsing
+    if ((Get-FileHash $candidatePubspec -Algorithm SHA256).Hash.ToLowerInvariant() -ne $pubspec.Hash) {
+        throw 'Integrite du pubspec incorrecte.'
+    }
+    foreach ($item in $files | Where-Object { $_.Path.EndsWith('.dart') }) {
+        $target = Join-Path $Repo $item.Path
+        if (Test-Path -LiteralPath $target) {
+            $copy = Join-Path $localComparison $item.Path
+            New-Item -ItemType Directory -Path (Split-Path $copy) -Force | Out-Null
+            Copy-Item -LiteralPath $target -Destination $copy
+        }
+    }
     $stagedDart = @($files | Where-Object { $_.Path.EndsWith('.dart') } |
         ForEach-Object {
             Join-Path $candidate $_.Path
             if ($null -ne $_.OldHash) { Join-Path $baseline $_.Path }
+            $copy = Join-Path $localComparison $_.Path
+            if (Test-Path -LiteralPath $copy) { $copy }
         })
     dart format @stagedDart
     if ($LASTEXITCODE -ne 0) { throw 'Formatage preparatoire echoue : aucun remplacement.' }
@@ -66,7 +96,11 @@ try {
                 $accepted += $item.OldHash
             }
             $accepted += $item.Hash
-            if ($actual -notin $accepted) {
+            $comparison = $actual
+            if ($item.Path.EndsWith('.dart')) {
+                $comparison = Get-CanonicalHash (Join-Path $localComparison $item.Path)
+            }
+            if ($actual -notin $accepted -and $comparison -notin $accepted) {
                 throw "Source locale differente : $($item.Path). Aucun remplacement."
             }
             $snapshots[$item.Path] = $actual
