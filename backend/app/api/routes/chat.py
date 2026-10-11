@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_, exists
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_validated_user
@@ -270,7 +270,7 @@ def user_display_name(user: User | None) -> str:
 def thread_notification_name(thread: ChatThread | None) -> str:
     if not thread:
         return "Conversation"
-    return thread.title or "Discussion privée"
+    return thread.title or "Discussion privee"
 
 
 def attach_file_to_thread(
@@ -555,6 +555,19 @@ def upload_chat_media(
         message_type=payload.message_type,
     )
 
+def notify_group_membership(db, thread, recipient_ids, actor, notification_type):
+    """Opening an unused direct conversation must not notify its recipient."""
+    if thread is None or thread.thread_type == "direct" or not recipient_ids:
+        return
+    notify_users(
+        db, user_ids=recipient_ids,
+        title="Ajout à un groupe",
+        message=f"{user_display_name(actor)} vous a ajouté au groupe « {thread_notification_name(thread)} ».",
+        notification_type=notification_type,
+        related_type="chat_thread", related_id=thread.id, dedupe=False,
+    )
+
+
 @router.post("/threads", response_model=ChatThreadRead)
 def create_thread(
     payload: ChatThreadCreate,
@@ -636,18 +649,9 @@ def create_thread(
         )
 
     recipient_ids = [user_id for user_id in participant_ids if user_id != current_user.id]
-    if recipient_ids:
-        creator_name = user_display_name(current_user)
-        notify_users(
-            db,
-            user_ids=recipient_ids,
-            title="Nouvelle conversation",
-            message=f"{creator_name} vous a ajouté à {thread_notification_name(thread)}.",
-            notification_type="chat_thread_created",
-            related_type="chat_thread",
-            related_id=thread.id,
-            dedupe=True,
-        )
+    notify_group_membership(
+        db, thread, recipient_ids, current_user, "chat_thread_created"
+    )
 
     db.commit()
     db.refresh(thread)
@@ -664,6 +668,11 @@ def list_threads(
         ChatParticipant.thread_id == ChatThread.id,
     ).filter(
         ChatParticipant.user_id == current_user.id,
+        or_(
+            ChatThread.thread_type != "direct",
+            ChatThread.created_by == current_user.id,
+            exists().where(ChatMessage.thread_id == ChatThread.id),
+        ),
     ).order_by(ChatThread.updated_at.desc()).all()
 
     return [build_thread_read(db, thread, current_user.id) for thread in threads]
@@ -716,6 +725,12 @@ def add_thread_participants(
 ):
     current_participant = get_participant_or_404(db, thread_id, current_user.id)
     require_thread_admin(current_participant)
+    thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
+    if thread is not None and thread.thread_type == "direct":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Une discussion privée reste entre deux personnes. Créez un groupe pour ajouter des membres.",
+        )
 
     if not payload.user_ids:
         raise HTTPException(
@@ -752,18 +767,9 @@ def add_thread_participants(
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
     if thread:
         thread.updated_at = utc_now()
-    if added_user_ids:
-        actor_name = user_display_name(current_user)
-        notify_users(
-            db,
-            user_ids=added_user_ids,
-            title="Ajout à une conversation",
-            message=f"{actor_name} vous a ajouté à {thread_notification_name(thread)}.",
-            notification_type="chat_participant_added",
-            related_type="chat_thread",
-            related_id=UUID(thread_id),
-            dedupe=True,
-        )
+    notify_group_membership(
+        db, thread, added_user_ids, current_user, "chat_participant_added"
+    )
 
     db.commit()
 
@@ -1030,7 +1036,7 @@ def upsert_message_reaction(
         notify_user(
             db,
             user_id=message.author_id,
-            title=f"{user_display_name(current_user)} a réagi à votre message",
+            title=f"{user_display_name(current_user)} a reagi a votre message",
             message=reaction_type,
             notification_type="chat_reaction",
             related_type="chat_thread",

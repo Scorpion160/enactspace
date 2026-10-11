@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/features/chat/models/chat_models.dart';
-import '../lib/features/chat/services/chat_gateway.dart';
-import '../lib/features/chat/widgets/chat_attachment_card.dart';
-import '../lib/core/brand/enact_brand_lockup.dart';
+import 'package:frontend/features/chat/models/chat_models.dart';
+import 'package:frontend/features/chat/services/chat_gateway.dart';
+import 'package:frontend/features/chat/widgets/chat_attachment_card.dart';
+import 'package:frontend/core/brand/enact_brand_lockup.dart';
 
 class _Gateway implements ChatGateway {
   int calls = 0;

@@ -23,6 +23,7 @@ import '../widgets/conversation_header.dart';
 import '../widgets/conversation_list.dart';
 import '../widgets/media_ui.dart';
 import '../widgets/chat_attachment_card.dart';
+import '../widgets/chat_gif_picker.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_list.dart';
 import '../widgets/new_conversation_dialog.dart';
@@ -1080,11 +1081,42 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       return;
     }
+    if (choice.type == 'catalog_gif') {
+      await _sendCatalogGif(choice.value);
+      return;
+    }
     if (choice.type == 'gif') {
       await _pickAndSendFile(
         messageType: 'image',
         allowedExtensions: const ['gif'],
       );
+    }
+  }
+
+  Future<void> _sendCatalogGif(String id) async {
+    final thread = _selectedThread;
+    if (thread == null || _sending) { return; }
+    setState(() => _sending = true);
+    try {
+      final items = await loadChatGifs();
+      final gif = items.firstWhere((item) => item.id == id);
+      final upload = await _gateway.uploadMediaBase64(
+        fileName: '${gif.id}.gif', dataBase64: gif.data,
+        messageType: 'image', threadId: thread.id, contentType: 'image/gif',
+      );
+      if (!mounted) { return; }
+      setState(() => _sending = false);
+      await _sendAttachmentMessage(_OutgoingAttachment(
+        messageType: 'image', fileId: upload.fileId, url: upload.url,
+        name: upload.fileName, caption: '', mimeType: upload.contentType,
+        sizeBytes: upload.sizeBytes, durationSeconds: null,
+        thumbnailUrl: null, stickerPack: null,
+      ));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _sending = false);
+        _showError('Envoi du GIF impossible. Réessayez.');
+      }
     }
   }
 
@@ -1658,7 +1690,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const Divider(),
                   Wrap(
                     spacing: 10,
-                    children: ['👍', '👏', '💛', '🔥', '🙏'].map((emoji) {
+                    children: ['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) {
                       return ActionChip(
                         label: Text(emoji),
                         onPressed: () {
@@ -1941,6 +1973,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : _selectedThread == null
                   ? const _EmptyConversation()
                   : _MessagesList(
+                      autoDownloadImages: _mediaCacheSettings.autoDownloadMedia,
                       gateway: _gateway,
                       thread: _selectedThread!,
                       messages: _messages
@@ -2601,6 +2634,7 @@ class _ConversationSubtitle extends StatelessWidget {
 
 class _MessagesList extends StatelessWidget {
   final ChatGateway gateway;
+  final bool autoDownloadImages;
   final ChatThreadModel thread;
   final List<ChatMessageModel> messages;
   final String? currentUserId;
@@ -2613,6 +2647,7 @@ class _MessagesList extends StatelessWidget {
   final void Function(ChatMessageModel, ChatPollOptionModel) onPollOptionTap;
 
   const _MessagesList({
+    required this.autoDownloadImages,
     required this.gateway,
     required this.thread,
     required this.messages,
@@ -2672,6 +2707,7 @@ class _MessagesList extends StatelessWidget {
                 ),
               ChatMediaRegion(
                 child: _MessageBody(
+                  autoDownloadImages: autoDownloadImages,
                   gateway: gateway,
                   message: message,
                   onPollOptionTap: (option) => onPollOptionTap(message, option),
@@ -2842,10 +2878,12 @@ class _MessageStatusIndicator extends StatelessWidget {
 
 class _MessageBody extends StatelessWidget {
   final ChatGateway gateway;
+  final bool autoDownloadImages;
   final ChatMessageModel message;
   final ValueChanged<ChatPollOptionModel> onPollOptionTap;
 
   const _MessageBody({
+    required this.autoDownloadImages,
     required this.gateway,
     required this.message,
     required this.onPollOptionTap,
@@ -2873,6 +2911,7 @@ class _MessageBody extends StatelessWidget {
       return Text(message.content, style: const TextStyle(fontSize: 64));
     }
     return ChatAttachmentCard(
+      autoDownloadImages: autoDownloadImages,
       key: ValueKey(message.id),
       gateway: gateway,
       message: message,
@@ -4055,42 +4094,12 @@ class _ChatExpressionSheet extends StatelessWidget {
                       context,
                     ).pop(_ExpressionChoice('sticker', value)),
                   ),
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.gif_box_rounded, size: 66),
-                          const SizedBox(height: 14),
-                          Text(
-                            'Envoyer un GIF animé',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Choisis un fichier .gif depuis ton appareil. '
-                            'Aucun compte ou service externe n’est nécessaire.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          FilledButton.icon(
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).pop(const _ExpressionChoice('gif', '')),
-                            icon: Icon(Icons.folder_open_rounded),
-                            label: Text('Choisir un GIF'),
-                          ),
-                        ],
-                      ),
+                  ChatGifPicker(
+                    onSelected: (gif) => Navigator.of(context).pop(
+                      _ExpressionChoice('catalog_gif', gif.id),
+                    ),
+                    onImport: () => Navigator.of(context).pop(
+                      const _ExpressionChoice('gif', ''),
                     ),
                   ),
                 ],

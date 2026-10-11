@@ -10,8 +10,9 @@ import '../services/chat_video_source.dart';
 
 class ChatAttachmentCard extends StatefulWidget {
   final ChatGateway gateway;
+  final bool autoDownloadImages;
   final ChatMessageModel message;
-  const ChatAttachmentCard({super.key, required this.gateway, required this.message});
+  const ChatAttachmentCard({super.key, required this.gateway, required this.message, this.autoDownloadImages = false});
 
   @override
   State<ChatAttachmentCard> createState() => _ChatAttachmentCardState();
@@ -28,6 +29,17 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
   bool get _video => widget.message.messageType == 'video';
   bool get _pdf => widget.message.attachmentMimeType == 'application/pdf' ||
       widget.message.attachmentLabel.toLowerCase().endsWith('.pdf');
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoDownloadImages && _image &&
+        (widget.message.attachmentSizeBytes ?? 0) <= 10 * 1024 * 1024) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) { unawaited(_load()); }
+      });
+    }
+  }
 
   Future<void> _load() async {
     if (_loading) { return; }
