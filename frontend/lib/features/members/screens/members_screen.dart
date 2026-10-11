@@ -2824,7 +2824,7 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
       };
       data['enactus_join_year'] = int.tryParse(_fields['enactus_join_year']!.text.trim());
       await widget.membersService.updateMemberAdmin(userId: widget.member.id, profileData: data);
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) { Navigator.of(context).pop(true); }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString().replaceAll('Exception: ', ''));
     } finally {
