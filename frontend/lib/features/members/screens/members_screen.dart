@@ -56,14 +56,18 @@ class _MembersScreenState extends State<MembersScreen> {
       final members = user.canManageMembers
           ? await _membersService.getManagedMembers()
           : await _membersService.getMembers();
-      if (user.canReviewJoinRequests && !user.canManageMembers) {
+      if (user.canReviewJoinRequests) {
         final pendingMembers = await _membersService.getPendingMembers();
         final knownIds = members.map((member) => member.id).toSet();
         members.addAll(
           pendingMembers.where((member) => knownIds.add(member.id)),
         );
       }
-      members.removeWhere((member) => member.isAlumni);
+      members.removeWhere(
+        (member) => !member.visibleInMemberManagement(
+          canReviewJoinRequests: user.canReviewJoinRequests,
+        ),
+      );
       members.sort(MemberModel.compareAlphabetically);
 
       if (!mounted) return;
@@ -488,7 +492,7 @@ class _MembersScreenState extends State<MembersScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _MembersHeader(
-                  total: _members.length,
+                  total: _members.where((member) => !member.isAlumni).length,
                   active: _activeCount,
                   pending: _pendingCount,
                   canManage: canManageMembers,

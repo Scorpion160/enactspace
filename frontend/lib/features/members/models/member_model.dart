@@ -55,6 +55,11 @@ class MemberModel {
     this.photoUrl,
   });
 
+  // Alumni requests are reviewed here, without joining enacteur totals.
+  bool visibleInMemberManagement({required bool canReviewJoinRequests}) {
+    return !isAlumni || (status == 'pending' && canReviewJoinRequests);
+  }
+
   factory MemberModel.fromJson(Map<String, dynamic> json) {
     return MemberModel(
       id: json['id']?.toString() ?? '',
