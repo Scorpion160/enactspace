@@ -444,7 +444,6 @@ class _InstitutionalRequestsPanelState
       request,
       () => widget.gateway.updateRequest(
         request: request,
-      initialDraft: _unsavedEdits[request.id],
         payload: result.payload,
         poleId: result.poleId,
         projectId: result.projectId,
