@@ -2816,7 +2816,7 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
     super.dispose();
   }
   Future<void> _submit() async {
-    if (_loading || !_formKey.currentState!.validate()) return;
+    if (_loading || !_formKey.currentState!.validate()) { return; }
     setState(() { _loading = true; _error = null; });
     try {
       final data = <String, dynamic>{
@@ -2857,11 +2857,11 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                     : entry.key == 'enactus_join_year' ? TextInputType.number : TextInputType.text,
                   validator: (value) {
                     final text = (value ?? '').trim();
-                    if ({'first_name', 'last_name', 'email'}.contains(entry.key) && text.isEmpty) return 'Ce champ est obligatoire.';
-                    if (entry.key == 'email' && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) return 'Adresse e-mail invalide.';
+                    if ({'first_name', 'last_name', 'email'}.contains(entry.key) && text.isEmpty) { return 'Ce champ est obligatoire.'; }
+                    if (entry.key == 'email' && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) { return 'Adresse e-mail invalide.'; }
                     if (entry.key == 'enactus_join_year' && text.isNotEmpty) {
                       final year = int.tryParse(text);
-                      if (year == null || year < 1900 || year > DateTime.now().year) return 'Indiquez une année valide.';
+                      if (year == null || year < 1900 || year > DateTime.now().year) { return 'Indiquez une année valide.'; }
                     }
                     return null;
                   },

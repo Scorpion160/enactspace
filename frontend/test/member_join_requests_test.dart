@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/features/members/models/member_model.dart';
+import 'package:frontend/features/members/models/member_model.dart';
 
 void main() {
   MemberModel member(String profile, String status) => MemberModel(
