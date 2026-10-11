@@ -315,7 +315,7 @@ def notify_application_status(
         title="Statut de candidature mis à jour",
         message=APPLICATION_TRACKING_NEXT_STEPS.get(
             normalized_status,
-            "Votre candidature a ete mise a jour.",
+            "Votre candidature a été mise à jour.",
         ),
         notification_type="recruitment_status",
         related_type="application",
@@ -1527,8 +1527,8 @@ def convert_application_to_user(
         notify_user(
             db,
             user_id=existing_user.id,
-            title="Candidature liee a votre compte",
-            message="Votre candidature Enactus ESP est maintenant liee a votre compte.",
+            title="Candidature liée à votre compte",
+            message="Votre candidature Enactus ESP est maintenant liée à votre compte.",
             notification_type="recruitment_update",
             related_type="application",
             related_id=application.id,
@@ -1613,8 +1613,8 @@ def convert_application_to_user(
         notify_user(
             db,
             user_id=existing_user.id,
-            title="Candidature liee a votre compte",
-            message="Votre candidature Enactus ESP est maintenant liee a votre compte.",
+            title="Candidature liée à votre compte",
+            message="Votre candidature Enactus ESP est maintenant liée à votre compte.",
             notification_type="recruitment_update",
             related_type="application",
             related_id=application.id,

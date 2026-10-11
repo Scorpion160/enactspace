@@ -115,6 +115,17 @@ def task_assignee_user_ids(db: Session, task: Task) -> list:
     ]
 
 
+def task_status_label(status: str) -> str:
+    return {
+        "a_faire": "à faire",
+        "en_cours": "en cours",
+        "bloque": "bloquée",
+        "termine": "terminée, en attente de validation",
+        "valide": "validée",
+        "annule": "annulée",
+    }.get(status, "mise à jour")
+
+
 def notify_task_assignees(
     db: Session,
     task: Task,
@@ -167,8 +178,8 @@ def notify_task_due_soon(db: Session, task: Task, *, actor_id=None) -> None:
     notify_task_assignees(
         db,
         task,
-        title="Echeance proche",
-        message=f"La tache {task.title} arrive bientot a echeance.",
+        title="Échéance proche",
+        message=f"La tâche {task.title} arrive bientôt à échéance.",
         notification_type="task_due_soon",
         actor_id=actor_id,
         dedupe=True,
@@ -510,8 +521,8 @@ def create_task(
     notify_task_assignees(
         db,
         task,
-        title="Nouvelle tache assignee",
-        message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
+        title="Nouvelle tâche attribuée",
+        message=f"Une nouvelle tâche vous a été attribuée : {task.title}.",
         notification_type="task_assigned",
         actor_id=current_user.id,
         dedupe=True,
@@ -694,8 +705,8 @@ def update_task(
         notify_task_assignees(
             db,
             task,
-            title="Statut de tache modifie",
-            message=f"La tache {task.title} est maintenant {task.status}.",
+            title="Statut de tâche modifié",
+            message=f"La tâche {task.title} est maintenant {task_status_label(task.status)}.",
             notification_type="task_updated",
             actor_id=current_user.id,
         )
@@ -703,8 +714,8 @@ def update_task(
         notify_task_assignees(
             db,
             task,
-            title="Tache mise a jour",
-            message=f"La tache {task.title} a ete modifiee.",
+            title="Tâche mise à jour",
+            message=f"La tâche {task.title} a été modifiée.",
             notification_type="task_updated",
             actor_id=current_user.id,
         )
@@ -753,8 +764,8 @@ def change_task_status(
         notify_task_assignees(
             db,
             task,
-            title="Statut de tache modifie",
-            message=f"La tache {task.title} est maintenant {task.status}.",
+            title="Statut de tâche modifié",
+            message=f"La tâche {task.title} est maintenant {task_status_label(task.status)}.",
             notification_type="task_updated",
             actor_id=current_user.id,
             dedupe=True,
@@ -881,8 +892,8 @@ def validate_task(
     notify_task_assignees(
         db,
         task,
-        title="Tache validee",
-        message=f"La tache {task.title} a ete validee.",
+        title="Tâche validée",
+        message=f"La tâche {task.title} a été validée.",
         notification_type="task_validated",
         actor_id=current_user.id,
         dedupe=True,
@@ -970,8 +981,8 @@ def add_task_assignees(
             notify_user(
                 db,
                 user_id=user_id,
-                title="Nouvelle tache assignee",
-                message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
+                title="Nouvelle tâche attribuée",
+                message=f"Une nouvelle tâche vous a été attribuée : {task.title}.",
                 notification_type="task_assigned",
                 related_type="task",
                 related_id=task.id,

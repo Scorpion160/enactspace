@@ -270,7 +270,7 @@ def user_display_name(user: User | None) -> str:
 def thread_notification_name(thread: ChatThread | None) -> str:
     if not thread:
         return "Conversation"
-    return thread.title or "Discussion privee"
+    return thread.title or "Discussion privée"
 
 
 def attach_file_to_thread(
@@ -642,7 +642,7 @@ def create_thread(
             db,
             user_ids=recipient_ids,
             title="Nouvelle conversation",
-            message=f"{creator_name} vous a ajoute a {thread_notification_name(thread)}.",
+            message=f"{creator_name} vous a ajouté à {thread_notification_name(thread)}.",
             notification_type="chat_thread_created",
             related_type="chat_thread",
             related_id=thread.id,
@@ -757,8 +757,8 @@ def add_thread_participants(
         notify_users(
             db,
             user_ids=added_user_ids,
-            title="Ajoute a une conversation",
-            message=f"{actor_name} vous a ajoute a {thread_notification_name(thread)}.",
+            title="Ajout à une conversation",
+            message=f"{actor_name} vous a ajouté à {thread_notification_name(thread)}.",
             notification_type="chat_participant_added",
             related_type="chat_thread",
             related_id=UUID(thread_id),
@@ -1030,7 +1030,7 @@ def upsert_message_reaction(
         notify_user(
             db,
             user_id=message.author_id,
-            title=f"{user_display_name(current_user)} a reagi a votre message",
+            title=f"{user_display_name(current_user)} a réagi à votre message",
             message=reaction_type,
             notification_type="chat_reaction",
             related_type="chat_thread",

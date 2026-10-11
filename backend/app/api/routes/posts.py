@@ -682,7 +682,7 @@ def update_post(
             db,
             post=post,
             current_user=current_user,
-            title="Publication marquee officielle",
+            title="Publication marquée officielle",
             message=post.title or post.content,
             notification_type="official_post",
         )
@@ -691,7 +691,7 @@ def update_post(
             db,
             post=post,
             current_user=current_user,
-            title="Publication epinglee",
+            title="Publication épinglée",
             message=post.title or post.content,
             notification_type="post_pinned",
         )
@@ -720,7 +720,7 @@ def pin_post(
             db,
             post=post,
             current_user=current_user,
-            title="Publication epinglee",
+            title="Publication épinglée",
             message=post.title or post.content,
             notification_type="post_pinned",
         )

@@ -821,8 +821,8 @@ def complete_lesson(
         notify_user(
             db,
             user_id=current_user.id,
-            title="Formation obligatoire terminee",
-            message=f"Vous avez termine {course.title}.",
+            title="Formation obligatoire terminée",
+            message=f"Vous avez terminé {course.title}.",
             notification_type="academy_completed",
             related_type="academy_course",
             related_id=course.id,
@@ -1090,7 +1090,7 @@ def submit_quiz(
             notify_user(
                 db,
                 user_id=current_user.id,
-                title=f"Quiz reussi : {db_quiz.title}",
+                title=f"Quiz réussi : {db_quiz.title}",
                 message=f"Score obtenu : {result['score']:.0f}%.",
                 notification_type="quiz_passed",
                 related_type="academy_quiz",
@@ -1115,7 +1115,7 @@ def submit_quiz(
         notify_user(
             db,
             user_id=current_user.id,
-            title=f"Quiz reussi : {quiz['title']}",
+            title=f"Quiz réussi : {quiz['title']}",
             message=f"Score obtenu : {score:.0f}%.",
             notification_type="quiz_passed",
             related_type="academy_quiz",

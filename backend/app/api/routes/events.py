@@ -428,7 +428,7 @@ def register_for_event(
         notify_user(
             db,
             user_id=event.created_by,
-            title=f"Nouvelle inscription a {event.title}",
+            title=f"Nouvelle inscription à {event.title}",
             message=(
                 f"{current_user.first_name} {current_user.last_name}".strip()
                 or current_user.email

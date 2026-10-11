@@ -304,10 +304,10 @@ def _sync_attendance_penalty(
     notify_user(
         db,
         user_id=record.user_id,
-        title="Absence non justifiee" if record.status == "absent" else "Retard",
+        title="Absence non justifiée" if record.status == "absent" else "Retard",
         message=(
-            f"Une sanction de {amount:.0f} FCFA peut etre appliquee "
-            "selon le reglement."
+            f"Une sanction de {amount:.0f} FCFA peut être appliquée "
+            "selon le règlement."
         ),
         notification_type="finance_penalty",
         related_type="attendance_record",
@@ -736,8 +736,8 @@ def _notify_record_change(
         notify_user(
             db,
             user_id=record.user_id,
-            title="Retard enregistre",
-            message=f"Vous avez ete marque en retard pour {session.title}.",
+            title="Retard enregistré",
+            message=f"Un retard a été enregistré pour {session.title}.",
             notification_type="attendance_late",
             related_type="attendance_record",
             related_id=record.id,
@@ -766,7 +766,7 @@ def _notify_justification_reviewers(
             db,
             user_ids=list(reviewer_ids),
             title="Justification d'absence",
-            message=f"Une justification a ete soumise pour {session.title}.",
+            message=f"Une justification a été soumise pour {session.title}.",
             notification_type="attendance_justification_pending",
             related_type="attendance_record",
             related_id=record.id,
@@ -776,8 +776,8 @@ def _notify_justification_reviewers(
         notify_user(
             db,
             user_id=record.user_id,
-            title="Absence enregistree",
-            message=f"Vous avez ete marque absent pour {session.title}.",
+            title="Absence enregistrée",
+            message=f"Une absence a été enregistrée pour {session.title}.",
             notification_type="attendance_absent",
             related_type="attendance_record",
             related_id=record.id,
@@ -2050,8 +2050,8 @@ def approve_absence_justification(
     notify_user(
         db,
         user_id=record.user_id,
-        title="Justification approuvee",
-        message=f"Votre justification pour {session.title} a ete approuvee.",
+        title="Justification approuvée",
+        message=f"Votre justification pour {session.title} a été approuvée.",
         notification_type="attendance_justification_approved",
         related_type="attendance_record",
         related_id=record.id,
@@ -2108,8 +2108,8 @@ def reject_absence_justification(
     notify_user(
         db,
         user_id=record.user_id,
-        title="Justification refusee",
-        message=f"Votre justification pour {session.title} a ete refusee: {reason}",
+        title="Justification refusée",
+        message=f"Votre justification pour {session.title} a été refusée : {reason}",
         notification_type="attendance_justification_rejected",
         related_type="attendance_record",
         related_id=record.id,

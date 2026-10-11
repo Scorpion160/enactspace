@@ -288,7 +288,7 @@ def create_fee(
     notify_user(
         db,
         user_id=payload.user_id,
-        title="Nouveau frais ajouté",
+        title="Nouveaux frais ajoutés",
         message=f"{payload.label}: {payload.amount:.0f} FCFA.",
         notification_type="fee_due",
         related_type="fee",
@@ -419,8 +419,8 @@ def cancel_fee(
     notify_user(
         db,
         user_id=fee.user_id,
-        title="Montant annule",
-        message=f"{fee.label} a ete annule: {reason}",
+        title="Montant annulé",
+        message=f"{fee.label} a été annulé : {reason}",
         notification_type="fee_cancelled",
         related_type="fee",
         related_id=fee.id,
@@ -612,7 +612,7 @@ def create_fee_record(
     notify_user(
         db,
         user_id=user_id,
-        title="Nouveau montant a payer",
+        title="Nouveau montant à payer",
         message=f"{label}: {amount:.0f} {currency}.",
         notification_type="fee_due",
         related_type="fee",
@@ -700,9 +700,9 @@ def mobile_money_public_payload(
         "created": "Paiement cree.",
         "pending": "Le paiement est en cours de verification.",
         "processing": "Le paiement est en cours de verification.",
-        "successful": "Le paiement a ete confirme.",
+        "successful": "Le paiement a été confirmé.",
         "failed": "Le paiement n'a pas ete finalise.",
-        "cancelled": "Le paiement a ete annule.",
+        "cancelled": "Le paiement a été annulé.",
         "expired": "La transaction a expire.",
         "refunded": "Le paiement a ete rembourse.",
     }
@@ -1710,10 +1710,10 @@ def reject_payment(
     notify_user(
         db,
         user_id=payment.user_id,
-        title="Paiement rejete",
+        title="Paiement rejeté",
         message=(
             f"Votre paiement de {float(payment.amount):.0f} FCFA "
-            f"est rejete: {reason}"
+            f"est rejeté : {reason}"
         ),
         notification_type="payment_rejected",
         related_type="payment",
@@ -1772,8 +1772,8 @@ def cancel_payment(
         notify_user(
             db,
             user_id=payment.user_id,
-            title="Paiement annule",
-            message=f"Votre paiement de {float(payment.amount):.0f} FCFA a ete annule.",
+            title="Paiement annulé",
+            message=f"Votre paiement de {float(payment.amount):.0f} FCFA a été annulé.",
             notification_type="payment_cancelled",
             related_type="payment",
             related_id=payment.id,
@@ -1786,8 +1786,8 @@ def cancel_payment(
         notify_users(
             db,
             user_ids=manager_ids,
-            title="Paiement annule",
-            message=f"Un paiement de {float(payment.amount):.0f} FCFA a ete annule.",
+            title="Paiement annulé",
+            message=f"Un paiement de {float(payment.amount):.0f} FCFA a été annulé.",
             notification_type="payment_cancelled",
             related_type="payment",
             related_id=payment.id,

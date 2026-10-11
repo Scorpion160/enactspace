@@ -131,9 +131,9 @@ def public_payload(
         "created": "Paiement cree.",
         "pending": "Le paiement est en cours de verification.",
         "processing": "Le paiement est en cours de verification.",
-        "successful": "Le paiement a ete confirme.",
+        "successful": "Le paiement a été confirmé.",
         "failed": "Le paiement n'a pas ete finalise.",
-        "cancelled": "Le paiement a ete annule.",
+        "cancelled": "Le paiement a été annulé.",
         "expired": "La transaction a expire.",
         "refunded": "Le paiement a ete rembourse.",
     }
@@ -293,10 +293,10 @@ def mark_not_successful(
         notify_user(
             db,
             user_id=transaction.member_id,
-            title="Paiement non confirme",
+            title="Paiement non confirmé",
             message=(
-                "Votre paiement n'a pas pu etre confirme. "
-                "Aucun reglement n'a ete enregistre."
+                "Votre paiement n’a pas pu être confirmé. "
+                "Aucun règlement n’a été enregistré."
             ),
             notification_type="payment_not_confirmed",
             related_type="mobile_money_transaction",
@@ -386,8 +386,8 @@ def confirm_transaction(
     notify_user(
         db,
         user_id=transaction.member_id,
-        title="Paiement confirme",
-        message=f"Votre paiement de {transaction.amount:.0f} FCFA a ete confirme.",
+        title="Paiement confirmé",
+        message=f"Votre paiement de {transaction.amount:.0f} FCFA a été confirmé.",
         notification_type="payment_confirmed",
         related_type="payment",
         related_id=payment.id,

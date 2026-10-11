@@ -623,7 +623,7 @@ def create_impact_record(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Donnee impact a verifier",
+            title="Donnée d’impact à vérifier",
             message=f"{impact_project.title} attend une validation.",
             notification_type="impact_submitted",
             related_type="impact_project",
@@ -659,8 +659,8 @@ def update_impact_record(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Donnee impact mise a jour",
-            message=f"{impact_project.title} attend une verification.",
+            title="Donnée d’impact mise à jour",
+            message=f"{impact_project.title} attend une vérification.",
             notification_type="impact_submitted",
             related_type="impact_project",
             related_id=impact_project.id,
@@ -691,8 +691,8 @@ def validate_impact_record(
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
-        title="Impact valide",
-        message=f"{impact_project.title} a ete valide.",
+        title="Impact validé",
+        message=f"{impact_project.title} a été validé.",
         notification_type="impact_validated",
         related_type="impact_project",
         related_id=impact_project.id,
@@ -725,8 +725,8 @@ def reject_impact_record(
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
-        title="Impact refuse",
-        message=f"{impact_project.title} a ete refuse: {reason}",
+        title="Impact refusé",
+        message=f"{impact_project.title} a été refusé : {reason}",
         notification_type="impact_rejected",
         related_type="impact_project",
         related_id=impact_project.id,
@@ -822,7 +822,7 @@ def create_impact_metric(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Indicateur impact a verifier",
+            title="Indicateur d’impact à vérifier",
             message=f"{metric.title} attend une validation.",
             notification_type="impact_metric_submitted",
             related_type="impact_metric",
@@ -915,8 +915,8 @@ def validate_impact_metric(
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
-        title="Indicateur impact valide",
-        message=f"{metric.title} a ete valide.",
+        title="Indicateur d’impact validé",
+        message=f"{metric.title} a été validé.",
         notification_type="impact_metric_validated",
         related_type="impact_metric",
         related_id=metric.id,
@@ -964,8 +964,8 @@ def reject_impact_metric(
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
-        title="Indicateur impact refuse",
-        message=f"{metric.title} a ete refuse: {reason}",
+        title="Indicateur d’impact refusé",
+        message=f"{metric.title} a été refusé : {reason}",
         notification_type="impact_metric_rejected",
         related_type="impact_metric",
         related_id=metric.id,
@@ -1034,8 +1034,8 @@ def create_impact_evidence(
             for user_id in _impact_reviewer_ids(db)
             if user_id != current_user.id
         ],
-        title="Preuve impact ajoutee",
-        message=f"{evidence.title} attend une verification.",
+        title="Preuve d’impact ajoutée",
+        message=f"{evidence.title} attend une vérification.",
         notification_type="impact_evidence_submitted",
         related_type="impact_evidence",
         related_id=evidence.id,
@@ -1073,8 +1073,8 @@ def validate_impact_evidence(
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
-        title="Preuve impact validee",
-        message=f"{evidence.title} a ete validee.",
+        title="Preuve d’impact validée",
+        message=f"{evidence.title} a été validée.",
         notification_type="impact_evidence_validated",
         related_type="impact_evidence",
         related_id=evidence.id,
@@ -1114,8 +1114,8 @@ def reject_impact_evidence(
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
-        title="Preuve impact refusee",
-        message=f"{evidence.title} a ete refusee: {reason}",
+        title="Preuve d’impact refusée",
+        message=f"{evidence.title} a été refusée : {reason}",
         notification_type="impact_evidence_rejected",
         related_type="impact_evidence",
         related_id=evidence.id,

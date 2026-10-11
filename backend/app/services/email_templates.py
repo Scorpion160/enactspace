@@ -5,7 +5,7 @@ import re
 
 
 APP_URL = "https://enactspace.kerunjombor.net"
-OTP_PATTERN = re.compile(r"(?<!\d)(\d{6})(?!\d)\.?")
+OTP_PATTERN = re.compile(r"(?<!\d)(\d{6}|\d{8})(?!\d)\.?")
 
 
 def _paragraphs(text_body: str) -> str:
@@ -33,7 +33,7 @@ def _action(subject: str, text_body: str) -> tuple[str, str] | None:
     if OTP_PATTERN.search(text_body) or "code de réinitialisation" in lowered:
         return None
     if "candidature" in lowered:
-        return ("Suivre ma candidature", APP_URL)
+        return ("Suivre ma candidature", APP_URL + "/application-tracking")
     if "invitation" in lowered or "réunion" in lowered or "enactmeet" in lowered:
         return ("Ouvrir EnactSpace", APP_URL)
     return ("Accéder à EnactSpace", APP_URL)

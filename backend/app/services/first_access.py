@@ -88,7 +88,7 @@ def issue_activation(db,user):
         for field,value in values.items():setattr(challenge,field,value)
     enqueue_email_delivery(db,recipient_email=user.email,user_id=user.id,
         subject="Bienvenue dans EnactSpace — activez votre accès",
-        text_body=(f"Bonjour {user.first_name},\n\nBienvenue dans l'espace de Enactus ESP !\n"
+        text_body=(f"Bonjour {user.first_name},\n\nBienvenue dans l’espace numérique Enactus ESP !\n"
             f"Votre identifiant : {user.username}\nVotre code personnel : {code}\n"
             "Ce code expire dans 30 minutes et ne peut être utilisé qu'une fois. "
             f"Ouvrez {APP_URL}/activate, puis créez votre propre mot de passe.\n\n"
@@ -121,7 +121,7 @@ def confirm_activation(db,payload):
     db.delete(challenge)
     enqueue_email_delivery(db,recipient_email=user.email,user_id=user.id,
         subject="Votre accès EnactSpace est prêt",
-        text_body=f"Bonjour {user.first_name},\n\nVotre mot de passe a été créé. Connectez-vous avec votre email ou {user.username} pour compléter votre profil.\nSi cette activation ne vient pas de vous, contactez immédiatement la SG.",
+        text_body=f"Bonjour {user.first_name},\n\nVotre mot de passe a été créé. Connectez-vous avec votre adresse e-mail ou {user.username} pour compléter votre profil.\nSi cette activation ne vient pas de vous, contactez immédiatement la SG.",
         dedupe_key=f"activation-complete:{user.id}:{now.isoformat()}")
     return user
 

@@ -75,9 +75,9 @@ class SmtpEmailProvider(EmailProvider):
         envelope["To"] = message.recipient
         envelope["Subject"] = message.subject
         envelope["Message-ID"] = message.message_id
-        envelope.set_content(message.text_body)
+        envelope.set_content(message.text_body, charset="utf-8")
         if message.html_body:
-            envelope.add_alternative(message.html_body, subtype="html")
+            envelope.add_alternative(message.html_body, subtype="html", charset="utf-8")
 
         timeout = max(1, int(settings.SMTP_TIMEOUT_SECONDS))
         context = ssl.create_default_context()
