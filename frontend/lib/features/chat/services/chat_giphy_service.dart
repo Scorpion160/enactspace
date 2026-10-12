@@ -18,9 +18,13 @@ class GiphyItem {
 }
 
 class ChatGiphyService {
-  static String get configuredKey => kIsWeb
-      ? const String.fromEnvironment('ENACTSPACE_GIPHY_API_KEY_WEB')
-      : const String.fromEnvironment('ENACTSPACE_GIPHY_API_KEY_ANDROID');
+  static String get configuredKey => selectGiphyPlatformKey(
+    isWeb: kIsWeb,
+    platform: defaultTargetPlatform,
+    webKey: const String.fromEnvironment('ENACTSPACE_GIPHY_API_KEY_WEB'),
+    androidKey: const String.fromEnvironment('ENACTSPACE_GIPHY_API_KEY_ANDROID'),
+    iosKey: const String.fromEnvironment('ENACTSPACE_GIPHY_API_KEY_IOS'),
+  );
   static bool get configured => configuredKey.isNotEmpty;
   final http.Client client;
   final String apiKey;
@@ -47,4 +51,19 @@ class ChatGiphyService {
     return GiphyItem.fromJson((jsonDecode(response.body) as Map<String, dynamic>)['data'] as Map<String, dynamic>);
   }
   void dispose() => client.close();
+}
+
+String selectGiphyPlatformKey({
+  required bool isWeb,
+  required TargetPlatform platform,
+  required String webKey,
+  required String androidKey,
+  required String iosKey,
+}) {
+  if (isWeb) { return webKey; }
+  return switch (platform) {
+    TargetPlatform.android => androidKey,
+    TargetPlatform.iOS => iosKey,
+    _ => '',
+  };
 }

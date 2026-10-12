@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -9,6 +10,15 @@ Map<String, dynamic> item(String id) => {'id': id, 'title': 'Merci !', 'images':
   'downsized': {'url': 'https://media.giphy.com/$id/full.gif?keep=yes'},
 }};
 void main() {
+  test('web, Android and iOS use separate keys without cross-platform fallback', () {
+    String key(bool web, TargetPlatform platform, {String ios = 'ios-key'}) => selectGiphyPlatformKey(
+      isWeb: web, platform: platform, webKey: 'web-key', androidKey: 'android-key', iosKey: ios);
+    expect(key(true, TargetPlatform.iOS), 'web-key');
+    expect(key(false, TargetPlatform.android), 'android-key');
+    expect(key(false, TargetPlatform.iOS), 'ios-key');
+    expect(key(false, TargetPlatform.iOS, ios: ''), isEmpty);
+    expect(key(false, TargetPlatform.macOS), isEmpty);
+  });
   test('search preserves query and URL parameters with pagination', () async {
     final service = ChatGiphyService(apiKey: 'test', client: MockClient((request) async {
       expect(request.url.host, 'api.giphy.com');
