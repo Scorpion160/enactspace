@@ -57,6 +57,7 @@ abstract interface class ChatGateway {
     String? scopeId,
   });
   Future<List<ChatMessageModel>> getMessages(String threadId);
+  Future<List<ChatMessageModel>> getSharedMessages(String threadId, {int offset = 0});
   Future<void> markThreadAsRead(String threadId);
   Future<List<ChatMessageModel>> getCachedMessages({
     required String userId,
@@ -251,6 +252,9 @@ class ApiChatGateway implements ChatGateway {
     scopeType: scopeType,
     scopeId: scopeId,
   );
+  @override
+  Future<List<ChatMessageModel>> getSharedMessages(String threadId, {int offset = 0}) => _chat.getSharedMessages(threadId, offset: offset);
+
   @override
   Future<List<ChatMessageModel>> getMessages(String threadId) =>
       _chat.getMessages(threadId);

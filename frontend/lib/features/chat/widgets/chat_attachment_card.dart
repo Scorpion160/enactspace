@@ -41,15 +41,31 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant ChatAttachmentCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != widget.message.id ||
+        oldWidget.message.absoluteAttachmentUrl != widget.message.absoluteAttachmentUrl) {
+      _bytes = null;
+      _error = null;
+      if (widget.autoDownloadImages && _image) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) { unawaited(_load()); }
+        });
+      }
+    }
+  }
+
   Future<void> _load() async {
     if (_loading) { return; }
     setState(() { _loading = true; _error = null; });
+    final requestedId = widget.message.id;
     try {
       final url = widget.message.absoluteAttachmentUrl;
       if (url == null || url.isEmpty) { throw Exception('Média indisponible.'); }
       final bytes = await widget.gateway.loadMediaBytes(url);
       if (bytes.isEmpty) { throw Exception('Le fichier reçu est vide.'); }
-      if (!mounted) { return; }
+      if (!mounted || widget.message.id != requestedId) { return; }
       setState(() => _bytes = bytes);
     } catch (_) {
       if (mounted) {
@@ -84,7 +100,7 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
 
   Future<void> _open() async {
     final bytes = _bytes;
-    if (bytes == null) { await _load(); return; }
+    if (bytes == null) { await _load(); if (!mounted || _bytes == null) { return; } await _open(); return; }
     if (!_image && !_video && !_pdf) { await _save(); return; }
     await Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (context) => Scaffold(
@@ -120,6 +136,40 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
     final details = size == null ? '' : size >= 1048576
         ? '${(size / 1048576).toStringAsFixed(1)} Mo'
         : '${(size / 1024).ceil()} Ko';
+
+    if (_image || _video) {
+      final caption = message.content.trim();
+      final showCaption = caption.isNotEmpty && caption != message.attachmentLabel &&
+          !const ['Photo', 'Vidéo', 'GIF', 'Sticker'].contains(caption);
+      return SizedBox(
+        width: 380,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: _loading ? null : _open,
+              child: _image && loaded
+                ? Image.memory(_bytes!, width: 380, fit: BoxFit.contain,
+                    errorBuilder: (_, error, stack) => const SizedBox(height: 180, child: Center(child: Text('Image indisponible.'))))
+                : _video && loaded
+                  ? SizedBox(height: 240, child: _ChatVideoViewer(bytes: _bytes!, mime: message.attachmentMimeType ?? 'video/mp4'))
+                  : Container(
+                    width: 380, height: 220,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    child: Center(child: _loading ? const CircularProgressIndicator()
+                      : Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(_video ? Icons.play_circle_rounded : Icons.download_rounded, size: 48),
+                          Text(_error != null ? 'Réessayer' : loaded ? 'Lire la vidéo' : 'Télécharger'),
+                        ])),
+                  ),
+            ),
+          ),
+          if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          if (showCaption) Padding(padding: const EdgeInsets.only(top: 6), child: Text(caption)),
+          if (message.isEphemeralMedia) const Text('Média éphémère', style: TextStyle(fontSize: 12)),
+        ]),
+      );
+    }
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 300),

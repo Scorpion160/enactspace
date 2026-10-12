@@ -24,6 +24,7 @@ import '../widgets/conversation_list.dart';
 import '../widgets/media_ui.dart';
 import '../widgets/chat_attachment_card.dart';
 import '../widgets/chat_gif_picker.dart';
+import '../widgets/chat_shared_content.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_list.dart';
 import '../widgets/new_conversation_dialog.dart';
@@ -1601,7 +1602,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
       _showInfo(
-        shouldRemove ? 'Réaction retirée.' : '$emoji réaction synchronisée.',
+        shouldRemove ? 'Réaction retirée.' : '$emoji réaction ajoutée.',
       );
     } catch (_) {
       _showInfo(
@@ -1841,53 +1842,28 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildDesktopChat() => RefreshIndicator(
-    onRefresh: _loadChat,
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+  Widget _buildDesktopChat() => Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(
       children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1280),
-            child: Column(
-              children: [
-                _ChatHeader(
-                  onNewThread: _openNewThreadDialog,
-                  onMediaCache: _openMediaCacheControls,
-                  usingLocalCache: _usingLocalCache,
-                ),
-                const SizedBox(height: 16),
-                if (_loading)
-                  const _LoadingCard()
-                else if (_error != null)
-                  _ErrorCard(message: _error!, onRetry: _loadChat)
-                else
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height - 170,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: 360,
-                          child: ConversationListRegion(
-                            child: _ThreadsPanel(
-                              threads: _threads,
-                              selectedThread: _selectedThread,
-                              pinnedThreadIds: _pinnedThreadIds,
-                              onlineUserIds: _onlineUserIds,
-                              currentUserId: _user?.id,
-                              onSelect: _selectThread,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(child: _conversationPanel()),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        Row(children: [
+          const Expanded(child: Text('Conversations', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+          IconButton(tooltip: 'Téléchargements', onPressed: _openMediaCacheControls, icon: const Icon(Icons.download_rounded)),
+          FilledButton.icon(onPressed: _openNewThreadDialog, icon: const Icon(Icons.add_rounded), label: const Text('Nouvelle discussion')),
+        ]),
+        const SizedBox(height: 12),
+        Expanded(
+          child: _loading ? const _LoadingCard()
+            : _error != null ? _ErrorCard(message: _error!, onRetry: _loadChat)
+            : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                SizedBox(width: 300, child: ConversationListRegion(child: _ThreadsPanel(
+                  threads: _threads, selectedThread: _selectedThread,
+                  pinnedThreadIds: _pinnedThreadIds, onlineUserIds: _onlineUserIds,
+                  currentUserId: _user?.id, onSelect: _selectThread,
+                ))),
+                const SizedBox(width: 12),
+                Expanded(child: _conversationPanel()),
+              ]),
         ),
       ],
     ),
@@ -2532,6 +2508,7 @@ class _ConversationHeader extends StatelessWidget {
         : _threadDisplayTitle(thread!, currentUserId);
 
     return ListTile(
+      onTap: thread == null ? null : onInfo,
       leading: showBack
           ? IconButton(
               onPressed: onBack,
@@ -2620,14 +2597,8 @@ class _ConversationSubtitle extends StatelessWidget {
       );
     }
 
-    final syncLabel = syncing
-        ? 'synchro...'
-        : lastSyncedAt == null
-        ? null
-        : 'sync ${DateFormat('HH:mm').format(lastSyncedAt!)}';
-
     return Text(
-      [_threadSubtitle(thread, currentUserId), ?syncLabel].join(' • '),
+      thread.threadType == 'direct' ? 'Discussion privée' : _threadSubtitle(thread, currentUserId),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
@@ -4186,7 +4157,7 @@ class _MediaCacheControlsDialogState extends State<_MediaCacheControlsDialog> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.storage_rounded),
-              title: Text('Cache local'),
+              title: Text('Fichiers sur cet appareil'),
               subtitle: Text(_formatBytes(_cacheBytes)),
               trailing: _busy
                   ? const SizedBox(
@@ -4201,7 +4172,7 @@ class _MediaCacheControlsDialogState extends State<_MediaCacheControlsDialog> {
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : _clearCache,
                 icon: Icon(Icons.cleaning_services_rounded),
-                label: Text('Vider le cache local'),
+                label: Text('Libérer de l’espace'),
               ),
             ),
           ],
@@ -4259,13 +4230,29 @@ class _ConversationInfoDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ChatAvatar(
-                  title: title,
-                  imageUrl: _threadAvatarUrl(thread, currentUserId),
-                  selected: true,
-                  icon: thread.threadType == 'direct'
-                      ? Icons.person_rounded
-                      : Icons.groups_rounded,
+                InkWell(
+                  onTap: () => showDialog<void>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(title),
+                      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        if (_threadAvatarUrl(thread, currentUserId) != null)
+                          Flexible(child: InteractiveViewer(child: Image.network(_threadAvatarUrl(thread, currentUserId)!, fit: BoxFit.contain,
+                            errorBuilder: (_, error, stack) => const Icon(Icons.person_rounded, size: 100))))
+                        else const Icon(Icons.person_rounded, size: 100),
+                        if (directParticipant != null) ...[
+                          const SizedBox(height: 16),
+                          Text(directParticipant.email),
+                          Text(_memberStatusLabel(directParticipant.status)),
+                        ],
+                      ])),
+                      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Fermer'))],
+                    ),
+                  ),
+                  child: SizedBox(width: 88, height: 88, child: FittedBox(child: _ChatAvatar(
+                    title: title, imageUrl: _threadAvatarUrl(thread, currentUserId),
+                    selected: true, icon: thread.threadType == 'direct' ? Icons.person_rounded : Icons.groups_rounded,
+                  ))),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -4280,6 +4267,15 @@ class _ConversationInfoDialog extends StatelessWidget {
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.perm_media_rounded),
+                  title: const Text('Médias, documents et liens'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push<void>(MaterialPageRoute(
+                    builder: (context) => ChatSharedContent(gateway: chatService, threadId: thread.id),
+                  )),
                 ),
                 const SizedBox(height: 16),
                 _ConversationInfoGrid(

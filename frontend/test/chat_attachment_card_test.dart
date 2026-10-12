@@ -54,7 +54,8 @@ void main() {
     await tester.tap(find.text('Réessayer'));
     await tester.pumpAndSettle();
     expect(gateway.calls, 2);
-    expect(find.text('Ouvrir'), findsOneWidget);
+    expect(find.text('Ouvrir'), findsNothing);
+    expect(find.text('photo.png'), findsNothing);
   });
 
   testWidgets('the two brands fit a narrow screen', (tester) async {
@@ -64,7 +65,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: EnactBrandLockup())));
     await tester.pumpAndSettle();
-    expect(find.byType(Image), findsNWidgets(2));
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

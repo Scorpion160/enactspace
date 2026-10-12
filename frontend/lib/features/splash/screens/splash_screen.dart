@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isCompact = size.width < 520 || size.height < 680;
-    final logoWidth = (size.width * 0.64).clamp(220.0, 420.0);
+    final logoWidth = (size.width * 0.64).clamp(260.0, 480.0);
 
     return Scaffold(
       body: Container(

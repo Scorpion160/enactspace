@@ -40,6 +40,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int? _lateTasks;
   UserExperience? _userExperience;
   bool _hasSession = false;
+  late bool _navigationExpanded;
   Timer? _metricsTimer;
   Timer? _notificationTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
@@ -54,6 +55,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _navigationExpanded = !widget.currentPath.startsWith('/chat');
     WidgetsBinding.instance.addObserver(this);
     _realtimeSubscription = _realtimeService.events.listen((event) {
       if (event['type'] == 'connected' && event['unread_count'] != null) {
@@ -185,6 +187,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.currentPath != widget.currentPath) {
+      _navigationExpanded = !widget.currentPath.startsWith('/chat');
       _loadNavigationMetrics();
     }
   }
@@ -406,7 +409,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         child: Scaffold(
           body: Row(
             children: [
-              _SideMenu(
+              if (_navigationExpanded) _SideMenu(
                 currentPath: widget.currentPath,
                 userExperience: _userExperience,
                 hasSession: _hasSession,
@@ -420,6 +423,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   children: [
                     _TopBar(
                       title: title,
+                      navigationExpanded: _navigationExpanded,
+                      onToggleNavigation: () => setState(() => _navigationExpanded = !_navigationExpanded),
                       backPath: detailParent,
                       unreadNotifications: _unreadNotifications,
                       onRefresh: () => _refresh(context),
@@ -492,6 +497,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class _TopBar extends StatelessWidget {
+  final bool navigationExpanded;
+  final VoidCallback onToggleNavigation;
   final String title;
   final String? backPath;
   final int? unreadNotifications;
@@ -499,6 +506,8 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onLogout;
 
   const _TopBar({
+    required this.navigationExpanded,
+    required this.onToggleNavigation,
     required this.title,
     this.backPath,
     required this.unreadNotifications,
@@ -519,6 +528,11 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          IconButton(
+            tooltip: navigationExpanded ? 'Masquer le menu' : 'Afficher le menu',
+            onPressed: onToggleNavigation,
+            icon: Icon(navigationExpanded ? Icons.menu_open_rounded : Icons.menu_rounded),
+          ),
           if (backPath != null) AppBackButton(fallbackPath: backPath!),
           Expanded(
             child: Text(

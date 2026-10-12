@@ -208,6 +208,12 @@ class ChatService {
     throw Exception('Réponse invalide lors de la création de conversation.');
   }
 
+  Future<List<ChatMessageModel>> getSharedMessages(String threadId, {int offset = 0}) async {
+    final token = await _requireToken();
+    final response = await _apiClient.get('/chat/threads/$threadId/shared?offset=$offset&limit=100', token: token);
+    return _extractList(response).whereType<Map<String, dynamic>>().map(ChatMessageModel.fromJson).toList();
+  }
+
   Future<List<ChatMessageModel>> getMessages(String threadId) async {
     final token = await _requireToken();
     final response = await _apiClient.get(

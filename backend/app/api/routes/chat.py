@@ -858,6 +858,25 @@ def delete_thread(
     return {"ok": True}
 
 
+@router.get("/threads/{thread_id}/shared", response_model=list[ChatMessageRead])
+def list_shared_messages(
+    thread_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    get_participant_or_404(db, thread_id, current_user.id)
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.thread_id == thread_id,
+        ChatMessage.deleted_at.is_(None),
+        or_(ChatMessage.attachment_url.isnot(None),
+            ChatMessage.content.ilike("%http://%"),
+            ChatMessage.content.ilike("%https://%")),
+    ).order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).offset(offset).limit(limit).all()
+    return [serialize_message(message, db=db, current_user_id=current_user.id) for message in messages]
+
+
 @router.get("/threads/{thread_id}/messages", response_model=list[ChatMessageRead])
 def list_messages(
     thread_id: str,
