@@ -25,6 +25,7 @@ import '../widgets/media_ui.dart';
 import '../widgets/chat_attachment_card.dart';
 import '../widgets/chat_gif_picker.dart';
 import '../widgets/chat_shared_content.dart';
+import '../widgets/chat_giphy_panel.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_list.dart';
 import '../widgets/new_conversation_dialog.dart';
@@ -1099,6 +1100,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendCatalogGif(String id) async {
     final thread = _selectedThread;
     if (thread == null || _sending) { return; }
+    if (id.startsWith('giphy-')) {
+      final gif = selectedGiphyGifs.remove(id);
+      if (gif == null) { return; }
+      await _sendAttachmentMessage(_OutgoingAttachment(
+        messageType: 'sticker', fileId: null, url: '', name: 'GIF', caption: 'GIF',
+        mimeType: 'image/gif', sizeBytes: null, durationSeconds: null,
+        thumbnailUrl: null, stickerPack: 'giphy:${id.substring(6)}',
+      ));
+      return;
+    }
     setState(() => _sending = true);
     try {
       final items = await loadChatGifs();
@@ -2739,6 +2750,10 @@ class _MessageBody extends StatelessWidget {
 
     if (message.messageType == 'audio') {
       return _AudioMessageBody(gateway: gateway, message: message);
+    }
+
+    if (message.stickerPack?.startsWith('giphy:') == true) {
+      return ChatGiphyMessage(gifId: message.stickerPack!.substring(6));
     }
 
     if (message.messageType == 'sticker' &&

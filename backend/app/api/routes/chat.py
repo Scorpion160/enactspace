@@ -870,7 +870,7 @@ def list_shared_messages(
     messages = db.query(ChatMessage).filter(
         ChatMessage.thread_id == thread_id,
         ChatMessage.deleted_at.is_(None),
-        or_(ChatMessage.attachment_url.isnot(None),
+        or_(ChatMessage.message_type.in_(MEDIA_MESSAGE_TYPES),
             ChatMessage.content.ilike("%http://%"),
             ChatMessage.content.ilike("%https://%")),
     ).order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).offset(offset).limit(limit).all()

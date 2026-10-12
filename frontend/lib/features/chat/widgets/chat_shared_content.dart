@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/chat_models.dart';
 import '../services/chat_gateway.dart';
 import 'chat_attachment_card.dart';
+import 'chat_giphy_panel.dart';
 
 class ChatSharedContent extends StatefulWidget {
   final ChatGateway gateway;
@@ -45,7 +46,7 @@ class _ChatSharedContentState extends State<ChatSharedContent> {
   }
 
   Widget _page(int tab) {
-    final files = _items.where((m) => m.absoluteAttachmentUrl != null &&
+    final files = _items.where((m) => (m.absoluteAttachmentUrl != null || m.stickerPack?.startsWith('giphy:') == true) &&
       (tab == 0 ? const ['image', 'video', 'sticker'].contains(m.messageType)
         : !const ['image', 'video', 'sticker'].contains(m.messageType))).toList();
     final links = _items.expand((m) => RegExp(r'https?://[^\s<>]+').allMatches(m.content)
@@ -59,7 +60,9 @@ class _ChatSharedContentState extends State<ChatSharedContent> {
       else
         for (final message in files) Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: Align(alignment: Alignment.centerLeft, child: ChatAttachmentCard(
+          child: Align(alignment: Alignment.centerLeft, child: message.stickerPack?.startsWith('giphy:') == true
+            ? ChatGiphyMessage(gifId: message.stickerPack!.substring(6))
+            : ChatAttachmentCard(
             key: ValueKey(message.id), gateway: widget.gateway, message: message,
             autoDownloadImages: false,
           )),

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import '../services/chat_giphy_service.dart';
+import 'chat_giphy_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +13,7 @@ class ChatGif {
   Uint8List get bytes => base64Decode(data);
 }
 
+final Map<String, ChatGif> selectedGiphyGifs = {};
 Future<List<ChatGif>>? _catalog;
 Future<List<ChatGif>> loadChatGifs() => _catalog ??= _readCatalog();
 
@@ -39,7 +42,13 @@ class _ChatGifPickerState extends State<ChatGifPicker> {
   late Future<List<ChatGif>> _future = loadChatGifs();
   String _query = '';
   @override
-  Widget build(BuildContext context) => Column(children: [
+  Widget build(BuildContext context) => ChatGiphyService.configured
+      ? ChatGiphyPanel(onImport: widget.onImport, onSelected: (item) {
+          final gif = ChatGif(id: 'giphy-${item.id}', label: item.title, category: 'GIPHY', data: '');
+          selectedGiphyGifs[gif.id] = gif;
+          widget.onSelected(gif);
+        })
+      : Column(children: [
     Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Row(children: [
