@@ -10,7 +10,7 @@ $files = @(
     @{ Name = 'test_chat_thread_notifications.py'; Path = 'backend/tests/test_chat_thread_notifications.py'; Hash = '422ae514033502605c306fa0a56b5adab2f2cfd6f6f5f87e962719810eb4d538' }
     @{ Name = 'test_chat_email_privacy.py'; Path = 'backend/tests/test_chat_email_privacy.py'; Hash = '3c92afd8e39294c86699748de2e18c634b00d1e4aa901947324b0df80f96e045' }
     @{ Name = 'test_chat_shared_content.py'; Path = 'backend/tests/test_chat_shared_content.py'; Hash = '289ff855a4f57c0f65537af3606d471154e6292e3c41725a561be5fc4f456ba6' }
-    @{ Name = 'deploy_chat_backend.py'; Path = 'tools/deploy_chat_backend.py'; Hash = '4ef894ac59d0296f8e878646080fe3bf6fc88b2f2726dc8a398807ab98197447' }
+    @{ Name = 'deploy_chat_backend.py'; Path = 'tools/deploy_chat_backend.py'; Hash = '9288e02e657f0388541398b6757fa1fc1c397d9faeb0a10bc6817e66ef97054e' }
 )
 $manifest = @{}
 foreach ($item in $files) {

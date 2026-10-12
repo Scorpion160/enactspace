@@ -19,6 +19,8 @@ old = None
 report = {'database_migration_performed': False, 'mail_routing_changed': False, 'web_changed': False}
 def run(command, timeout=180, input=None):
     result = subprocess.run(command, input=input, capture_output=True, text=True, timeout=timeout)
+    if stage == 'candidate_tests':
+        print(result.stdout + result.stderr, end='', flush=True)
     if result.returncode: raise RuntimeError('Command_failed_at_' + stage)
     return result.stdout
 def compose(*command):
@@ -77,7 +79,7 @@ with open('/opt/enactspace/operations/backend-publication.lock', 'a') as lock:
         stage = 'candidate_build'
         run(['docker', 'build', '--pull=false', '--network=none', '--label', 'org.opencontainers.image.revision='+args.commit, '-t', new_image, str(directory)], timeout=300)
         stage = 'candidate_tests'
-        run(['docker', 'run', '--rm', '--network=none', '-v', str(directory)+':/app/backend/tests:ro', '--entrypoint', 'python', new_image,
+        run(['docker', 'run', '--rm', '--network=none', '--user=0:0', '-v', str(directory)+':/app/backend/tests:ro', '--entrypoint', 'python', new_image,
              '-m', 'unittest', 'discover', '-s', '/app/backend/tests', '-p', 'test_chat_*.py', '-v'])
         override = directory/'candidate.json'; override.write_text(json.dumps({'services': {'backend': {'image': new_image}}}))
         stage = 'candidate_preflight'
