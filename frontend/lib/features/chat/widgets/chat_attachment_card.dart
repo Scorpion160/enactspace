@@ -100,7 +100,7 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
 
   Future<void> _open() async {
     final bytes = _bytes;
-    if (bytes == null) { await _load(); if (!mounted || _bytes == null) { return; } await _open(); return; }
+    if (bytes == null) { await _load(); return; }
     if (!_image && !_video && !_pdf) { await _save(); return; }
     await Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (context) => Scaffold(
@@ -147,7 +147,7 @@ class _ChatAttachmentCardState extends State<ChatAttachmentCard> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
-              onTap: _loading ? null : _open,
+              onTap: _loading ? null : loaded ? _open : _load,
               child: _image && loaded
                 ? Image.memory(_bytes!, width: 380, fit: BoxFit.contain,
                     errorBuilder: (_, error, stack) => const SizedBox(height: 180, child: Center(child: Text('Image indisponible.'))))
