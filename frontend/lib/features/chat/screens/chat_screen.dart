@@ -928,6 +928,8 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
+      isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: 340),
       builder: (context) => const _ChatAttachmentSheet(),
     );
     if (!mounted || action == null) return;
@@ -3877,114 +3879,37 @@ class _ChatAttachmentSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const actions = <(String, String, IconData)>[
-      ('image', 'Photo', Icons.image_rounded),
-      ('video', 'Vidéo', Icons.videocam_rounded),
-      ('gif', 'GIF', Icons.gif_box_rounded),
-      ('document', 'Document', Icons.description_rounded),
-      ('audio', 'Audio', Icons.headphones_rounded),
-      ('sticker', 'Sticker', Icons.emoji_emotions_rounded),
-      ('poll', 'Sondage', Icons.poll_rounded),
+    const actions = <(String, String, IconData, Color)>[
+      ('document', 'Document', Icons.description_rounded, Color(0xFF9095FF)),
+      ('image', 'Photos', Icons.image_rounded, Color(0xFF26C6DA)),
+      ('video', 'Vidéos', Icons.videocam_rounded, Color(0xFFEC66B3)),
+      ('audio', 'Audio', Icons.headphones_rounded, Color(0xFFFFA447)),
+      ('gif', 'GIF', Icons.gif_box_rounded, Color(0xFF5CCDB1)),
+      ('sticker', 'Sticker', Icons.emoji_emotions_rounded, Color(0xFF48C9CB)),
+      ('poll', 'Sondage', Icons.poll_rounded, Color(0xFFFFCB36)),
+      ('advanced', 'Options avancées', Icons.tune_rounded, Color(0xFFABB4BD)),
     ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Partager',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Choisis ce que tu veux envoyer dans la conversation.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 18),
-          GridView.count(
-            crossAxisCount: 3,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 12,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.12,
-            children: [
-              for (final action in actions)
-                _ChatAttachmentTile(
-                  icon: action.$3,
-                  label: action.$2,
-                  onTap: () => Navigator.of(context).pop(action.$1),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              child: const Icon(Icons.tune_rounded),
-            ),
-            title: Text(
-              'Options avancées',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            subtitle: Text('Lien, légende, miniature et métadonnées.'),
-            trailing: Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.of(context).pop('advanced'),
-          ),
-        ],
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        maxWidth: 340,
       ),
-    );
-  }
-}
-
-class _ChatAttachmentTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ChatAttachmentTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppTheme.enactusYellow.withValues(alpha: 0.22),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppTheme.enactusYellow.withValues(alpha: 0.65),
+          for (final action in actions)
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
+              leading: Icon(action.$3, color: action.$4, size: 26),
+              title: Text(
+                action.$2,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onTap: () => Navigator.of(context).pop(action.$1),
             ),
-            child: Icon(icon, color: AppTheme.softBlack, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
         ],
       ),
     );
