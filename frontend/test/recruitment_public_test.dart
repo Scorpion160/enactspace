@@ -104,6 +104,7 @@ Future<void> _fillIdentity(WidgetTester tester) async {
     find.byKey(const ValueKey('field-phone')),
     '+221770000000',
   );
+  await tester.ensureVisible(find.byKey(const ValueKey('field-gender')));
   await tester.tap(find.byKey(const ValueKey('field-gender')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Femme').last);
@@ -114,10 +115,12 @@ Future<void> _fillIdentity(WidgetTester tester) async {
 
 Future<void> _reachReview(WidgetTester tester) async {
   await _fillIdentity(tester);
+  await tester.ensureVisible(find.byKey(const ValueKey('field-studyLevel')));
   await tester.tap(find.byKey(const ValueKey('field-studyLevel')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Master1').last);
   await tester.pumpAndSettle();
+  await tester.ensureVisible(find.byKey(const ValueKey('field-department')));
   await tester.tap(find.byKey(const ValueKey('field-department')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Génie Informatique').last);

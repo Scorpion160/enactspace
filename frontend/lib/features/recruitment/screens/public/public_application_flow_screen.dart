@@ -10,6 +10,7 @@ import '../../models/public_application_draft.dart';
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/public_recruitment_gateway.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
+import '../../widgets/public/public_application_field.dart';
 
 class PublicApplicationFlowScreen extends StatefulWidget {
   final String campaignId;
@@ -322,6 +323,13 @@ class _PublicApplicationFlowScreenState
       DropdownButtonFormField<String>(
         key: const ValueKey('field-gender'),
         initialValue: _gender,
+        isExpanded: true,
+        itemHeight: null,
+        selectedItemBuilder: (context) => const [
+          PublicApplicationChoiceText('Femme'),
+          PublicApplicationChoiceText('Homme'),
+          PublicApplicationChoiceText('Préfère ne pas préciser'),
+        ],
         decoration: const InputDecoration(labelText: 'Genre *'),
         items: const [
           DropdownMenuItem(value: 'femme', child: Text('Femme')),
@@ -564,34 +572,42 @@ class _PublicApplicationFlowScreenState
     Iterable<String>? autofillHints,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      key: ValueKey('field-$key'),
-      controller: _controller(key),
-      keyboardType: keyboardType,
-      autofillHints: autofillHints,
-      textInputAction: TextInputAction.next,
-      decoration: InputDecoration(labelText: label),
-      validator:
-          validator ?? (required ? (value) => _required(value, label) : null),
+    return PublicApplicationField(
+      label: required ? '$label *' : label,
+      child: TextFormField(
+        key: ValueKey('field-$key'),
+        controller: _controller(key),
+        keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(errorMaxLines: 4),
+        validator: validator ?? (required ? (value) => _required(value, label) : null),
+      ),
     );
   }
 
   Widget _choiceField(String key, String label, List<String> options) {
     final controller = _controller(key);
     final current = controller.text.trim();
-    return DropdownButtonFormField<String>(
-      key: ValueKey('field-$key'),
-      initialValue: options.contains(current) ? current : null,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: [
-        for (final option in options)
-          DropdownMenuItem(value: option, child: Text(option)),
-      ],
-      onChanged: (value) => controller.text = value ?? '',
-      validator: (value) => value == null || value.trim().isEmpty
-          ? 'Ce champ est nécessaire pour continuer.'
-          : null,
+    return PublicApplicationField(
+      label: label,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('field-$key'),
+        initialValue: options.contains(current) ? current : null,
+        isExpanded: true,
+        itemHeight: null,
+        decoration: const InputDecoration(errorMaxLines: 4),
+        selectedItemBuilder: (context) => [
+          for (final option in options) PublicApplicationChoiceText(option),
+        ],
+        items: [
+          for (final option in options)
+            DropdownMenuItem(value: option, child: Text(option, softWrap: true)),
+        ],
+        onChanged: (value) => controller.text = value ?? '',
+        validator: (value) => value == null || value.trim().isEmpty
+            ? 'Ce champ est nécessaire pour continuer.' : null,
+      ),
     );
   }
 
@@ -601,18 +617,20 @@ class _PublicApplicationFlowScreenState
     String help, {
     bool required = false,
   }) {
-    return TextFormField(
-      key: ValueKey('field-$key'),
-      controller: _controller(key),
-      minLines: 4,
-      maxLines: 7,
-      maxLength: 1200,
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: help,
-        alignLabelWithHint: true,
+    return PublicApplicationField(
+      label: required ? '$label *' : label,
+      help: help,
+      child: TextFormField(
+        key: ValueKey('field-$key'),
+        controller: _controller(key),
+        minLines: 4,
+        maxLines: 7,
+        maxLength: 1200,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
+        decoration: const InputDecoration(errorMaxLines: 4),
+        validator: required ? (value) => _required(value, label) : null,
       ),
-      validator: required ? (value) => _required(value, label) : null,
     );
   }
 
@@ -719,7 +737,10 @@ class _NavigationBar extends StatelessWidget {
     child: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820),
-        child: Row(
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 12,
+          runSpacing: 8,
           children: [
             if (step > 0)
               Semantics(
@@ -731,7 +752,7 @@ class _NavigationBar extends StatelessWidget {
                   label: Text('Retour'),
                 ),
               ),
-            const Spacer(),
+            if (step == 0) const SizedBox.shrink(),
             if (step < 5)
               Semantics(
                 button: true,
