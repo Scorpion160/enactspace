@@ -22,7 +22,7 @@ void main() {
   for (final width in [320.0, 390.0, 1200.0]) {
     for (final scale in [1.0, 2.0]) {
       for (final dark in [false, true]) {
-        testWidgets('landing fits $width scale=$scale dark=$dark and finds campaigns before stories', (tester) async {
+        testWidgets('landing fits $width scale=$scale dark=$dark with campaign before stories', (tester) async {
           tester.view.physicalSize = Size(width, 900);
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
@@ -35,15 +35,13 @@ void main() {
             home: PublicRecruitmentCampaignsScreen(gateway: _LandingGateway([_campaign])),
           ));
           await tester.pumpAndSettle();
-          final discover = find.byKey(const ValueKey('discover-campaigns'));
-          await tester.ensureVisible(discover);
-          await tester.tap(discover);
+          expect(find.byKey(const ValueKey('sticky-campaign-action')), findsNothing);
+          final start = find.widgetWithText(FilledButton, 'Commencer ma candidature');
+          expect(start, findsOneWidget);
+          await tester.ensureVisible(start);
           await tester.pumpAndSettle();
-          final heading = find.text('Les candidatures ouvertes');
-          expect(tester.getTopLeft(heading).dy, greaterThanOrEqualTo(0));
-          expect(tester.getTopLeft(heading).dy, lessThan(300));
           expect(tester.getTopLeft(find.text(_campaign.title)).dy,
-            lessThan(tester.getTopLeft(find.text('Une équipe, des idées, des actions.')).dy));
+            lessThan(tester.getTopLeft(find.text('Une aventure à vivre ensemble')).dy));
           expect(find.textContaining('29 octobre 2026'), findsWidgets);
           expect(find.text('Retour à la connexion'), findsNothing);
           final faq = find.widgetWithText(ExpansionTile, 'Comment mon dossier est-il étudié ?');
@@ -56,6 +54,36 @@ void main() {
       }
     }
   }
+  testWidgets('mobile sticky action appears after original leaves and hides on return', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: PublicRecruitmentCampaignsScreen(gateway: _LandingGateway([_campaign]))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('sticky-campaign-action')), findsNothing);
+    await tester.ensureVisible(find.text('Avant de te lancer'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('sticky-campaign-action')), findsOneWidget);
+    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    scroll.position.jumpTo(0);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('sticky-campaign-action')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('multiple campaigns remain a choice and show all available cards', (tester) async {
+    const second = RecruitmentCampaignModel(id: 'second', title: 'Une autre campagne', isActive: true);
+    await tester.pumpWidget(MaterialApp(home: PublicRecruitmentCampaignsScreen(gateway: _LandingGateway([_campaign, second]))));
+    await tester.pumpAndSettle();
+    final choose = find.widgetWithText(FilledButton, 'Choisir ma campagne');
+    await tester.ensureVisible(choose);
+    await tester.tap(choose);
+    await tester.pumpAndSettle();
+    expect(find.text(_campaign.title), findsOneWidget);
+    expect(find.text(second.title), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Les candidatures ouvertes')).dy, lessThan(300));
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('closed recruitment never offers a start action and retains tracking', (tester) async {
     await tester.pumpWidget(MaterialApp(home: PublicRecruitmentCampaignsScreen(gateway: _LandingGateway([]))));
     await tester.pumpAndSettle();

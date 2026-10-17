@@ -28,11 +28,13 @@ class PublicRecruitmentShell extends StatelessWidget {
 class CampaignPublicCard extends StatelessWidget {
   final RecruitmentCampaignModel campaign;
   final VoidCallback onStart;
+  final Key? actionKey;
 
   const CampaignPublicCard({
     super.key,
     required this.campaign,
     required this.onStart,
+    this.actionKey,
   });
 
   @override
@@ -93,6 +95,8 @@ class CampaignPublicCard extends StatelessWidget {
                 button: true,
                 label: 'Commencer ma candidature pour ${campaign.title}',
                 child: FilledButton.icon(
+                  key: actionKey,
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFFD34D), foregroundColor: const Color(0xFF211B0B)),
                   onPressed: onStart,
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: Text('Commencer ma candidature'),
