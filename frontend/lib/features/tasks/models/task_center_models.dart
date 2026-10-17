@@ -105,6 +105,7 @@ class TaskUpdateInput {
   final DateTime? dueDate;
   final bool proofRequired;
   final String? proofUrl;
+  final String? deadlineChangeReason;
 
   const TaskUpdateInput({
     required this.title,
@@ -114,6 +115,7 @@ class TaskUpdateInput {
     required this.dueDate,
     required this.proofRequired,
     required this.proofUrl,
+    this.deadlineChangeReason,
   });
 }
 

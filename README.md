@@ -2,16 +2,16 @@
 
 EnactSpace is the private digital workspace for Enactus ESP. It brings membership, projects, communication, attendance, finance, impact, operational integrity, and institutional memory into one maintained platform.
 
-The current release target is **V1.0.0** (`1.0.0+1` for the Flutter application). This repository does not claim that V1.0.0 is deployed or publicly released; the remaining release and external mobile gates are tracked in the [release checklist](docs/RELEASE_CHECKLIST.md).
+Le web, l’API et l’APK Android installé sont en **1.0.13** (build clients **16**) au 10 octobre 2026. Le dernier checkpoint source est `b152677372ded22d63b544b1336240902613b559`, qui conserve le correctif backend de première connexion. Voir [l’état de release](docs/releases/20261010-release-1.0.13.md) et les [vérifications restantes](docs/RELEASE_CHECKLIST.md). La livraison technique est confirmée; toutes les validations fonctionnelles et les publications de stores ne sont pas encore terminées.
 
 ## Platform
 
-- Flutter `3.44.9` / Dart `3.12.2` for Android, iOS, and web clients.
+- Flutter `3.47.5` used for the latest builds for Android, iOS, and web clients.
 - FastAPI on Python 3.12 for the API and background operations.
 - PostgreSQL 16 for production and concurrency-sensitive validation.
-- Alembic migrations through `20260913_0009`.
+- Alembic migrations through `20261007_0031`.
 
-Android and iOS are the primary mobile targets; web is a supported build target. Production URLs, push providers, mobile signing, and store distribution are external environment/release concerns and are never embedded in the repository.
+Android and iOS are the primary mobile targets; web is a supported build target. Production endpoints are supplied through external build configuration. Provider credentials, signing material and secrets are never committed.
 
 ## Repository map
 

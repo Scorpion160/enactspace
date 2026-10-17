@@ -106,6 +106,12 @@ class AcademyService {
 
     return AcademyCourseModel(
       id: _string(json['id'], fallback: 'course'),
+      isLocked: json['is_locked'] == true,
+      lockReason: json['lock_reason']?.toString() ?? '',
+      quizPassed: json['quiz_passed'] == true,
+      prerequisiteCourseIds: (json['prerequisite_course_ids'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
       title: _string(json['title'], fallback: 'Cours Academy'),
       category: _string(json['category'], fallback: 'Academy'),
       level: _string(json['level'], fallback: 'Débutant'),

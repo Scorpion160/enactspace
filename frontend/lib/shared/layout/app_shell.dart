@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../ui/app_back_button.dart';
 import '../../core/api/api_client.dart';
 import '../../core/auth/user_experience.dart';
 import '../../core/brand/brand_assets.dart';
@@ -39,6 +40,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int? _lateTasks;
   UserExperience? _userExperience;
   bool _hasSession = false;
+  late bool _navigationExpanded;
   Timer? _metricsTimer;
   Timer? _notificationTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
@@ -53,6 +55,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _navigationExpanded = !widget.currentPath.startsWith('/chat');
     WidgetsBinding.instance.addObserver(this);
     _realtimeSubscription = _realtimeService.events.listen((event) {
       if (event['type'] == 'connected' && event['unread_count'] != null) {
@@ -184,6 +187,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.currentPath != widget.currentPath) {
+      _navigationExpanded = !widget.currentPath.startsWith('/chat');
       _loadNavigationMetrics();
     }
   }
@@ -393,91 +397,122 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 1100;
     final title = _navigationTitle(widget.currentPath);
+    final segments = widget.currentPath
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final detailParent = segments.length > 1 ? '/${segments.first}' : null;
 
     if (isWide) {
-      return Scaffold(
-        body: Row(
-          children: [
-            _SideMenu(
-              currentPath: widget.currentPath,
-              userExperience: _userExperience,
-              hasSession: _hasSession,
-              unreadNotifications: _unreadNotifications,
-              unreadChatMessages: _unreadChatMessages,
-              lateTasks: _lateTasks,
-              onLogout: () => _logout(context),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  _TopBar(
-                    title: title,
-                    unreadNotifications: _unreadNotifications,
-                    onRefresh: () => _refresh(context),
-                    onLogout: () => _logout(context),
-                  ),
-                  Expanded(child: widget.child),
-                ],
+      return AppBackScope(
+        fallbackPath: detailParent,
+        child: Scaffold(
+          body: Row(
+            children: [
+              if (_navigationExpanded)
+                _SideMenu(
+                  currentPath: widget.currentPath,
+                  userExperience: _userExperience,
+                  hasSession: _hasSession,
+                  unreadNotifications: _unreadNotifications,
+                  unreadChatMessages: _unreadChatMessages,
+                  lateTasks: _lateTasks,
+                  onLogout: () => _logout(context),
+                ),
+              Expanded(
+                child: Column(
+                  children: [
+                    _TopBar(
+                      title: title,
+                      navigationExpanded: _navigationExpanded,
+                      onToggleNavigation: () => setState(
+                        () => _navigationExpanded = !_navigationExpanded,
+                      ),
+                      backPath: detailParent,
+                      unreadNotifications: _unreadNotifications,
+                      onRefresh: () => _refresh(context),
+                      onLogout: () => _logout(context),
+                    ),
+                    Expanded(child: widget.child),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 8,
-        title: Text(_mobileNavigationTitle(widget.currentPath)),
-        actions: [
-          _NotificationIconButton(
-            unreadNotifications: _unreadNotifications,
-            onPressed: () => context.go('/notifications'),
-          ),
-          IconButton(
-            onPressed: () => context.go('/settings'),
-            tooltip: 'Réglages',
-            icon: const Icon(Icons.settings_rounded),
-          ),
-          IconButton(
-            onPressed: () => _logout(context),
-            tooltip: 'Déconnexion',
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
-      bottomNavigationBar: MobileBottomNavigation(
-        currentPath: widget.currentPath,
-        userExperience: _userExperience,
-        unreadNotifications: _unreadNotifications,
-        unreadChatMessages: _unreadChatMessages,
-        lateTasks: _lateTasks,
-      ),
-      drawer: Drawer(
-        child: _SideMenu(
+    return AppBackScope(
+      fallbackPath: detailParent,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: detailParent == null
+              ? null
+              : AppBackButton(fallbackPath: detailParent),
+          titleSpacing: 8,
+          title: Text(_mobileNavigationTitle(widget.currentPath)),
+          actions: [
+            _NotificationIconButton(
+              unreadNotifications: _unreadNotifications,
+              onPressed: () => context.go('/notifications'),
+            ),
+            IconButton(
+              onPressed: () => context.go('/profile'),
+              tooltip: 'Mon profil',
+              icon: const Icon(Icons.account_circle_rounded),
+            ),
+            IconButton(
+              onPressed: () => context.go('/settings'),
+              tooltip: 'Réglages',
+              icon: const Icon(Icons.settings_rounded),
+            ),
+            IconButton(
+              onPressed: () => _logout(context),
+              tooltip: 'Déconnexion',
+              icon: const Icon(Icons.logout_rounded),
+            ),
+          ],
+        ),
+        bottomNavigationBar: MobileBottomNavigation(
           currentPath: widget.currentPath,
           userExperience: _userExperience,
-          hasSession: _hasSession,
           unreadNotifications: _unreadNotifications,
           unreadChatMessages: _unreadChatMessages,
           lateTasks: _lateTasks,
-          onLogout: () => _logout(context),
-          compact: true,
         ),
+        drawer: Drawer(
+          child: _SideMenu(
+            currentPath: widget.currentPath,
+            userExperience: _userExperience,
+            hasSession: _hasSession,
+            unreadNotifications: _unreadNotifications,
+            unreadChatMessages: _unreadChatMessages,
+            lateTasks: _lateTasks,
+            onLogout: () => _logout(context),
+            compact: true,
+          ),
+        ),
+        body: widget.child,
       ),
-      body: widget.child,
     );
   }
 }
 
 class _TopBar extends StatelessWidget {
+  final bool navigationExpanded;
+  final VoidCallback onToggleNavigation;
   final String title;
+  final String? backPath;
   final int? unreadNotifications;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
 
   const _TopBar({
+    required this.navigationExpanded,
+    required this.onToggleNavigation,
     required this.title,
+    this.backPath,
     required this.unreadNotifications,
     required this.onRefresh,
     required this.onLogout,
@@ -496,6 +531,16 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          IconButton(
+            tooltip: navigationExpanded
+                ? 'Masquer le menu'
+                : 'Afficher le menu',
+            onPressed: onToggleNavigation,
+            icon: Icon(
+              navigationExpanded ? Icons.menu_open_rounded : Icons.menu_rounded,
+            ),
+          ),
+          if (backPath != null) AppBackButton(fallbackPath: backPath!),
           Expanded(
             child: Text(
               title,
@@ -511,6 +556,11 @@ class _TopBar extends StatelessWidget {
           _NotificationIconButton(
             unreadNotifications: unreadNotifications,
             onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            onPressed: () => context.go('/profile'),
+            tooltip: 'Mon profil',
+            icon: const Icon(Icons.account_circle_rounded),
           ),
           IconButton(
             onPressed: () => context.go('/settings'),
@@ -580,6 +630,11 @@ class _SideMenu extends StatelessWidget {
                     badgeCount: unreadChatMessages,
                   ),
                   _MenuItem(
+                    label: 'EnactMeet',
+                    icon: Icons.video_call_rounded,
+                    path: '/meetings',
+                  ),
+                  _MenuItem(
                     label: 'Gamification',
                     icon: Icons.workspace_premium_rounded,
                     path: '/gamification',
@@ -623,6 +678,11 @@ class _SideMenu extends StatelessWidget {
                     label: 'Présences',
                     icon: Icons.fact_check_rounded,
                     path: '/attendance',
+                  ),
+                  _MenuItem(
+                    label: 'Pôle Veille',
+                    icon: Icons.track_changes_rounded,
+                    path: '/veille',
                   ),
                   _MenuItem(
                     label: 'Tâches',
@@ -709,6 +769,16 @@ class _SideMenu extends StatelessWidget {
                   children: [
                     _NavigationTile(
                       item: const _MenuItem(
+                        label: 'Mon profil',
+                        icon: Icons.account_circle_rounded,
+                        path: '/profile',
+                      ),
+                      selected: _isSelected(currentPath, '/profile'),
+                      compact: compact,
+                    ),
+                    const SizedBox(height: 4),
+                    _NavigationTile(
+                      item: const _MenuItem(
                         label: 'Réglages',
                         icon: Icons.settings_rounded,
                         path: '/settings',
@@ -739,10 +809,13 @@ Set<String> _visibleShellRoutes(UserExperience? user, bool hasSession) {
 
   return const {
     '/dashboard',
+    '/profile',
     '/notifications',
     '/posts',
     '/chat',
+    '/meetings',
     '/tasks',
+    '/veille',
     '/documents',
     '/gamification',
     '/academy',
@@ -1009,6 +1082,18 @@ class MobileBottomNavigation extends StatelessWidget {
         badgeCount: unreadChatMessages,
       ),
       _MobileDestination(
+        label: 'Meet',
+        icon: Icons.video_call_outlined,
+        selectedIcon: Icons.video_call_rounded,
+        path: '/meetings',
+      ),
+      _MobileDestination(
+        label: 'Veille',
+        icon: Icons.track_changes_outlined,
+        selectedIcon: Icons.track_changes_rounded,
+        path: '/veille',
+      ),
+      _MobileDestination(
         label: 'Tâches',
         icon: Icons.task_alt_outlined,
         selectedIcon: Icons.task_alt_rounded,
@@ -1144,17 +1229,22 @@ class MobileBottomNavigation extends StatelessWidget {
           : NavigationDestinationLabelBehavior.alwaysShow,
       destinations: [
         for (final destination in destinations)
-          NavigationDestination(
-            icon: _BottomNavIcon(
-              icon: destination.icon,
-              badgeCount: destination.badgeCount,
+          DefaultTextStyle.merge(
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            child: NavigationDestination(
+              icon: _BottomNavIcon(
+                icon: destination.icon,
+                badgeCount: destination.badgeCount,
+              ),
+              selectedIcon: _BottomNavIcon(
+                icon: destination.selectedIcon,
+                badgeCount: destination.badgeCount,
+                selected: true,
+              ),
+              label: destination.label,
             ),
-            selectedIcon: _BottomNavIcon(
-              icon: destination.selectedIcon,
-              badgeCount: destination.badgeCount,
-              selected: true,
-            ),
-            label: destination.label,
           ),
       ],
     );
@@ -1288,6 +1378,7 @@ String _navigationTitle(String currentPath) {
     '/events': 'Événements',
     '/attendance': 'Présences',
     '/tasks': 'Tâches',
+    '/veille': 'Pôle Veille',
     '/finance': 'Finance',
     '/documents': 'Documents',
     '/archives': 'Archives & Mémoire collective',
@@ -1296,9 +1387,11 @@ String _navigationTitle(String currentPath) {
     '/notifications': 'Notifications',
     '/posts': 'Communication',
     '/chat': 'Chat',
+    '/meetings': 'EnactMeet',
     '/gamification': 'Gamification',
     '/academy': 'EnactSpace Academy',
     '/impact': 'Impact & Performance',
+    '/profile': 'Mon profil',
     '/settings': 'Réglages',
     '/help': 'Centre d’aide',
   };

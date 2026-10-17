@@ -1,10 +1,15 @@
+import '../../../shared/ui/project_photo_gallery.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/archive_models.dart';
 import '../services/archives_gateway.dart';
 import 'archive_forms.dart';
+import '../../../shared/ui/reading_blocks.dart';
 import 'archives_center_sections.dart';
+import 'archive_visuals.dart';
+import '../../../shared/ui/project_reference_documents.dart';
 
 class ArchiveItemDetailScreen extends StatefulWidget {
   final String archiveId;
@@ -86,8 +91,6 @@ class _ArchiveItemDetailScreenState extends State<ArchiveItemDetailScreen> {
             Chip(label: Text(item.visibilityLabel)),
             if (item.isFeatured) const Chip(label: Text('Mis en avant')),
             Chip(label: Text(item.isPublic ? 'Public' : 'Non public')),
-            if (!item.isPersisted)
-              const Chip(label: Text('Mémoire historique Enactus ESP')),
           ],
         ),
         const SizedBox(height: 24),
@@ -108,7 +111,7 @@ class _ArchiveItemDetailScreenState extends State<ArchiveItemDetailScreen> {
               if (item.projectId != null) Text('Projet · ${item.projectId}'),
               if (item.documentId != null)
                 Text('Document · ${item.documentId}'),
-              if (item.seasonId != null) Text('Saison · ${item.seasonId}'),
+              if (item.seasonId != null) Text('Année · ${item.seasonId}'),
             ],
           ),
         ),
@@ -360,8 +363,7 @@ class _HistoricalProjectDetailScreenState
     if (project == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return ListView(
-      padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 30),
+    return ArchiveDetailLayout(
       children: [
         Text(
           '${project.periodLabel} · ${project.statusLabel}',
@@ -374,24 +376,63 @@ class _HistoricalProjectDetailScreenState
             context,
           ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
-        if (!project.isPersisted) ...[
-          const SizedBox(height: 10),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Chip(label: Text('Mémoire historique Enactus ESP')),
-          ),
-        ],
+
         const SizedBox(height: 28),
+        if (project.imageAsset != null) ...[
+          HeritageImage(asset: project.imageAsset!, title: project.name),
+          const SizedBox(height: 20),
+        ],
+        if (project.sourceUrl != null)
+          DetailSection(
+            title: 'Source officielle',
+            child: TextButton.icon(
+              onPressed: () => openArchiveUrl(context, project.sourceUrl),
+              icon: const Icon(Icons.link),
+              label: const Text('Consulter la publication'),
+            ),
+          ),
         if (project.description != null)
-          DetailSection(title: 'Contexte', child: Text(project.description!)),
+          DetailSection(
+            title: 'Contexte',
+            child: ArchiveParagraphs(project.description!),
+          ),
         if (project.problem != null)
-          DetailSection(title: 'Le problème', child: Text(project.problem!)),
+          DetailSection(
+            title: 'Le problème',
+            child: ArchiveParagraphs(project.problem!),
+          ),
         if (project.solution != null)
-          DetailSection(title: 'La réponse', child: Text(project.solution!)),
+          DetailSection(
+            title: 'La réponse',
+            child: ArchiveParagraphs(project.solution!),
+          ),
         if (project.impactSummary != null)
           DetailSection(
             title: 'Impact et héritage',
-            child: Text(project.impactSummary!),
+            child: ArchiveParagraphs(project.impactSummary!),
+          ),
+        if (project.presentation?.gallery.isNotEmpty == true)
+          DetailSection(
+            title: 'Sur le terrain',
+            child: ProjectPhotoGallery(photos: project.presentation!.gallery),
+          ),
+        for (final section in project.storySections)
+          DetailSection(
+            title: section.title,
+            child: ArchiveParagraphs(section.body),
+          ),
+        if (project.storySections.isEmpty && project.presentation != null)
+          for (final section in project.presentation!.sections)
+            DetailSection(
+              title: section.title,
+              child: ArchiveParagraphs(section.body),
+            ),
+        if (project.referenceDocuments.isNotEmpty)
+          DetailSection(
+            title: 'Les dossiers du projet',
+            child: ProjectReferenceDocuments(
+              documents: project.referenceDocuments,
+            ),
           ),
         if (project.keyMembers.isNotEmpty)
           DetailSection(
@@ -484,8 +525,7 @@ class _HallOfFameDetailScreenState extends State<HallOfFameDetailScreen> {
         entry.file?.previewUrl != null ||
         entry.file?.downloadUrl != null ||
         entry.externalUrl != null;
-    return ListView(
-      padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 30),
+    return ArchiveDetailLayout(
       children: [
         Text(
           '${entry.year ?? 'Année non renseignée'} · ${entry.entryTypeLabel}',
@@ -508,8 +548,7 @@ class _HallOfFameDetailScreenState extends State<HallOfFameDetailScreen> {
           runSpacing: 8,
           children: [
             if (entry.isFeatured) const Chip(label: Text('Mis en avant')),
-            if (!entry.isPersisted)
-              const Chip(label: Text('Mémoire historique Enactus ESP')),
+
             if (entry.scoreValue != null)
               Chip(
                 label: Text(
@@ -519,13 +558,16 @@ class _HallOfFameDetailScreenState extends State<HallOfFameDetailScreen> {
           ],
         ),
         const SizedBox(height: 28),
+        if (entry.imageAsset != null) ...[
+          HeritageImage(asset: entry.imageAsset!, title: entry.title),
+          const SizedBox(height: 24),
+        ],
         if (entry.description != null)
-          DetailSection(title: 'Le moment', child: Text(entry.description!)),
-        if (entry.subtitle != null && entry.description != null)
           DetailSection(
-            title: 'Pourquoi il compte',
-            child: Text(entry.subtitle!),
+            title: 'Le moment',
+            child: ArchiveParagraphs(entry.description!),
           ),
+
         if (hasTrace)
           DetailSection(
             title: 'Trace / média',
@@ -567,8 +609,14 @@ class DetailSection extends StatelessWidget {
   const DetailSection({super.key, required this.title, required this.child});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 26),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 20),
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -630,4 +678,165 @@ class DetailErrorState extends StatelessWidget {
       ),
     ),
   );
+}
+
+class ArchiveParagraphs extends StatelessWidget {
+  final String text;
+  const ArchiveParagraphs(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => ReadingBlocks(text);
+}
+
+class ArchiveDetailLayout extends StatelessWidget {
+  final List<Widget> children;
+  const ArchiveDetailLayout({super.key, required this.children});
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ListView(
+      padding: EdgeInsets.symmetric(
+        horizontal: constraints.maxWidth > 980
+            ? (constraints.maxWidth - 920) / 2
+            : 20,
+        vertical: 24,
+      ),
+      children: children,
+    ),
+  );
+}
+
+class ArchiveCollectionDetailScreen extends StatefulWidget {
+  final String recordId;
+  final bool competition;
+  final ArchivesGateway? gateway;
+  const ArchiveCollectionDetailScreen({
+    super.key,
+    required this.recordId,
+    required this.competition,
+    this.gateway,
+  });
+  @override
+  State<ArchiveCollectionDetailScreen> createState() =>
+      _ArchiveCollectionDetailScreenState();
+}
+
+class _ArchiveCollectionDetailScreenState
+    extends State<ArchiveCollectionDetailScreen> {
+  late final ArchivesGateway _gateway;
+  ArchivesHomeData? _home;
+  Object? _error;
+  @override
+  void initState() {
+    super.initState();
+    _gateway = widget.gateway ?? ApiArchivesGateway();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _error = null);
+    try {
+      final home = await _gateway.loadHome();
+      if (mounted) setState(() => _home = home);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) return DetailErrorState(error: _error!, onRetry: _load);
+    final home = _home;
+    if (home == null) return const Center(child: CircularProgressIndicator());
+    final competitions = home.competitions.where(
+      (row) => row.id == widget.recordId,
+    );
+    final awards = home.awards.where((row) => row.id == widget.recordId);
+    final competition = widget.competition && competitions.isNotEmpty
+        ? competitions.first
+        : null;
+    final award = !widget.competition && awards.isNotEmpty
+        ? awards.first
+        : null;
+    if (competition == null && award == null) {
+      return const Center(child: Text('Cette fiche est introuvable.'));
+    }
+    final title = competition?.name ?? award!.title;
+    final description = competition?.description ?? award?.description;
+    final image = competition?.imageAsset ?? award?.imageAsset;
+    final source = competition?.sourceUrl ?? award?.sourceUrl;
+    final sections = competition?.storySections ?? award!.storySections;
+    final projectIds =
+        competition?.projectIds ??
+        [if (award?.archivedProjectId != null) award!.archivedProjectId!];
+    final related = home.projects.where((row) => projectIds.contains(row.id));
+    return ArchiveDetailLayout(
+      children: [
+        Text(
+          [
+            competition?.year ?? award?.year,
+            competition?.location,
+            competition?.result ?? award?.rank ?? award?.result,
+          ].where((part) => part != null && '$part'.isNotEmpty).join(' · '),
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 24),
+        if (image != null) ...[
+          HeritageImage(asset: image, title: title),
+          const SizedBox(height: 24),
+        ],
+        if (description != null)
+          DetailSection(
+            title: 'Le rendez-vous',
+            child: ArchiveParagraphs(description),
+          ),
+        for (final section in sections)
+          DetailSection(
+            title: section.title,
+            child: ArchiveParagraphs(section.body),
+          ),
+        if (related.isNotEmpty)
+          DetailSection(
+            title: 'Les projets à découvrir',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final project in related)
+                  Card(
+                    child: ListTile(
+                      title: Text(project.name),
+                      subtitle: project.description == null
+                          ? null
+                          : Text(
+                              project.description!,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                      trailing: const Icon(Icons.arrow_forward_rounded),
+                      onTap: () => context.push(
+                        '/archives/projects/${project.id}',
+                        extra: _gateway,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (source != null)
+          DetailSection(
+            title: 'Pour aller plus loin',
+            child: TextButton.icon(
+              onPressed: () => openArchiveUrl(context, source),
+              icon: const Icon(Icons.link),
+              label: const Text('Consulter la publication'),
+            ),
+          ),
+      ],
+    );
+  }
 }

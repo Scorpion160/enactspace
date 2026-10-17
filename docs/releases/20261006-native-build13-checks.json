@@ -1,0 +1,73 @@
+{
+  "version": "1.0.10+13",
+  "tests": [
+    {
+      "method": "testProfilePhoto",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testRecruitmentFinal",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testOpenCandidate",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testHistory",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testCloseCandidate",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testAcademy",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testAcademyContinue",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testLessonRead",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testHomeFinal",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testAlumniRepaired113",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testRecruitmentHumanRubric110",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testDimbaliGallery110",
+      "passed": true,
+      "fresh_result": true
+    },
+    {
+      "method": "testSherySaveSystemBack109",
+      "passed": true,
+      "fresh_result": true
+    }
+  ],
+  "display_setting_restored": true,
+  "no_candidate_evaluation_saved": true,
+  "no_status_changed": true
+}

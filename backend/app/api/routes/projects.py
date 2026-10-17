@@ -1,3 +1,5 @@
+from uuid import UUID
+from app.core.time import utc_now
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -22,7 +24,7 @@ from app.models.role import Role, UserRole
 from app.models.user import User
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
-from app.services.operational_integrity import assert_active_operational_member, lock_row
+from app.services.operational_integrity import assert_active_operational_member, assert_operational_actor, lock_row, lock_structure_write, assert_existing_year, assert_project_dates, get_or_create_role
 from app.services.institutional_memory_capture import capture_project_completion
 
 
@@ -54,7 +56,7 @@ GLOBAL_PROJECT_MANAGERS = {
 PROJECT_LEADERSHIP_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
 
 
-def get_project_or_404(db: Session, project_id: str) -> Project:
+def get_project_or_404(db: Session, project_id: UUID) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
     if project is None:
         raise HTTPException(
@@ -64,7 +66,7 @@ def get_project_or_404(db: Session, project_id: str) -> Project:
     return project
 
 
-def get_user_or_404(db: Session, user_id: str) -> User:
+def get_user_or_404(db: Session, user_id: UUID) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(
@@ -94,8 +96,9 @@ def project_member_payload(membership: ProjectMember, user: User) -> ProjectMemb
 def require_project_manager(
     db: Session,
     current_user: User,
-    project_id: str,
+    project_id: UUID,
 ) -> bool:
+    assert_operational_actor(current_user)
     roles = get_user_role_names(db, current_user.id)
     if roles.intersection(GLOBAL_PROJECT_MANAGERS):
         return True
@@ -125,11 +128,7 @@ def sync_project_responsibility_role(
     user_id,
     role_name: str,
 ) -> None:
-    role = db.query(Role).filter(Role.name == role_name).first()
-    if role is None:
-        role = Role(name=role_name, description="Responsabilité de projet")
-        db.add(role)
-        db.flush()
+    role = get_or_create_role(db, role_name)
 
     should_have_role = (
         db.query(ProjectMember.id)
@@ -182,6 +181,12 @@ def create_project(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut projet invalide",
         )
+    current_user, _, _ = lock_structure_write(db, current_user.id, Project)
+    if not get_user_role_names(db, current_user.id).intersection(GLOBAL_PROJECT_MANAGERS):
+        raise HTTPException(403, "Gestion réservée à la direction du club.")
+    assert_existing_year(db, payload.season_id)
+    assert_project_dates(payload.started_at, payload.ended_at)
+
     project = Project(
         season_id=payload.season_id,
         name=payload.name,
@@ -223,18 +228,22 @@ def list_projects(
 
 @router.patch("/{project_id}", response_model=ProjectRead)
 def update_project(
-    project_id: str,
+    project_id: UUID,
     payload: ProjectUpdate,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    project = lock_row(db, Project, project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Projet introuvable")
-    require_project_manager(db, current_user, project_id)
+    current_user, _, project = lock_structure_write(db, current_user.id, Project, project_id)
+    global_manager = require_project_manager(db, current_user, project_id)
     data = payload.model_dump(exclude_unset=True)
 
+    if "season_id" in data and data["season_id"] != project.season_id and not global_manager:
+        raise HTTPException(403, "Le changement d'année relève de la direction du club.")
+    if "season_id" in data:
+        assert_existing_year(db, data["season_id"])
+    if "started_at" in data or "ended_at" in data:
+        assert_project_dates(data.get("started_at", project.started_at), data.get("ended_at", project.ended_at))
     old_value = {key: getattr(project, key) for key in data}
     next_status = data.pop("status", None)
     status_changed = False
@@ -243,7 +252,7 @@ def update_project(
     for field, value in data.items():
         setattr(project, field, value)
 
-    project.updated_at = datetime.utcnow()
+    project.updated_at = utc_now()
     new_value = {key: getattr(project, key) for key in old_value}
     if next_status is not None:
         old_value["status"] = old_value.get("status", project.status if not status_changed else None)
@@ -268,7 +277,7 @@ def update_project(
 
 @router.get("/{project_id}/members", response_model=list[ProjectMemberRead])
 def list_project_members(
-    project_id: str,
+    project_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -279,6 +288,7 @@ def list_project_members(
         .filter(
             ProjectMember.project_id == project_id,
             ProjectMember.is_active.is_(True),
+            ProjectMember.left_at.is_(None),
         )
         .order_by(ProjectMember.position.asc(), ProjectMember.joined_at.asc())
         .all()
@@ -288,18 +298,13 @@ def list_project_members(
 
 @router.post("/{project_id}/members", response_model=ProjectMemberRead)
 def assign_project_member(
-    project_id: str,
+    project_id: UUID,
     payload: ProjectMemberAssign,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    project = lock_row(db, Project, project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Projet introuvable")
-    user = lock_row(db, User, payload.user_id)
-    if user is None:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    current_user, user, project = lock_structure_write(db, current_user.id, Project, project_id, payload.user_id)
     is_global_manager = require_project_manager(db, current_user, project_id)
 
     if payload.position not in VALID_PROJECT_POSITIONS:
@@ -327,6 +332,9 @@ def assign_project_member(
         .first()
     )
 
+    if membership is not None and membership.position in PROJECT_LEADERSHIP_POSITIONS and not is_global_manager:
+        raise HTTPException(403, "La modification d'une responsabilité relève de la direction du club.")
+
     previous_position = None
     membership_created = membership is None
     old_value = None
@@ -334,7 +342,7 @@ def assign_project_member(
         membership = ProjectMember(
             project_id=project_id,
             user_id=payload.user_id,
-            position=payload.position,
+            position="membre",
         )
         db.add(membership)
     else:
@@ -348,10 +356,11 @@ def assign_project_member(
             if membership.left_at
             else None,
         }
-        membership.position = payload.position
+        membership.position = "membre"
         membership.is_active = True
         membership.left_at = None
 
+    db.flush()
     if payload.position in PROJECT_LEADERSHIP_POSITIONS:
         existing_leaders = (
             db.query(ProjectMember)
@@ -360,6 +369,7 @@ def assign_project_member(
                 ProjectMember.user_id != payload.user_id,
                 ProjectMember.position == payload.position,
                 ProjectMember.is_active.is_(True),
+                ProjectMember.left_at.is_(None),
             )
             .order_by(ProjectMember.id.asc())
             .with_for_update()
@@ -368,6 +378,7 @@ def assign_project_member(
         for existing_leader in existing_leaders:
             previous_leader_position = existing_leader.position
             existing_leader.position = "membre"
+            db.flush()
             sync_project_responsibility_role(
                 db,
                 existing_leader.user_id,
@@ -401,6 +412,8 @@ def assign_project_member(
                 ip_address=get_client_ip(request),
             )
 
+    membership.position = payload.position
+    db.flush()
     if previous_position in PROJECT_LEADERSHIP_POSITIONS:
         sync_project_responsibility_role(db, payload.user_id, previous_position)
     if payload.position in PROJECT_LEADERSHIP_POSITIONS:
@@ -447,18 +460,19 @@ def assign_project_member(
 
 @router.delete("/{project_id}/members/{user_id}", response_model=ProjectMemberRead)
 def remove_project_member(
-    project_id: str,
-    user_id: str,
+    project_id: UUID,
+    user_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    project = get_project_or_404(db, project_id)
+    current_user, _, project = lock_structure_write(db, current_user.id, Project, project_id, user_id)
     is_global_manager = require_project_manager(db, current_user, project_id)
     row = (
         db.query(ProjectMember, User)
         .join(User, User.id == ProjectMember.user_id)
         .filter(ProjectMember.project_id == project_id, ProjectMember.user_id == user_id)
+        .with_for_update()
         .first()
     )
 
@@ -487,6 +501,7 @@ def remove_project_member(
     }
     membership.is_active = False
     membership.left_at = date.today()
+    db.flush()
     if previous_position in PROJECT_LEADERSHIP_POSITIONS:
         sync_project_responsibility_role(db, membership.user_id, previous_position)
     notify_user(

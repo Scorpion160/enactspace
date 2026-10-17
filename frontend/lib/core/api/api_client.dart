@@ -83,6 +83,8 @@ class ApiClient {
       '/auth/join-requests',
       '/auth/password-reset/request',
       '/auth/password-reset/confirm',
+      '/auth/activation/request',
+      '/auth/activation/confirm',
     }.contains(route);
   }
 
@@ -326,6 +328,47 @@ class ApiClient {
     return decodeResponse(response);
   }
 
+  Future<dynamic> postMultipartFiles(
+    String path, {
+    String? token,
+    Map<String, String> fields = const {},
+    required Map<String, ({String name, List<int> bytes})> files,
+  }) async {
+    final buffered = {
+      for (final entry in files.entries)
+        entry.key: (
+          name: entry.value.name,
+          bytes: List<int>.of(entry.value.bytes),
+        ),
+    };
+    final response = await sendAuthenticated(
+      path,
+      token: token,
+      send: (access) async {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl$path'),
+        );
+        request.headers.addAll({
+          'Accept': 'application/json',
+          if (access != null) 'Authorization': 'Bearer $access',
+        });
+        request.fields.addAll(fields);
+        for (final entry in buffered.entries) {
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              entry.key,
+              entry.value.bytes,
+              filename: entry.value.name,
+            ),
+          );
+        }
+        return http.Response.fromStream(await _client.send(request));
+      },
+    );
+    return decodeResponse(response);
+  }
+
   Future<List<int>> getBytes(String url, {required String token}) async {
     final uri = Uri.parse(url);
     // Public external media must never receive our API bearer credential.
@@ -509,13 +552,18 @@ class ApiClient {
       return body;
     }
 
-    String message = 'Erreur serveur ${response.statusCode}';
-
-    if (body is Map<String, dynamic>) {
-      if (body['detail'] is String) {
-        message = body['detail'];
-      } else if (body['detail'] != null) {
-        message = body['detail'].toString();
+    String message = response.statusCode >= 500
+        ? 'Le service est momentanément indisponible. Réessayez dans un instant.'
+        : 'Cette action ne peut pas être terminée. Réessayez.';
+    if (response.statusCode < 500 && body is Map<String, dynamic>) {
+      final detail = body['detail'];
+      if (detail is String) {
+        message = detail;
+      } else if (detail is Map && detail['message'] is String) {
+        message = detail['message'] as String;
+      } else if (response.statusCode == 422) {
+        message =
+            'Vérifiez les informations saisies. Certains champs sont manquants ou invalides.';
       }
     }
 

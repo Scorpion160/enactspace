@@ -1,5 +1,27 @@
 # V1.0.0 release checklist
 
+## Situation actuelle — 10 octobre 2026
+
+- [x] Web 1.0.13 build 16 publié; version publique contrôlée.
+- [x] APK 1.0.13 build 16 compilé et installé sur le téléphone de validation.
+- [x] API 1.0.13 et quatre services backend basculés; santé et configuration contrôlées.
+- [x] Schéma PostgreSQL `20261007_0031` confirmé.
+- [x] Sauvegarde fraîche avec répétition de restauration réussie avant la bascule.
+- [x] Redirection des mails désactivée; mail et push activés.
+- [x] Correctif administratrice conservé dans les sources et le checkpoint b152677.
+- [ ] Confirmer l’activation réelle de Mariama et la réception de son code.
+- [ ] Confirmer réception mail et push sur plusieurs comptes/appareils.
+- [ ] Valider à l’écran annuaire alumni, compteurs membres, droits admin/SG et absence d’auto-conversation.
+- [ ] Rejouer les tests backend pertinents après la résolution finale des dépendances; vérifier les limites PostgreSQL et disciplinaires.
+- [ ] Examiner les anciennes auto-conversations et le traitement d’une cible disciplinaire invalide dans un lot.
+- [ ] Remplacer l’exception nominative de première connexion par un mécanisme d’autorisation audité.
+- [ ] Vérifier les restrictions Firebase, la garde des clés et les paramètres de distribution.
+- [ ] Terminer les gates iOS, stores, gouvernance GitHub et validation de reprise/RPO/RTO.
+
+La publication technique ne signifie pas que tous les parcours sont validés. Les checklists historiques ci-dessous restent des exigences; ne pas les cocher sur la seule base de la santé API.
+
+## Procédures générales et contexte antérieur
+
 This checklist governs EnactSpace V1.0.0 release execution. It does not by itself create a tag, GitHub Release, signed artifact, deployment, or merge.
 
 Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md). Store preparation uses [store release metadata](STORE_RELEASE_METADATA.md), the [privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md), and [artifact provenance](ARTIFACT_PROVENANCE.md). These records do not close a gate by themselves.
@@ -17,7 +39,7 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 
 - [ ] Backend compile, OpenAPI import, and full tests pass without PostgreSQL suite skips.
 - [ ] PostgreSQL 16 migration/reversal/concurrency evidence is current.
-- [ ] Exactly one Alembic head: `20260913_0009`.
+- [ ] Exactly one Alembic head: `20261007_0031`.
 - [ ] Flutter lock file is unchanged; analysis and full tests pass.
 - [ ] Web release and Android debug compile checks pass.
 - [ ] Backup is complete and restore rehearsal evidence is accepted.
@@ -52,3 +74,30 @@ Record gate evidence in the [release evidence index](RELEASE_EVIDENCE_INDEX.md).
 - [ ] Evidence location:
 - [ ] Remaining exceptions, owner, expiry:
 - [ ] Go / no-go decision and timestamp:
+
+## Première connexion — lot 24, source non déployée
+
+- [x] Activation individuelle, profil obligatoire, parcours Alumni et confirmation de l'année implémentés et testés sur données synthétiques.
+- [x] Migration 0030 répétée sur schéma isolé ; anciens états et historique d'accueil conservés.
+- [ ] Confirmer individuellement les contacts manquants et les situations d'accès avec la SG et les membres.
+- [ ] Recette réelle Android/web du build final : activation, accueil, consentement légal, récupération et accès selon les rôles.
+- [ ] Vérifier invitation et notifications avec la redirection de test, puis examiner la file avant toute bascule des destinataires.
+- [ ] Après validation de la mise en service et livraison cohérente backend/app/web, préparer les invitations individuelles au moment de l'ouverture.
+
+Guide : [Premières connexions](FIRST_ACCESS_ONBOARDING.md). Preuves : [Lot 24](releases/20261007-prelaunch-lot24-first-access.md).
+
+## Centre d’aide — lot 25, source non déployée
+
+- [x] Guide, FAQ, aide pendant l’accueil et traitement sécurisé implémentés.
+- [x] 88 tests SQLite, 32 PostgreSQL et 105 Flutter réussis ; migration 0031 répétée.
+- [ ] Recette finale téléphone/web : aide pendant l’accueil, envoi, réponse, suivi, droits, mode sombre et textes agrandis.
+- [ ] Vérifier la réception des alertes en redirection et le lien de navigation sur téléphone.
+- [ ] Confirmer les personnes chargées du traitement à l’ouverture et contrôler leurs accès actifs.
+
+Guide : [Centre d’aide](HELP_SUPPORT_OPERATIONS.md). Preuves : [Lot 25](releases/20261007-prelaunch-lot25-help.md).
+
+## Sauvegarde et restauration — lot 26
+
+Restauration locale isolée vérifiée : 19 tests de protection, 111 tables et 721 lignes comparées, schéma complet contrôlé, 14 fichiers et leurs références intacts. Les modifications synthétiques de contrainte, d’index et de colonne sont détectées. La copie Windows et la récupération depuis sa clé DPAPI sont vérifiées. Restent le second secours de clé, la reprise sur un hôte neuf, la planification, la conservation et les objectifs RPO/RTO. Voir [les preuves](releases/20261008-prelaunch-lot26-backup-restore.md) et [la procédure](V1_1_BACKUP_RESTORE.md).
+
+Sauvegardes planifiées : timer actif à 03 h 00 UTC et premier lancement systemd validé, quatre tests de garde réussis. La copie automatique hors du VPS, le secours de clé remis à un second détenteur et la reprise sur un hôte neuf restent à terminer. Voir les preuves du lot 26.

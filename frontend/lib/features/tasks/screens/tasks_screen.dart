@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../models/task_center_models.dart';
 import '../models/task_model.dart';
 import '../services/tasks_gateway.dart';
@@ -13,12 +12,15 @@ class TasksScreen extends StatefulWidget {
   final TasksGateway? gateway;
   final TaskCenterView initialView;
   final DateTime Function()? clock;
+  final String? initialPoleId, initialProjectId;
 
   const TasksScreen({
     super.key,
     this.gateway,
     this.initialView = TaskCenterView.all,
     this.clock,
+    this.initialPoleId,
+    this.initialProjectId,
   });
 
   @override
@@ -44,6 +46,8 @@ class _TasksScreenState extends State<TasksScreen> {
   void initState() {
     super.initState();
     _gateway = widget.gateway ?? ApiTasksGateway();
+    _poleId = widget.initialPoleId;
+    _projectId = widget.initialProjectId;
     _view = widget.initialView;
     _load();
   }
@@ -158,6 +162,8 @@ class _TasksScreenState extends State<TasksScreen> {
                       ),
                       const SizedBox(height: 14),
                       SegmentedButton<TaskCenterView>(
+                        expandedInsets: EdgeInsets.zero,
+                        showSelectedIcon: false,
                         key: const Key('tasks-views'),
                         segments: TaskCenterView.values
                             .map(
@@ -168,7 +174,6 @@ class _TasksScreenState extends State<TasksScreen> {
                             )
                             .toList(),
                         selected: {_view},
-                        showSelectedIcon: false,
                         onSelectionChanged: _loading
                             ? null
                             : (values) {
@@ -214,8 +219,10 @@ class _TasksScreenState extends State<TasksScreen> {
                       else if (data != null) ...[
                         Text(
                           '${_visibleTasks.length} tâche(s)',
-                          style: const TextStyle(
-                            color: AppTheme.secondaryText,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -251,7 +258,7 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final title = const Column(
+          final title = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -261,7 +268,9 @@ class _Header extends StatelessWidget {
               SizedBox(height: 5),
               Text(
                 'Priorisez, filtrez et ouvrez chaque tâche sans perdre le contexte.',
-                style: TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           );
@@ -275,7 +284,7 @@ class _Header extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: onCreate,
                     icon: const Icon(Icons.add_task_rounded),
-                    label: const Text('Créer une tâche'),
+                    label: Text('Créer une tâche'),
                   ),
                 ],
               ],
@@ -288,7 +297,7 @@ class _Header extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onCreate,
                   icon: const Icon(Icons.add_task_rounded),
-                  label: const Text('Créer une tâche'),
+                  label: Text('Créer une tâche'),
                 ),
             ],
           );
@@ -320,7 +329,7 @@ class _ErrorState extends StatelessWidget {
           FilledButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Réessayer'),
+            label: Text('Réessayer'),
           ),
         ],
       ),

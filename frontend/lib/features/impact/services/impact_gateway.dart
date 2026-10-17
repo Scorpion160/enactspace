@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 // ignore_for_file: curly_braces_in_flow_control_structures
 
 import '../../../core/api/api_client.dart';
@@ -8,6 +10,7 @@ import 'impact_service.dart';
 
 abstract class ImpactGateway {
   Future<ImpactDashboardData> loadDashboard();
+  Future<Uint8List> downloadSummaryPdf();
   Future<List<ImpactRecordModel>> getRecords();
   Future<ImpactRecordModel> getRecord(String id);
   Future<ImpactRecordModel> createRecord(Map<String, dynamic> fields);
@@ -65,6 +68,13 @@ class ApiImpactGateway implements ImpactGateway {
 
   @override
   Future<ImpactDashboardData> loadDashboard() => service.getDashboard();
+  @override
+  Future<Uint8List> downloadSummaryPdf() async => Uint8List.fromList(
+    await apiClient.getBytes(
+      '${ApiClient.baseUrl}/impact/report/summary.pdf',
+      token: await _token(),
+    ),
+  );
   @override
   Future<List<ImpactRecordModel>> getRecords() async => _items(
     await apiClient.get('/impact/records', token: await _token()),

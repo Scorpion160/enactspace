@@ -1,27 +1,144 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from uuid import UUID
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Literal
+from app.services.recruitment_application_metadata import academic_year, discovery_answer
+from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
 
 
-class RecruitmentCampaignCreate(BaseModel):
-    season_id: Optional[UUID] = None
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+class RecruitmentPosition(BaseModel):
     title: str
+    headcount: int = Field(default=1, ge=1)
     description: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: bool = True
+    target_profile: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "title" not in value:
+            value = dict(value)
+            for alias in ("name", "position", "label"):
+                if alias in value:
+                    value["title"] = value[alias]
+                    break
+        return value
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Le poste ne peut pas être vide")
+        return cleaned
+
+    @field_validator("description", "target_profile")
+    @classmethod
+    def clean_optional_fields(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
 
 
-class RecruitmentCampaignUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: Optional[bool] = None
+class RecruitmentCommunicationAction(BaseModel):
+    action: str
+    channel: Optional[str] = None
+    owner: Optional[str] = None
+    timing: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "action" not in value:
+            value = dict(value)
+            for alias in ("title", "name", "label", "text"):
+                if alias in value:
+                    value["action"] = value[alias]
+                    break
+        return value
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("L'action de communication ne peut pas être vide")
+        return cleaned
+
+    @field_validator("channel", "owner", "timing")
+    @classmethod
+    def clean_optional_fields(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
 
 
-class RecruitmentCampaignRead(BaseModel):
+class RecruitmentInterviewQuestion(BaseModel):
+    question: str
+    category: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "question" not in value:
+            value = dict(value)
+            for alias in ("text", "title", "label"):
+                if alias in value:
+                    value["question"] = value[alias]
+                    break
+        return value
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("La question d'entretien ne peut pas être vide")
+        return cleaned
+
+    @field_validator("category")
+    @classmethod
+    def clean_category(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
+
+
+class RecruitmentApplicationQuestion(BaseModel):
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    label: str = Field(min_length=1, max_length=300)
+    hint: str = Field(default="", max_length=500)
+    section: Literal["motivation", "availability"] = "motivation"
+    required: bool = False
+    legacy_field: Optional[str] = None
+
+    @field_validator("label", "hint")
+    @classmethod
+    def clean_text(cls, value):
+        cleaned = value.strip()
+        if not cleaned and value != "":
+            raise ValueError("Le libellé ne peut pas être vide")
+        return cleaned
+
+    @field_validator("legacy_field")
+    @classmethod
+    def validate_mapping(cls, value):
+        if value is not None and value not in LEGACY_FIELDS:
+            raise ValueError("Champ de compatibilité invalide")
+        return value
+
+
+def validate_question_list(values):
+    if values is not None and len({q.id for q in values}) != len(values):
+        raise ValueError("Chaque question doit avoir un identifiant unique")
+    if values is not None:
+        mapped = [q.legacy_field for q in values if q.legacy_field]
+        if len(set(mapped)) != len(mapped):
+            raise ValueError("Un champ de compatibilité ne peut être utilisé qu’une fois")
+    return values
+
+
+class RecruitmentCampaignPublicRead(BaseModel):
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -32,20 +149,110 @@ class RecruitmentCampaignRead(BaseModel):
     created_by: Optional[UUID]
     created_at: datetime
     updated_at: datetime
+    application_questions: list[RecruitmentApplicationQuestion] = Field(default_factory=list, max_length=40)
+    questionnaire_version: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def public_questionnaire(cls, value):
+        if not isinstance(value, dict):
+            value = {name: getattr(value, name, None) for name in cls.model_fields}
+        else:
+            value = dict(value)
+        questions = value.get('application_questions')
+        value['application_questions'] = effective_questions(questions)
+        value['questionnaire_version'] = questionnaire_version(questions)
+        return value
 
     class Config:
         from_attributes = True
 
 
+class RecruitmentCampaignCreate(BaseModel):
+    season_id: Optional[UUID] = None
+    title: str
+    description: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    target_headcount: Optional[int] = Field(default=None, ge=1)
+    positions: list[RecruitmentPosition] = Field(default_factory=list)
+    target_profiles: list[str] = Field(default_factory=list)
+    communication_actions: list[RecruitmentCommunicationAction] = Field(default_factory=list)
+    interview_questions: list[RecruitmentInterviewQuestion] = Field(default_factory=list)
+    application_questions: Optional[list[RecruitmentApplicationQuestion]] = Field(default=None, max_length=40)
+    _question_ids = field_validator('application_questions')(validate_question_list)
+    is_active: bool = True
+
+    @field_validator("target_profiles")
+    @classmethod
+    def clean_target_profiles(cls, values: list[str]) -> list[str]:
+        return [cleaned for value in values if (cleaned := value.strip())]
+
+
+class RecruitmentCampaignUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    target_headcount: Optional[int] = Field(default=None, ge=1)
+    positions: Optional[list[RecruitmentPosition]] = None
+    target_profiles: Optional[list[str]] = None
+    communication_actions: Optional[list[RecruitmentCommunicationAction]] = None
+    interview_questions: Optional[list[RecruitmentInterviewQuestion]] = None
+    application_questions: Optional[list[RecruitmentApplicationQuestion]] = Field(default=None, max_length=40)
+    _question_ids = field_validator('application_questions')(validate_question_list)
+    is_active: Optional[bool] = None
+
+    @field_validator("target_profiles")
+    @classmethod
+    def clean_target_profiles(cls, values: list[str] | None) -> list[str] | None:
+        if values is None:
+            return None
+        return [cleaned for value in values if (cleaned := value.strip())]
+
+
+class RecruitmentCampaignRead(RecruitmentCampaignPublicRead):
+    target_headcount: Optional[int] = None
+    positions: Optional[list[RecruitmentPosition]] = None
+    target_profiles: Optional[list[str]] = None
+    communication_actions: Optional[list[RecruitmentCommunicationAction]] = None
+    interview_questions: Optional[list[RecruitmentInterviewQuestion]] = None
+
+
 class ApplicationCreate(BaseModel):
+    # Additive fields: canonical text is persisted in the existing columns.
+    # Older clients and historical records keep their original free text.
+    promotion_academic_year: Optional[str] = None
+    discovery_channel: Optional[str] = None
+    discovery_other: Optional[str] = None
+
+    @model_validator(mode="after")
+    def normalize_application_metadata(self):
+        if self.promotion_academic_year is not None:
+            year = academic_year(self.promotion_academic_year)
+            if self.class_name and self.class_name.strip() != year:
+                raise ValueError('La promotion et son année académique ne correspondent pas.')
+            self.promotion_academic_year = year
+            self.class_name = year
+        if self.discovery_channel is not None:
+            answer = discovery_answer(self.discovery_channel, self.discovery_other)
+            if self.known_enactus_from and self.known_enactus_from.strip() != answer:
+                raise ValueError('Le canal et sa description ne correspondent pas.')
+            self.known_enactus_from = answer
+        elif self.discovery_other:
+            raise ValueError('Choisis le canal Autre avant de préciser le moyen.')
+        return self
+
+    questionnaire_answers: Optional[dict[str, str]] = None
+    questionnaire_version: Optional[str] = None
     campaign_id: UUID
     first_name: str
     last_name: str
-    gender: Optional[str] = None
+    gender: str
     email: EmailStr
-    phone: Optional[str] = None
-    department: Optional[str] = None
-    study_level: Optional[str] = None
+    phone: str
+    department: str
+    study_level: str
     class_name: Optional[str] = None
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
@@ -96,7 +303,25 @@ class ApplicationInterviewSchedule(BaseModel):
     interview_note: Optional[str] = None
 
 
+class ApplicationHistoryRead(BaseModel):
+    id: str
+    kind: Literal["submission", "status", "interview", "integration"]
+    title: str
+    occurred_at: datetime
+    actor_name: str
+    from_status: Optional[str] = None
+    to_status: Optional[str] = None
+    scheduled_for: Optional[datetime] = None
+
+
 class ApplicationRead(BaseModel):
+    my_review: Optional[dict] = None
+    screening_rubric: Optional[dict] = None
+    screening_score: Optional[float] = None
+    screening_review_count: int = 0
+    screening_spread: Optional[float] = None
+    history: list[ApplicationHistoryRead] = Field(default_factory=list)
+    questionnaire_answers: Optional[list[dict[str, str]]] = None
     id: UUID
     campaign_id: UUID
     first_name: str
@@ -172,19 +397,23 @@ class ApplicationTrackingRead(BaseModel):
 
 
 class ApplicationReviewCreate(BaseModel):
+    criteria_assessment: Optional[dict] = None
     application_id: UUID
-    score: Optional[float] = None
+    score: Optional[float] = Field(default=None, ge=0, le=20, allow_inf_nan=False)
     comment: Optional[str] = None
     recommendation: str = "reserve"
 
 
 class ApplicationReviewUpdate(BaseModel):
-    score: Optional[float] = None
+    criteria_assessment: Optional[dict] = None
+    score: Optional[float] = Field(default=None, ge=0, le=20, allow_inf_nan=False)
     comment: Optional[str] = None
     recommendation: Optional[str] = None
 
 
 class ApplicationReviewRead(BaseModel):
+    criteria_assessment: Optional[dict] = None
+    reviewer_name: Optional[str] = None
     id: UUID
     application_id: UUID
     reviewer_id: UUID
@@ -199,7 +428,7 @@ class ApplicationReviewRead(BaseModel):
 
 
 class ConvertApplicationToUserRequest(BaseModel):
-    password: str
+    password: Optional[str] = None
     profile_type: Optional[str] = None
     core_pole_id: Optional[UUID] = None
     support_pole_ids: list[UUID] = []

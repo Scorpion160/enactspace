@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import Field, field_validator, model_validator, BaseModel
 from uuid import UUID
 from datetime import date, datetime
 from typing import Optional
@@ -6,20 +6,37 @@ from typing import Optional
 
 class PoleCreate(BaseModel):
     season_id: Optional[UUID] = None
-    name: str
-    short_name: Optional[str] = None
-    type: str
+    name: str = Field(min_length=1, max_length=100)
+    short_name: Optional[str] = Field(default=None, max_length=50)
+    type: str = Field(min_length=1, max_length=50)
     description: Optional[str] = None
     objectives: Optional[str] = None
 
+
+    @field_validator("name", "type", mode="before")
+    @classmethod
+    def trim_required_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 class PoleUpdate(BaseModel):
-    name: Optional[str] = None
-    short_name: Optional[str] = None
-    type: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    short_name: Optional[str] = Field(default=None, max_length=50)
+    type: Optional[str] = Field(default=None, min_length=1, max_length=50)
     description: Optional[str] = None
     objectives: Optional[str] = None
 
+
+    @field_validator("name", "type", mode="before")
+    @classmethod
+    def trim_required_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self):
+        for name in ['name', 'type']:
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError("Ce champ ne peut pas être vide")
+        return self
 
 class PoleRead(BaseModel):
     id: UUID

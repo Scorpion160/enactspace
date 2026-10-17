@@ -15,7 +15,10 @@ async def main() -> None:
             f"successful={summary['successful']} "
             f"expired={summary['expired']} "
             f"failed={summary['failed']} "
-            f"pending={summary['pending']}"
+            f"pending={summary['pending']} "
+            f"deferred={summary['deferred']} "
+            f"unavailable={summary['unavailable']} "
+            f"needs_review={summary['needs_review']}"
         )
     finally:
         db.close()

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../models/task_center_models.dart';
 import '../models/task_model.dart';
 
@@ -21,12 +20,16 @@ class TaskCenterList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tasks.isEmpty) {
-      return const Card(
+      return Card(
         child: Padding(
           padding: EdgeInsets.all(36),
           child: Column(
             children: [
-              Icon(Icons.task_alt_rounded, size: 48, color: Colors.black38),
+              Icon(
+                Icons.task_alt_rounded,
+                size: 48,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               SizedBox(height: 12),
               Text(
                 'Aucune tâche',
@@ -94,18 +97,17 @@ class _TaskRow extends StatelessWidget {
                 children: [
                   Text(
                     task.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
                   if (task.description?.trim().isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       task.description!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ],
@@ -131,7 +133,7 @@ class _TaskRow extends StatelessWidget {
                 ],
               );
               final people = data.assigneeErrorTaskIds.contains(task.id)
-                  ? const Text(
+                  ? Text(
                       'Assignés indisponibles',
                       style: TextStyle(color: Colors.orange),
                     )
@@ -145,23 +147,23 @@ class _TaskRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     title,
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     metadata,
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.people_alt_rounded, size: 18),
-                        const SizedBox(width: 6),
+                        Icon(Icons.people_alt_rounded, size: 18),
+                        SizedBox(width: 6),
                         Expanded(child: people),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
                         onPressed: onOpen,
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Ouvrir'),
+                        icon: Icon(Icons.open_in_new_rounded),
+                        label: Text('Ouvrir'),
                       ),
                     ),
                   ],
@@ -170,14 +172,14 @@ class _TaskRow extends StatelessWidget {
               return Row(
                 children: [
                   Expanded(flex: 4, child: title),
-                  const SizedBox(width: 18),
+                  SizedBox(width: 18),
                   Expanded(flex: 4, child: metadata),
-                  const SizedBox(width: 18),
+                  SizedBox(width: 18),
                   Expanded(flex: 2, child: people),
                   IconButton(
                     onPressed: onOpen,
                     tooltip: 'Ouvrir',
-                    icon: const Icon(Icons.chevron_right_rounded),
+                    icon: Icon(Icons.chevron_right_rounded),
                   ),
                 ],
               );
@@ -197,24 +199,27 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: danger
-            ? Colors.red.shade50
-            : Colors.black.withValues(alpha: .045),
+        color: danger ? colors.errorContainer : colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: danger ? Colors.red.shade700 : null),
-          const SizedBox(width: 5),
+          Icon(
+            icon,
+            size: 15,
+            color: danger ? colors.onErrorContainer : colors.onSurfaceVariant,
+          ),
+          SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: danger ? Colors.red.shade700 : null,
+              color: danger ? colors.onErrorContainer : colors.onSurfaceVariant,
             ),
           ),
         ],

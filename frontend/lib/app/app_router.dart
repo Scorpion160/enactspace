@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+
+import '../features/veille/screens/veille_screen.dart';
+import '../features/veille/screens/veille_record_screen.dart';
+import '../features/veille/services/veille_gateway.dart';
+
 import 'package:go_router/go_router.dart';
+
 import '../core/auth/auth_service.dart';
 import '../core/auth/auth_storage.dart';
 import '../core/auth/user_experience.dart';
 import '../features/academy/screens/academy_home_screen.dart';
+import '../features/academy/screens/academy_path_screen.dart';
 import '../features/academy/screens/academy_course_screen.dart';
 import '../features/academy/services/academy_gateway.dart';
 import '../features/about/screens/about_screen.dart';
@@ -11,6 +18,7 @@ import '../features/alumni/screens/alumni_screen.dart';
 import '../features/alumni/screens/alumni_profile_detail_screen.dart';
 import '../features/alumni/services/alumni_gateway.dart';
 import '../features/archives/screens/archive_detail_screens.dart';
+import '../features/archives/screens/archive_minutes_screen.dart';
 import '../features/archives/screens/archives_center_screen.dart';
 import '../features/archives/models/memory_timeline_models.dart';
 import '../features/archives/services/archives_gateway.dart';
@@ -18,28 +26,40 @@ import '../features/attendance/screens/attendance_nfc_enrollment_screen.dart';
 import '../features/attendance/screens/attendance_qr_scanner_screen.dart';
 import '../features/attendance/screens/attendance_screen.dart';
 import '../features/auth/screens/login_screen.dart';
+import '../features/first_access/screens/activation_screen.dart';
+import '../features/first_access/screens/first_access_gate.dart';
+import '../features/first_access/screens/first_access_management_screen.dart';
 import '../features/chat/screens/chat_screen.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/documents/screens/institutional_documents_hub_screen.dart';
 import '../features/documents/screens/document_detail_screen.dart';
+import '../features/documents/screens/club_rules_screen.dart';
 import '../features/documents/services/documents_gateway.dart';
 import '../features/events/screens/events_screen.dart';
 import '../features/events/screens/event_detail_screen.dart';
 import '../features/events/services/events_gateway.dart';
 import '../features/finance/screens/finance_screen.dart';
 import '../features/gamification/screens/gamification_screen.dart';
+import '../features/gamification/screens/games_screen.dart';
 import '../features/help/screens/help_screen.dart';
+import '../features/help/screens/help_guide_screen.dart';
+import '../features/help/screens/help_management_screen.dart';
 import '../features/impact/screens/impact_dashboard_screen.dart';
 import '../features/impact/screens/impact_records_screen.dart';
 import '../features/impact/services/impact_gateway.dart';
 import '../features/legal/screens/public_legal_screen.dart';
 import '../features/legal/widgets/legal_acceptance_gate.dart';
+import '../features/members/screens/member_profile_screen.dart';
 import '../features/members/screens/members_screen.dart';
+import '../features/meetings/screens/meeting_conference_screen.dart';
+import '../features/meetings/screens/meeting_detail_screen.dart';
+import '../features/meetings/screens/meetings_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/poles/screens/pole_detail_screen.dart';
 import '../features/poles/screens/poles_screen.dart';
 import '../features/product_readiness/product_readiness_gate.dart';
 import '../features/posts/screens/posts_screen.dart';
+import '../features/profile/screens/my_profile_screen.dart';
 import '../features/projects/screens/project_detail_screen.dart';
 import '../features/projects/screens/projects_portfolio_screen.dart';
 import '../features/recruitment/screens/internal/internal_recruitment_screen.dart';
@@ -48,6 +68,8 @@ import '../features/recruitment/screens/public/public_application_flow_screen.da
 import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
+import '../features/settings/screens/team_years_screen.dart';
+import '../features/settings/screens/academic_profile_screen.dart';
 import '../features/tasks/screens/tasks_screen.dart';
 import '../features/tasks/screens/task_detail_screen.dart';
 import '../features/tasks/models/task_center_models.dart';
@@ -65,6 +87,7 @@ class AppRouter {
       final loggedIn = await _authService.isLoggedIn();
       final publicPath = isPublicPath(state.matchedLocation);
       final goingToLogin = state.matchedLocation == '/login';
+      final unlocking = state.uri.queryParameters['unlock'] == '1';
 
       if (state.matchedLocation == '/splash') {
         return null;
@@ -74,7 +97,7 @@ class AppRouter {
         return '/login';
       }
 
-      if (loggedIn && goingToLogin) {
+      if (loggedIn && goingToLogin && !unlocking) {
         return '/dashboard';
       }
 
@@ -110,6 +133,10 @@ class AppRouter {
     },
     routes: [
       GoRoute(
+        path: '/help-guide',
+        builder: (context, state) => const HelpGuideScreen(),
+      ),
+      GoRoute(
         path: '/legal/privacy',
         builder: (context, state) =>
             const PublicLegalScreen(documentType: 'privacy_policy'),
@@ -129,6 +156,20 @@ class AppRouter {
           GoRoute(
             path: '/login',
             builder: (context, state) => const LoginScreen(),
+          ),
+          GoRoute(
+            path: '/welcome-help',
+            builder: (context, state) => Scaffold(
+              appBar: AppBar(
+                title: const Text('Vos demandes d’aide'),
+                leading: BackButton(onPressed: () => context.go('/dashboard')),
+              ),
+              body: const HelpScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/activate',
+            builder: (context, state) => const ActivationScreen(),
           ),
           GoRoute(path: '/about', builder: (context, state) => AboutScreen()),
           GoRoute(
@@ -150,18 +191,38 @@ class AppRouter {
           ),
           ShellRoute(
             builder: (context, state, child) {
-              return LegalAcceptanceGate(
-                child: AppShell(currentPath: state.uri.path, child: child),
+              return FirstAccessGate(
+                child: LegalAcceptanceGate(
+                  child: AppShell(currentPath: state.uri.path, child: child),
+                ),
               );
             },
             routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (context, state) => const MyProfileScreen(),
+              ),
               GoRoute(
                 path: '/settings',
                 builder: (context, state) => const SettingsScreen(),
               ),
               GoRoute(
+                path: '/settings/years',
+                builder: (context, state) => const TeamYearsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/academic',
+                builder: (context, state) => const AcademicProfileScreen(),
+              ),
+              GoRoute(
                 path: '/help',
                 builder: (context, state) => const HelpScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'manage',
+                    builder: (context, state) => const HelpManagementScreen(),
+                  ),
+                ],
               ),
               GoRoute(
                 path: '/dashboard',
@@ -170,6 +231,19 @@ class AppRouter {
               GoRoute(
                 path: '/members',
                 builder: (context, state) => const MembersScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'first-access',
+                    builder: (context, state) =>
+                        const FirstAccessManagementScreen(),
+                  ),
+                  GoRoute(
+                    path: ':memberId',
+                    builder: (context, state) => MemberProfileScreen(
+                      memberId: state.pathParameters['memberId']!,
+                    ),
+                  ),
+                ],
               ),
               GoRoute(
                 path: '/attendance',
@@ -185,8 +259,33 @@ class AppRouter {
                     const AttendanceNfcEnrollmentScreen(),
               ),
               GoRoute(
+                path: '/veille',
+                builder: (context, state) => VeilleScreen(
+                  initialPoleId: state.uri.queryParameters['pole_id'],
+                  initialProjectId: state.uri.queryParameters['project_id'],
+                  initialTab: state.uri.queryParameters['tab'] ?? 'overview',
+                  gateway: state.extra is VeilleGateway
+                      ? state.extra! as VeilleGateway
+                      : null,
+                ),
+                routes: [
+                  GoRoute(
+                    path: 'records/:kind/:id',
+                    builder: (context, state) => VeilleRecordScreen(
+                      kind: state.pathParameters['kind']!,
+                      id: state.pathParameters['id']!,
+                      gateway: state.extra is VeilleGateway
+                          ? state.extra! as VeilleGateway
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
                 path: '/tasks',
                 builder: (context, state) => TasksScreen(
+                  initialPoleId: state.uri.queryParameters['pole_id'],
+                  initialProjectId: state.uri.queryParameters['project_id'],
                   initialView: TaskCenterViewPresentation.fromQuery(
                     state.uri.queryParameters['view'],
                   ),
@@ -213,9 +312,15 @@ class AppRouter {
               ),
               GoRoute(
                 path: '/documents',
-                builder: (context, state) =>
-                    const InstitutionalDocumentsHubScreen(),
+                builder: (context, state) => InstitutionalDocumentsHubScreen(
+                  initialPoleId: state.uri.queryParameters['pole_id'],
+                  initialProjectId: state.uri.queryParameters['project_id'],
+                ),
                 routes: [
+                  GoRoute(
+                    path: 'reglement-interieur',
+                    builder: (context, state) => const ClubRulesScreen(),
+                  ),
                   GoRoute(
                     path: ':documentId',
                     builder: (context, state) => DocumentDetailScreen(
@@ -240,6 +345,29 @@ class AppRouter {
                 builder: (context, state) => ChatScreen(
                   initialThreadId: state.uri.queryParameters['thread'],
                 ),
+              ),
+              GoRoute(
+                path: '/meetings',
+                builder: (context, state) => const MeetingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':meetingId',
+                    builder: (context, state) => MeetingDetailScreen(
+                      meetingId: state.pathParameters['meetingId']!,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'live',
+                        builder: (context, state) => MeetingConferenceScreen(
+                          meetingId: state.pathParameters['meetingId']!,
+                          title: state.extra is String
+                              ? state.extra! as String
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               GoRoute(
                 path: '/poles',
@@ -285,7 +413,10 @@ class AppRouter {
               ),
               GoRoute(
                 path: '/events',
-                builder: (context, state) => const EventsScreen(),
+                builder: (context, state) => EventsScreen(
+                  initialPoleId: state.uri.queryParameters['pole_id'],
+                  initialProjectId: state.uri.queryParameters['project_id'],
+                ),
                 routes: [
                   GoRoute(
                     path: ':eventId',
@@ -316,15 +447,36 @@ class AppRouter {
               GoRoute(
                 path: '/gamification',
                 builder: (context, state) => const GamificationScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'games',
+                    builder: (context, state) => const GamesScreen(),
+                    routes: [
+                      GoRoute(
+                        path: ':roomId',
+                        builder: (context, state) => GameRoomScreen(
+                          roomId: state.pathParameters['roomId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               GoRoute(
                 path: '/academy',
                 builder: (context, state) => const AcademyHomeScreen(),
                 routes: [
                   GoRoute(
+                    path: 'paths/:pathId',
+                    builder: (context, state) => AcademyPathScreen(
+                      pathId: state.pathParameters['pathId']!,
+                    ),
+                  ),
+                  GoRoute(
                     path: 'courses/:courseId',
                     builder: (context, state) => AcademyCourseScreen(
                       courseId: state.pathParameters['courseId']!,
+                      resume: state.uri.queryParameters['resume'] == 'true',
                       gateway: state.extra is AcademyGateway
                           ? state.extra! as AcademyGateway
                           : null,
@@ -363,6 +515,25 @@ class AppRouter {
                 ),
                 routes: [
                   GoRoute(
+                    path: 'minutes',
+                    builder: (context, state) => ArchiveMinutesScreen(
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':minuteId',
+                        builder: (context, state) => ArchiveMinutesScreen(
+                          minuteId: state.pathParameters['minuteId'],
+                          gateway: state.extra is ArchivesGateway
+                              ? state.extra! as ArchivesGateway
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
                     path: 'items/:archiveId',
                     builder: (context, state) => ArchiveItemDetailScreen(
                       archiveId: state.pathParameters['archiveId']!,
@@ -375,6 +546,26 @@ class AppRouter {
                     path: 'projects/:projectId',
                     builder: (context, state) => HistoricalProjectDetailScreen(
                       projectId: state.pathParameters['projectId']!,
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'competitions/:recordId',
+                    builder: (context, state) => ArchiveCollectionDetailScreen(
+                      recordId: state.pathParameters['recordId']!,
+                      competition: true,
+                      gateway: state.extra is ArchivesGateway
+                          ? state.extra! as ArchivesGateway
+                          : null,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'awards/:recordId',
+                    builder: (context, state) => ArchiveCollectionDetailScreen(
+                      recordId: state.pathParameters['recordId']!,
+                      competition: false,
                       gateway: state.extra is ArchivesGateway
                           ? state.extra! as ArchivesGateway
                           : null,
@@ -426,8 +617,10 @@ class AppRouter {
   static bool isPublicPath(String path) {
     return path == '/splash' ||
         path == '/login' ||
+        path == '/activate' ||
         path == '/legal/privacy' ||
         path == '/legal/terms' ||
+        path == '/help-guide' ||
         path == '/about' ||
         path == '/application-tracking' ||
         path == '/recruitment/apply' ||
@@ -435,10 +628,15 @@ class AppRouter {
   }
 
   static bool isProductReadinessExemptPath(String path) {
-    return path == '/legal/privacy' || path == '/legal/terms';
+    return path == '/legal/privacy' ||
+        path == '/legal/terms' ||
+        path == '/help-guide';
   }
 
   static bool _authenticatedFallbackAllows(String path) {
+    if (path == '/help/manage' || path.startsWith('/help/manage/')) {
+      return false;
+    }
     if (path == '/finance' ||
         path.startsWith('/finance/') ||
         path == '/attendance/nfc' ||
@@ -451,6 +649,7 @@ class AppRouter {
       '/notifications',
       '/posts',
       '/chat',
+      '/meetings',
       '/tasks',
       '/documents',
       '/gamification',
@@ -467,6 +666,7 @@ class AppRouter {
       '/alumni',
       '/settings',
       '/help',
+      '/welcome-help',
     };
 
     return fallbackRoutes.any(

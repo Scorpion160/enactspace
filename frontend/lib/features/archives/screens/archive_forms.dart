@@ -105,7 +105,7 @@ class _ArchiveItemFormDialogState extends State<ArchiveItemFormDialog> {
                     .toList(),
                 onChanged: (value) => setState(() => _visibility = value!),
               ),
-              _field('season_id', 'Saison (identifiant fiable)'),
+              _field('season_id', 'Année (identifiant fiable)'),
               _field('pole_id', 'Pôle'),
               _field('project_id', 'Projet'),
               _field('document_id', 'Document'),
@@ -301,7 +301,7 @@ Future<bool> showHistoricalProjectDialog(
   fields: const {
     'name': 'Nom',
     'year': 'Année',
-    'season_label': 'Saison / période',
+    'season_label': 'Année / période',
     'description': 'Description',
     'problem': 'Problème',
     'solution': 'Solution',

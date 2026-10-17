@@ -1,0 +1,67 @@
+{
+  "version": "enactus-esp-2026-v1",
+  "scale_max": 4,
+  "guidance": "Les réponses sont lues par des personnes. Chaque critère compte pour 20 points sur 100. La note doit s’appuyer sur un exemple ou une observation. Une information manquante appelle une précision, pas une note inventée. Le jury prend la décision finale.",
+  "criteria": [
+    {
+      "id": "mission",
+      "label": "Motivation et mission sociale",
+      "description": "Relier son envie de rejoindre l’équipe à une action utile pour les communautés, au-delà du seul titre ou du certificat.",
+      "anchors": [
+        "La réponse évaluée exprime une démarche contraire à la mission ou aucune envie d’y contribuer.",
+        "L’envie est exprimée, mais le lien avec la mission reste général.",
+        "La personne relie sa motivation à une contribution sociale compréhensible.",
+        "La motivation s’appuie sur un exemple concret et une contribution envisageable.",
+        "La personne explique sa motivation, la contribution envisagée et ce qu’elle souhaite apprendre avec l’équipe."
+      ]
+    },
+    {
+      "id": "community",
+      "label": "Écoute et compréhension d’un besoin",
+      "description": "Décrire un problème social, économique ou environnemental et chercher à comprendre les personnes concernées avant d’imposer une solution.",
+      "anchors": [
+        "La réponse évaluée refuse de considérer les besoins ou la parole des personnes concernées.",
+        "Le problème est nommé sans contexte ni personnes clairement identifiées.",
+        "Le contexte et les personnes concernées sont décrits de manière cohérente.",
+        "La personne distingue les besoins observés de ses hypothèses et propose d’écouter les personnes concernées.",
+        "La personne précise le besoin, les parties prenantes, les questions à vérifier et la manière de construire une solution avec elles."
+      ]
+    },
+    {
+      "id": "initiative",
+      "label": "Initiative et capacité à apprendre",
+      "description": "Proposer une première action réalisable, accepter les retours et apprendre d’un essai. Les exemples scolaires, personnels et familiaux ont autant leur place que le bénévolat.",
+      "anchors": [
+        "La réponse évaluée montre un refus d’essayer ou de tenir compte d’un retour.",
+        "Une idée est avancée, sans premier pas ni apprentissage identifié.",
+        "Une première action simple et réaliste est proposée.",
+        "La personne décrit un essai, un retour ou un ajustement concret.",
+        "La personne relie l’action, les retours, les apprentissages et une amélioration réalisable."
+      ]
+    },
+    {
+      "id": "teamwork",
+      "label": "Coopération et responsabilité",
+      "description": "Écouter, partager le travail, prévenir en cas de difficulté et reconnaître les contributions. L’aisance à l’oral ne remplace pas la coopération.",
+      "anchors": [
+        "La réponse évaluée justifie l’exclusion, l’irrespect ou le refus de rendre compte à l’équipe.",
+        "La personne affirme aimer travailler en équipe sans préciser sa manière de contribuer.",
+        "Un exemple ou une situation explique sa contribution et son écoute des autres.",
+        "La personne explique comment elle répartit le travail, communique et traite un désaccord.",
+        "La personne décrit une coopération concrète, assume sa part et propose un traitement constructif d’un blocage."
+      ]
+    },
+    {
+      "id": "commitment",
+      "label": "Engagement réaliste et fiabilité",
+      "description": "Annoncer une contribution compatible avec ses études et ses contraintes, organiser ses disponibilités et prévenir tôt. L’impossibilité de voyager ne constitue pas une exclusion automatique.",
+      "anchors": [
+        "La réponse évaluée refuse de respecter un engagement ou de signaler une indisponibilité.",
+        "La personne promet une disponibilité générale sans organisation précise.",
+        "La personne annonce des créneaux ou une contribution réaliste et ses contraintes.",
+        "La personne explique comment elle organise ses engagements et prévient en cas de difficulté.",
+        "La personne propose un engagement réaliste, une organisation concrète et une solution de relais ou d’adaptation en cas de blocage."
+      ]
+    }
+  ]
+}

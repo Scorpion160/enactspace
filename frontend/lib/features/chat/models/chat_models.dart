@@ -271,6 +271,100 @@ class ChatThreadMemberModel {
   };
 }
 
+class ChatPollOptionModel {
+  final String id;
+  final String label;
+  final int position;
+  final int votesCount;
+  final bool currentUserVoted;
+
+  const ChatPollOptionModel({
+    required this.id,
+    required this.label,
+    required this.position,
+    required this.votesCount,
+    required this.currentUserVoted,
+  });
+
+  factory ChatPollOptionModel.fromJson(Map<String, dynamic> json) {
+    return ChatPollOptionModel(
+      id: json['id']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      position: int.tryParse(json['position']?.toString() ?? '') ?? 0,
+      votesCount: int.tryParse(json['votes_count']?.toString() ?? '') ?? 0,
+      currentUserVoted: json['current_user_voted'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'label': label,
+    'position': position,
+    'votes_count': votesCount,
+    'current_user_voted': currentUserVoted,
+  };
+}
+
+class ChatPollModel {
+  final String id;
+  final String messageId;
+  final String question;
+  final bool allowsMultiple;
+  final DateTime? closesAt;
+  final bool isClosed;
+  final int totalVotes;
+  final int totalVoters;
+  final List<ChatPollOptionModel> options;
+
+  const ChatPollModel({
+    required this.id,
+    required this.messageId,
+    required this.question,
+    required this.allowsMultiple,
+    required this.closesAt,
+    required this.isClosed,
+    required this.totalVotes,
+    required this.totalVoters,
+    required this.options,
+  });
+
+  factory ChatPollModel.fromJson(Map<String, dynamic> json) {
+    final rawOptions = json['options'];
+    return ChatPollModel(
+      id: json['id']?.toString() ?? '',
+      messageId: json['message_id']?.toString() ?? '',
+      question: json['question']?.toString() ?? '',
+      allowsMultiple: json['allows_multiple'] == true,
+      closesAt: DateTime.tryParse(json['closes_at']?.toString() ?? ''),
+      isClosed: json['is_closed'] == true,
+      totalVotes: int.tryParse(json['total_votes']?.toString() ?? '') ?? 0,
+      totalVoters: int.tryParse(json['total_voters']?.toString() ?? '') ?? 0,
+      options: rawOptions is List
+          ? rawOptions
+                .whereType<Map>()
+                .map(
+                  (item) => ChatPollOptionModel.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList()
+          : const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'message_id': messageId,
+    'question': question,
+    'allows_multiple': allowsMultiple,
+    'closes_at': closesAt?.toIso8601String(),
+    'is_closed': isClosed,
+    'total_votes': totalVotes,
+    'total_voters': totalVoters,
+    'options': options.map((item) => item.toJson()).toList(),
+  };
+}
+
 class ChatMessageModel {
   final String id;
   final String threadId;
@@ -289,6 +383,7 @@ class ChatMessageModel {
   final int reactionsCount;
   final Map<String, int> reactionsSummary;
   final String? currentUserReaction;
+  final ChatPollModel? poll;
   final DateTime createdAt;
   final DateTime? editedAt;
   final DateTime? deletedAt;
@@ -311,6 +406,7 @@ class ChatMessageModel {
     required this.reactionsCount,
     required this.reactionsSummary,
     required this.currentUserReaction,
+    this.poll,
     required this.createdAt,
     required this.editedAt,
     required this.deletedAt,
@@ -338,6 +434,11 @@ class ChatMessageModel {
           int.tryParse(json['reactions_count']?.toString() ?? '') ?? 0,
       reactionsSummary: _parseReactionsSummary(json['reactions_summary']),
       currentUserReaction: json['current_user_reaction']?.toString(),
+      poll: json['poll'] is Map
+          ? ChatPollModel.fromJson(
+              Map<String, dynamic>.from(json['poll'] as Map),
+            )
+          : null,
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -365,6 +466,7 @@ class ChatMessageModel {
       'reactions_count': reactionsCount,
       'reactions_summary': reactionsSummary,
       'current_user_reaction': currentUserReaction,
+      'poll': poll?.toJson(),
       'created_at': createdAt.toIso8601String(),
       'edited_at': editedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
@@ -400,6 +502,8 @@ class ChatMessageModel {
         return 'Document';
       case 'sticker':
         return 'Sticker';
+      case 'poll':
+        return poll?.question ?? 'Sondage';
       default:
         return 'Média';
     }

@@ -1,8 +1,24 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/secure_storage_options.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/academy_models.dart';
+
+class AcademyQuizQueuedException implements Exception {
+  const AcademyQuizQueuedException();
+
+  @override
+  String toString() =>
+      'Réponses conservées sur cet appareil. Le serveur n’a pas pu confirmer le résultat ; la validation sera retentée à la prochaine synchronisation.';
+}
 
 abstract class AcademyGateway {
   Future<AcademyHomeData> loadHome();
@@ -37,9 +53,14 @@ abstract class AcademyGateway {
 class ApiAcademyGateway implements AcademyGateway {
   final ApiClient apiClient;
   final AuthService authService;
-  ApiAcademyGateway({ApiClient? apiClient, AuthService? authService})
-    : apiClient = apiClient ?? ApiClient(),
-      authService = authService ?? AuthService();
+  final FlutterSecureStorage secureStorage;
+  ApiAcademyGateway({
+    ApiClient? apiClient,
+    AuthService? authService,
+    FlutterSecureStorage? secureStorage,
+  }) : apiClient = apiClient ?? ApiClient(),
+       authService = authService ?? AuthService(),
+       secureStorage = secureStorage ?? enactSpaceSecureStorage;
 
   Future<String> _token() async {
     final value = await authService.getToken();
@@ -48,19 +69,137 @@ class ApiAcademyGateway implements AcademyGateway {
     return value;
   }
 
-  @override
-  Future<AcademyHomeData> loadHome() async {
-    final token = await _token();
-    final results = await Future.wait<dynamic>([
-      apiClient.get('/academy/courses', token: token),
-      apiClient.get('/academy/me/progress', token: token),
-      apiClient.get('/academy/me/paths', token: token),
-    ]);
+  Future<String?> _cacheKey() async {
+    try {
+      final user = await authService.getCachedCurrentUser();
+      final id = user?['id']?.toString();
+      if (id == null || id.isEmpty) return null;
+      return 'academy-home-v2-$id';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _userId() async {
+    try {
+      return (await authService.getCachedCurrentUser())?['id']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _outboxKey(String userId) => 'enactspace.academy.outbox.v1.$userId';
+  String _quizKey(String userId, String quizId) =>
+      'enactspace.academy.quiz.v2.$userId.$quizId';
+
+  Future<List<Map<String, dynamic>>> _readOutbox(String userId) async {
+    try {
+      final raw = await secureStorage.read(key: _outboxKey(userId));
+      final decoded = raw == null ? null : jsonDecode(raw);
+      if (decoded is! List) return <Map<String, dynamic>>[];
+      return decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> _writeOutbox(
+    String userId,
+    List<Map<String, dynamic>> actions,
+  ) async {
+    if (actions.isEmpty) {
+      await secureStorage.delete(key: _outboxKey(userId));
+    } else {
+      await secureStorage.write(
+        key: _outboxKey(userId),
+        value: jsonEncode(actions),
+      );
+    }
+  }
+
+  Future<void> _queueAction(Map<String, dynamic> action) async {
+    final userId = await _userId();
+    if (userId == null || userId.isEmpty) return;
+    final actions = List<Map<String, dynamic>>.of(await _readOutbox(userId));
+    actions.removeWhere((item) => item['id'] == action['id']);
+    actions.add(action);
+    await _writeOutbox(userId, actions);
+  }
+
+  String _actionId(String type, String target) =>
+      '$type-$target-${DateTime.now().microsecondsSinceEpoch}';
+
+  bool _retryable(Object error) =>
+      error is TimeoutException ||
+      error is http.ClientException ||
+      error is ApiException &&
+          (error.statusCode == 408 ||
+              error.statusCode == 429 ||
+              error.statusCode >= 500);
+
+  bool _permanent(Object error) =>
+      error is ApiException &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500 &&
+      error.statusCode != 401 &&
+      error.statusCode != 408 &&
+      error.statusCode != 429;
+
+  Future<void> _syncPending(String token) async {
+    final userId = await _userId();
+    if (userId == null || userId.isEmpty) return;
+    final actions = await _readOutbox(userId);
+    if (actions.isEmpty) return;
+    final remaining = List<Map<String, dynamic>>.of(actions);
+    for (final action in actions) {
+      try {
+        final type = action['type']?.toString();
+        final target = action['target']?.toString() ?? '';
+        if (type == 'quiz') {
+          await apiClient.postJson(
+            '/academy/quizzes/$target/submit',
+            token: token,
+            data: {
+              'answers': action['answers'] ?? const <int>[],
+              'client_submission_id': action['id'],
+            },
+          );
+        } else if (type == 'start' || type == 'complete') {
+          await apiClient.postJson(
+            '/academy/lessons/$target/$type',
+            token: token,
+            data: {},
+          );
+        } else {
+          remaining.remove(action);
+          continue;
+        }
+        remaining.remove(action);
+      } catch (error) {
+        if (_permanent(error)) {
+          remaining.remove(action);
+          continue;
+        }
+        break;
+      }
+    }
+    await _writeOutbox(userId, remaining);
+  }
+
+  AcademyHomeData _homeFromResponses(
+    List<dynamic> results, {
+    bool offline = false,
+    int pendingActions = 0,
+  }) {
     final courses = _items(
       results[0],
     ).whereType<Map<String, dynamic>>().map(_course).toList();
-    if (results[1] is! Map<String, dynamic>)
+    if (results[1] is! Map<String, dynamic>) {
       throw Exception('Progression Academy indisponible.');
+    }
     return AcademyHomeData(
       courses: courses,
       paths: _items(
@@ -69,62 +208,203 @@ class ApiAcademyGateway implements AcademyGateway {
       badges: const [],
       caseStudies: const [],
       progress: _progress(results[1] as Map<String, dynamic>, courses),
+      offline: offline,
+      pendingActions: pendingActions,
     );
+  }
+
+  Future<AcademyHomeData> _homeWithPending(
+    List<dynamic> raw, {
+    bool offline = false,
+  }) async {
+    final userId = await _userId();
+    final actions = userId == null
+        ? <Map<String, dynamic>>[]
+        : await _readOutbox(userId);
+    final results = jsonDecode(jsonEncode(raw)) as List<dynamic>;
+    for (final course in _items(results[0]).whereType<Map>()) {
+      for (final lesson in _items(course['lessons']).whereType<Map>()) {
+        for (final action in actions) {
+          if (action['target'] != lesson['id']) continue;
+          if (action['type'] == 'start' && lesson['completed'] != true) {
+            lesson['started'] = true;
+            lesson['status'] = 'in_progress';
+          } else if (action['type'] == 'complete') {
+            lesson['started'] = true;
+            lesson['completed'] = true;
+            lesson['status'] = 'completed';
+          }
+        }
+      }
+    }
+    if (actions.isNotEmpty && results[1] is Map) {
+      (results[1] as Map)['completed_lessons'] = _items(results[0])
+          .whereType<Map>()
+          .expand((c) => _items(c['lessons']).whereType<Map>())
+          .where((l) => l['completed'] == true)
+          .length;
+    }
+    return _homeFromResponses(
+      results,
+      offline: offline,
+      pendingActions: actions.length,
+    );
+  }
+
+  @override
+  Future<AcademyHomeData> loadHome() async {
+    final token = await _token();
+    final key = await _cacheKey();
+    try {
+      await _syncPending(token);
+      final results = await Future.wait<dynamic>([
+        apiClient.get('/academy/courses', token: token),
+        apiClient.get('/academy/me/progress', token: token),
+        apiClient.get('/academy/me/paths', token: token),
+      ]);
+      final home = await _homeWithPending(results);
+      if (key != null) {
+        try {
+          final preferences = await SharedPreferences.getInstance();
+          await preferences.setString(key, jsonEncode(results));
+        } catch (_) {
+          // Local storage failure must not block online learning.
+        }
+      }
+      return home;
+    } catch (error) {
+      if (!_retryable(error)) rethrow;
+      if (key == null) rethrow;
+      try {
+        final cached = (await SharedPreferences.getInstance()).getString(key);
+        if (cached == null) rethrow;
+        final results = jsonDecode(cached);
+        if (results is! List) rethrow;
+        return await _homeWithPending(results, offline: error is! ApiException);
+      } catch (_) {
+        rethrow;
+      }
+    }
   }
 
   @override
   Future<AcademyCourseModel> getCourse(String courseId) async {
     final courses = (await loadHome()).courses;
     return courses.firstWhere(
-      (course) => course.id == courseId,
+      (course) =>
+          course.id == courseId ||
+          course.title ==
+              const {
+                'discover-enactus': 'Découvrir Enactus',
+                'sdgs-impact': 'Comprendre les ODD',
+              }[courseId],
       orElse: () => throw Exception('Formation introuvable.'),
     );
   }
 
   @override
   Future<void> startLesson(String lessonId) async {
-    await apiClient.postJson(
-      '/academy/lessons/$lessonId/start',
-      token: await _token(),
-      data: {},
-    );
+    final action = {
+      'id': _actionId('start', lessonId),
+      'type': 'start',
+      'target': lessonId,
+    };
+    try {
+      await apiClient.postJson(
+        '/academy/lessons/$lessonId/start',
+        token: await _token(),
+        data: {},
+      );
+    } catch (error) {
+      if (!_retryable(error)) rethrow;
+      await _queueAction(action);
+    }
   }
 
   @override
   Future<AcademyRewardResult> completeLesson(String lessonId) async {
-    final response = await apiClient.postJson(
-      '/academy/lessons/$lessonId/complete',
-      token: await _token(),
-      data: {},
-    );
-    final json = response is Map<String, dynamic>
-        ? response
-        : <String, dynamic>{};
-    return AcademyRewardResult(
-      points: _int(json['points']),
-      label: _text(json['message'], 'Leçon terminée'),
-      syncedWithGamification: json['gamification_synced'] != false,
-    );
+    final action = {
+      'id': _actionId('complete', lessonId),
+      'type': 'complete',
+      'target': lessonId,
+    };
+    try {
+      final response = await apiClient.postJson(
+        '/academy/lessons/$lessonId/complete',
+        token: await _token(),
+        data: {},
+      );
+      final json = response is Map<String, dynamic>
+          ? response
+          : <String, dynamic>{};
+      return AcademyRewardResult(
+        points: _int(json['points']),
+        label: _text(json['message'], 'Leçon terminée'),
+        syncedWithGamification: json['gamification_synced'] != false,
+      );
+    } catch (error) {
+      if (!_retryable(error)) rethrow;
+      await _queueAction(action);
+      return AcademyRewardResult(
+        points: 0,
+        label: error is ApiException
+            ? 'Progression conservée sur cet appareil. Le serveur est temporairement indisponible ; nouvelle tentative au prochain chargement.'
+            : 'Progression conservée sur cet appareil : connexion au serveur impossible, synchronisation en attente',
+        syncedWithGamification: false,
+      );
+    }
   }
 
   @override
   Future<AcademyQuizModel> getQuiz(String quizId) async {
-    final response = await apiClient.get(
-      '/academy/quizzes/$quizId',
-      token: await _token(),
-    );
-    if (response is! Map<String, dynamic>)
-      throw Exception('Quiz indisponible.');
-    return _quiz(response);
+    final userId = await _userId();
+    try {
+      final response = await apiClient.get(
+        '/academy/quizzes/$quizId',
+        token: await _token(),
+      );
+      if (response is! Map<String, dynamic>)
+        throw Exception('Quiz indisponible.');
+      if (userId != null && userId.isNotEmpty) {
+        try {
+          await secureStorage.write(
+            key: _quizKey(userId, quizId),
+            value: jsonEncode(response),
+          );
+        } catch (_) {
+          /* An available online quiz stays usable without local storage. */
+        }
+      }
+      return _quiz(response);
+    } catch (error) {
+      if (!_retryable(error) || userId == null || userId.isEmpty) rethrow;
+      final cached = await secureStorage.read(key: _quizKey(userId, quizId));
+      final decoded = cached == null ? null : jsonDecode(cached);
+      if (decoded is! Map) rethrow;
+      return _quiz(Map<String, dynamic>.from(decoded));
+    }
   }
 
   @override
   Future<AcademyQuizResult> submitQuiz(String quizId, List<int> answers) async {
-    final response = await apiClient.postJson(
-      '/academy/quizzes/$quizId/submit',
-      token: await _token(),
-      data: {'answers': answers},
-    );
+    final submissionId = _actionId('quiz', quizId);
+    dynamic response;
+    try {
+      response = await apiClient.postJson(
+        '/academy/quizzes/$quizId/submit',
+        token: await _token(),
+        data: {'answers': answers, 'client_submission_id': submissionId},
+      );
+    } catch (error) {
+      if (!_retryable(error)) rethrow;
+      await _queueAction({
+        'id': submissionId,
+        'type': 'quiz',
+        'target': quizId,
+        'answers': answers,
+      });
+      throw const AcademyQuizQueuedException();
+    }
     if (response is! Map<String, dynamic>)
       throw Exception('Résultat du quiz indisponible.');
     return AcademyQuizResult(
@@ -135,6 +415,10 @@ class ApiAcademyGateway implements AcademyGateway {
           : _int(response['correct_answers']),
       total: _int(response['total_questions'] ?? response['total']),
       points: _int(response['points']),
+      feedback: _itemsOrEmpty(response['feedback'])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(),
       attemptNumber: response['attempt_number'] == null
           ? null
           : _int(response['attempt_number']),
@@ -277,6 +561,24 @@ class ApiAcademyGateway implements AcademyGateway {
       ),
       points: _int(json['points']),
       isRequired: json['is_required'] == true,
+      quizPassed: json['quiz_passed'] == true,
+      isLocked: json['is_locked'] == true,
+      lockReason: _text(json['lock_reason'], ''),
+      serverMastered: json['is_mastered'] is bool
+          ? json['is_mastered'] as bool
+          : null,
+      prerequisiteCourseIds: _strings(json['prerequisite_course_ids']),
+      prerequisites: _itemsOrEmpty(json['prerequisites'])
+          .whereType<Map>()
+          .map(
+            (p) => AcademyPrerequisiteModel(
+              id: _text(p['id'], ''),
+              title: _text(p['title'], 'Formation'),
+              completed: p['completed'] == true,
+              available: p['available'] != false,
+            ),
+          )
+          .toList(),
       targetRoles: _strings(json['target_roles']),
       isPublished: json['is_published'] != false,
       poleId: json['pole_id']?.toString(),

@@ -166,6 +166,7 @@ class SupportPriority(str, Enum):
 
 
 class SupportTicketCreate(BaseModel):
+    client_request_id: UUID | None = None
     subject: str = Field(min_length=1, max_length=200)
     category: SupportCategory = SupportCategory.general
     priority: SupportPriority = SupportPriority.normal
@@ -180,6 +181,7 @@ class SupportTicketCreate(BaseModel):
 
 
 class SupportTicketMessageCreate(BaseModel):
+    client_request_id: UUID | None = None
     message: str = Field(min_length=1, max_length=10000)
 
     @field_validator("message")
@@ -217,10 +219,12 @@ class SupportTicketRead(BaseModel):
 
 
 class SupportTicketDetail(SupportTicketRead):
+    requester_name: str | None = None
     messages: list[SupportTicketMessageRead]
 
 
 class SupportTicketManage(BaseModel):
+    expected_updated_at: datetime | None = None
     status: SupportStatus | None = None
     priority: SupportPriority | None = None
     assigned_to_id: UUID | None = None
@@ -241,6 +245,7 @@ class FeedbackStatus(str, Enum):
 
 
 class ProductFeedbackCreate(BaseModel):
+    client_request_id: UUID | None = None
     category: FeedbackCategory
     message: str = Field(min_length=1, max_length=10000)
     rating: int | None = Field(default=None, ge=1, le=5)
@@ -257,6 +262,7 @@ class ProductFeedbackCreate(BaseModel):
 
 
 class ProductFeedbackRead(BaseModel):
+    public_reply: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -277,6 +283,8 @@ class ProductFeedbackAdminRead(ProductFeedbackRead):
 
 
 class ProductFeedbackManage(BaseModel):
+    public_reply: str | None = Field(default=None,max_length=10000)
+    expected_updated_at: datetime | None = None
     status: FeedbackStatus | None = None
     admin_note: str | None = Field(default=None, max_length=10000)
 

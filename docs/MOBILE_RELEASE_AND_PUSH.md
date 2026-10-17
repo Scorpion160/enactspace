@@ -1,11 +1,21 @@
 # Mobile release and push
 
+## Livraison constatée — Android 1.0.13+16
+
+L’APK release a été compilé puis installé avec `adb install -r` sur un Samsung SM_A065F le 10 octobre. Android indique `versionName=1.0.13` et `versionCode=16`. Cela confirme cette installation, sans constituer une publication Play Store ni une validation complète FCM.
+
+Si ADB indique `unauthorized`, déverrouiller le téléphone, accepter le débogage USB puis vérifier `adb devices -l`. Ne pas désinstaller pour résoudre l’autorisation USB. Vérifier le SHA256 avant installation et contrôler la version après.
+
+Aucune livraison iOS ni publication de store n’est attestée. Les contrôles physiques de permissions, réception en arrière-plan, rotation des tokens et déconnexion restent à terminer. Voir [les identifiants d’artefacts](releases/20261010-release-1.0.13.md).
+
+## Procédures générales et contexte antérieur
+
 Repository builds prove compilation and automated behavior; they do not prove distribution signing, provider entitlement, store ownership, or physical-device delivery.
 
 ## Shared release rules
 
 - Keep the application/bundle identifier `sn.enactusesp.enactspace`.
-- The V1.0.0 Flutter identity is `1.0.0+1`; PR-7 does not consume another build number.
+- The delivered Flutter identity is `1.0.13+16`; increment build numbers for subsequent distributed artifacts.
 - Release API configuration must be an authorized HTTPS endpoint.
 - No keystore, private key, provisioning profile, provider JSON/plist, APNs key, or password belongs in Git or ordinary CI artifacts.
 - Android debug signing is never valid release evidence. `EXTERNAL_SIGNING_REQUIRED` remains enforced.

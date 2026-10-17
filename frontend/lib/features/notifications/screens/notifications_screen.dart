@@ -239,17 +239,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer la notification'),
+        title: Text('Supprimer la notification'),
         content: Text('Supprimer « ${notification.title} » ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+            child: Text('Annuler'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Supprimer'),
+            icon: Icon(Icons.delete_outline_rounded),
+            label: Text('Supprimer'),
           ),
         ],
       ),
@@ -360,7 +360,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             onRefresh: _loadNotifications,
             onMarkAllRead: _markAllAsRead,
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           _NotificationsFilters(
             unreadOnly: _unreadOnly,
             type: _type,
@@ -372,14 +372,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               setState(() => _type = value);
             },
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           _NotificationSearchCard(
             controller: _searchController,
             onChanged: () => setState(() {}),
           ),
-          const SizedBox(height: 22),
+          SizedBox(height: 22),
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(),
@@ -433,13 +433,13 @@ class _NotificationsHeader extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          icon: Icon(Icons.refresh_rounded),
+          label: Text('Actualiser'),
         ),
         ElevatedButton.icon(
           onPressed: unread > 0 ? onMarkAllRead : null,
-          icon: const Icon(Icons.done_all_rounded),
-          label: const Text('Tout lire'),
+          icon: Icon(Icons.done_all_rounded),
+          label: Text('Tout lire'),
         ),
       ],
     );
@@ -454,7 +454,7 @@ class _NotificationsHeader extends StatelessWidget {
           ? Row(
               children: [
                 _HeaderIcon(unread: unread),
-                const SizedBox(width: 18),
+                SizedBox(width: 18),
                 Expanded(
                   child: _HeaderText(
                     total: total,
@@ -472,7 +472,7 @@ class _NotificationsHeader extends StatelessWidget {
                 Row(
                   children: [
                     _HeaderIcon(unread: unread),
-                    const SizedBox(width: 18),
+                    SizedBox(width: 18),
                     Expanded(
                       child: _HeaderText(
                         total: total,
@@ -483,7 +483,7 @@ class _NotificationsHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 actions,
               ],
             ),
@@ -508,7 +508,7 @@ class _HeaderIcon extends StatelessWidget {
           color: AppTheme.enactusYellow,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.notifications_rounded,
           color: AppTheme.softBlack,
           size: 34,
@@ -536,7 +536,7 @@ class _HeaderText extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Notifications',
           style: TextStyle(
             color: Colors.white,
@@ -544,16 +544,16 @@ class _HeaderText extends StatelessWidget {
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
           '$total notification(s) affichée(s) • $unread non lue(s) • $read lue(s)',
-          style: const TextStyle(color: Colors.white70, height: 1.4),
+          style: TextStyle(color: Colors.white70, height: 1.4),
         ),
         if (lastSyncedAt != null) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Synchronisation auto ${_timeLabel(lastSyncedAt!)}',
-            style: const TextStyle(color: Colors.white60, fontSize: 12),
+            style: TextStyle(color: Colors.white60, fontSize: 12),
           ),
         ],
       ],
@@ -592,14 +592,14 @@ class _NotificationsFilters extends StatelessWidget {
               children: [
                 ChoiceChip(
                   selected: !unreadOnly,
-                  label: const Text('Toutes'),
-                  avatar: const Icon(Icons.list_rounded, size: 18),
+                  label: Text('Toutes'),
+                  avatar: Icon(Icons.list_rounded, size: 18),
                   onSelected: (_) => onUnreadOnlyChanged(false),
                 ),
                 ChoiceChip(
                   selected: unreadOnly,
-                  label: const Text('Non lues'),
-                  avatar: const Icon(Icons.mark_email_unread_rounded, size: 18),
+                  label: Text('Non lues'),
+                  avatar: Icon(Icons.mark_email_unread_rounded, size: 18),
                   onSelected: (_) => onUnreadOnlyChanged(true),
                 ),
                 SizedBox(
@@ -653,7 +653,7 @@ class _NotificationSearchCard extends StatelessWidget {
           onChanged: (_) => onChanged(),
           decoration: InputDecoration(
             labelText: 'Rechercher une notification',
-            prefixIcon: const Icon(Icons.search_rounded),
+            prefixIcon: Icon(Icons.search_rounded),
             suffixIcon: controller.text.trim().isEmpty
                 ? null
                 : IconButton(
@@ -661,7 +661,7 @@ class _NotificationSearchCard extends StatelessWidget {
                       controller.clear();
                       onChanged();
                     },
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icon(Icons.close_rounded),
                     tooltip: 'Effacer',
                   ),
           ),
@@ -758,7 +758,7 @@ class _NotificationCard extends StatelessWidget {
                 foregroundColor: AppTheme.softBlack,
                 child: Icon(presentation.icon),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,16 +774,16 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     if (notification.message != null &&
                         notification.message!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       Text(
                         notification.message!,
-                        style: const TextStyle(
-                          color: Colors.black54,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.35,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -799,9 +799,9 @@ class _NotificationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               if (busy)
-                const SizedBox(
+                SizedBox(
                   width: 38,
                   height: 38,
                   child: Padding(
@@ -832,24 +832,24 @@ class _NotificationCard extends StatelessWidget {
                     if (notification.routePath != null)
                       IconButton(
                         onPressed: () => onOpen(notification),
-                        icon: const Icon(Icons.open_in_new_rounded),
+                        icon: Icon(Icons.open_in_new_rounded),
                         tooltip: 'Ouvrir',
                       ),
                     if (!notification.isRead)
                       IconButton(
                         onPressed: () => onMarkAsRead(notification),
-                        icon: const Icon(Icons.mark_email_read_rounded),
+                        icon: Icon(Icons.mark_email_read_rounded),
                         tooltip: 'Marquer comme lue',
                       ),
                     if (notification.isRead)
                       IconButton(
                         onPressed: () => onMarkAsUnread(notification),
-                        icon: const Icon(Icons.mark_email_unread_rounded),
+                        icon: Icon(Icons.mark_email_unread_rounded),
                         tooltip: 'Marquer comme non lue',
                       ),
                     IconButton(
                       onPressed: () => onDelete(notification),
-                      icon: const Icon(Icons.delete_rounded),
+                      icon: Icon(Icons.delete_rounded),
                       tooltip: 'Supprimer',
                       color: Colors.red,
                     ),
@@ -868,13 +868,15 @@ class _EmptyNotificationsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune notification trouvée.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -887,13 +889,15 @@ class _NoNotificationMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune notification ne correspond à la recherche.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -919,18 +923,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 """PR-5 PostgreSQL 16 migration, lease, and lock-fencing acceptance."""
 
+from app.core.time import utc_now
 import os
 import secrets
 import unittest
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import HTTPException
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
@@ -219,7 +221,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
         auth_session = AuthSession(
             user_id=user_id,
             refresh_token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
-            expires_at=datetime.utcnow() + timedelta(days=1),
+            expires_at=utc_now() + timedelta(days=1),
             platform="android",
         )
         db.add(auth_session)
@@ -251,7 +253,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
             version = connection.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-        self.assertEqual(version, "20260913_0009")
+        self.assertEqual(version, ScriptDirectory.from_config(Config("alembic.ini")).get_current_head())
         user_id, installation_id = self._identity(token="unique-token")
         db = self.Session()
         second = AppInstallation(
@@ -261,7 +263,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
             push_provider="fcm",
             push_token_ciphertext="cipher-2",
             push_token_hash=db.get(AppInstallation, installation_id).push_token_hash,
-            push_token_updated_at=datetime.utcnow(),
+            push_token_updated_at=utc_now(),
         )
         db.add(second)
         with self.assertRaises(IntegrityError):
@@ -272,7 +274,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
     def test_02_pending_retry_and_lease_boundaries(self):
         user_id, installation_id = self._identity()
         db = self.Session()
-        now = datetime.utcnow()
+        now = utc_now()
         notifications = [
             Notification(user_id=user_id, title=str(index), message="B", type="task")
             for index in range(4)
@@ -335,7 +337,7 @@ class PushLifecyclePostgreSQLTests(unittest.TestCase):
         db = self.Session()
         delivery = db.get(PushDelivery, delivery_id)
         delivery.status = "processing"
-        delivery.processing_started_at = datetime.utcnow() - timedelta(minutes=6)
+        delivery.processing_started_at = utc_now() - timedelta(minutes=6)
         db.commit()
         db.close()
         barrier = Barrier(2)

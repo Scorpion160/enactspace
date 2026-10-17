@@ -1,7 +1,12 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, use_null_aware_elements
 
 import 'package:flutter/material.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/widgets/app_form_dialog.dart';
+import '../../../shared/ui/reading_blocks.dart';
+import '../../../shared/ui/heritage_photo.dart';
 
 import '../models/impact_record_models.dart';
 import '../services/impact_gateway.dart';
@@ -50,30 +55,44 @@ class _ImpactRecordsScreenState extends State<ImpactRecordsScreen> {
     child: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Fiches Impact',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final copy = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fiches Impact',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
                   ),
-                  const Text(
-                    'Mesures consolidées, indicateurs et preuves serveur.',
-                  ),
-                ],
-              ),
-            ),
-            FilledButton.icon(
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Retrouve les actions, les résultats et les prochaines étapes de nos projets.',
+                  style: TextStyle(height: 1.5),
+                ),
+              ],
+            );
+            final action = FilledButton.icon(
               onPressed: create,
               icon: const Icon(Icons.add_rounded),
               label: const Text('Nouvelle fiche Impact'),
-            ),
-          ],
+            );
+            if (constraints.maxWidth < 750 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [copy, const SizedBox(height: 16), action],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: copy),
+                const SizedBox(width: 18),
+                action,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 18),
         if (error != null)
@@ -111,13 +130,7 @@ class _ImpactRecordsScreenState extends State<ImpactRecordsScreen> {
                             children: [
                               Wrap(
                                 spacing: 8,
-                                children: [
-                                  Chip(label: Text(r.statusLabel)),
-                                  if (r.canValidate)
-                                    const Chip(
-                                      label: Text('Validation autorisée'),
-                                    ),
-                                ],
+                                children: [Chip(label: Text(r.statusLabel))],
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -271,6 +284,15 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/impact/records', extra: gateway),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Retour aux fiches Impact'),
+            ),
+          ),
+          const SizedBox(height: 12),
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -278,21 +300,16 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
             runSpacing: 12,
             children: [
               SizedBox(
-                width: MediaQuery.sizeOf(context).width < 700
-                    ? double.infinity
-                    : 650,
+                width: (MediaQuery.sizeOf(context).width - 48).clamp(
+                  0.0,
+                  650.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
                       spacing: 8,
-                      children: [
-                        Chip(label: Text(r.statusLabel)),
-                        if (r.canManage)
-                          const Chip(label: Text('Gestion autorisée')),
-                        if (r.canValidate)
-                          const Chip(label: Text('Validation autorisée')),
-                      ],
+                      children: [Chip(label: Text(r.statusLabel))],
                     ),
                     Text(
                       r.title,
@@ -334,22 +351,29 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
               ),
             ],
           ),
+          if (heritagePhotoFor(r.title) case final photo?) ...[
+            const SizedBox(height: 18),
+            HeritagePhoto(photo: photo),
+          ],
           const SizedBox(height: 16),
           _Section(
-            'Résumé',
+            'L’essentiel du projet',
             Icons.description_rounded,
             Wrap(
               spacing: 28,
               runSpacing: 16,
               children: [
                 _Datum('Projet', r.projectId),
-                _Datum('Saison', r.seasonId ?? 'Non renseignée'),
+                _Datum('Année', r.seasonId ?? 'Non renseignée'),
                 _Datum('Population cible', _value(r.targetPopulation)),
                 _Datum(
-                  'ODD',
+                  'ODD ciblés',
                   r.sdgs.isEmpty ? 'À documenter' : r.sdgs.join(', '),
                 ),
-                SizedBox(width: 500, child: Text(_value(r.summary))),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 700),
+                  child: ReadingBlocks(_value(r.summary)),
+                ),
               ],
             ),
           ),
@@ -399,19 +423,19 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Problème', style: _label),
-                Text(_value(r.problemStatement)),
+                ReadingBlocks(_value(r.problemStatement)),
                 const SizedBox(height: 10),
                 Text('Solution', style: _label),
-                Text(_value(r.solutionSummary)),
+                ReadingBlocks(_value(r.solutionSummary)),
                 const SizedBox(height: 10),
                 Text('Méthodologie', style: _label),
-                Text(_value(r.methodology)),
+                ReadingBlocks(_value(r.methodology)),
                 const SizedBox(height: 10),
                 Text('Projection 12 mois', style: _label),
-                Text(_value(r.projectionNext12Months)),
+                ReadingBlocks(_value(r.projectionNext12Months)),
                 const SizedBox(height: 10),
                 Text('Notes de preuves', style: _label),
-                Text(_value(r.evidenceNotes)),
+                ReadingBlocks(_value(r.evidenceNotes)),
               ],
             ),
           ),
@@ -439,10 +463,18 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(m.title),
-                          subtitle: Text(
-                            '${m.categoryLabel} · ${impactValueLabel(m.value)} ${m.unitLabel} · '
-                            '${m.claimTypeLabel} · ${m.statusLabel}'
-                            '${m.rejectionReason == null ? '' : ' · ${m.rejectionReason}'}',
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${m.categoryLabel} · ${impactValueLabel(m.value)} ${m.unitLabel} · ${m.claimTypeLabel} · ${m.statusLabel}${m.rejectionReason == null ? '' : ' · ${m.rejectionReason}'}',
+                              ),
+                              if (m.evidenceFileId != null)
+                                StoredAttachmentButton(
+                                  url:
+                                      '/api/files/${m.evidenceFileId}/download',
+                                ),
+                            ],
                           ),
                           trailing: r.canValidate
                               ? PopupMenuButton<String>(
@@ -505,8 +537,17 @@ class _ImpactRecordDetailScreenState extends State<ImpactRecordDetailScreen> {
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(e.title),
-                          subtitle: Text(
-                            '${e.categoryLabel} · ${e.statusLabel}${e.rejectionReason == null ? '' : ' · ${e.rejectionReason}'}',
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${e.categoryLabel} · ${e.statusLabel}${e.rejectionReason == null ? '' : ' · ${e.rejectionReason}'}',
+                              ),
+                              if (e.fileId != null)
+                                StoredAttachmentButton(
+                                  url: '/api/files/${e.fileId}/download',
+                                ),
+                            ],
                           ),
                           trailing: r.canValidate
                               ? PopupMenuButton<String>(
@@ -610,14 +651,18 @@ class _RecordFormDialogState extends State<_RecordFormDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => AppFormDialog(
+    icon: Icons.insights_rounded,
+    description: 'Décrivez les résultats du projet et les preuves disponibles.',
     title: Text(
       widget.record == null
           ? 'Nouvelle fiche Impact'
           : 'Modifier la fiche Impact',
     ),
     content: SizedBox(
-      width: 720,
+      width: MediaQuery.sizeOf(context).width < 800
+          ? MediaQuery.sizeOf(context).width - 80
+          : 720,
       child: SingleChildScrollView(
         child: Wrap(
           spacing: 10,
@@ -625,12 +670,13 @@ class _RecordFormDialogState extends State<_RecordFormDialog> {
           children: [
             for (final e in c.entries)
               SizedBox(
-                width:
-                    e.key.contains('summary') ||
-                        e.key.contains('statement') ||
-                        e.key.contains('methodology') ||
-                        e.key.contains('notes') ||
-                        e.key.contains('projection')
+                width: MediaQuery.sizeOf(context).width < 760
+                    ? double.infinity
+                    : e.key.contains('summary') ||
+                          e.key.contains('statement') ||
+                          e.key.contains('methodology') ||
+                          e.key.contains('notes') ||
+                          e.key.contains('projection')
                     ? 690
                     : 330,
                 child: TextField(
@@ -697,6 +743,28 @@ class _MetricDialogState extends State<_MetricDialog> {
       file = TextEditingController();
   String category = 'social', unit = 'personnes', claimType = 'MEASURED';
   bool busy = false;
+  String? error;
+  SelectedAttachment? _attachment;
+  @override
+  void dispose() {
+    for (final controller in [
+      semanticKey,
+      title,
+      value,
+      source,
+      sourceReference,
+      periodStart,
+      periodEnd,
+      populationScope,
+      method,
+      limitations,
+      file,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Nouvel indicateur'),
@@ -819,12 +887,26 @@ class _MetricDialogState extends State<_MetricDialog> {
               controller: limitations,
               decoration: const InputDecoration(labelText: 'Notes / limites'),
             ),
-            TextField(
-              controller: file,
-              decoration: const InputDecoration(
-                labelText: 'Fichier de preuve existant',
-              ),
+            AttachmentPickerField(
+              label: 'Justificatif de cet indicateur',
+              value: _attachment,
+              enabled: !busy,
+              onChanged: (value) => setState(() {
+                _attachment = value;
+                file.clear();
+              }),
             ),
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    height: 1.5,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -838,27 +920,47 @@ class _MetricDialogState extends State<_MetricDialog> {
         onPressed: busy
             ? null
             : () async {
-                setState(() => busy = true);
-                await widget.gateway.createMetric(widget.recordId, {
-                  'semantic_key': semanticKey.text.trim(),
-                  'title': title.text,
-                  'category': category,
-                  'unit': unit,
-                  'value': value.text.trim().isEmpty
-                      ? null
-                      : double.tryParse(value.text),
-                  'claim_type': claimType,
-                  'validation_status': 'DRAFT',
-                  'source': _emptyToNull(source.text),
-                  'source_reference': _emptyToNull(sourceReference.text),
-                  'period_start': _emptyToNull(periodStart.text),
-                  'period_end': _emptyToNull(periodEnd.text),
-                  'population_scope': _emptyToNull(populationScope.text),
-                  'methodology_note': _emptyToNull(method.text),
-                  'notes_limitations': _emptyToNull(limitations.text),
-                  'evidence_file_id': file.text.isEmpty ? null : file.text,
+                setState(() {
+                  busy = true;
+                  error = null;
                 });
-                if (context.mounted) Navigator.pop(context, true);
+                try {
+                  if (_attachment != null && file.text.isEmpty) {
+                    final stored = await AttachmentService().uploadImpact(
+                      widget.recordId,
+                      _attachment!,
+                    );
+                    file.text = stored['id'].toString();
+                  }
+                  await widget.gateway.createMetric(widget.recordId, {
+                    'semantic_key': semanticKey.text.trim(),
+                    'title': title.text,
+                    'category': category,
+                    'unit': unit,
+                    'value': value.text.trim().isEmpty
+                        ? null
+                        : double.tryParse(value.text),
+                    'claim_type': claimType,
+                    'validation_status': 'DRAFT',
+                    'source': _emptyToNull(source.text),
+                    'source_reference': _emptyToNull(sourceReference.text),
+                    'period_start': _emptyToNull(periodStart.text),
+                    'period_end': _emptyToNull(periodEnd.text),
+                    'population_scope': _emptyToNull(populationScope.text),
+                    'methodology_note': _emptyToNull(method.text),
+                    'notes_limitations': _emptyToNull(limitations.text),
+                    'evidence_file_id': file.text.isEmpty ? null : file.text,
+                  });
+                  if (context.mounted) Navigator.pop(context, true);
+                } catch (e) {
+                  if (mounted)
+                    setState(
+                      () =>
+                          error = e.toString().replaceFirst('Exception: ', ''),
+                    );
+                } finally {
+                  if (mounted) setState(() => busy = false);
+                }
               },
         child: const Text('Créer'),
       ),
@@ -886,58 +988,86 @@ class _EvidenceDialogState extends State<_EvidenceDialog> {
   String category = 'autre';
   String? metric;
   bool busy = false;
+  String? error;
+  SelectedAttachment? _attachment;
+  @override
+  void dispose() {
+    for (final controller in [title, description, file]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Nouvelle preuve'),
     content: SizedBox(
       width: 520,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: title,
-            decoration: const InputDecoration(labelText: 'Titre'),
-          ),
-          TextField(
-            controller: description,
-            decoration: const InputDecoration(labelText: 'Description'),
-          ),
-          DropdownButtonFormField(
-            initialValue: category,
-            decoration: const InputDecoration(labelText: 'Catégorie'),
-            items:
-                const [
-                      'social',
-                      'economique',
-                      'environmental',
-                      'formation',
-                      'sensibilisation',
-                      'autre',
-                    ]
-                    .map(
-                      (v) => DropdownMenuItem(
-                        value: v,
-                        child: Text(impactCategoryLabel(v)),
-                      ),
-                    )
-                    .toList(),
-            onChanged: (v) => category = v!,
-          ),
-          DropdownButtonFormField<String?>(
-            initialValue: metric,
-            decoration: const InputDecoration(labelText: 'Indicateur lié'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Aucun')),
-              for (final m in widget.metrics)
-                DropdownMenuItem(value: m.id, child: Text(m.title)),
-            ],
-            onChanged: (v) => metric = v,
-          ),
-          TextField(
-            controller: file,
-            decoration: const InputDecoration(labelText: 'Fichier existant'),
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: title,
+              decoration: const InputDecoration(labelText: 'Titre'),
+            ),
+            TextField(
+              controller: description,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            DropdownButtonFormField(
+              initialValue: category,
+              decoration: const InputDecoration(labelText: 'Catégorie'),
+              items:
+                  const [
+                        'social',
+                        'economique',
+                        'environmental',
+                        'formation',
+                        'sensibilisation',
+                        'autre',
+                      ]
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(impactCategoryLabel(v)),
+                        ),
+                      )
+                      .toList(),
+              onChanged: (v) => category = v!,
+            ),
+            DropdownButtonFormField<String?>(
+              initialValue: metric,
+              decoration: const InputDecoration(labelText: 'Indicateur lié'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Aucun')),
+                for (final m in widget.metrics)
+                  DropdownMenuItem(value: m.id, child: Text(m.title)),
+              ],
+              onChanged: (v) => metric = v,
+            ),
+            AttachmentPickerField(
+              label: 'Pièce jointe',
+              value: _attachment,
+              enabled: !busy,
+              onChanged: (value) => setState(() {
+                _attachment = value;
+                file.clear();
+              }),
+            ),
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     ),
     actions: [
@@ -949,15 +1079,35 @@ class _EvidenceDialogState extends State<_EvidenceDialog> {
         onPressed: busy
             ? null
             : () async {
-                setState(() => busy = true);
-                await widget.gateway.createEvidence(widget.recordId, {
-                  'title': title.text,
-                  'description': description.text,
-                  'category': category,
-                  'metric_id': metric,
-                  'file_id': file.text.isEmpty ? null : file.text,
+                setState(() {
+                  busy = true;
+                  error = null;
                 });
-                if (context.mounted) Navigator.pop(context, true);
+                try {
+                  if (_attachment != null && file.text.isEmpty) {
+                    final stored = await AttachmentService().uploadImpact(
+                      widget.recordId,
+                      _attachment!,
+                    );
+                    file.text = stored['id'].toString();
+                  }
+                  await widget.gateway.createEvidence(widget.recordId, {
+                    'title': title.text,
+                    'description': description.text,
+                    'category': category,
+                    'metric_id': metric,
+                    'file_id': file.text.isEmpty ? null : file.text,
+                  });
+                  if (context.mounted) Navigator.pop(context, true);
+                } catch (e) {
+                  if (mounted)
+                    setState(
+                      () =>
+                          error = e.toString().replaceFirst('Exception: ', ''),
+                    );
+                } finally {
+                  if (mounted) setState(() => busy = false);
+                }
               },
         child: const Text('Créer'),
       ),

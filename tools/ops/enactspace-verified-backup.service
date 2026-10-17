@@ -1,0 +1,22 @@
+[Unit]
+Description=EnactSpace encrypted capture and isolated restore verification
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/enactspace/operations/backup-lot26/backend
+ExecStart=/usr/bin/python3 -m app.scripts.prelaunch_scheduled_backup --execute-scheduled-capture
+Environment=GNUPGHOME=/opt/enactspace/staging/backup-gpg-runtime
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/enactspace/uploads
+ReadWritePaths=/var/backups/enactspace /opt/enactspace/backup-keys /opt/enactspace/staging /opt/enactspace/operations/backup-lot26
+RestrictSUIDSGID=true
+LockPersonality=true
+TimeoutStartSec=10min

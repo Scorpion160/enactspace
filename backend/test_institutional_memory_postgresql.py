@@ -1,5 +1,6 @@
 """PR-2D acceptance tests against isolated local PostgreSQL 16."""
 
+from app.core.time import utc_now
 import os
 import secrets
 import unittest
@@ -70,7 +71,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
         cls.addClassCleanup(cls.engine.dispose)
         cls.config = Config("alembic.ini")
         cls.heads = ScriptDirectory.from_config(cls.config).get_heads()
-        if cls.heads != ["20260913_0009"]:
+        if len(cls.heads) != 1:
             raise AssertionError(f"Expected current Alembic head, got {cls.heads}")
         with patch.object(settings, "DATABASE_URL", cls.isolated_url):
             command.upgrade(cls.config, "head")
@@ -274,7 +275,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
                 connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one(),
-                "20260913_0009",
+                self.heads[0],
             )
 
         self._downgrade("20260903_0003")
@@ -284,7 +285,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
         inspector = inspect(self.engine)
         self.assertTrue(MEMORY_TABLES.issubset(inspector.get_table_names()))
 
-        now = datetime.utcnow()
+        now = utc_now()
         user_id = uuid.uuid4()
         source_id = uuid.uuid4()
         first_project_id = uuid.uuid4()

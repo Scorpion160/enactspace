@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.13+16 — 2026-10-10
+
+- Web publié et APK Android installé; API 1.0.13 déployée avec le schéma 20261007_0031.
+- Conversations avec soi-même refusées; séparation membres/alumni pour les listes et statistiques.
+- Annuaire alumni interne et gestion des profils admin/SG corrigés; parcours disciplinaire avec approbations et exécution datée.
+- Aide : mot de passe personnel. Recrutement : photo Haffé 2022 et accueil amélioré. Connexion : photo de terrain, logo translucide et accroche approuvée.
+- Mails/push activés sans redirection de test; Mobile Money reste désactivé.
+- Correctif ciblé de première connexion administratrice ajouté après la release, conservé dans b152677; validation réelle en attente.
+- Documentation alignée sur les comptes rendus opérateur; voir [preuves et limites](docs/releases/20261010-release-1.0.13.md).
+
 All notable release changes should be recorded here. Dates represent repository milestones, not proof of deployment.
 
 ## [Unreleased]

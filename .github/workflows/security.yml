@@ -4,10 +4,12 @@ on:
   pull_request:
     branches:
       - main
+      - recovery/final-20260927
       - feat/product-readiness-v1
   push:
     branches:
       - main
+      - recovery/final-20260927
       - feat/product-readiness-v1
   schedule:
     - cron: "17 6 * * 1"
@@ -35,15 +37,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install pinned audit tool
-        run: python -m pip install --disable-pip-version-check "pip-audit==2.10.1"
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1"
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.1"
 
       - name: Audit backend requirements
-        # PYSEC-2026-1325 has no fixed ecdsa release. python-jose brings it in,
-        # while application configuration rejects every JWT algorithm except HS256.
-        # Reassess this exception before changing ALGORITHM or python-jose.
-        run: >-
-          python -m pip_audit --strict --requirement backend/requirements.txt
-          --ignore-vuln PYSEC-2026-1325
+        run: python -m pip_audit --strict --requirement backend/requirements.txt
 
   repository-guards:
     name: Secret, environment, and action-reference guards

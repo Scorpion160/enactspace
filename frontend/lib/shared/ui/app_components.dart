@@ -65,8 +65,8 @@ class AppPageHeader extends StatelessWidget {
             if (eyebrow != null)
               Text(
                 eyebrow!,
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -83,8 +83,8 @@ class AppPageHeader extends StatelessWidget {
               const SizedBox(height: AppTheme.space8),
               Text(
                 subtitle!,
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.35,
                 ),
               ),
@@ -126,14 +126,16 @@ class AppSectionHeader extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             ...(subtitle == null
                 ? const <Widget>[]
                 : [
                     Text(
                       subtitle!,
-                      style: const TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ]),
           ],
@@ -160,14 +162,15 @@ class AppPrimaryButton extends StatelessWidget {
   final bool expand;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final button = FilledButton.icon(
       onPressed: onPressed,
       icon: icon == null ? const SizedBox.shrink() : Icon(icon),
       label: Text(label),
       style: FilledButton.styleFrom(
         minimumSize: const Size(44, 48),
-        backgroundColor: AppTheme.softBlack,
-        foregroundColor: Colors.white,
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         ),
@@ -191,14 +194,15 @@ class AppSecondaryButton extends StatelessWidget {
   final bool expand;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final button = OutlinedButton.icon(
       onPressed: onPressed,
       icon: icon == null ? const SizedBox.shrink() : Icon(icon),
       label: Text(label),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(44, 48),
-        foregroundColor: AppTheme.softBlack,
-        side: const BorderSide(color: AppTheme.border),
+        foregroundColor: colors.onSurface,
+        side: BorderSide(color: colors.outlineVariant),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         ),
@@ -244,14 +248,21 @@ class AppStatusBadge extends StatelessWidget {
   final AppStatusTone tone;
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    (Color, Color) accentColors(Color accent) => (
+      accent.withValues(alpha: dark ? 0.24 : 0.12),
+      dark ? Color.lerp(accent, Colors.white, 0.48)! : accent,
+    );
     final colors = switch (tone) {
-      AppStatusTone.success => (const Color(0xFFE3F3E8), AppTheme.success),
-      AppStatusTone.warning => (const Color(0xFFFFF0D4), AppTheme.warning),
-      AppStatusTone.error => (const Color(0xFFFCE5E5), AppTheme.error),
-      AppStatusTone.info => (const Color(0xFFE1F1F7), AppTheme.information),
+      AppStatusTone.success => accentColors(AppTheme.success),
+      AppStatusTone.warning => accentColors(AppTheme.warning),
+      AppStatusTone.error => (scheme.errorContainer, scheme.onErrorContainer),
+      AppStatusTone.info => accentColors(AppTheme.information),
       AppStatusTone.neutral => (
-        const Color(0xFFECECE8),
-        AppTheme.secondaryText,
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
       ),
     };
     return Container(
@@ -296,7 +307,7 @@ class AppMetric extends StatelessWidget {
       AppStatusTone.warning => AppTheme.warning,
       AppStatusTone.success => AppTheme.success,
       AppStatusTone.info => AppTheme.information,
-      AppStatusTone.neutral => AppTheme.softBlack,
+      AppStatusTone.neutral => Theme.of(context).colorScheme.onSurface,
     };
     return AppDataCard(
       onTap: onTap,
@@ -314,12 +325,12 @@ class AppMetric extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(label, style: TextStyle(fontWeight: FontWeight.w700)),
           if (detail != null)
             Text(
               detail!,
-              style: const TextStyle(
-                color: AppTheme.secondaryText,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -340,18 +351,21 @@ class AppDataCard extends StatelessWidget {
   final VoidCallback? onTap;
   final EdgeInsets padding;
   @override
-  Widget build(BuildContext context) => Material(
-    color: AppTheme.surfaceElevated,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      side: const BorderSide(color: AppTheme.border),
-    ),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      child: Padding(padding: padding, child: child),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
 }
 
 class AppIdentityCell extends StatelessWidget {
@@ -390,7 +404,7 @@ class AppIdentityCell extends StatelessWidget {
           child: imageUrl == null || imageUrl!.isEmpty
               ? Text(
                   initials.isEmpty ? '?' : initials,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 )
               : null,
         ),
@@ -404,15 +418,15 @@ class AppIdentityCell extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               if (subtitle != null && subtitle!.trim().isNotEmpty)
                 Text(
                   subtitle!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.secondaryText,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -452,10 +466,10 @@ class AppProgressSummary extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(value, style: TextStyle(fontWeight: FontWeight.w800)),
             ],
           ),
           const SizedBox(height: AppTheme.space12),
@@ -465,15 +479,15 @@ class AppProgressSummary extends StatelessWidget {
               value: normalized,
               minHeight: 8,
               color: AppTheme.enactusYellow,
-              backgroundColor: AppTheme.border,
+              backgroundColor: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           if (detail != null) ...[
             const SizedBox(height: AppTheme.space8),
             Text(
               detail!,
-              style: const TextStyle(
-                color: AppTheme.secondaryText,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -500,16 +514,22 @@ class AppEmptyState extends StatelessWidget {
   Widget build(BuildContext context) => AppDataCard(
     child: Row(
       children: [
-        Icon(icon, color: AppTheme.secondaryText, size: 28),
+        Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          size: 28,
+        ),
         const SizedBox(width: AppTheme.space16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800)),
               Text(
                 message,
-                style: const TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

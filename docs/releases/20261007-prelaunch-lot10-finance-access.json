@@ -1,0 +1,50 @@
+{
+  "lot": 10,
+  "date_utc": "2026-10-07T13:43:29.810887+00:00",
+  "tests": {
+    "sqlite": {
+      "passed": 63,
+      "seconds": 18.182,
+      "skipped": 0
+    },
+    "postgresql": {
+      "passed": 14,
+      "seconds": 45.366,
+      "skipped": 0
+    }
+  },
+  "reviewed_files": [
+    "backend/app/api/routes/finance.py",
+    "backend/app/api/deps.py",
+    "backend/test_prelaunch_finance_boundaries.py",
+    "backend/test_prelaunch_finance_boundaries_postgresql.py",
+    "backend/test_finance_receipts.py",
+    "backend/app/schemas/finance.py",
+    "backend/app/models/stored_file.py"
+  ],
+  "changes": [
+    "Shared finance management permission requires active status, enabled account, verified email and finance role",
+    "Finance notification recipients filtered to enabled verified active managers",
+    "Finance route UUID validation",
+    "Fee cancellation locks fee and repeated cancellation does not reduce balance again"
+  ],
+  "whole_manual_review_complete": false,
+  "isolated_resources_absent": true,
+  "production_changed": false,
+  "build_performed": false,
+  "git_push": false,
+  "smtp_emails_sent": 0,
+  "club_test_data_deleted": false,
+  "remaining_finance_review": [
+    "Payment attachment access and immutable bound evidence",
+    "CSV export protection against spreadsheet formula interpretation",
+    "Input validation for finite amounts, existing target users and accounting references",
+    "Payment declaration concurrency, duplicate proof/reference and simultaneous account creation"
+  ],
+  "remaining_global": [
+    "Remaining permissions/manual source review",
+    "Real Android and web end-to-end checks",
+    "Targeted test recruitment cleanup",
+    "Final documentation and deployment preparation"
+  ]
+}
