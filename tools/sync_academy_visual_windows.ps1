@@ -9,7 +9,7 @@ $observed = @{}
 $files = @(
     @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = '931a4d1cc4751a845e9b6c7dca4b0ab1cf89ce6b808649e5f0df2de0568a3020'; New = $false; Binary = $false },
     @{ Path = 'frontend/lib/features/academy/widgets/academy_artwork.dart'; Hash = '415057c919bb0658ad59f9e56f2ea334b6f4395a5c527f8de8e51637db71fac1'; New = $true; Binary = $false },
-    @{ Path = 'frontend/test/academy_home_redesign_test.dart'; Hash = '91d9c13ee7384f92cd10ca7192fdb7996fddf6774209a2a5cf247c7cc5d271c1'; New = $true; Binary = $false },
+    @{ Path = 'frontend/test/academy_home_redesign_test.dart'; Hash = '2d172e95ce6aa9b72f05748b49a397eb21f6b31578d49c2df17e9aae097c4747'; New = $true; Binary = $false },
     @{ Path = 'frontend/assets/img/academy_web_hero_learning.webp'; Hash = 'bce0e731bc3bd1a959e08490944b5cced9d7a7fe97330476b3a8b904951f1e6d'; New = $true; Binary = $true },
     @{ Path = 'frontend/assets/img/academy_web_recommended_path.webp'; Hash = '893731749c8fbe22cd05edebf275c10e6708b92bf7ec58a135ae381a3cd52c3b'; New = $true; Binary = $true },
     @{ Path = 'frontend/assets/img/academy_web_course_enactus.webp'; Hash = '2de56fed49ee9915a79fc367f0a8fc3306fc805e2b41a936325a86bdc54b446d'; New = $true; Binary = $true },

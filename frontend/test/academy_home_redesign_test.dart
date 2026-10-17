@@ -48,8 +48,12 @@ void main() {
           final button = tester.widget<ElevatedButton>(find.ancestor(
             of: find.text('Continuer'), matching: find.byType(ElevatedButton)));
           expect(button.onPressed, isNull);
-          await tester.scrollUntilVisible(find.text('Ma progression'), 180);
-          await tester.scrollUntilVisible(find.text('7/20'), 100);
+          await tester.scrollUntilVisible(find.text('Ma progression'), 180,
+            scrollable: find.descendant(of: find.byType(ListView).first,
+              matching: find.byType(Scrollable)).first);
+          await tester.scrollUntilVisible(find.text('7/20'), 100,
+            scrollable: find.descendant(of: find.byType(ListView).first,
+              matching: find.byType(Scrollable)).first);
           expect(find.text('7/20'), findsOneWidget);
           expect(find.text('42'), findsOneWidget);
           expect(tester.takeException(), isNull);
