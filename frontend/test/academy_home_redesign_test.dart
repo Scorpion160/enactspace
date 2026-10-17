@@ -1,0 +1,60 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/features/academy/models/academy_models.dart';
+import 'package:frontend/features/academy/screens/academy_home_screen.dart';
+import 'package:frontend/features/academy/services/academy_gateway.dart';
+
+class _Gateway implements AcademyGateway {
+  @override
+  Future<AcademyHomeData> loadHome() async => const AcademyHomeData(
+    courses: [], paths: [], badges: [], caseStudies: [],
+    progress: AcademyProgressModel(completedLessons: 7, totalLessons: 20,
+      passedQuizzes: 2, totalQuizzes: 5, points: 42, rank: 3, monthlyProgress: 0),
+  );
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+void main() {
+  test('all local academy illustrations are bundled', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    for (final variant in ['mobile', 'web']) {
+      for (final name in ['hero_learning', 'recommended_path', 'course_enactus',
+          'course_design_thinking', 'course_immersion']) {
+        final bytes = await rootBundle.load('assets/img/academy_${variant}_$name.webp');
+        expect(bytes.lengthInBytes, greaterThan(100));
+      }
+    }
+  });
+  for (final width in [320.0, 390.0, 1280.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final dark in [false, true]) {
+        testWidgets('academy home fits $width scale=$scale dark=$dark', (tester) async {
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(MaterialApp(
+            theme: ThemeData(useMaterial3: true,
+              brightness: dark ? Brightness.dark : Brightness.light),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!),
+            home: Scaffold(body: AcademyHomeScreen(gateway: _Gateway())),
+          ));
+          await tester.pumpAndSettle();
+          expect(find.text('Apprendre pour agir.'), findsOneWidget);
+          final button = tester.widget<ElevatedButton>(find.ancestor(
+            of: find.text('Continuer'), matching: find.byType(ElevatedButton)));
+          expect(button.onPressed, isNull);
+          await tester.scrollUntilVisible(find.text('Ma progression'), 180);
+          await tester.scrollUntilVisible(find.text('7/20'), 100);
+          expect(find.text('7/20'), findsOneWidget);
+          expect(find.text('42'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+}

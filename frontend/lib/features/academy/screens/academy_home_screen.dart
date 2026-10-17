@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../models/academy_models.dart';
 import '../services/academy_gateway.dart';
 import '../widgets/academy_quiz_dialog.dart';
+import '../widgets/academy_artwork.dart';
 
 class AcademyHomeScreen extends StatefulWidget {
   final AcademyGateway? gateway;
@@ -122,14 +123,27 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          _AcademyHeader(
+          LayoutBuilder(builder: (context, constraints) {
+            final hero = _AcademyHeader(
             onContinue:
                 _loading ||
                     _data == null ||
                     !_data!.courses.any((c) => !c.isLocked && !c.isMastered)
                 ? null
                 : _continueLearning,
-          ),
+          );
+            if (_data == null || _loading || _error != null) return hero;
+            final progress = _ProgressPanel(progress: _data!.progress);
+            if (constraints.maxWidth >= 1100 &&
+                MediaQuery.textScalerOf(context).scale(16) <= 24) {
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 3, child: hero),
+                const SizedBox(width: 16),
+                Expanded(flex: 2, child: progress),
+              ]);
+            }
+            return Column(children: [hero, const SizedBox(height: 16), progress]);
+          }),
           const SizedBox(height: 18),
           if (_data?.offline == true && !_loading && _error == null) ...[
             const Card(
@@ -147,12 +161,12 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.sync),
-                title: const Text('Synchronisation en attente'),
+                title: const Text('Tes progrès sont conservés'),
                 subtitle: Text(
-                  '${_data!.pendingActions} action(s) conservée(s) sur cet appareil.',
+                  'Ils seront envoyés dès que la connexion sera rétablie.',
                 ),
                 trailing: IconButton(
-                  tooltip: 'Réessayer la synchronisation',
+                  tooltip: 'Réessayer',
                   onPressed: _loadAcademy,
                   icon: const Icon(Icons.sync),
                 ),
@@ -197,94 +211,59 @@ class _AcademyHeader extends StatelessWidget {
   const _AcademyHeader({this.onContinue});
 
   @override
-  Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 760;
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF102B36), Color(0xFF061B28)],
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
       ),
-      child: wide
-          ? Row(
-              children: [
-                const _HeaderIcon(),
-                const SizedBox(width: 18),
-                Expanded(child: _HeaderCopy()),
-                ElevatedButton.icon(
-                  onPressed: onContinue,
-                  icon: Icon(Icons.play_arrow_rounded),
-                  label: Text('Continuer'),
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _HeaderIcon(),
-                    SizedBox(width: 18),
-                    Expanded(child: _HeaderCopy()),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: onContinue,
-                    icon: Icon(Icons.play_arrow_rounded),
-                    label: Text('Continuer'),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Icon(Icons.school_rounded, color: AppTheme.softBlack, size: 34),
-    );
-  }
-}
-
-class _HeaderCopy extends StatelessWidget {
-  const _HeaderCopy();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'EnactSpace Academy',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xFF31515D)),
+    ),
+    child: LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 650 &&
+          MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('ENACTSPACE ACADEMY', style: TextStyle(
+          color: Color(0xFFFFD34D), fontWeight: FontWeight.w800, letterSpacing: 1.6,
+        )),
+        const SizedBox(height: 12),
+        Text('Apprendre pour agir.', style: TextStyle(
+          color: Colors.white, fontSize: wide ? 36 : 28,
+          fontWeight: FontWeight.w900, height: 1.15,
+        )),
+        const SizedBox(height: 12),
+        const Text('Avance à ton rythme, fais grandir ton impact.',
+          style: TextStyle(color: Color(0xFFD2E2E8), height: 1.5, fontSize: 16)),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFFD34D),
+            foregroundColor: const Color(0xFF151D24),
+            disabledBackgroundColor: const Color(0xFF344A54),
+            disabledForegroundColor: const Color(0xFFCBDAE0),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           ),
+          onPressed: onContinue,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Continuer'),
         ),
-        SizedBox(height: 6),
-        Text(
-          'Comprends les concepts, découvre les projets du club et mets tes connaissances en pratique, à ton rythme.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
-        ),
-      ],
-    );
-  }
+      ]);
+      if (wide) {
+        return Row(children: [
+          Expanded(flex: 3, child: copy),
+          const SizedBox(width: 16),
+          const Expanded(flex: 2, child: AcademyArtwork(
+            name: 'hero_learning', height: 210)),
+        ]);
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const AcademyArtwork(name: 'hero_learning', height: 130),
+        const SizedBox(height: 8), copy,
+      ]);
+    }),
+  );
 }
 
 class _AcademyContent extends StatelessWidget {
@@ -373,8 +352,7 @@ class _AcademyContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ProgressPanel(progress: data.progress),
-        const SizedBox(height: 22),
+
         _AcademyFiltersCard(
           controller: searchController,
           courseFilter: courseFilter,
@@ -389,7 +367,7 @@ class _AcademyContent extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         const _SectionTitle(
-          title: 'Parcours recommandés',
+          title: 'Ton parcours recommandé',
           subtitle:
               'Des chemins courts pour intégrer, progresser et préparer les temps forts.',
         ),
@@ -397,7 +375,7 @@ class _AcademyContent extends StatelessWidget {
         _PathGrid(paths: data.paths),
         const SizedBox(height: 22),
         const _SectionTitle(
-          title: 'Catalogue de cours',
+          title: 'Explore les formations',
           subtitle:
               'Des leçons expliquées, des exemples et des exercices pour apprendre en agissant.',
         ),
@@ -455,127 +433,50 @@ class _AcademyContent extends StatelessWidget {
 
 class _ProgressPanel extends StatelessWidget {
   final AcademyProgressModel progress;
-
   const _ProgressPanel({required this.progress});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 720;
-            final summary = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Ma progression Academy',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Un suivi personnel et positif: leçons terminées, quiz réussis, points et badges.',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text('${progress.points} points')),
-                    Chip(label: Text('Rang positif #${progress.rank}')),
-                    Chip(
-                      label: Text(
-                        '${progress.monthlyProgress.toStringAsFixed(0)}% ce mois',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-            final meters = Column(
-              children: [
-                _ProgressMeter(
-                  label: 'Leçons',
-                  value: progress.lessonsProgress,
-                  detail:
-                      '${progress.completedLessons}/${progress.totalLessons}',
-                ),
-                const SizedBox(height: 12),
-                _ProgressMeter(
-                  label: 'Quiz',
-                  value: progress.quizProgress,
-                  detail: '${progress.passedQuizzes}/${progress.totalQuizzes}',
-                ),
-              ],
-            );
-
-            if (wide) {
-              return Row(
-                children: [
-                  Expanded(child: summary),
-                  const SizedBox(width: 22),
-                  SizedBox(width: 280, child: meters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [summary, const SizedBox(height: 18), meters],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressMeter extends StatelessWidget {
-  final String label;
-  final double value;
-  final String detail;
-
-  const _ProgressMeter({
-    required this.label,
-    required this.value,
-    required this.detail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
+    final colors = Theme.of(context).colorScheme;
+    final ratio = progress.totalLessons == 0 ? 0.0 :
+        (progress.completedLessons / progress.totalLessons).clamp(0.0, 1.0);
+    return Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(label, style: TextStyle(fontWeight: FontWeight.w900)),
-            ),
-            Text(
-              detail,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: value.clamp(0.0, 1.0),
-          minHeight: 9,
-          borderRadius: BorderRadius.circular(99),
+        Text('Ma progression', style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w900)),
+        const SizedBox(height: 18),
+        LayoutBuilder(builder: (context, constraints) {
+          final columns = MediaQuery.textScalerOf(context).scale(16) > 24 ||
+              constraints.maxWidth < 260 ? 1 : 3;
+          final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
+          return Wrap(spacing: 10, runSpacing: 10, children: [
+            for (final stat in [
+              ('${progress.completedLessons}/${progress.totalLessons}', 'Leçons', Icons.menu_book_rounded),
+              ('${progress.passedQuizzes}/${progress.totalQuizzes}', 'Quiz réussis', Icons.task_alt_rounded),
+              ('${progress.points}', 'Points', Icons.star_outline_rounded),
+            ]) SizedBox(width: width, child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+              decoration: BoxDecoration(color: colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14)),
+              child: Column(children: [Icon(stat.$3, color: colors.primary),
+                const SizedBox(height: 8),
+                Text(stat.$1, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4), Text(stat.$2, textAlign: TextAlign.center),
+              ]),
+            )),
+          ]);
+        }),
+        const SizedBox(height: 18),
+        LinearProgressIndicator(value: ratio, minHeight: 9,
           color: AppTheme.enactusYellow,
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.08),
-        ),
+          backgroundColor: colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(99)),
+        const SizedBox(height: 10),
+        Text('${(ratio * 100).round()} % des leçons terminées · Chaque étape compte.',
+          style: TextStyle(color: colors.onSurfaceVariant, height: 1.4)),
       ],
-    );
+    )));
   }
 }
 
@@ -764,6 +665,8 @@ class _PathCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const AcademyArtwork(name: 'recommended_path', height: 100),
+            const SizedBox(height: 12),
             Text(
               path.title,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
@@ -863,6 +766,8 @@ class _CourseCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            AcademyArtwork(name: academyCourseArtwork(course.title, course.category), height: 125),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -882,8 +787,6 @@ class _CourseCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               course.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
@@ -1372,7 +1275,9 @@ class _ResponsiveWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = (constraints.maxWidth / minWidth).floor().clamp(1, 4);
+        final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+        final count = (constraints.maxWidth / (minWidth * scale.clamp(1.0, 2.0)))
+            .floor().clamp(1, 3);
         const spacing = 12.0;
         final width = (constraints.maxWidth - spacing * (count - 1)) / count;
 
@@ -1532,3 +1437,4 @@ String _academyKey(String value) {
       .replaceAll('-', '_')
       .replaceAll(' ', '_');
 }
+
