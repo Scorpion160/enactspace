@@ -17,6 +17,7 @@ import 'package:frontend/features/recruitment/screens/application_tracking_scree
 import 'package:frontend/features/recruitment/screens/public/public_application_flow_screen.dart';
 import 'package:frontend/features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 import 'package:frontend/features/recruitment/services/public_recruitment_gateway.dart';
+import 'package:frontend/features/recruitment/widgets/public/public_recruitment_widgets.dart';
 
 const _campaign = RecruitmentCampaignModel(
   id: 'campaign-open',
@@ -165,6 +166,38 @@ Future<void> _reachReview(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('review edit preserves other answers and requires confirmation again', (tester) async {
+    final gateway = _FakeGateway();
+    await tester.pumpWidget(_app(PublicApplicationFlowScreen(
+      campaignId: _campaign.id, campaign: _campaign, gateway: gateway,
+    )));
+    await _reachReview(tester);
+    final confirmation = find.byType(CheckboxListTile);
+    await tester.ensureVisible(confirmation);
+    await tester.tap(confirmation);
+    await tester.pump();
+    final section = find.byWidgetPredicate((widget) => widget is ApplicationReviewSection && widget.title == 'Motivations');
+    final edit = find.descendant(of: section, matching: find.widgetWithText(TextButton, 'Modifier'));
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    final answer = find.byKey(const ValueKey('field-motivation'));
+    expect(tester.widget<TextFormField>(answer).controller!.text,
+      'Je souhaite contribuer à des projets utiles et apprendre en équipe.');
+    await tester.enterText(answer, 'Une motivation corrigée sans reprendre toute la candidature.');
+    await tester.tap(find.byKey(const ValueKey('application-next')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(find.byKey(const ValueKey('field-availability'))).controller!.text,
+      'Disponible les mardi et jeudi après les cours.');
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byKey(const ValueKey('application-next')));
+      await tester.pumpAndSettle();
+    }
+    expect(find.textContaining('Une motivation corrigée'), findsOneWidget);
+    expect(tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value, isFalse);
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('application-submit'))).onPressed, isNull);
+    expect(gateway.lastDraft, isNull);
+  });
   for (final dark in [false, true]) {
     testWidgets(
       'duplicate preserves draft and opens tracking with return dark=$dark',

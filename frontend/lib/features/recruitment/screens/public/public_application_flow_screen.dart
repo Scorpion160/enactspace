@@ -11,6 +11,7 @@ import '../../models/recruitment_campaign_model.dart';
 import '../../services/public_recruitment_gateway.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
 import '../../widgets/public/public_application_field.dart';
+import '../../widgets/public/public_application_journey.dart';
 
 class PublicApplicationFlowScreen extends StatefulWidget {
   final String campaignId;
@@ -45,6 +46,7 @@ class _PublicApplicationFlowScreenState
   final _controllers = <String, TextEditingController>{};
   RecruitmentCampaignModel? _campaign;
   ApplicationModel? _submitted;
+  final _scroll = ScrollController();
   int _step = 0;
   bool _campaignLoading = true;
   bool _campaignFailed = false;
@@ -105,6 +107,7 @@ class _PublicApplicationFlowScreenState
 
   @override
   void dispose() {
+    _scroll.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -144,14 +147,25 @@ class _PublicApplicationFlowScreenState
     attachmentFile: _attachmentFile,
   );
 
+  void _goToStep(int step) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _step = step;
+      if (step < 5) _confirmed = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
+    });
+  }
+
   void _next() {
     final form = _formKeys[_step].currentState;
     if (form != null && !form.validate()) return;
-    if (_step < 5) setState(() => _step += 1);
+    if (_step < 5) _goToStep(_step + 1);
   }
 
   void _back() {
-    if (_step > 0) setState(() => _step -= 1);
+    if (_step > 0) _goToStep(_step - 1);
   }
 
   Future<void> _submit() async {
@@ -227,6 +241,8 @@ class _PublicApplicationFlowScreenState
         children: [
           Expanded(
             child: SingleChildScrollView(
+              controller: _scroll,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.symmetric(
                 horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
                 vertical: 24,
@@ -239,22 +255,12 @@ class _PublicApplicationFlowScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          _campaign!.title,
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        PublicApplicationJourney(
+                          campaignTitle: _campaign!.title,
+                          currentStep: _step,
+                          titles: _stepTitles,
                         ),
-                        const SizedBox(height: 14),
-                        ApplicationStepHeader(
-                          currentStep: _step + 1,
-                          totalSteps: 6,
-                          title: _stepTitles[_step],
-                        ),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 24),
                         _buildStep(),
                       ],
                     ),
@@ -403,8 +409,18 @@ class _PublicApplicationFlowScreenState
           const Text(
             'Cette campagne ne demande pas de réponse dans cette rubrique.',
           ),
-        for (final q in questions)
-          _longField(_questionKey(q), q.label, q.hint, required: q.required),
+        for (var index = 0; index < questions.length; index++)
+          PublicApplicationQuestionCard(
+            number: index + 1,
+            total: questions.length,
+            requiredAnswer: questions[index].required,
+            child: _longField(
+              _questionKey(questions[index]),
+              questions[index].label,
+              questions[index].hint,
+              required: questions[index].required,
+            ),
+          ),
         if (section == 'availability')
           const Text(
             'Décris un engagement réaliste. Tes études et tes contraintes personnelles comptent aussi.',
@@ -463,7 +479,7 @@ class _PublicApplicationFlowScreenState
       ApplicationReviewSection(
         title: 'Campagne',
         lines: [_campaign!.title],
-        onEdit: () => setState(() => _step = 0),
+        onEdit: () => _goToStep(0),
       ),
       ApplicationReviewSection(
         title: 'Identité',
@@ -472,7 +488,7 @@ class _PublicApplicationFlowScreenState
           _text('email'),
           _text('phone'),
         ],
-        onEdit: () => setState(() => _step = 0),
+        onEdit: () => _goToStep(0),
       ),
       ApplicationReviewSection(
         title: 'Parcours',
@@ -485,7 +501,7 @@ class _PublicApplicationFlowScreenState
           ))
             'Découverte d’Enactus ESP : ${_text('knownEnactusFrom').isEmpty ? 'Non renseigné' : _text('knownEnactusFrom')}',
         ],
-        onEdit: () => setState(() => _step = 1),
+        onEdit: () => _goToStep(1),
       ),
       ApplicationReviewSection(
         title: 'Motivations',
@@ -495,7 +511,7 @@ class _PublicApplicationFlowScreenState
           ))
             '${q.label}\n${_text(_questionKey(q)).isEmpty ? 'Non renseigné' : _text(_questionKey(q))}',
         ],
-        onEdit: () => setState(() => _step = 2),
+        onEdit: () => _goToStep(2),
       ),
       ApplicationReviewSection(
         title: 'Disponibilités',
@@ -505,7 +521,7 @@ class _PublicApplicationFlowScreenState
           ))
             '${q.label}\n${_text(_questionKey(q)).isEmpty ? 'Non renseigné' : _text(_questionKey(q))}',
         ],
-        onEdit: () => setState(() => _step = 3),
+        onEdit: () => _goToStep(3),
       ),
       ApplicationReviewSection(
         title: 'Documents',
@@ -515,7 +531,7 @@ class _PublicApplicationFlowScreenState
           _attachmentFile?.name ??
               'Document complémentaire : aucun fichier joint',
         ],
-        onEdit: () => setState(() => _step = 4),
+        onEdit: () => _goToStep(4),
       ),
       CheckboxListTile(
         contentPadding: EdgeInsets.zero,
@@ -623,12 +639,15 @@ class _PublicApplicationFlowScreenState
       child: TextFormField(
         key: ValueKey('field-$key'),
         controller: _controller(key),
-        minLines: 4,
+        minLines: 3,
         maxLines: 7,
         maxLength: 1200,
         keyboardType: TextInputType.multiline,
         textInputAction: TextInputAction.newline,
-        decoration: const InputDecoration(errorMaxLines: 4),
+        decoration: const InputDecoration(
+          hintText: 'Écris ta réponse ici…',
+          errorMaxLines: 4,
+        ),
         validator: required ? (value) => _required(value, label) : null,
       ),
     );

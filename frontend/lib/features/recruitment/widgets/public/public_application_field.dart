@@ -14,14 +14,14 @@ class PublicApplicationField extends StatelessWidget {
       Text(label, softWrap: true, style: Theme.of(context).textTheme.bodyLarge?.copyWith(
         fontWeight: FontWeight.w600, height: 1.4,
       )),
-      const SizedBox(height: 8),
-      Semantics(label: label, child: child),
       if (help != null && help!.trim().isNotEmpty) ...[
         const SizedBox(height: 6),
         Text(help!, softWrap: true, style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.4,
         )),
       ],
+      const SizedBox(height: 12),
+      Semantics(label: label, child: child),
     ],
   );
 }
