@@ -118,10 +118,27 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final palette = theme.colorScheme.copyWith(
+      primary: dark ? const Color(0xFF35CFDA) : const Color(0xFF008B98),
+      surface: dark ? const Color(0xFF10212D) : Colors.white,
+      surfaceContainerLow: dark ? const Color(0xFF132936) : const Color(0xFFF7F8F8),
+      surfaceContainerHighest: dark ? const Color(0xFF203846) : const Color(0xFFF1F5F5),
+      secondaryContainer: dark ? const Color(0xFF153C49) : const Color(0xFFDFF1F1),
+      onSecondaryContainer: dark ? const Color(0xFFDBF7F8) : const Color(0xFF123B45),
+      onSurface: dark ? const Color(0xFFF0F6F9) : const Color(0xFF10202B),
+      onSurfaceVariant: dark ? const Color(0xFFB8CBD5) : const Color(0xFF52616C),
+      outlineVariant: dark ? const Color(0xFF304652) : const Color(0xFFDEE5E8),
+    );
+    return Theme(data: theme.copyWith(colorScheme: palette,
+      cardTheme: theme.cardTheme.copyWith(color: palette.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: palette.outlineVariant)))),
+      child: RefreshIndicator(
       onRefresh: _loadAcademy,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 700 ? 12 : 18),
         children: [
           LayoutBuilder(builder: (context, constraints) {
             final hero = _AcademyHeader(
@@ -134,7 +151,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
           );
             if (_data == null || _loading || _error != null) return hero;
             final progress = _ProgressPanel(progress: _data!.progress);
-            if (constraints.maxWidth >= 1100 &&
+            if (constraints.maxWidth >= 850 &&
                 MediaQuery.textScalerOf(context).scale(16) <= 24) {
               return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(flex: 3, child: hero),
@@ -202,7 +219,7 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
             ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -219,7 +236,7 @@ class _AcademyHeader extends StatelessWidget {
     ),
     child: LayoutBuilder(builder: (context, constraints) {
       final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-      final wide = constraints.maxWidth >= 580;
+      final wide = MediaQuery.sizeOf(context).width >= 900 && constraints.maxWidth >= 400;
       final sideArt = constraints.maxWidth >= 265 && scale <= 1.3;
       final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(wide ? 'APPRENDRE POUR AGIR' : 'ENACTSPACE ACADEMY', style: const TextStyle(
@@ -245,7 +262,7 @@ class _AcademyHeader extends StatelessWidget {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (sideArt) Row(children: [Expanded(flex: 3, child: copy),
           const SizedBox(width: 10),
-          Expanded(flex: 2, child: AcademyArtwork(name: 'hero_learning', height: wide ? 180 : 150)),
+          Expanded(flex: 2, child: AcademyArtwork(name: 'hero_learning', height: wide ? 160 : 140)),
         ]) else copy,
         if (!sideArt) const AcademyArtwork(name: 'hero_learning', height: 100),
         const SizedBox(height: 18),
@@ -440,7 +457,7 @@ class _ProgressPanel extends StatelessWidget {
         const SizedBox(height: 18),
         LayoutBuilder(builder: (context, constraints) {
           final columns = MediaQuery.textScalerOf(context).scale(16) > 24 ||
-              constraints.maxWidth < 260 ? 1 : 3;
+              constraints.maxWidth < 210 ? 1 : 3;
           final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
           return Wrap(spacing: 10, runSpacing: 10, children: [
             for (final stat in [
@@ -448,7 +465,7 @@ class _ProgressPanel extends StatelessWidget {
               ('${progress.passedQuizzes}/${progress.totalQuizzes}', 'Quiz réussis', Icons.task_alt_rounded),
               ('${progress.points}', 'Points', Icons.star_outline_rounded),
             ]) SizedBox(width: width, child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
               decoration: BoxDecoration(color: colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(14)),
               child: Column(children: [Icon(stat.$3, color: colors.primary),
@@ -529,11 +546,11 @@ class _AcademyFiltersCard extends StatelessWidget {
     ]);
     final split = constraints.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(16) <= 24;
     final menuWidth = split ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth;
-    if (constraints.maxWidth >= 1100 && MediaQuery.textScalerOf(context).scale(16) <= 18) {
+    if (constraints.maxWidth >= 900 && MediaQuery.textScalerOf(context).scale(16) <= 18) {
       return Row(children: [Expanded(child: search), const SizedBox(width: 12),
-        SizedBox(width: 350, child: statuses), const SizedBox(width: 12),
-        SizedBox(width: 145, child: menu(levelLabel, levels, onLevelChanged)),
-        const SizedBox(width: 8), SizedBox(width: 185, child: menu(_academyCategoryLabel(categoryFilter),
+        SizedBox(width: 300, child: statuses), const SizedBox(width: 12),
+        SizedBox(width: 135, child: menu(levelLabel, levels, onLevelChanged)),
+        const SizedBox(width: 8), SizedBox(width: 175, child: menu(_academyCategoryLabel(categoryFilter),
           [('all', 'Toutes les catégories'), for (final c in categories) (_academyKey(c), c)], onCategoryChanged)),
       ]);
     }

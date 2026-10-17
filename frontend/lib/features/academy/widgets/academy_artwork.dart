@@ -10,14 +10,19 @@ class AcademyArtwork extends StatelessWidget {
   Widget build(BuildContext context) => ExcludeSemantics(
     child: SizedBox(height: height, child: LayoutBuilder(
       builder: (context, constraints) {
-        final variant = constraints.maxWidth >= 400 ? 'web' : 'mobile';
-        return Image.asset('assets/img/academy_${variant}_$name.webp',
-          fit: BoxFit.contain, width: double.infinity,
+        final desktop = MediaQuery.sizeOf(context).width >= 900;
+        final variant = desktop ? 'web' : 'mobile';
+        final banner = desktop && (name.startsWith('course_') || name == 'recommended_path');
+        final theme = Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light';
+        final path = banner ? 'assets/img/academy_banner_${theme}_$name.webp' :
+            'assets/img/academy_${variant}_$name.webp';
+        return ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset(path,
+          fit: banner ? BoxFit.cover : BoxFit.contain, width: double.infinity,
           errorBuilder: (context, error, stack) => Center(
             child: Icon(Icons.auto_stories_rounded, size: 48,
               color: Theme.of(context).colorScheme.primary),
           ),
-        );
+        ));
       },
     )),
   );

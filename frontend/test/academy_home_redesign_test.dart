@@ -32,6 +32,12 @@ class _Gateway implements AcademyGateway {
 void main() {
   test('all local academy illustrations are bundled', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
+    for (final theme in ['light', 'dark']) {
+      for (final name in ['recommended_path', 'course_enactus', 'course_design_thinking', 'course_immersion']) {
+        final bytes = await rootBundle.load('assets/img/academy_banner_${theme}_$name.webp');
+        expect(bytes.lengthInBytes, greaterThan(100));
+      }
+    }
     for (final variant in ['mobile', 'web']) {
       for (final name in ['hero_learning', 'recommended_path', 'course_enactus',
           'course_design_thinking', 'course_immersion']) {
@@ -40,7 +46,7 @@ void main() {
       }
     }
   });
-  for (final width in [320.0, 390.0, 1280.0]) {
+  for (final width in [320.0, 390.0, 1024.0, 1280.0]) {
     for (final scale in [1.0, 2.0]) {
       for (final dark in [false, true]) {
         testWidgets('academy home fits $width scale=$scale dark=$dark', (tester) async {
