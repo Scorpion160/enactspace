@@ -195,7 +195,7 @@ void main() {
       await tester.pumpAndSettle();
       final button = tester.widget<ElevatedButton>(
         find.ancestor(
-          of: find.text('Continuer'),
+          of: find.text('Continuer mon apprentissage'),
           matching: find.byType(ElevatedButton),
         ),
       );
@@ -358,7 +358,7 @@ void main() {
         MaterialApp.router(theme: AppTheme.darkTheme, routerConfig: router),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Continuer'));
+      await tester.tap(find.text('Continuer mon apprentissage'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Écouter avant de proposer.'),

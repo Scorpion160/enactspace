@@ -209,58 +209,47 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
 class _AcademyHeader extends StatelessWidget {
   final VoidCallback? onContinue;
   const _AcademyHeader({this.onContinue});
-
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF102B36), Color(0xFF061B28)],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(24),
+      gradient: const LinearGradient(colors: [Color(0xFF102B36), Color(0xFF061B28)]),
+      borderRadius: BorderRadius.circular(22),
       border: Border.all(color: const Color(0xFF31515D)),
     ),
     child: LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 650 &&
-          MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+      final wide = constraints.maxWidth >= 580;
+      final sideArt = constraints.maxWidth >= 265 && scale <= 1.3;
       final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('ENACTSPACE ACADEMY', style: TextStyle(
-          color: Color(0xFFFFD34D), fontWeight: FontWeight.w800, letterSpacing: 1.6,
-        )),
+        Text(wide ? 'APPRENDRE POUR AGIR' : 'ENACTSPACE ACADEMY', style: const TextStyle(
+          color: Color(0xFFFFD34D), fontSize: 11,
+          fontWeight: FontWeight.w800, letterSpacing: 1.2)),
         const SizedBox(height: 12),
-        Text('Apprendre pour agir.', style: TextStyle(
-          color: Colors.white, fontSize: wide ? 36 : 28,
-          fontWeight: FontWeight.w900, height: 1.15,
-        )),
+        Text(wide ? 'Fais grandir ton impact.' : 'Apprendre pour agir.',
+          style: TextStyle(color: Colors.white, fontSize: wide ? 32 : 26,
+            fontWeight: FontWeight.w900, height: 1.15)),
         const SizedBox(height: 12),
-        const Text('Avance à ton rythme, fais grandir ton impact.',
-          style: TextStyle(color: Color(0xFFD2E2E8), height: 1.5, fontSize: 16)),
-        const SizedBox(height: 20),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFFFD34D),
-            foregroundColor: const Color(0xFF151D24),
-            disabledBackgroundColor: const Color(0xFF344A54),
-            disabledForegroundColor: const Color(0xFFCBDAE0),
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-          ),
-          onPressed: onContinue,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Continuer'),
-        ),
+        Text(wide ? 'Des leçons, des projets et de la pratique pour avancer à ton rythme.' : 'Avance à ton rythme, fais grandir ton impact.',
+          style: const TextStyle(color: Color(0xFFD2E2E8), height: 1.5)),
       ]);
-      if (wide) {
-        return Row(children: [
-          Expanded(flex: 3, child: copy),
-          const SizedBox(width: 16),
-          const Expanded(flex: 2, child: AcademyArtwork(
-            name: 'hero_learning', height: 210)),
-        ]);
-      }
+      final button = ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD34D),
+          foregroundColor: const Color(0xFF151D24),
+          disabledBackgroundColor: const Color(0xFF344A54),
+          disabledForegroundColor: const Color(0xFFCBDAE0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15)),
+        onPressed: onContinue, icon: const Icon(Icons.play_arrow_rounded),
+        label: const Text('Continuer mon apprentissage', textAlign: TextAlign.center),
+      );
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const AcademyArtwork(name: 'hero_learning', height: 130),
-        const SizedBox(height: 8), copy,
+        if (sideArt) Row(children: [Expanded(flex: 3, child: copy),
+          const SizedBox(width: 10),
+          Expanded(flex: 2, child: AcademyArtwork(name: 'hero_learning', height: wide ? 180 : 150)),
+        ]) else copy,
+        if (!sideArt) const AcademyArtwork(name: 'hero_learning', height: 100),
+        const SizedBox(height: 18),
+        if (wide) Align(alignment: Alignment.centerLeft, child: button) else button,
       ]);
     }),
   );
@@ -353,18 +342,6 @@ class _AcademyContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
 
-        _AcademyFiltersCard(
-          controller: searchController,
-          courseFilter: courseFilter,
-          levelFilter: levelFilter,
-          categoryFilter: categoryFilter,
-          onChanged: onFiltersChanged,
-          onCourseFilterChanged: onCourseFilterChanged,
-          onLevelChanged: onLevelChanged,
-          onCategoryChanged: onCategoryChanged,
-          categories: data.courses.map((c) => c.category).toSet().toList()
-            ..sort(),
-        ),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Ton parcours recommandé',
@@ -380,10 +357,24 @@ class _AcademyContent extends StatelessWidget {
               'Des leçons expliquées, des exemples et des exercices pour apprendre en agissant.',
         ),
         const SizedBox(height: 12),
+        _AcademyFiltersCard(
+          controller: searchController,
+          courseFilter: courseFilter,
+          levelFilter: levelFilter,
+          categoryFilter: categoryFilter,
+          onChanged: onFiltersChanged,
+          onCourseFilterChanged: onCourseFilterChanged,
+          onLevelChanged: onLevelChanged,
+          onCategoryChanged: onCategoryChanged,
+          categories: data.courses.map((c) => c.category).toSet().toList()
+            ..sort(),
+        ),
+        const SizedBox(height: 12),
         _CourseGrid(
           courses: _filteredCourses,
           rewardingActionId: rewardingActionId,
           onCompleteNextLesson: onCompleteNextLesson,
+          onPassQuiz: onPassQuiz,
         ),
         const SizedBox(height: 22),
         const _SectionTitle(
@@ -405,6 +396,7 @@ class _AcademyContent extends StatelessWidget {
                 .toList(),
             rewardingActionId: rewardingActionId,
             onCompleteNextLesson: onCompleteNextLesson,
+          onPassQuiz: onPassQuiz,
           ),
         const SizedBox(height: 22),
         const _SectionTitle(
@@ -504,116 +496,57 @@ class _AcademyFiltersCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 820;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: InputDecoration(
-                labelText: 'Rechercher cours, quiz, cas pratique',
-                prefixIcon: Icon(Icons.search_rounded),
-                suffixIcon: controller.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          controller.clear();
-                          onChanged();
-                        },
-                        icon: Icon(Icons.close_rounded),
-                        tooltip: 'Effacer',
-                      ),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _AcademyChoiceChip(
-                  label: 'Tous',
-                  selected: courseFilter == 'all',
-                  onSelected: () => onCourseFilterChanged('all'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Obligatoires',
-                  selected: courseFilter == 'required',
-                  onSelected: () => onCourseFilterChanged('required'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'En cours',
-                  selected: courseFilter == 'in_progress',
-                  onSelected: () => onCourseFilterChanged('in_progress'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Terminés',
-                  selected: courseFilter == 'completed',
-                  onSelected: () => onCourseFilterChanged('completed'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Tous niveaux',
-                  selected: levelFilter == 'all',
-                  onSelected: () => onLevelChanged('all'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Débutant',
-                  selected: levelFilter == 'debutant',
-                  onSelected: () => onLevelChanged('debutant'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Intermédiaire',
-                  selected: levelFilter == 'intermediaire',
-                  onSelected: () => onLevelChanged('intermediaire'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Avancé',
-                  selected: levelFilter == 'avance',
-                  onSelected: () => onLevelChanged('avance'),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Catégorie',
-                  onSelected: onCategoryChanged,
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'all',
-                      child: Text('Toutes les catégories'),
-                    ),
-                    for (final category in categories)
-                      PopupMenuItem(
-                        value: _academyKey(category),
-                        child: Text(category),
-                      ),
-                  ],
-                  child: Chip(
-                    avatar: Icon(Icons.tune_rounded, size: 16),
-                    label: Text(_academyCategoryLabel(categoryFilter)),
-                  ),
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, const SizedBox(height: 12), filters],
-            );
-          },
-        ),
-      ),
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+    final colors = Theme.of(context).colorScheme;
+    Widget menu(String label, List<(String, String)> values,
+        ValueChanged<String> changed) => PopupMenuButton<String>(
+      tooltip: label, onSelected: changed,
+      itemBuilder: (_) => [for (final value in values)
+        PopupMenuItem(value: value.$1, child: Text(value.$2))],
+      child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(color: colors.surfaceContainerLow,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [Expanded(child: Text(label)),
+          const Icon(Icons.keyboard_arrow_down_rounded, size: 20)])),
     );
-  }
+    final levels = <(String, String)>[('all', 'Tous niveaux'),
+      ('debutant', 'Débutant'), ('intermediaire', 'Intermédiaire'),
+      ('avance', 'Avancé'), ('responsable', 'Responsable')];
+    final levelLabel = levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ?? 'Tous niveaux';
+    final search = TextField(controller: controller, onChanged: (_) => onChanged(),
+      decoration: InputDecoration(hintText: 'Rechercher une formation…',
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: controller.text.isEmpty ? null : IconButton(
+          tooltip: 'Effacer', icon: const Icon(Icons.close_rounded),
+          onPressed: () { controller.clear(); onChanged(); })),
+    );
+    final statuses = Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final item in [('all', 'Tous'), ('required', 'Obligatoires'),
+          ('in_progress', 'En cours'), ('completed', 'Terminés')])
+        _AcademyChoiceChip(label: item.$2, selected: courseFilter == item.$1,
+          onSelected: () => onCourseFilterChanged(item.$1)),
+    ]);
+    final split = constraints.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(16) <= 24;
+    final menuWidth = split ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth;
+    if (constraints.maxWidth >= 1100 && MediaQuery.textScalerOf(context).scale(16) <= 18) {
+      return Row(children: [Expanded(child: search), const SizedBox(width: 12),
+        SizedBox(width: 350, child: statuses), const SizedBox(width: 12),
+        SizedBox(width: 145, child: menu(levelLabel, levels, onLevelChanged)),
+        const SizedBox(width: 8), SizedBox(width: 185, child: menu(_academyCategoryLabel(categoryFilter),
+          [('all', 'Toutes les catégories'), for (final c in categories) (_academyKey(c), c)], onCategoryChanged)),
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      search, const SizedBox(height: 10), statuses, const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        SizedBox(width: menuWidth, child: menu(levelLabel, levels, onLevelChanged)),
+        SizedBox(width: menuWidth, child: menu(_academyCategoryLabel(categoryFilter),
+          [('all', 'Toutes les catégories'), for (final c in categories) (_academyKey(c), c)],
+          onCategoryChanged)),
+      ]),
+    ]);
+  });
 }
 
 class _AcademyChoiceChip extends StatelessWidget {
@@ -632,7 +565,10 @@ class _AcademyChoiceChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
+      labelStyle: TextStyle(color: selected ? const Color(0xFF17212A) :
+          Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600),
+      showCheckmark: false,
       onSelected: (_) => onSelected(),
     );
   }
@@ -640,84 +576,64 @@ class _AcademyChoiceChip extends StatelessWidget {
 
 class _PathGrid extends StatelessWidget {
   final List<AcademyPathModel> paths;
-
   const _PathGrid({required this.paths});
-
   @override
   Widget build(BuildContext context) {
-    return _ResponsiveWrap(
-      minWidth: 280,
-      children: [for (final path in paths) _PathCard(path: path)],
-    );
+    if (paths.isEmpty) return const SizedBox.shrink();
+    final recommended = paths.where((p) => p.id == 'new-enacteur').firstOrNull ?? paths.first;
+    final others = paths.where((p) => p.id != recommended.id).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _PathCard(path: recommended),
+      if (others.isNotEmpty) ExpansionTile(title: const Text('Autres parcours'),
+        children: [for (final path in others) _PathCard(path: path)]),
+    ]);
   }
 }
 
 class _PathCard extends StatelessWidget {
   final AcademyPathModel path;
-
   const _PathCard({required this.path});
-
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AcademyArtwork(name: 'recommended_path', height: 100),
-            const SizedBox(height: 12),
-            Text(
-              path.title,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              path.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(
-              value: (path.progress / 100).clamp(0.0, 1.0),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(99),
-              color: AppTheme.enactusYellow,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.08),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '${path.progress.toStringAsFixed(0)}% complété · ${path.courseIds.length} formations',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.tonalIcon(
-              onPressed: path.courseIds.isEmpty
-                  ? null
-                  : () => context.go('/academy/paths/${path.id}'),
-              icon: const Icon(Icons.route_outlined),
-              label: const Text('Explorer le parcours'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Card(child: Padding(
+    padding: const EdgeInsets.all(14), child: LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 700;
+      final sideArt = constraints.maxWidth >= 270 && MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final action = OutlinedButton.icon(
+        onPressed: path.courseIds.isEmpty ? null : () => context.go('/academy/paths/${path.id}'),
+        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+        label: const Text('Explorer le parcours', textAlign: TextAlign.center));
+      final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(path.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 6),
+        if (wide) ...[Text(path.description), const SizedBox(height: 8)],
+        Text('${path.courseIds.length} formations · ${path.progress.toStringAsFixed(0)} % complété'),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(value: (path.progress / 100).clamp(0.0, 1.0),
+          minHeight: 6, color: AppTheme.enactusYellow,
+          borderRadius: BorderRadius.circular(99)),
+        if (!wide) ...[const SizedBox(height: 10), action],
+      ]);
+      if (!sideArt) return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [const AcademyArtwork(name: 'recommended_path', height: 85),
+          const SizedBox(height: 8), copy]);
+      return Row(children: [SizedBox(width: wide ? 150 : 88,
+        child: const AcademyArtwork(name: 'recommended_path', height: 100)),
+        const SizedBox(width: 14), Expanded(child: copy),
+        if (wide) ...[const SizedBox(width: 20), action],
+      ]);
+    }),
+  ));
 }
 
 class _CourseGrid extends StatelessWidget {
   final List<AcademyCourseModel> courses;
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
   final String? rewardingActionId;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
 
   const _CourseGrid({
     required this.courses,
+    required this.onPassQuiz,
     required this.rewardingActionId,
     required this.onCompleteNextLesson,
   });
@@ -736,6 +652,7 @@ class _CourseGrid extends StatelessWidget {
         for (final course in courses)
           _CourseCard(
             course: course,
+            onPassQuiz: onPassQuiz,
             busy: rewardingActionId == 'lesson-${course.id}',
             onCompleteNextLesson: onCompleteNextLesson,
           ),
@@ -748,124 +665,71 @@ class _CourseCard extends StatelessWidget {
   final AcademyCourseModel course;
   final bool busy;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
-
-  const _CourseCard({
-    required this.course,
-    required this.busy,
-    required this.onCompleteNextLesson,
-  });
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
+  const _CourseCard({required this.course, required this.busy,
+    required this.onCompleteNextLesson, required this.onPassQuiz});
 
   @override
-  Widget build(BuildContext context) {
-    final completed = course.lessons.where((lesson) => lesson.completed).length;
-    final done = completed == course.lessonCount;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AcademyArtwork(name: academyCourseArtwork(course.title, course.category), height: 125),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text(course.levelLabel)),
-                Chip(label: Text(course.category)),
-                if (course.isRequired) Chip(label: Text('Obligatoire')),
-                if (course.isLocked)
-                  const Chip(
-                    avatar: Icon(Icons.lock_outline, size: 18),
-                    label: Text('À débloquer'),
-                  ),
-                if (course.isMastered)
-                  const Chip(label: Text('Formation réussie')),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              course.title,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              course.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(
-              value: course.progress.clamp(0.0, 1.0),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(99),
-              color: AppTheme.enactusYellow,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.08),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text('${course.lessonCount} leçons')),
-                Chip(label: Text('${course.durationMinutes} min')),
-                Chip(label: Text('+${course.points} pts')),
-                Chip(label: Text('$completed/${course.lessonCount} fait')),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: () => context.go('/academy/courses/${course.id}'),
-                icon: Icon(Icons.open_in_new_rounded),
-                label: Text(
-                  course.isLocked
-                      ? 'Voir les prérequis'
-                      : 'Ouvrir la formation',
-                ),
-              ),
-            ),
-            if (course.isLocked) ...[
-              const SizedBox(height: 10),
-              Text(course.lockReason, style: const TextStyle(height: 1.5)),
-            ] else ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: busy ? null : () => onCompleteNextLesson(course),
-                  icon: busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          done ? Icons.check_rounded : Icons.play_arrow_rounded,
-                        ),
-                  label: Text(
-                    course.isMastered
-                        ? 'Relire les leçons'
-                        : done
-                        ? 'Passer le quiz'
-                        : 'Poursuivre les leçons',
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Card(child: Padding(
+    padding: const EdgeInsets.all(12), child: LayoutBuilder(builder: (context, constraints) {
+      final mobile = MediaQuery.sizeOf(context).width < 700;
+      final compact = mobile && constraints.maxWidth >= 270 &&
+          MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final colors = Theme.of(context).colorScheme;
+      final started = course.lessons.any((l) => l.started || l.completed);
+      final label = course.isLocked ? 'Voir les prérequis' : course.isMastered ? 'Relire' :
+          course.canTakeQuiz ? 'Passer le quiz' : started ? 'Reprendre' : 'Commencer';
+      final title = Text(course.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900));
+      final chips = Wrap(spacing: 6, runSpacing: 5, children: [
+        for (final text in [course.levelLabel, course.category, if (course.isRequired) 'Obligatoire'])
+          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(8)),
+            child: Text(text, style: TextStyle(fontSize: 11, color: colors.onSecondaryContainer))),
+      ]);
+      final progress = Column(children: [
+        LinearProgressIndicator(value: course.progress.clamp(0.0, 1.0), minHeight: 6,
+          color: AppTheme.enactusYellow, borderRadius: BorderRadius.circular(99)),
+        const SizedBox(height: 5), Align(alignment: Alignment.centerRight,
+          child: Text('${course.completedLessonCount}/${course.lessonCount} fait',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant))),
+      ]);
+      final action = FilledButton.icon(
+        style: FilledButton.styleFrom(backgroundColor: course.isLocked ? colors.secondaryContainer :
+          AppTheme.enactusYellow, foregroundColor: course.isLocked ? colors.onSecondaryContainer :
+          const Color(0xFF17212A)),
+        onPressed: busy ? null : () {
+          if (course.isLocked || course.isMastered) {
+            context.go('/academy/courses/${course.id}');
+          } else if (course.canTakeQuiz) {
+            onPassQuiz(course);
+          } else {
+            onCompleteNextLesson(course);
+          }
+        },
+        icon: Icon(course.isLocked ? Icons.lock_outline_rounded : Icons.arrow_forward_rounded, size: 17),
+        label: Text(label, textAlign: TextAlign.center),
+      );
+      final details = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        chips, const SizedBox(height: 8), title, const SizedBox(height: 6),
+        if (!compact) ...[Text(course.description, style: TextStyle(color: colors.onSurfaceVariant,
+          height: 1.4)), const SizedBox(height: 10)],
+        Text('${course.lessonCount} leçons · ${course.durationMinutes} min${compact ? '' : ' · +${course.points} pts'}',
+          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+        const SizedBox(height: 8), progress, const SizedBox(height: 8), action,
+      ]);
+      final image = Container(decoration: BoxDecoration(
+        color: colors.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12)),
+        child: AcademyArtwork(name: academyCourseArtwork(course.title, course.category),
+          height: compact ? 130 : 110));
+      if (compact) return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 88, child: image), const SizedBox(width: 12), Expanded(child: details),
+      ]);
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [image, const SizedBox(height: 12), details]);
+    }),
+  ));
 }
 
 class _QuizStrip extends StatelessWidget {
