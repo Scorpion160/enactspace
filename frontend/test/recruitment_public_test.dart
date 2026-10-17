@@ -364,7 +364,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         gateway.lastDraft?.knownEnactusFrom,
-        'Une présentation à l’ESP et Instagram.',
+        'Réseaux sociaux',
       );
       expect(gateway.lastDraft?.preferredPole, isNull);
       expect(gateway.lastDraft?.projectInterest, isNull);
