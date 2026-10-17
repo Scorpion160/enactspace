@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from uuid import UUID
 from datetime import date, datetime
 from typing import Optional, Literal
+from app.services.recruitment_application_metadata import academic_year, discovery_answer
 from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
 
 
@@ -219,6 +220,29 @@ class RecruitmentCampaignRead(RecruitmentCampaignPublicRead):
 
 
 class ApplicationCreate(BaseModel):
+    # Additive fields: canonical text is persisted in the existing columns.
+    # Older clients and historical records keep their original free text.
+    promotion_academic_year: Optional[str] = None
+    discovery_channel: Optional[str] = None
+    discovery_other: Optional[str] = None
+
+    @model_validator(mode="after")
+    def normalize_application_metadata(self):
+        if self.promotion_academic_year is not None:
+            year = academic_year(self.promotion_academic_year)
+            if self.class_name and self.class_name.strip() != year:
+                raise ValueError('La promotion et son année académique ne correspondent pas.')
+            self.promotion_academic_year = year
+            self.class_name = year
+        if self.discovery_channel is not None:
+            answer = discovery_answer(self.discovery_channel, self.discovery_other)
+            if self.known_enactus_from and self.known_enactus_from.strip() != answer:
+                raise ValueError('Le canal et sa description ne correspondent pas.')
+            self.known_enactus_from = answer
+        elif self.discovery_other:
+            raise ValueError('Choisis le canal Autre avant de préciser le moyen.')
+        return self
+
     questionnaire_answers: Optional[dict[str, str]] = None
     questionnaire_version: Optional[str] = None
     campaign_id: UUID

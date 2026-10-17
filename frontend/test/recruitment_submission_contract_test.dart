@@ -21,6 +21,8 @@ PublicApplicationDraft _draft(bool files) => PublicApplicationDraft(
   department: 'Génie Informatique',
   studyLevel: 'Master1',
   motivation: 'Apprendre et agir.',
+  className: '2025-2026',
+  knownEnactusFrom: 'Réseaux sociaux',
   cvFile: files
       ? SelectedAttachment(
           name: 'cv-qa.pdf',
@@ -77,6 +79,10 @@ void main() {
           client: MockClient((request) async {
             requests++;
             expect(request.method, 'POST');
+            expect(request.body, contains('promotion_academic_year'));
+            expect(request.body, contains('2025-2026'));
+            expect(request.body, contains('discovery_channel'));
+            expect(request.body, contains('social_media'));
             expect(
               request.url.path,
               files

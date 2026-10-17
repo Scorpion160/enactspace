@@ -3,6 +3,7 @@ import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/application_model.dart';
+import '../models/recruitment_application_metadata.dart';
 import '../models/application_review_model.dart';
 import '../models/application_tracking_model.dart';
 import '../models/recruitment_campaign_model.dart';
@@ -278,6 +279,12 @@ class RecruitmentService {
       'department': _nullIfEmpty(department),
       'study_level': _nullIfEmpty(studyLevel),
       'class_name': _nullIfEmpty(className),
+      if ((className ?? '').trim().isNotEmpty && promotionAcademicYearError(className) == null)
+        'promotion_academic_year': className!.trim(),
+      if (discoveryChannelCode(knownEnactusFrom) != null)
+        'discovery_channel': discoveryChannelCode(knownEnactusFrom),
+      if (discoveryChannelCode(knownEnactusFrom) == 'other')
+        'discovery_other': knownEnactusFrom!.trim().substring('Autre : '.length),
       'motivation': _nullIfEmpty(motivation),
       'known_enactus_from': _nullIfEmpty(knownEnactusFrom),
       'enactus_knowledge': _nullIfEmpty(enactusKnowledge),

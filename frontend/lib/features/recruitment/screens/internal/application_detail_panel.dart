@@ -307,8 +307,8 @@ class _DetailBody extends StatelessWidget {
               'Campagne': campaignTitle,
               'Statut': application.statusLabel,
               'Soumise le': _dateTime(application.createdAt),
-              'Département / classe':
-                  '${_value(application.department)} · ${_value(application.className)}',
+              'Département': _value(application.department),
+              'Promotion': _value(application.className),
               'Niveau': _value(application.studyLevel),
               if (!anonymized &&
                   application.knownEnactusFrom?.trim().isNotEmpty == true)

@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../models/application_model.dart';
 import '../../models/recruitment_question_model.dart';
 import '../../models/public_application_draft.dart';
+import '../../models/recruitment_application_metadata.dart';
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/public_recruitment_gateway.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
@@ -55,6 +56,7 @@ class _PublicApplicationFlowScreenState
   String? _submitError;
   PublicRecruitmentFailureKind? _submitFailureKind;
   String? _gender;
+  String? _discoveryChannel;
   SelectedAttachment? _cvFile, _motivationLetterFile, _attachmentFile;
 
   TextEditingController _controller(String key) =>
@@ -365,7 +367,18 @@ class _PublicApplicationFlowScreenState
           ),
         ],
       ),
-      _field('className', 'Classe ou promotion — facultatif'),
+      PublicApplicationField(
+        label: 'Promotion — facultatif',
+        help: 'Indique l’année académique de ta promotion, par exemple 2025-2026.',
+        child: TextFormField(
+          key: const ValueKey('field-className'),
+          controller: _controller('className'),
+          keyboardType: TextInputType.datetime,
+          maxLength: 9,
+          decoration: const InputDecoration(hintText: '2025-2026', errorMaxLines: 4),
+          validator: promotionAcademicYearError,
+        ),
+      ),
       _longField(
         'associativeExperience',
         'Expérience associative — facultatif',
@@ -374,11 +387,53 @@ class _PublicApplicationFlowScreenState
       if (!_campaign!.applicationQuestions.any(
         (q) => q.legacyField == 'known_enactus_from',
       ))
-        _longField(
-          'knownEnactusFrom',
-          'Comment as-tu connu Enactus ESP ?',
-          'Un ami, les réseaux sociaux, un événement, un cours… raconte-nous.',
+        _discoveryField(),
+    ],
+  );
+
+  Widget _discoveryField({bool requiredAnswer = false}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      PublicApplicationField(
+        label: 'Comment as-tu connu Enactus ESP ?${requiredAnswer ? ' *' : ''}',
+        help: 'Choisis le principal moyen par lequel tu nous as découverts.',
+        child: DropdownButtonFormField<String>(
+          key: const ValueKey('field-knownEnactusFrom'),
+          initialValue: _discoveryChannel,
+          isExpanded: true,
+          itemHeight: null,
+          decoration: const InputDecoration(hintText: 'Choisir un canal', errorMaxLines: 4),
+          selectedItemBuilder: (context) => [
+            for (final label in recruitmentDiscoveryChannels.values)
+              PublicApplicationChoiceText(label),
+          ],
+          items: [
+            for (final entry in recruitmentDiscoveryChannels.entries)
+              DropdownMenuItem(value: entry.key, child: Text(entry.value, softWrap: true)),
+          ],
+          validator: (value) => requiredAnswer && value == null
+              ? 'Choisis un canal pour continuer.' : null,
+          onChanged: (value) => setState(() {
+            _discoveryChannel = value;
+            _controller('knownEnactusFrom').text = discoveryAnswer(value, _text('discoveryOther'));
+          }),
         ),
+      ),
+      if (_discoveryChannel == 'other') ...[
+        const SizedBox(height: 14),
+        PublicApplicationField(
+          label: 'Précise cet autre moyen *',
+          child: TextFormField(
+            key: const ValueKey('field-discoveryOther'),
+            controller: _controller('discoveryOther'),
+            maxLength: 200,
+            decoration: const InputDecoration(errorMaxLines: 4),
+            onChanged: (value) => _controller('knownEnactusFrom').text = discoveryAnswer('other', value),
+            validator: (value) => (value ?? '').trim().isEmpty
+                ? 'Précise comment tu as connu Enactus ESP.' : null,
+          ),
+        ),
+      ],
     ],
   );
 
@@ -414,7 +469,9 @@ class _PublicApplicationFlowScreenState
             number: index + 1,
             total: questions.length,
             requiredAnswer: questions[index].required,
-            child: _longField(
+            child: questions[index].legacyField == 'known_enactus_from'
+                ? _discoveryField(requiredAnswer: questions[index].required)
+                : _longField(
               _questionKey(questions[index]),
               questions[index].label,
               questions[index].hint,
@@ -432,7 +489,7 @@ class _PublicApplicationFlowScreenState
 
   Widget _motivationStep() => _questionStep(
     'motivation',
-    'Parle-nous de toi et de ce qui te donne envie d’agir. Tes réponses restent en place si tu reviens en arrière.',
+    'Parle-nous de toi et de ce qui te donne envie d’agir.',
   );
 
   Widget _availabilityStep() => _questionStep(
@@ -495,7 +552,7 @@ class _PublicApplicationFlowScreenState
         lines: [
           _text('studyLevel'),
           _text('department'),
-          _text('className'),
+          'Promotion : ${_text('className').isEmpty ? 'Non renseignée' : _text('className')}',
           if (!_campaign!.applicationQuestions.any(
             (q) => q.legacyField == 'known_enactus_from',
           ))

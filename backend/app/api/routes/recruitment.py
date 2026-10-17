@@ -550,6 +550,13 @@ def create_application(payload, db, attachments=None, created_files=None):
             if q.get('legacy_field'):
                 setattr(payload, q['legacy_field'], answer or None)
 
+    # The questionnaire may also map a legacy discovery question. Re-check the
+    # canonical metadata after that mapping, before any application is stored.
+    try:
+        payload.normalize_application_metadata()
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
     application = Application(
         campaign_id=payload.campaign_id,
         first_name=first_name,
@@ -1686,3 +1693,4 @@ def convert_application_to_user(
         "project_id": str(payload.project_id) if payload.project_id else None,
         "onboarding": member_onboarding_payload(),
     }
+

@@ -849,7 +849,7 @@ class _RecruitmentFilters extends StatelessWidget {
                 _RecruitmentTextFilter(
                   width: textFilterWidth,
                   controller: classController,
-                  label: 'Classe',
+                  label: 'Promotion',
                   onSearch: onSearch,
                 ),
                 SizedBox(
@@ -2058,7 +2058,7 @@ class _CreateApplicationDialogState extends State<CreateApplicationDialog> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _classNameController,
-                  decoration: const InputDecoration(labelText: 'Classe'),
+                  decoration: const InputDecoration(labelText: 'Promotion (année académique)'),
                   validator: _requiredText,
                 ),
                 const SizedBox(height: 18),

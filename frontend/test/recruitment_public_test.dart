@@ -128,10 +128,13 @@ Future<void> _reachReview(WidgetTester tester) async {
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('field-preferredPole')), findsNothing);
   expect(find.byKey(const ValueKey('field-projectInterest')), findsNothing);
-  await tester.enterText(
-    find.byKey(const ValueKey('field-knownEnactusFrom')),
-    'Une présentation à l’ESP et Instagram.',
-  );
+  await tester.enterText(find.byKey(const ValueKey('field-className')), '2025-2026');
+  final discovery = find.byKey(const ValueKey('field-knownEnactusFrom'));
+  await tester.ensureVisible(discovery);
+  await tester.tap(discovery);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Réseaux sociaux').last);
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('application-next')));
   await tester.pump();
   await tester.enterText(
@@ -166,6 +169,30 @@ Future<void> _reachReview(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('another discovery channel requires detail and preserves it after returning', (tester) async {
+    await tester.pumpWidget(_app(PublicApplicationFlowScreen(
+      campaignId: _campaign.id, campaign: _campaign, gateway: _FakeGateway(),
+    )));
+    await _fillIdentity(tester);
+    final channel = find.byKey(const ValueKey('field-knownEnactusFrom'));
+    await tester.ensureVisible(channel);
+    await tester.tap(channel);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Autre').last);
+    await tester.pumpAndSettle();
+    final detail = find.byKey(const ValueKey('field-discoveryOther'));
+    expect(detail, findsOneWidget);
+    final form = tester.widget<Form>(find.byType(Form));
+    expect((form.key! as GlobalKey<FormState>).currentState!.validate(), isFalse);
+    await tester.enterText(detail, 'La radio du campus');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Retour'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('application-next')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(find.byKey(const ValueKey('field-discoveryOther'))).controller!.text,
+      'La radio du campus');
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('review edit preserves other answers and requires confirmation again', (tester) async {
     final gateway = _FakeGateway();
     await tester.pumpWidget(_app(PublicApplicationFlowScreen(

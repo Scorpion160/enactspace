@@ -293,7 +293,7 @@ class InternalFilterBar extends StatelessWidget {
                         ),
                         _TextFilter(
                           controller: classController,
-                          label: 'Classe',
+                          label: 'Promotion',
                         ),
                         _DateFilter(
                           label: 'Soumise à partir du',
