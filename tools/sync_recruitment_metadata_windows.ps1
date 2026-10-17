@@ -101,7 +101,7 @@ print('PROMOTION_ET_CANAUX_BACKEND_TESTS_OK_AUCUNE_MODIFICATION_PRODUCTION')
 '@
     $probe = $probe.Replace('CANDIDATE_BUNDLE', $data)
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($probe))
-    & ssh vps "printf '%s' '$encoded' | base64 -d | docker exec -i enactspace_backend python -"
+    $encoded | & ssh vps "tr -d '\r\n' | base64 -d | docker exec -i enactspace_backend python -"
     if ($LASTEXITCODE -ne 0) { throw 'Tests backend candidats echoues : aucune source locale remplacee.' }
     foreach ($item in $files) {
         $local = Join-Path $repo $item.Path
