@@ -96,6 +96,13 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
       return;
     }
     final amount = _enteredAmount!;
+    if (amount < 200) {
+      setState(() {
+        _error = 'Le paiement en ligne nécessite au moins 200 FCFA. '
+            'Sélectionnez plusieurs cotisations ou déclarez un paiement manuel.';
+      });
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -430,3 +437,4 @@ class _TransactionStatusCard extends StatelessWidget {
 }
 
 String _money(double amount) => '${amount.toStringAsFixed(0)} FCFA';
+

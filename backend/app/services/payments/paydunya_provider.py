@@ -89,7 +89,7 @@ def validated_checkout_url(value, token: str) -> str:
         url = urlsplit(value)
         expected = {"/checkout/invoice/" + token, "/sandbox-checkout/invoice/" + token}
         valid = (
-            url.scheme == "https" and url.hostname == "app.paydunya.com"
+            url.scheme == "https" and url.hostname in {"app.paydunya.com", "paydunya.com"}
             and url.port in {None, 443} and url.username is None and url.password is None
             and not url.fragment and unquote(url.path) in expected
         )
@@ -296,6 +296,13 @@ class PayDunyaProvider:
                 code="invalid_amount",
             )
 
+        if request.amount < 200:
+            raise PaymentProviderError(
+                "PayDunya minimum checkout amount is 200 XOF",
+                code="amount_below_minimum",
+                public_message="Le paiement en ligne nécessite au moins 200 FCFA. Vous pouvez regrouper vos cotisations ou déclarer un paiement manuel.",
+            )
+
         response = await self._request(
             "POST",
             "/checkout-invoice/create",
@@ -451,3 +458,4 @@ class PayDunyaProvider:
             code="refund_not_supported",
             public_message="Remboursement automatique indisponible. Traitement manuel requis.",
         )
+

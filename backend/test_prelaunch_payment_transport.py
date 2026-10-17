@@ -163,4 +163,40 @@ class PayDunyaTransportTests(unittest.TestCase):
                     asyncio.run(provider.verify_callback({"hash":hashlib.sha512(b"synthetic").hexdigest(),"invoice":invoice}))
             lookup.assert_not_awaited()
 
+class PayDunyaObservedContractTests(unittest.TestCase):
+    def test_both_official_checkout_hosts_preserve_invoice_identity(self):
+        for host in ("paydunya.com", "app.paydunya.com"):
+            for prefix in ("checkout", "sandbox-checkout"):
+                url = f"https://{host}/{prefix}/invoice/test_Token123"
+                self.assertEqual(module.validated_checkout_url(url, "test_Token123"), url)
+        for host in ("paydunya.com.evil.test", "evilpaydunya.com", "sub.paydunya.com"):
+            with self.assertRaises(PaymentProviderError):
+                module.validated_checkout_url(f"https://{host}/sandbox-checkout/invoice/test_Token123", "test_Token123")
+
+    def test_small_amount_is_refused_before_provider_request(self):
+        from unittest.mock import AsyncMock
+        provider = PayDunyaProvider()
+        for amount in (1, 100, 199):
+            request = PaymentProviderRequest(transaction_id="synthetic", amount=amount,
+                currency="XOF", description="Test", customer_name="Test")
+            with patch.object(provider, "_ensure_configured"), patch.object(provider, "_request", AsyncMock()) as network:
+                with self.assertRaises(PaymentProviderError) as caught:
+                    asyncio.run(provider.create_payment(request))
+                self.assertEqual(caught.exception.code, "amount_below_minimum")
+                network.assert_not_awaited()
+
+    def test_minimum_amount_and_actual_checkout_host_are_accepted(self):
+        from unittest.mock import AsyncMock
+        from uuid import uuid4
+        provider = PayDunyaProvider()
+        request = PaymentProviderRequest(transaction_id=str(uuid4()), amount=200,
+            currency="XOF", description="Test", customer_name="Test")
+        url = "https://paydunya.com/sandbox-checkout/invoice/test_Token123"
+        with patch.object(provider, "_ensure_configured"), patch.object(provider, "_request", AsyncMock(return_value={
+            "response_code": "00", "token": "test_Token123", "response_text": url
+        })):
+            result = asyncio.run(provider.create_payment(request))
+        self.assertEqual(result.checkout_url, url)
+
 if __name__=="__main__":unittest.main()
+
