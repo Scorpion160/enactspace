@@ -126,6 +126,8 @@ class PayDunyaProvider:
     def _headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "EnactSpace/1.0",
             "PAYDUNYA-MASTER-KEY": settings.PAYDUNYA_MASTER_KEY or "",
             "PAYDUNYA-PUBLIC-KEY": settings.PAYDUNYA_PUBLIC_KEY or "",
             "PAYDUNYA-PRIVATE-KEY": settings.PAYDUNYA_PRIVATE_KEY or "",

@@ -164,6 +164,12 @@ class PayDunyaTransportTests(unittest.TestCase):
             lookup.assert_not_awaited()
 
 class PayDunyaObservedContractTests(unittest.TestCase):
+    def test_provider_requests_identify_client_and_accept_json(self):
+        headers = PayDunyaProvider()._headers()
+        self.assertEqual(headers["Accept"], "application/json")
+        self.assertEqual(headers["User-Agent"], "EnactSpace/1.0")
+        self.assertEqual(headers["Content-Type"], "application/json")
+
     def test_both_official_checkout_hosts_preserve_invoice_identity(self):
         for host in ("paydunya.com", "app.paydunya.com"):
             for prefix in ("checkout", "sandbox-checkout"):
