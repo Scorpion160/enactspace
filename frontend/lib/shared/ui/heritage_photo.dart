@@ -73,7 +73,8 @@ HeritagePhotoData? heritagePhotoFor(String subject) {
 class HeritagePhoto extends StatelessWidget {
   final HeritagePhotoData photo;
   final double height;
-  const HeritagePhoto({super.key, required this.photo, this.height = 240});
+  final bool showCaption;
+  const HeritagePhoto({super.key, required this.photo, this.height = 240, this.showCaption = true});
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +109,14 @@ class HeritagePhoto extends StatelessWidget {
                         ),
                         Padding(
                           padding: const EdgeInsets.all(20),
-                          child: Text(
-                            photo.caption,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(height: 1.5),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(photo.caption, textAlign: TextAlign.center, style: const TextStyle(height: 1.5)),
+                              const SizedBox(height: 4),
+                              Text('Source : Photothèque Enactus ESP', textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodySmall),
+                            ],
                           ),
                         ),
                       ],
@@ -143,6 +148,7 @@ class HeritagePhoto extends StatelessWidget {
             ),
           ),
         ),
+        if (showCaption) ...[
         const SizedBox(height: 10),
         Text(
           photo.caption,
@@ -153,6 +159,7 @@ class HeritagePhoto extends StatelessWidget {
           'Source : Photothèque Enactus ESP',
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        ],
       ],
     );
   }

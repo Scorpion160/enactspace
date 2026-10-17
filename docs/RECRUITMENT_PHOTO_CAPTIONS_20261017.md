@@ -1,0 +1,7 @@
+# Photographies de la page Postuler — 17 octobre 2026
+
+À partir des captures fournies (mobile et web), les légendes sous les images surchargeaient les cartes. HeritagePhoto propose désormais showCaption, vrai par défaut. La page Postuler passe faux pour ses cinq photographies (composition et trois cartes). La légende et la mention Source : Photothèque Enactus ESP apparaissent dans la vue agrandie au clic, tout en conservant les libellés d’accessibilité. Les autres pages gardent leurs légendes visibles.
+
+Les trois cartes reprennent les intitulés et textes courts de la maquette. À largeur mobile suffisante elles alignent image et texte sans colonne de légende. À très petite largeur ou texte agrandi elles restent verticales. Le parcours explicatif est regroupé dans un bandeau de trois colonnes sur ordinateur et une colonne sur mobile. Il ne représente pas une progression personnelle.
+
+Le lot précédent a passé analyse et 62 tests sur Windows. Pour ce lot, exécuter tools/sync_recruitment_photos_windows.ps1 : comparaison de sources, sauvegarde, analyse, tests du parcours, landing et photos. Deux tests ajoutés vérifient les légendes masquées, leur affichage avec la source dans la vue agrandie, la fermeture, et la conservation du comportement par défaut sur les autres pages. Le SDK Flutter est absent de l’environnement de préparation ; ces nouveaux tests restent à exécuter sur Windows. Aucun build ni déploiement.

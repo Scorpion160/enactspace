@@ -71,11 +71,13 @@ class _LandingPhotoComposition extends StatelessWidget {
       decoration: BoxDecoration(color: const Color(0xFFFFD34D), borderRadius: BorderRadius.circular(32)),
     )),
     Padding(padding: EdgeInsets.fromLTRB(0, 12, 14, wide ? 110 : 0), child: HeritagePhoto(
+      showCaption: false,
       photo: const HeritagePhotoData('resources/hafe-collectif-2022', 'Enactus ESP et les communautés à Haffé, en 2022.'),
       height: wide ? 360 : 220,
     )),
     if (wide) Positioned(bottom: 0, right: 0, child: SizedBox(width: 270,
       child: Card(elevation: 4, child: Padding(padding: const EdgeInsets.all(6), child: HeritagePhoto(
+      showCaption: false,
         photo: const HeritagePhotoData('haffe-2025-ecoute', 'Des idées qui prennent vie sur le terrain.'), height: 145,
       ))),
     )),
@@ -89,11 +91,11 @@ class RecruitmentWelcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     const stories = [
-      ('Agir avec les communautés', 'Écoute les personnes concernées et construis avec elles des réponses à leurs besoins.',
+      ('Écouter pour mieux agir', 'Comprendre les besoins, au contact du terrain.',
         HeritagePhotoData('haffe-2025-ecoute', 'À Haffé, écouter pour mieux comprendre.')),
-      ('Donner vie à tes idées', 'Propose, teste et fais évoluer des projets au contact du terrain.',
+      ('Donner vie aux idées', 'Construire et tester des solutions utiles.',
         HeritagePhotoData('dimbali-gie-favec', 'Dimbali et les femmes du GIE FAVEC.')),
-      ('Apprendre en équipe', 'Développe tes compétences et partage des expériences avec les enacteurs et enactrices.',
+      ('Trouver ta place dans l’équipe', 'Apprendre et avancer avec les autres.',
         HeritagePhotoData('polytech-innovation-2025', 'Polytech Innovation, en 2025.')),
     ];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -114,12 +116,23 @@ class RecruitmentWelcome extends StatelessWidget {
       const SizedBox(height: 30),
       Text('Comment ça se passe ?', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: 16),
-      const _JourneyStep(number: '01', title: 'Raconte-nous ton parcours',
-        text: 'Choisis une campagne ouverte et complète ta candidature. Relis tes réponses avant de les envoyer.'),
-      const _JourneyStep(number: '02', title: 'L’équipe étudie ton dossier',
-        text: 'Ton dossier est examiné par les personnes chargées du recrutement. Les prochaines étapes dépendent de la campagne.'),
-      const _JourneyStep(number: '03', title: 'Suis les prochaines étapes',
-        text: 'Conserve ton code de suivi pour consulter les informations et les éventuelles invitations à un entretien.'),
+      LayoutBuilder(builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900 && MediaQuery.textScalerOf(context).scale(16) <= 24 ? 3 : 1;
+        const steps = [
+          ('01', 'Choisis ta campagne', 'Découvre les candidatures ouvertes.'),
+          ('02', 'Raconte ton parcours', 'Partage tes motivations et tes expériences.'),
+          ('03', 'Suis ta candidature', 'Consulte les prochaines étapes avec ton code de suivi.'),
+        ];
+        return Card(child: Padding(padding: const EdgeInsets.all(18),
+          child: LayoutBuilder(builder: (context, inner) {
+            final itemWidth = columns == 1 ? inner.maxWidth : (inner.maxWidth - 24 * (columns - 1)) / columns;
+            return Wrap(spacing: 24, runSpacing: 12, children: [
+              for (final step in steps)
+                SizedBox(width: itemWidth, child: _JourneyStep(number: step.$1, title: step.$2, text: step.$3)),
+            ]);
+          }),
+        ));
+      }),
       const SizedBox(height: 16),
       Container(padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(20)),
@@ -148,8 +161,11 @@ class _JourneyStep extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 18),
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      ExcludeSemantics(child: Text(number, style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w800))),
+      ExcludeSemantics(child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer, shape: BoxShape.circle),
+        child: Text(number, style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: Theme.of(context).colorScheme.onSecondaryContainer, fontWeight: FontWeight.w800)))),
       const SizedBox(width: 16),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
@@ -180,19 +196,19 @@ class _LandingStory extends StatelessWidget {
   Widget build(BuildContext context) => Card(child: Padding(
     padding: const EdgeInsets.all(12),
     child: LayoutBuilder(builder: (context, constraints) {
-      final compact = horizontal && constraints.maxWidth >= 310 && MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final compact = horizontal && constraints.maxWidth >= 270 && MediaQuery.textScalerOf(context).scale(16) <= 24;
       final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 8), Text(text, style: const TextStyle(height: 1.5)),
       ]);
       if (compact) {
         return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          SizedBox(width: 115, child: HeritagePhoto(photo: photo, height: 105)),
+          SizedBox(width: 115, child: HeritagePhoto(showCaption: false, photo: photo, height: 105)),
           const SizedBox(width: 14), Expanded(child: copy),
         ]);
       }
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        HeritagePhoto(photo: photo, height: horizontal ? 145 : 160),
+        HeritagePhoto(showCaption: false, photo: photo, height: horizontal ? 145 : 160),
         const SizedBox(height: 14), copy,
       ]);
     }),
