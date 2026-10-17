@@ -421,7 +421,7 @@ void main() {
       find.text('Aucune campagne n’est ouverte pour le moment'),
       findsOneWidget,
     );
-    expect(find.text('Suivre une candidature'), findsWidgets);
+    expect(find.text('Suivre ma candidature'), findsWidgets);
   });
 
   testWidgets('campaign discovery has a distinct loading error', (

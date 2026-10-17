@@ -79,12 +79,12 @@ class CampaignPublicCard extends StatelessWidget {
                   _Fact(
                     icon: Icons.date_range_outlined,
                     label: 'Période',
-                    value: campaign.periodLabel,
+                    value: _campaignPeriod(campaign),
                   ),
                   _Fact(
                     icon: Icons.event_available_outlined,
                     label: 'Date limite',
-                    value: campaign.endDate ?? 'À confirmer',
+                    value: _campaignDate(campaign.endDate) ?? 'À confirmer',
                   ),
                 ],
               ),
@@ -106,6 +106,23 @@ class CampaignPublicCard extends StatelessWidget {
   }
 }
 
+String? _campaignDate(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) return null;
+  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _campaignPeriod(RecruitmentCampaignModel campaign) {
+  final start = _campaignDate(campaign.startDate);
+  final end = _campaignDate(campaign.endDate);
+  if (start == null && end == null) return 'Dates à confirmer';
+  if (start == null) return 'Jusqu’au $end';
+  if (end == null) return 'À partir du $start';
+  return 'Du $start au $end';
+}
+
 class _Fact extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -118,7 +135,7 @@ class _Fact extends StatelessWidget {
     children: [
       Icon(icon, size: 20),
       const SizedBox(width: 8),
-      Text('$label : $value'),
+      Flexible(child: Text('$label : $value', softWrap: true)),
     ],
   );
 }

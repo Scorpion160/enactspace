@@ -74,92 +74,61 @@ class _CampaignLoadingState extends StatelessWidget {
 
 class _CampaignList extends StatelessWidget {
   final List<RecruitmentCampaignModel> campaigns;
-  const _CampaignList({required this.campaigns});
+  final _campaignsKey = GlobalKey();
+  _CampaignList({required this.campaigns});
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
-        vertical: 32,
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  TextButton.icon(
-                    onPressed: () => context.go('/login'),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Retour à la connexion'),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => context.go('/application-tracking'),
-                    icon: const Icon(Icons.search_rounded),
-                    label: const Text('Suivre ma candidature'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Rejoins le mouvement',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Découvre les campagnes ouvertes et choisis celle qui correspond à ton envie d’agir avec Enactus ESP.',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 16,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 28),
-              const RecruitmentWelcome(),
-              if (campaigns.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Aucune campagne n’est ouverte pour le moment',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            height: 1.6,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Reviens ici pour découvrir les prochaines candidatures ; ton suivi reste disponible si tu as déjà postulé.',
-                          style: TextStyle(height: 1.6),
-                        ),
-                        TextButton(
-                          onPressed: () => context.go('/application-tracking'),
-                          child: const Text('Suivre une candidature'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              for (var index = 0; index < campaigns.length; index++) ...[
-                CampaignPublicCard(
-                  campaign: campaigns[index],
-                  onStart: () =>
-                      context.go('/recruitment/apply/${campaigns[index].id}'),
-                ),
-                if (index < campaigns.length - 1) const SizedBox(height: 16),
-              ],
-            ],
-          ),
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: EdgeInsets.symmetric(
+      horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+      vertical: 24,
+    ),
+    child: Center(child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1040),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        RecruitmentLandingHero(
+          hasCampaigns: campaigns.isNotEmpty,
+          onDiscover: () {
+            final target = _campaignsKey.currentContext;
+            if (target != null) {
+              Scrollable.ensureVisible(target,
+                duration: Duration(milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 250),
+                alignment: 0,
+              );
+            }
+          },
+          onTrack: () => context.go('/application-tracking'),
         ),
-      ),
-    );
-  }
+        const SizedBox(height: 28),
+        Semantics(
+          key: _campaignsKey,
+          header: true,
+          child: Text('Les candidatures ouvertes',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+        ),
+        const SizedBox(height: 16),
+        if (campaigns.isEmpty)
+          const Card(child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Aucune campagne n’est ouverte pour le moment',
+                style: TextStyle(fontWeight: FontWeight.w700, height: 1.6)),
+              SizedBox(height: 8),
+              Text('Reviens ici pour découvrir les prochaines candidatures. Si tu as déjà postulé, ton suivi reste disponible.',
+                style: TextStyle(height: 1.6)),
+            ]),
+          )),
+        for (var index = 0; index < campaigns.length; index++) ...[
+          CampaignPublicCard(
+            campaign: campaigns[index],
+            onStart: () => context.go('/recruitment/apply/${campaigns[index].id}'),
+          ),
+          if (index < campaigns.length - 1) const SizedBox(height: 16),
+        ],
+        const SizedBox(height: 36),
+        const RecruitmentWelcome(),
+        const SizedBox(height: 28),
+      ]),
+    )),
+  );
 }
