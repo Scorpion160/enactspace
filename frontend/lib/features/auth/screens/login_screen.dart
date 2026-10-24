@@ -1,3 +1,5 @@
+import '../../demo/demo_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -73,8 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!authenticated) {
         if (mounted) {
           setState(
-            () => _error =
-                'Déverrouillage annulé. Réessaie avec la biométrie ou utilise ton mot de passe.',
+            () => _error = 'Déverrouillage annulé. Réessaie avec la biométrie ou utilise ton mot de passe.',
           );
         }
         return;
@@ -86,15 +87,13 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         setState(() {
           _biometricAvailable = false;
-          _error =
-              'La session sécurisée a expiré. Connecte-toi une fois avec ton mot de passe.';
+          _error = 'La session sécurisée a expiré. Connecte-toi une fois avec ton mot de passe.';
         });
       }
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error =
-              'Authentification biométrique indisponible. Utilise ton mot de passe.',
+          () => _error = 'Authentification biométrique indisponible. Utilise ton mot de passe.',
         );
       }
     } finally {
@@ -326,6 +325,8 @@ class _LoginPanel extends StatelessWidget {
                     height: MediaQuery.sizeOf(context).width >= 600 ? 18 : 14,
                   ),
                 ],
+                const DemoLoginEntry(),
+                const SizedBox(height: 16),
                 AppDataCard(
                   padding: EdgeInsets.all(
                     MediaQuery.sizeOf(context).width < 420 ? 16 : 24,
@@ -785,8 +786,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     ];
     if (requiredFields.any((value) => value.isEmpty)) {
       setState(
-        () => _error =
-            'Prénom, nom, nom d’utilisateur, genre, email, téléphone, département et niveau sont obligatoires.',
+        () => _error = 'Prénom, nom, nom d’utilisateur, genre, email, téléphone, département et niveau sont obligatoires.',
       );
       return;
     }
@@ -797,8 +797,7 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
           _joinYearController.text.trim(),
         ].any((value) => value.isEmpty)) {
       setState(
-        () => _error =
-            'Pour un Alumni, département, année d’entrée et année d’arrivée dans Enactus ESP sont obligatoires.',
+        () => _error = 'Pour un Alumni, département, année d’entrée et année d’arrivée dans Enactus ESP sont obligatoires.',
       );
       return;
     }
@@ -1187,26 +1186,22 @@ class _BeginnerGuideDialog extends StatelessWidget {
       _GuideItem(
         icon: Icons.dynamic_feed_rounded,
         title: 'Fil d’actualité',
-        body:
-            'Suis les annonces officielles, réactions, commentaires et posts épinglés.',
+        body: 'Suis les annonces officielles, réactions, commentaires et posts épinglés.',
       ),
       _GuideItem(
         icon: Icons.chat_bubble_rounded,
         title: 'Chat interne',
-        body:
-            'Discute en privé, par pôle, projet ou groupe avec médias et messages importants.',
+        body: 'Discute en privé, par pôle, projet ou groupe avec médias et messages importants.',
       ),
       _GuideItem(
         icon: Icons.assignment_turned_in_rounded,
         title: 'Travail d’équipe',
-        body:
-            'Retrouve tâches, présences, documents, projets, événements et objectifs.',
+        body: 'Retrouve tâches, présences, documents, projets, événements et objectifs.',
       ),
       _GuideItem(
         icon: Icons.privacy_tip_rounded,
         title: 'Accès adapté',
-        body:
-            'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
+        body: 'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
       ),
     ];
 
@@ -1284,9 +1279,8 @@ class _PublicDialogTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(
-        context,
-      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+      style: Theme.of(context).textTheme.titleLarge
+          ?.copyWith(fontWeight: FontWeight.w900),
     );
   }
 }

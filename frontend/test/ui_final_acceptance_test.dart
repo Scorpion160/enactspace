@@ -33,11 +33,15 @@ void main() {
   group('matrice routes', () {
     test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
-      final declared = RegExp(
-        r"path:\s*'([^']+)'",
-      ).allMatches(source).map((match) => match.group(1)!).toList();
+      final declared = RegExp(r"path:\s*'([^']+)'")
+          .allMatches(source)
+          .map((match) => match.group(1)!)
+          .toList();
 
       const expectedRoutes = [
+        '/demo',
+        '/demo/enacteur',
+        '/demo/alumni',
         '/help-guide',
         '/welcome-help',
         '/activate',
@@ -109,6 +113,9 @@ void main() {
 
     test('les routes publiques restent strictement bornées', () {
       for (final path in const [
+        '/demo',
+        '/demo/enacteur',
+        '/demo/alumni',
         '/splash',
         '/login',
         '/application-tracking',
@@ -121,6 +128,8 @@ void main() {
         expect(AppRouter.isPublicPath(path), isTrue, reason: path);
       }
       for (final path in const [
+        '/demo/admin',
+        '/democracy',
         '/dashboard',
         '/tasks/task-1',
         '/veille/records/task/task-1',
@@ -351,9 +360,8 @@ void main() {
     test(
       'le drawer reste le point d’entrée de toutes les routes autorisées',
       () {
-        final source = File(
-          'lib/shared/layout/app_shell.dart',
-        ).readAsStringSync();
+        final source = File('lib/shared/layout/app_shell.dart')
+            .readAsStringSync();
         expect(source, contains('drawer: Drawer('));
         for (final path in const [
           '/attendance',
@@ -653,9 +661,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(2)),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2)),
             child: child!,
           ),
           home: Scaffold(
@@ -695,9 +702,8 @@ void main() {
     });
 
     test('les commandes Chat ambiguës disposent de tooltips', () {
-      final source = File(
-        'lib/features/chat/screens/chat_screen.dart',
-      ).readAsStringSync();
+      final source = File('lib/features/chat/screens/chat_screen.dart')
+          .readAsStringSync();
       expect(source, contains("tooltip: 'Annuler la réponse'"));
       expect(
         RegExp("tooltip: 'Rechercher des membres'").allMatches(source),
@@ -738,9 +744,8 @@ Future<void> _pumpScaled(
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, content) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: const TextScaler.linear(2)),
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(2)),
         child: content!,
       ),
       home: scaffold ? Scaffold(body: child) : child,

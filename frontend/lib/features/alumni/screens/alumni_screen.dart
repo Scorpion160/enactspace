@@ -1,6 +1,9 @@
 // ignore_for_file: unused_element
 
 import 'package:flutter/material.dart';
+
+import '../widgets/alumni_community_hero.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -197,8 +200,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
             content: Text(
               alumniErrorMessage(
                 error,
-                fallback:
-                    'Impossible de mettre à jour le mentorat. Réessayez dans quelques instants.',
+                fallback: 'Impossible de mettre à jour le mentorat. Réessayez dans quelques instants.',
               ),
             ),
           ),
@@ -341,59 +343,31 @@ class _AlumniHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 860;
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(28),
+  Widget build(BuildContext context) => AlumniCommunityHero(
+    total: total,
+    mentors: mentors,
+    activeMentorships: activeMentorships,
+    onMemories: () => context.go('/archives'),
+    actions: [
+      IconButton.filledTonal(
+        tooltip: 'Actualiser l’annuaire',
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
       ),
-      child: isWide
-          ? Row(
-              children: [
-                const _HeaderIcon(),
-                SizedBox(width: 18),
-                Expanded(
-                  child: _HeaderText(
-                    total: total,
-                    mentors: mentors,
-                    activeMentorships: activeMentorships,
-                  ),
-                ),
-                SizedBox(width: 18),
-                _HeaderActions(
-                  onCreateProfile: onCreateProfile,
-                  onCreateMentorship: onCreateMentorship,
-                  onRefresh: onRefresh,
-                  canCreateProfile: canCreateProfile,
-                  canCreateMentorship: canCreateMentorship,
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _HeaderIcon(),
-                SizedBox(height: 18),
-                _HeaderText(
-                  total: total,
-                  mentors: mentors,
-                  activeMentorships: activeMentorships,
-                ),
-                SizedBox(height: 18),
-                _HeaderActions(
-                  onCreateProfile: onCreateProfile,
-                  onCreateMentorship: onCreateMentorship,
-                  onRefresh: onRefresh,
-                  canCreateProfile: canCreateProfile,
-                  canCreateMentorship: canCreateMentorship,
-                ),
-              ],
-            ),
-    );
-  }
+      if (canCreateProfile)
+        FilledButton.tonalIcon(
+          onPressed: onCreateProfile,
+          icon: const Icon(Icons.person_add_alt_1_outlined),
+          label: const Text('Créer un profil'),
+        ),
+      if (canCreateMentorship)
+        FilledButton.tonalIcon(
+          onPressed: onCreateMentorship,
+          icon: const Icon(Icons.handshake_outlined),
+          label: const Text('Créer un mentorat'),
+        ),
+    ],
+  );
 }
 
 class _HeaderIcon extends StatelessWidget {
@@ -764,9 +738,9 @@ class _ProfileCard extends StatelessWidget {
                           ),
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                         ),
                       ],

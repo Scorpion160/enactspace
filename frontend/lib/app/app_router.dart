@@ -1,3 +1,6 @@
+import '../features/demo/demo_screen.dart';
+import '../features/demo/demo_session.dart';
+
 import 'package:flutter/material.dart';
 
 import '../features/veille/screens/veille_screen.dart';
@@ -84,6 +87,12 @@ class AppRouter {
     refreshListenable: AuthStorage.instance.sessionChanges,
     errorBuilder: (context, state) => const _RouteNotFoundScreen(),
     redirect: (context, state) async {
+      // Public demo has its own ephemeral state and never enters authenticated shells.
+      if (state.matchedLocation == '/demo' ||
+          state.matchedLocation == '/demo/enacteur' ||
+          state.matchedLocation == '/demo/alumni') {
+        return null;
+      }
       final loggedIn = await _authService.isLoggedIn();
       final publicPath = isPublicPath(state.matchedLocation);
       final goingToLogin = state.matchedLocation == '/login';
@@ -132,6 +141,21 @@ class AppRouter {
       return null;
     },
     routes: [
+      GoRoute(path: '/demo', builder: (context, state) => const DemoScreen()),
+      GoRoute(
+        path: '/demo/enacteur',
+        builder: (context, state) => DemoScreen(
+          profile: DemoProfile.enacteur,
+          initialSection: state.uri.queryParameters['section'] ?? 'home',
+        ),
+      ),
+      GoRoute(
+        path: '/demo/alumni',
+        builder: (context, state) => DemoScreen(
+          profile: DemoProfile.alumni,
+          initialSection: state.uri.queryParameters['section'] ?? 'home',
+        ),
+      ),
       GoRoute(
         path: '/help-guide',
         builder: (context, state) => const HelpGuideScreen(),
@@ -615,7 +639,10 @@ class AppRouter {
   );
 
   static bool isPublicPath(String path) {
-    return path == '/splash' ||
+    return path == '/demo' ||
+        path == '/demo/enacteur' ||
+        path == '/demo/alumni' ||
+        path == '/splash' ||
         path == '/login' ||
         path == '/activate' ||
         path == '/legal/privacy' ||
