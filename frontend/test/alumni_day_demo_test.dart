@@ -95,8 +95,9 @@ void main() {
       if (path == '/login' ||
           path == '/splash' ||
           path == '/demo' ||
-          path.startsWith('/demo/'))
+          path.startsWith('/demo/')) {
         continue;
+      }
       final module = demoModuleForPath(path);
       expect(module, isNotNull, reason: 'Missing demo for $path');
       expect(ids, contains(module), reason: path);
@@ -398,8 +399,9 @@ void main() {
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.navigation,
         (call) async {
-          if (call.method == 'routeInformationUpdated')
+          if (call.method == 'routeInformationUpdated') {
             reports.add(call.arguments.toString());
+          }
           return null;
         },
       );

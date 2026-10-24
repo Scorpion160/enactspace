@@ -272,8 +272,9 @@ const demoModuleRoutes = <String, String>{
 String? demoModuleForPath(String path) {
   final clean = Uri.parse(path).path;
   for (final entry in demoModuleRoutes.entries) {
-    if (clean == entry.key || clean.startsWith('${entry.key}/'))
+    if (clean == entry.key || clean.startsWith('${entry.key}/')) {
       return entry.value;
+    }
   }
   return null;
 }

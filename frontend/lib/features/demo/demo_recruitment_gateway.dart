@@ -67,8 +67,9 @@ class DemoRecruitmentGateway extends ChangeNotifier
   }
 
   void changeStatus(String candidate, String status) {
-    if (!statuses.containsKey(candidate) || !statusLabels.containsKey(status))
+    if (!statuses.containsKey(candidate) || !statusLabels.containsKey(status)) {
       return;
+    }
     statuses[candidate] = status;
     notifyListeners();
   }
