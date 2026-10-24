@@ -11,6 +11,7 @@ import 'demo_session.dart';
 import 'demo_widgets.dart';
 import 'demo_recruitment.dart';
 import 'demo_poles.dart';
+import 'demo_heritage_data.dart';
 
 class DemoLoginEntry extends StatelessWidget {
   const DemoLoginEntry({super.key});
@@ -71,7 +72,7 @@ class _DemoScreenState extends State<DemoScreen> {
   bool? dark;
   String query = '';
   String year = 'Tout';
-  late final Future<List<Map<String, dynamic>>> memories;
+  final List<Map<String, dynamic>> memories = demoHeritage;
   final scroll = ScrollController();
 
   @override
@@ -80,13 +81,6 @@ class _DemoScreenState extends State<DemoScreen> {
     session = DemoSession(widget.profile ?? DemoProfile.alumni)
       ..addListener(_refresh);
     section = _safeSection(widget.initialSection);
-    memories = rootBundle
-        .loadString('assets/img/alumni_day_heritage.json')
-        .then(
-          (raw) => (jsonDecode(raw) as List)
-              .map((value) => Map<String, dynamic>.from(value as Map))
-              .toList(),
-        );
   }
 
   String _safeSection(String value) =>
@@ -636,20 +630,9 @@ class _DemoScreenState extends State<DemoScreen> {
         ],
       ),
       const SizedBox(height: 18),
-      FutureBuilder<List<Map<String, dynamic>>>(
-        future: memories,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const DemoPanel(
-              child: Text(
-                'Les photos n’ont pas pu être chargées. Revenez à l’accueil puis réessayez.',
-              ),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final rows = snapshot.data!.where((row) {
+      Builder(
+        builder: (context) {
+          final rows = memories.where((row) {
             final matches =
                 '${row['title']} ${row['description']} ${row['year'] ?? ''}'
                     .toLowerCase()

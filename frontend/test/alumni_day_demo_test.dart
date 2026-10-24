@@ -11,6 +11,7 @@ import 'package:frontend/features/demo/demo_screen.dart';
 import 'package:frontend/features/demo/demo_session.dart';
 import 'package:frontend/features/demo/demo_recruitment.dart';
 import 'package:frontend/features/demo/demo_recruitment_gateway.dart';
+import 'package:frontend/features/demo/demo_heritage_data.dart';
 import 'package:frontend/features/recruitment/models/public_application_draft.dart';
 import 'package:frontend/features/recruitment/screens/public/public_application_flow_screen.dart';
 
@@ -35,10 +36,6 @@ Future<void> _mount(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  // Asset I/O must finish in the real async zone before settling animation time.
-  await tester.runAsync(
-    () => rootBundle.loadString('assets/img/alumni_day_heritage.json'),
-  );
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(
@@ -207,6 +204,11 @@ void main() {
       final rows = jsonDecode(
         await rootBundle.loadString('assets/img/alumni_day_heritage.json'),
       ) as List;
+      expect(
+        demoHeritage,
+        equals(rows),
+        reason: 'Compiled metadata must match the bundled public catalog.',
+      );
       expect(rows, hasLength(40));
       expect(rows.map((r) => r['id']).toSet(), hasLength(40));
       for (final raw in rows) {
@@ -395,6 +397,19 @@ void main() {
     (tester) async {
       final gateway = DemoRecruitmentGateway();
       addTearDown(gateway.dispose);
+      final outer = GoRouter(
+        initialLocation: '/demo/alumni',
+        overridePlatformDefaultLocation: true,
+        routes: [
+          GoRoute(
+            path: '/demo/alumni',
+            builder: (_, _) => Scaffold(
+              body: DemoRecruitmentExperience(gateway: gateway, onClose: () {}),
+            ),
+          ),
+        ],
+      );
+      addTearDown(outer.dispose);
       final reports = <String>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.navigation,
@@ -411,14 +426,12 @@ void main() {
           null,
         ),
       );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DemoRecruitmentExperience(gateway: gateway, onClose: () {}),
-          ),
-        ),
-      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: outer));
       await tester.pumpAndSettle();
+      // The outer app is expected to report its initial /demo/alumni location.
+      // Only subsequent changes from the nested recruitment flow are forbidden.
+      expect(outer.routeInformationProvider.value.uri.path, '/demo/alumni');
+      reports.clear();
       await _tap(tester, find.text('Commencer ma candidature'));
       final flow = tester.widget<PublicApplicationFlowScreen>(
         find.byType(PublicApplicationFlowScreen),
@@ -426,6 +439,7 @@ void main() {
       expect(identical(flow.gateway, gateway), isTrue);
       expect(flow.demoMode, isTrue);
       expect(find.text('Étape 1 sur 6'), findsOneWidget);
+      expect(outer.routeInformationProvider.value.uri.path, '/demo/alumni');
       expect(reports, isEmpty);
       expect(tester.takeException(), isNull);
     },
@@ -441,18 +455,24 @@ void main() {
       );
       final gateway = DemoRecruitmentGateway();
       addTearDown(gateway.dispose);
-      await tester.pumpWidget(
-        MaterialApp(
-          initialRoute: '/',
-          home: Scaffold(
-            body: DemoRecruitmentExperience(
-              gateway: gateway,
-              initialLocation: '/recruitment/apply/demo-alumni-day',
-              onClose: () {},
+      final outer = GoRouter(
+        initialLocation: '/demo/alumni',
+        overridePlatformDefaultLocation: true,
+        routes: [
+          GoRoute(
+            path: '/demo/alumni',
+            builder: (_, _) => Scaffold(
+              body: DemoRecruitmentExperience(
+                gateway: gateway,
+                initialLocation: '/recruitment/apply/demo-alumni-day',
+                onClose: () {},
+              ),
             ),
           ),
-        ),
+        ],
       );
+      addTearDown(outer.dispose);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: outer));
       await tester.pumpAndSettle();
       for (var i = 0; i < 5; i++) {
         await _tap(tester, find.byKey(const ValueKey('application-next')));
@@ -465,6 +485,7 @@ void main() {
       expect(find.text(DemoRecruitmentGateway.code), findsOneWidget);
       expect(gateway.submissions, 1);
       expect(gateway.lastApplication?.canConvert, isFalse);
+      expect(outer.routeInformationProvider.value.uri.path, '/demo/alumni');
       expect(tester.takeException(), isNull);
     },
   );
