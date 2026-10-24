@@ -9,14 +9,14 @@ class DemoPanel extends StatelessWidget {
   final Widget child;
   final double padding;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.all(padding),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surface,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       borderRadius: BorderRadius.circular(22),
     ),
-    child: child,
+    child: Padding(padding: EdgeInsets.all(padding), child: child),
   );
 }
 
@@ -231,6 +231,7 @@ IconData demoIcon(String id) => switch (id) {
   'archives' => Icons.photo_library_outlined,
   'alumni' => Icons.diversity_2_outlined,
   'projects' => Icons.rocket_launch_outlined,
+  'recruitment' => Icons.how_to_reg_outlined,
   'academy' => Icons.school_outlined,
   'chat' => Icons.chat_bubble_outline_rounded,
   'posts' => Icons.dynamic_feed_outlined,

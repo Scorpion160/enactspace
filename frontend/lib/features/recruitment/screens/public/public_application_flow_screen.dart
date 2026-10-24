@@ -19,12 +19,14 @@ class PublicApplicationFlowScreen extends StatefulWidget {
   final String campaignId;
   final RecruitmentCampaignModel? campaign;
   final PublicRecruitmentGateway? gateway;
+  final bool demoMode;
 
   const PublicApplicationFlowScreen({
     super.key,
     required this.campaignId,
     this.campaign,
     this.gateway,
+    this.demoMode = false,
   });
 
   @override
@@ -66,12 +68,44 @@ class _PublicApplicationFlowScreenState
   @override
   void initState() {
     super.initState();
+    if (widget.demoMode && widget.gateway == null) {
+      throw StateError(
+        'Le parcours de démonstration requiert un fournisseur de données explicite.',
+      );
+    }
     _gateway = widget.gateway ?? RecruitmentPublicGateway();
     _campaign = widget.campaign;
     if (_campaign != null) {
       _campaignLoading = false;
+      if (widget.demoMode) _prefillDemo();
     } else {
       _loadCampaign();
+    }
+  }
+
+  void _prefillDemo() {
+    const answers = <String, String>{
+      'firstName': 'Awa',
+      'lastName': 'Démo',
+      'email': 'awa.demo@example.test',
+      'phone': '+221000000000',
+      'department': 'Génie Électrique',
+      'studyLevel': 'DIC2',
+      'className': '2026-2027',
+      'motivation': 'Exemple fictif : apprendre en équipe et contribuer à des projets utiles aux communautés.',
+      'availability': 'Exemple fictif : deux soirées par semaine et des activités ponctuelles le week-end.',
+    };
+    for (final entry in answers.entries) {
+      _controller(entry.key).text = entry.value;
+    }
+    _gender = 'non_precise';
+    _discoveryChannel = 'poster';
+    _controller('knownEnactusFrom').text = discoveryAnswer('poster', '');
+    for (final question in _campaign!.applicationQuestions) {
+      final input = _controller(_questionKey(question));
+      if (input.text.isEmpty) {
+        input.text = 'Exemple fictif : écouter les personnes concernées, apprendre ensemble et tester une première action utile.';
+      }
     }
   }
 
@@ -194,8 +228,7 @@ class _PublicApplicationFlowScreenState
             }
             _step = 2;
             _confirmed = false;
-            _submitError =
-                'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.';
+            _submitError = 'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.';
           });
         }
       } else if (mounted) {
@@ -232,6 +265,7 @@ class _PublicApplicationFlowScreenState
     if (_submitted != null) {
       return PublicRecruitmentShell(
         child: ApplicationSuccessView(
+          demoMode: widget.demoMode,
           campaignTitle: _campaign!.title,
           email: _text('email'),
           trackingCode: _submitted!.publicTrackingCode,
@@ -273,6 +307,7 @@ class _PublicApplicationFlowScreenState
             ),
           ),
           _NavigationBar(
+            demoMode: widget.demoMode,
             step: _step,
             submitting: _submitting,
             canSubmit: _confirmed,
@@ -370,8 +405,7 @@ class _PublicApplicationFlowScreenState
       ),
       PublicApplicationField(
         label: 'Promotion — facultatif',
-        help:
-            'Indique l’année académique de ta promotion, par exemple 2025-2026.',
+        help: 'Indique l’année académique de ta promotion, par exemple 2025-2026.',
         child: TextFormField(
           key: const ValueKey('field-className'),
           controller: _controller('className'),
@@ -515,8 +549,9 @@ class _PublicApplicationFlowScreenState
   );
 
   Widget _documentsStep() => _StepBody(
-    introduction:
-        'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
+    introduction: widget.demoMode
+        ? 'Tu peux essayer la sélection d’un document fictif. Il reste dans cet essai : aucun fichier n’est transmis ni conservé dans un dossier réel.'
+        : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
     children: [
       AttachmentPickerField(
         label: 'Ton CV',
@@ -539,16 +574,17 @@ class _PublicApplicationFlowScreenState
         enabled: !_submitting,
         onChanged: (file) => setState(() => _attachmentFile = file),
       ),
-      const Text(
-        'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
-        style: TextStyle(height: 1.5),
+      Text(
+        widget.demoMode
+            ? 'Documents facultatifs pour cet essai. Le mode démonstration ne téléverse aucun fichier.'
+            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
+        style: const TextStyle(height: 1.5),
       ),
     ],
   );
 
   Widget _reviewStep() => _StepBody(
-    introduction:
-        'Relis tes informations avant l’envoi. Rien ne sera envoyé automatiquement.',
+    introduction: 'Relis tes informations avant l’envoi. Rien ne sera envoyé automatiquement.',
     children: [
       ApplicationReviewSection(
         title: 'Campagne',
@@ -640,9 +676,9 @@ class _PublicApplicationFlowScreenState
                   key: const ValueKey('duplicate-application-tracking'),
                   onPressed: () => context.push('/recruitment/track'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onErrorContainer,
+                    foregroundColor: Theme.of(context)
+                        .colorScheme
+                        .onErrorContainer,
                   ),
                   icon: const Icon(Icons.track_changes_rounded),
                   label: const Text('Suivre ma candidature'),
@@ -803,6 +839,7 @@ class _ResponsiveFields extends StatelessWidget {
 }
 
 class _NavigationBar extends StatelessWidget {
+  final bool demoMode;
   final int step;
   final bool submitting;
   final bool canSubmit;
@@ -810,6 +847,7 @@ class _NavigationBar extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onSubmit;
   const _NavigationBar({
+    this.demoMode = false,
     required this.step,
     required this.submitting,
     required this.canSubmit,
@@ -866,7 +904,9 @@ class _NavigationBar extends StatelessWidget {
             else
               Semantics(
                 button: true,
-                label: 'Envoyer ma candidature',
+                label: demoMode
+                    ? 'Simuler ma candidature'
+                    : 'Envoyer ma candidature',
                 child: FilledButton.icon(
                   key: const ValueKey('application-submit'),
                   onPressed: canSubmit && !submitting ? onSubmit : null,
@@ -878,7 +918,11 @@ class _NavigationBar extends StatelessWidget {
                         )
                       : const Icon(Icons.send_rounded),
                   label: Text(
-                    submitting ? 'Envoi en cours…' : 'Envoyer ma candidature',
+                    submitting
+                        ? 'Veuillez patienter…'
+                        : demoMode
+                        ? 'Simuler ma candidature'
+                        : 'Envoyer ma candidature',
                   ),
                 ),
               ),

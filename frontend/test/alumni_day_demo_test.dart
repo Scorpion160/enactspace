@@ -9,6 +9,10 @@ import 'package:frontend/app/app_router.dart';
 import 'package:frontend/features/alumni/widgets/alumni_community_hero.dart';
 import 'package:frontend/features/demo/demo_screen.dart';
 import 'package:frontend/features/demo/demo_session.dart';
+import 'package:frontend/features/demo/demo_recruitment.dart';
+import 'package:frontend/features/demo/demo_recruitment_gateway.dart';
+import 'package:frontend/features/recruitment/models/public_application_draft.dart';
+import 'package:frontend/features/recruitment/screens/public/public_application_flow_screen.dart';
 
 class _NoNetwork extends HttpOverrides {
   int attempts = 0;
@@ -31,6 +35,10 @@ Future<void> _mount(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  // Asset I/O must finish in the real async zone before settling animation time.
+  await tester.runAsync(
+    () => rootBundle.loadString('assets/img/alumni_day_heritage.json'),
+  );
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(
@@ -76,6 +84,79 @@ void main() {
       expect(AppRouter.isPublicPath(path), isFalse);
     }
   });
+
+  test('every real module route is covered by the public demo inventory', () {
+    final source = File('lib/app/app_router.dart').readAsStringSync();
+    final paths = RegExp(r"path:\s*'(/[^']*)'")
+        .allMatches(source)
+        .map((m) => m[1]!);
+    final ids = demoModules.map((m) => m.id).toSet();
+    for (final path in paths) {
+      if (path == '/login' ||
+          path == '/splash' ||
+          path == '/demo' ||
+          path.startsWith('/demo/'))
+        continue;
+      final module = demoModuleForPath(path);
+      expect(module, isNotNull, reason: 'Missing demo for $path');
+      expect(ids, contains(module), reason: path);
+    }
+    expect(demoModuleForPath('/recruitment/apply/example'), 'recruitment');
+    expect(demoModuleForPath('/poles/example'), 'poles');
+    expect(demoModuleForPath('/projects/example'), 'projects');
+    expect(demoModuleForPath('/chat'), 'chat');
+  });
+
+  test(
+    'chat histories and media stay inside their own fictional conversation',
+    () {
+      final visit = DemoSession(DemoProfile.enacteur);
+      addTearDown(visit.dispose);
+      visit.send('Bonjour les générations');
+      visit.share(const DemoSharedItem('photo', 'Photo publique'));
+      visit.selectConversation('direct');
+      expect(visit.messages, isEmpty);
+      expect(visit.sharedItems, isEmpty);
+      visit.send('Échange privé fictif');
+      visit.selectConversation('generations');
+      expect(visit.messages, ['Bonjour les générations']);
+      expect(visit.sharedItems.single.label, 'Photo publique');
+    },
+  );
+
+  test(
+    'recruitment preserves metadata and updates only in-memory tracking',
+    () async {
+      final gateway = DemoRecruitmentGateway();
+      addTearDown(gateway.dispose);
+      const draft = PublicApplicationDraft(
+        campaignId: 'demo-alumni-day',
+        firstName: 'Awa',
+        lastName: 'Démo',
+        email: 'essai@example.test',
+        className: '2025-2026',
+        department: 'Génie Électrique',
+        studyLevel: 'DIC2',
+        knownEnactusFrom: 'Une affiche ou un support imprimé',
+      );
+      final result = await gateway.submitApplication(draft);
+      expect(result.className, '2025-2026');
+      expect(result.knownEnactusFrom, draft.knownEnactusFrom);
+      expect(result.canConvert, isFalse);
+      expect(result.cvUrl, isNull);
+      gateway.changeStatus('Ma candidature d’essai', 'accepted');
+      final tracking = await gateway.trackApplication(
+        code: DemoRecruitmentGateway.code,
+        email: draft.email,
+      );
+      expect(tracking.status, 'accepted');
+      expect(tracking.accountCreated, isFalse);
+      await expectLater(
+        gateway.trackApplication(code: 'BAD', email: draft.email),
+        throwsA(isA<Exception>()),
+      );
+    },
+  );
 
   test(
     'visits are independent and repeated actions do not invent money or points',
@@ -130,7 +211,11 @@ void main() {
       for (final raw in rows) {
         final row = raw as Map;
         final asset = row['image_asset'] as String;
-        expect(asset, startsWith('assets/heritage/'));
+        expect(
+          asset,
+          anyOf(startsWith('assets/heritage/'), startsWith('assets/img/')),
+        );
+        expect(asset, isNot(contains('..')));
         expect(row['source_label'], isNotEmpty);
         expect(row['description'], isNotEmpty);
         expect((await rootBundle.load(asset)).lengthInBytes, greaterThan(100));
@@ -144,6 +229,8 @@ void main() {
       for (final path in [
         'lib/features/demo/demo_screen.dart',
         'lib/features/demo/demo_session.dart',
+        'lib/features/demo/demo_recruitment.dart',
+        'lib/features/demo/demo_recruitment_gateway.dart',
       ]) {
         final source = File(path).readAsStringSync();
         expect(source, isNot(contains('AuthService(')));
@@ -278,6 +365,107 @@ void main() {
     expect(find.text('Quel plaisir de vous retrouver !'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('chat offers local photo sharing and a shared media view', (
+    tester,
+  ) async {
+    await _mount(tester, section: 'chat');
+    await _tap(tester, find.byKey(const ValueKey('demo-share-photo')));
+    expect(find.textContaining('Vous · World Cup 2022'), findsOneWidget);
+    await _tap(tester, find.byTooltip('Informations et médias partagés'));
+    await _tap(tester, find.text('Voir les éléments partagés'));
+    expect(find.text('Médias et documents partagés'), findsOneWidget);
+    expect(find.text('Lire le dossier public de Terrasen'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('pole cards open their fictional team and roadmap', (
+    tester,
+  ) async {
+    await _mount(tester, section: 'poles');
+    await _tap(tester, find.byKey(const ValueKey('demo-pole-Veille')));
+    expect(find.text('Pôle Veille'), findsOneWidget);
+    expect(find.textContaining('Feuille de route d’exemple'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'native recruitment uses only the demo gateway and never reports a live browser URL',
+    (tester) async {
+      final gateway = DemoRecruitmentGateway();
+      addTearDown(gateway.dispose);
+      final reports = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.navigation,
+        (call) async {
+          if (call.method == 'routeInformationUpdated')
+            reports.add(call.arguments.toString());
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.navigation,
+          null,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DemoRecruitmentExperience(gateway: gateway, onClose: () {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _tap(tester, find.text('Commencer ma candidature'));
+      final flow = tester.widget<PublicApplicationFlowScreen>(
+        find.byType(PublicApplicationFlowScreen),
+      );
+      expect(identical(flow.gateway, gateway), isTrue);
+      expect(flow.demoMode, isTrue);
+      expect(find.text('Étape 1 sur 6'), findsOneWidget);
+      expect(reports, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'prefilled native recruitment completes all six steps without a real submission',
+    (tester) async {
+      tester.binding.platformDispatcher.defaultRouteNameTestValue =
+          '/demo/alumni';
+      addTearDown(
+        tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+      );
+      final gateway = DemoRecruitmentGateway();
+      addTearDown(gateway.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          initialRoute: '/',
+          home: Scaffold(
+            body: DemoRecruitmentExperience(
+              gateway: gateway,
+              initialLocation: '/recruitment/apply/demo-alumni-day',
+              onClose: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 5; i++) {
+        await _tap(tester, find.byKey(const ValueKey('application-next')));
+      }
+      expect(find.text('Étape 6 sur 6'), findsOneWidget);
+      expect(gateway.submissions, 0);
+      await _tap(tester, find.byType(CheckboxListTile));
+      await _tap(tester, find.byKey(const ValueKey('application-submit')));
+      expect(find.text('Simulation terminée'), findsOneWidget);
+      expect(find.text(DemoRecruitmentGateway.code), findsOneWidget);
+      expect(gateway.submissions, 1);
+      expect(gateway.lastApplication?.canConvert, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'a lesson and a correct quiz answer update the visible progression',

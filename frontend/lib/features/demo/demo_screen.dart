@@ -9,6 +9,8 @@ import '../../shared/ui/project_reference_documents.dart';
 import '../alumni/widgets/alumni_community_hero.dart';
 import 'demo_session.dart';
 import 'demo_widgets.dart';
+import 'demo_recruitment.dart';
+import 'demo_poles.dart';
 
 class DemoLoginEntry extends StatelessWidget {
   const DemoLoginEntry({super.key});
@@ -471,6 +473,11 @@ class _DemoScreenState extends State<DemoScreen> {
     'academy' => _academy(context),
     'chat' => _chat(context),
     'projects' => _projects(context),
+    'recruitment' => DemoRecruitmentPanel(gateway: session.recruitment),
+    'poles' => DemoPolesPanel(
+      session: session,
+      onTasks: () => navigate('tasks'),
+    ),
     'tasks' => _tasks(context),
     'finance' => _finance(context),
     'documents' => _documents(context),
@@ -918,10 +925,17 @@ class _DemoScreenState extends State<DemoScreen> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Des équipes, des besoins réels et une démarche collective. '
-                    'Le dossier de référence permet de distinguer objectifs et résultats documentés.',
+                    'Des équipes, des besoins réels et une démarche collective.',
                     style: TextStyle(height: 1.6),
                   ),
+                  const SizedBox(height: 8),
+                  Text(switch (project.$3) {
+                    'terrasen' => 'Micro-jardinage sur table, arrosage automatique et transfert de savoir-faire aux GIE.',
+                    'aquatus' => 'Associer élevage de poissons et cultures : découvrir l’aquaponie.',
+                    'men nan' => 'Transformation de produits locaux et accompagnement des femmes dans leurs activités.',
+                    'shery' => 'Protections réutilisables et sensibilisation à l’hygiène menstruelle.',
+                    _ => 'Formations et séchoirs solaires : découvrir une partie de l’histoire du club.',
+                  }, style: const TextStyle(height: 1.6)),
                   const SizedBox(height: 14),
                   OutlinedButton(
                     onPressed: () => _project(context, project.$1, project.$3),
@@ -1155,6 +1169,20 @@ class _DemoScreenState extends State<DemoScreen> {
         'Les idées circulent.',
         'Conversation fictive · Aucun message n’est envoyé à une personne réelle.',
       ),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final entry in demoConversations.entries)
+            ChoiceChip(
+              key: ValueKey('demo-thread-${entry.key}'),
+              label: Text(entry.value),
+              selected: session.conversationId == entry.key,
+              onSelected: (_) => session.selectConversation(entry.key),
+            ),
+        ],
+      ),
+      const SizedBox(height: 16),
       DemoPanel(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1162,21 +1190,25 @@ class _DemoScreenState extends State<DemoScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const CircleAvatar(child: Icon(Icons.groups_outlined)),
-              title: const Text('Générations en lien'),
-              subtitle: const Text('Groupe de démonstration'),
+              title: Text(demoConversations[session.conversationId]!),
+              subtitle: Text(
+                session.conversationId == 'direct'
+                    ? 'Discussion privée fictive'
+                    : 'Groupe de démonstration',
+              ),
               trailing: IconButton(
                 tooltip: 'Informations et médias partagés',
                 icon: const Icon(Icons.info_outline),
                 onPressed: () => _detail(
                   context,
-                  'Générations en lien',
+                  demoConversations[session.conversationId]!,
                   'Une conversation pour se retrouver et transmettre.\n\n'
-                      'Médias partagés : photo de la World Cup 2022.\nDocuments : dossiers des projets.\n'
-                      'Dans l’application, les informations du groupe regroupent membres, médias, liens et documents.',
-                  action: 'Voir les photos',
+                  'Médias partagés : photo de la World Cup 2022.\nDocuments : dossiers des projets.\n'
+                  'Les essais de partage de cette conversation restent dans cette visite.',
+                  action: 'Voir les éléments partagés',
                   onAction: () {
                     Navigator.pop(context);
-                    navigate('archives');
+                    _sharedMedia(context);
                   },
                 ),
               ),
@@ -1185,7 +1217,9 @@ class _DemoScreenState extends State<DemoScreen> {
             _bubble(
               context,
               'Awa · profil fictif',
-              'Quel plaisir de retrouver ces souvenirs ! Sur quoi travaille la nouvelle génération ?',
+              session.conversationId == 'project'
+                  ? 'Retrouvons les dossiers du projet et répartissons les prochaines tâches.'
+                  : 'Quel plaisir de retrouver ces souvenirs ! Sur quoi travaille la nouvelle génération ?',
             ),
             _bubble(
               context,
@@ -1208,13 +1242,210 @@ class _DemoScreenState extends State<DemoScreen> {
             ),
             for (final text in session.messages)
               _bubble(context, 'Vous · essai local', text, mine: true),
+            for (final item in session.sharedItems)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _sharedItem(context, item),
+              ),
             const SizedBox(height: 20),
-            _DemoComposer(onSend: session.send),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                TextButton.icon(
+                  key: const ValueKey('demo-share-photo'),
+                  onPressed: () => session.share(
+                    const DemoSharedItem(
+                      'photo',
+                      'World Cup 2022 · Photothèque publique',
+                      asset: 'assets/heritage/world-cup-2022-delegation.jpg',
+                    ),
+                  ),
+                  icon: const Icon(Icons.photo_outlined),
+                  label: const Text('Photo d’essai'),
+                ),
+                TextButton.icon(
+                  key: const ValueKey('demo-share-document'),
+                  onPressed: () => session.share(
+                    const DemoSharedItem(
+                      'document',
+                      'Dossier public · Terrasen',
+                    ),
+                  ),
+                  icon: const Icon(Icons.attach_file),
+                  label: const Text('Document'),
+                ),
+                TextButton.icon(
+                  onPressed: () => _gif(context),
+                  icon: const Icon(Icons.gif_box_outlined),
+                  label: const Text('GIF animé'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _DemoComposer(
+              key: ValueKey('demo-composer-${session.conversationId}'),
+              onSend: session.send,
+            ),
           ],
         ),
       ),
     ],
   );
+
+  Widget _sharedItem(BuildContext context, DemoSharedItem item) => Align(
+    alignment: Alignment.centerRight,
+    child: SizedBox(
+      width: 330,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (item.kind == 'photo')
+            InkWell(
+              onTap: () => _photo(context, item),
+              child: DemoPhoto(item.asset!, height: 210, label: item.label),
+            )
+          else if (item.kind == 'gif')
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.memory(
+                base64Decode(item.data!),
+                height: 180,
+                fit: BoxFit.contain,
+                semanticLabel: item.label,
+              ),
+            )
+          else
+            DemoPanel(
+              padding: 12,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: Text(item.label),
+                subtitle: const Text('PDF public · Appuyer pour lire'),
+                onTap: () => _project(context, 'Terrasen', 'terrasen'),
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            'Vous · ${item.label}',
+            style: const TextStyle(fontSize: 11, height: 1.5),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  void _photo(BuildContext context, DemoSharedItem item) => showDialog<void>(
+    context: context,
+    builder: (context) => Dialog.fullscreen(
+      child: Scaffold(
+        appBar: AppBar(title: Text(item.label)),
+        body: Center(
+          child: InteractiveViewer(
+            child: Image.asset(item.asset!, fit: BoxFit.contain),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  void _sharedMedia(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (context) => Dialog.fullscreen(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Médias et documents partagés')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const DemoTitle(
+                'Les éléments de cette conversation.',
+                'Photos et dossiers publics du club ; essais de partage propres à cette conversation.',
+              ),
+              InkWell(
+                onTap: () => _photo(
+                  context,
+                  const DemoSharedItem(
+                    'photo',
+                    'World Cup 2022',
+                    asset: 'assets/heritage/world-cup-2022-delegation.jpg',
+                  ),
+                ),
+                child: const DemoPhoto(
+                  'assets/heritage/world-cup-2022-delegation.jpg',
+                  height: 230,
+                ),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => _project(context, 'Terrasen', 'terrasen'),
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('Lire le dossier public de Terrasen'),
+              ),
+              const SizedBox(height: 16),
+              for (final item in session.sharedItems)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _sharedItem(context, item),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _gif(BuildContext context) async {
+    final raw = await rootBundle.loadString('assets/chat/gifs/catalog.json');
+    final gifs = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(title: const Text('GIF animés · Catalogue intégré')),
+          body: GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 240,
+              childAspectRatio: 1.2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+            ),
+            itemCount: gifs.length,
+            itemBuilder: (context, index) {
+              final gif = gifs[index];
+              return InkWell(
+                onTap: () {
+                  session.share(
+                    DemoSharedItem(
+                      'gif',
+                      gif['label'] as String,
+                      data: gif['data'] as String,
+                    ),
+                  );
+                  Navigator.pop(context);
+                },
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Image.memory(
+                        base64Decode(gif['data'] as String),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Text(gif['label'] as String),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _bubble(
     BuildContext context,
@@ -1961,7 +2192,7 @@ class _DemoTextInputState extends State<_DemoTextInput> {
 }
 
 class _DemoComposer extends StatefulWidget {
-  const _DemoComposer({required this.onSend});
+  const _DemoComposer({super.key, required this.onSend});
   final ValueChanged<String> onSend;
   @override
   State<_DemoComposer> createState() => _DemoComposerState();

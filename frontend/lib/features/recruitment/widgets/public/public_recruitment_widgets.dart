@@ -62,9 +62,8 @@ class CampaignPublicCard extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 campaign.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w900),
               ),
               if (campaign.description?.trim().isNotEmpty == true) ...[
                 const SizedBox(height: 10),
@@ -166,8 +165,7 @@ class PublicRecruitmentEmptyState extends StatelessWidget {
   Widget build(BuildContext context) => _PublicState(
     icon: Icons.event_busy_outlined,
     title: 'Aucune campagne n’est ouverte pour le moment',
-    message:
-        'Les prochaines opportunités seront publiées ici. Si tu as déjà postulé, ton suivi reste disponible.',
+    message: 'Les prochaines opportunités seront publiées ici. Si tu as déjà postulé, ton suivi reste disponible.',
     actions: [
       FilledButton(
         onPressed: () => context.go('/application-tracking'),
@@ -189,8 +187,7 @@ class PublicRecruitmentErrorState extends StatelessWidget {
   Widget build(BuildContext context) => _PublicState(
     icon: Icons.cloud_off_outlined,
     title: 'Impossible de charger les campagnes',
-    message:
-        'Le service est momentanément indisponible. Tes informations n’ont pas été modifiées.',
+    message: 'Le service est momentanément indisponible. Tes informations n’ont pas été modifiées.',
     actions: [
       FilledButton.icon(
         onPressed: onRetry,
@@ -335,11 +332,13 @@ class ApplicationReviewSection extends StatelessWidget {
 }
 
 class ApplicationSuccessView extends StatelessWidget {
+  final bool demoMode;
   final String campaignTitle;
   final String email;
   final String trackingCode;
   const ApplicationSuccessView({
     super.key,
+    this.demoMode = false,
     required this.campaignTitle,
     required this.email,
     required this.trackingCode,
@@ -356,12 +355,20 @@ class ApplicationSuccessView extends StatelessWidget {
             const Icon(Icons.mark_email_read_outlined, size: 64),
             const SizedBox(height: 18),
             Text(
-              'Candidature envoyée',
+              demoMode ? 'Simulation terminée' : 'Candidature envoyée',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 10),
             Text(campaignTitle, textAlign: TextAlign.center),
+            if (demoMode) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Aucun dossier réel n’a été créé et aucun e-mail n’a été envoyé. Le code ci-dessous fonctionne uniquement pendant cette visite de démonstration.',
+                textAlign: TextAlign.center,
+                style: TextStyle(height: 1.5),
+              ),
+            ],
             const SizedBox(height: 24),
             Semantics(
               label: 'Code de suivi $trackingCode',
