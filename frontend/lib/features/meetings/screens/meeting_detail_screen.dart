@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,7 +15,13 @@ class MeetingDetailScreen extends StatefulWidget {
   final String meetingId;
   final MeetingsService? service;
 
-  const MeetingDetailScreen({super.key, required this.meetingId, this.service});
+  final MembersService? membersService;
+  const MeetingDetailScreen({
+    super.key,
+    required this.meetingId,
+    this.service,
+    this.membersService,
+  });
 
   @override
   State<MeetingDetailScreen> createState() => _MeetingDetailScreenState();
@@ -21,7 +29,8 @@ class MeetingDetailScreen extends StatefulWidget {
 
 class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   late final MeetingsService _service;
-  final MembersService _membersService = MembersService();
+  late final MembersService _membersService =
+      widget.membersService ?? MembersService();
   MeetingModel? _meeting;
   List<MeetingMemberModel> _members = const [];
   bool _loading = true;
@@ -130,6 +139,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   }
 
   void _join() {
+    if (PreviewModeScope.block(context)) return;
     final meeting = _meeting;
     if (meeting == null) return;
     context.go('/meetings/${meeting.id}/live', extra: meeting.title);

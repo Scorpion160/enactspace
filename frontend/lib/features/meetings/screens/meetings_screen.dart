@@ -18,7 +18,18 @@ import '../services/meetings_service.dart';
 class MeetingsScreen extends StatefulWidget {
   final MeetingsService? service;
 
-  const MeetingsScreen({super.key, this.service});
+  final AuthService? authService;
+  final MembersService? membersService;
+  final PolesService? polesService;
+  final ProjectsService? projectsService;
+  const MeetingsScreen({
+    super.key,
+    this.service,
+    this.authService,
+    this.membersService,
+    this.polesService,
+    this.projectsService,
+  });
 
   @override
   State<MeetingsScreen> createState() => _MeetingsScreenState();
@@ -26,10 +37,12 @@ class MeetingsScreen extends StatefulWidget {
 
 class _MeetingsScreenState extends State<MeetingsScreen> {
   late final MeetingsService _service;
-  final AuthService _auth = AuthService();
-  final MembersService _members = MembersService();
-  final PolesService _poles = PolesService();
-  final ProjectsService _projects = ProjectsService();
+  late final AuthService _auth = widget.authService ?? AuthService();
+  late final MembersService _members =
+      widget.membersService ?? MembersService();
+  late final PolesService _poles = widget.polesService ?? PolesService();
+  late final ProjectsService _projects =
+      widget.projectsService ?? ProjectsService();
 
   List<MeetingModel> _meetings = const [];
   List<MemberModel> _memberOptions = const [];

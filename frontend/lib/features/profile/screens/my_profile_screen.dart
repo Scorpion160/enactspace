@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -14,8 +16,9 @@ import '../services/my_profile_service.dart';
 
 class MyProfileScreen extends StatefulWidget {
   final MyProfileService? service;
+  final GamesService? gamesService;
 
-  const MyProfileScreen({super.key, this.service});
+  const MyProfileScreen({super.key, this.service, this.gamesService});
 
   @override
   State<MyProfileScreen> createState() => _MyProfileScreenState();
@@ -88,7 +91,11 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
           else if (_error != null && _profile == null)
             _ProfileError(onRetry: _load)
           else if (_profile != null)
-            _ProfileContent(profile: _profile!, onEdit: _editProfile),
+            _ProfileContent(
+              profile: _profile!,
+              onEdit: _editProfile,
+              gamesService: widget.gamesService,
+            ),
         ],
       ),
     );
@@ -96,10 +103,15 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
 }
 
 class _ProfileContent extends StatelessWidget {
+  final GamesService? gamesService;
   final MemberModel profile;
   final VoidCallback onEdit;
 
-  const _ProfileContent({required this.profile, required this.onEdit});
+  const _ProfileContent({
+    required this.profile,
+    required this.onEdit,
+    this.gamesService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +146,7 @@ class _ProfileContent extends StatelessWidget {
             const SizedBox(height: 14),
             _AboutSection(profile: profile),
             const SizedBox(height: 14),
-            _ActivitySection(profile: profile),
+            _ActivitySection(profile: profile, gamesService: gamesService),
           ],
         ),
       ),
@@ -317,9 +329,10 @@ class _AboutSection extends StatelessWidget {
 }
 
 class _ActivitySection extends StatelessWidget {
+  final GamesService? gamesService;
   final MemberModel profile;
 
-  const _ActivitySection({required this.profile});
+  const _ActivitySection({required this.profile, this.gamesService});
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +341,11 @@ class _ActivitySection extends StatelessWidget {
       icon: Icons.auto_graph_rounded,
       children: [
         FutureBuilder<Map<String, dynamic>>(
-          future: GamesService().profile(profile.id),
+          future:
+              (gamesService ??
+                      PreviewModeScope.service<GamesService>(context) ??
+                      GamesService())
+                  .profile(profile.id),
           builder: (context, snapshot) {
             final data = snapshot.data;
             if (data == null) return const SizedBox.shrink();

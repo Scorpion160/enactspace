@@ -1,3 +1,4 @@
+import '../../core/widgets/preview_mode_scope.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -104,6 +105,7 @@ class AttachmentPickerField extends StatelessWidget {
                 ? null
                 : () async {
                     try {
+                      if (PreviewModeScope.block(context)) return;
                       final picked = await pickAttachment(
                         application: application,
                       );

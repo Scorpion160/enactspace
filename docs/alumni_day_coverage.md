@@ -1,35 +1,33 @@
-# Couverture de la démonstration Alumni Day
+# Couverture de la démonstration native
 
-Audit du 24 octobre 2026 : les 40 chemins absolus déclarés dans le routeur principal ont été comparés au catalogue. Les entrées de connexion, démarrage et choix de démo sont exclues de la liste des modules. Les autres chemins sont rattachés explicitement à l’une des 23 rubriques ; un test vérifie ce rattachement pour détecter les oublis futurs.
-
-| Module réel | Présentation dans la démo |
+| Rubrique | Écran réutilisé |
 | --- | --- |
-| Accueil | Choix Enacteur/Alumni, raccourcis et menu complet |
-| Archives et mémoire | 40 photos publiques, recherche, années, favoris, lecture en grand, attributions |
-| Alumni et mentorat | Annuaire fictif, profils, disponibilité et proposition d’échange simulée |
-| Projets | Terrasen, Aquatus, Mën Nañ, Shery, Dimbali ; photos et dossiers publics disponibles |
-| Pôles | Les 4 pôles cœur et 3 pôles support, leurs missions, fiches d’équipes et demandes simulées |
-| Recrutement | Véritable formulaire en six étapes, code fictif, vrai écran de suivi avec données locales ; statuts modifiables côté équipe d’exemple |
-| Academy | Leçons découvertes, progression, quiz, points et badge d’exemple |
-| Discussions | Trois conversations, textes et médias locaux, documents publics, éléments partagés et GIF animés embarqués |
-| Vie du club | Publications d’exemple, photos et essais de réaction/commentaire |
-| Événements | Activités fictives et inscriptions/annulations simulées |
-| EnactMeet | Présentation des usages ; aucune réunion réelle, caméra ou connexion audio |
-| Membres | Profils et compétences fictifs ; aucune coordonnée réelle |
-| Impact et performance | Explication des indicateurs, résultats et preuves à partir d’un exemple explicitement fictif |
-| Tâches | Cases à cocher et progression locale |
-| Documents | Quatre PDF publics, brouillon éditable, aperçu et conservation pendant la visite |
-| Finances | Cotisation d’exemple et paiement simulé idempotent ; aucun opérateur appelé |
-| Présences | Historique fictif et présentation du QR/NFC ; aucun pointage réel |
-| Veille | Engagements et demande d’accompagnement simulée |
-| Jeux et récompenses | Aperçu des jeux, brise-glace et points du quiz ; pas de session multijoueur réelle |
-| Notifications | Exemples cliquables et lecture locale |
-| Profil | Identité fictive et progression de visite |
-| Paramètres | Apparence de la visite ; explication des préférences et notifications |
-| Aide, accès, à propos et mentions légales | Présentation du fonctionnement, des droits et du retour à la connexion |
+| Accueil | DashboardScreen et AppShell |
+| Alumni | AlumniScreen, AlumniProfileDetailScreen |
+| Archives | ArchivesScreen, HistoricalMemoryContents, fiches et collections |
+| Projets | ProjectsPortfolioScreen, ProjectDetailScreen |
+| Pôles | PolesScreen, PoleDetailScreen |
+| Membres | MembersScreen, MemberProfileScreen |
+| Academy | AcademyHomeScreen, AcademyPathScreen, AcademyCourseScreen et quiz |
+| Discussions | ChatScreen, pièces jointes et éléments partagés existants |
+| Vie du club | PostsScreen |
+| Événements | EventsScreen, EventDetailScreen |
+| EnactMeet | MeetingsScreen, MeetingDetailScreen ; appels désactivés |
+| Recrutement | InternalRecruitmentScreen, campagne publique, formulaire et suivi |
+| Tâches | TasksScreen, TaskDetailScreen |
+| Documents | InstitutionalDocumentsHubScreen, DocumentDetailScreen et lecteur PDF existant |
+| Finances | FinanceScreen ; aucun paiement réel |
+| Présences | AttendanceScreen ; caméra et NFC désactivés |
+| Impact | ImpactDashboardScreen, ImpactRecordsScreen et fiches |
+| Veille | VeilleScreen, VeilleRecordScreen |
+| Jeux et récompenses | GamificationScreen, GamesScreen ; aucune session réelle |
+| Notifications | NotificationsScreen ; lecture locale |
+| Profil | MyProfileScreen |
+| Paramètres | SettingsScreen, profil académique, années ; dépendances isolées |
+| Aide et informations | HelpScreen, HelpGuideScreen, AboutScreen et mentions légales |
 
-Les permissions, actions de responsable et fonctions matérielles sont présentées comme telles. La couverture de navigation ne signifie pas que la démo reproduit tous les traitements de production : les jeux multijoueurs, visioconférences, pointages, envois et paiements réels restent des aperçus ou simulations. Les informations internes du club ne sont jamais chargées pour alimenter la visite publique.
+Les fonctionnalités et les droits visibles dépendent du vrai modèle UserExperience appliqué au profil fictif. Les routes publiques de production restent strictement bornées à `/demo`, `/demo/enacteur` et `/demo/alumni` pour cette visite. Les liens internes restent dans le routeur de démonstration.
 
-Le dernier journal utilisateur indique une analyse Flutter sans problème, 135 tests réussis et 4 échecs. Les cartes disposent de leur propre `Material` et les deux dossiers légitimes de photos publiques sont reconnus. Les descriptions d’archives sont désormais compilées dans la démo : leur affichage ne dépend plus d’une lecture asynchrone du catalogue. Un contrôle de cohérence compare ces descriptions au JSON public et vérifie les 40 photos locales.
+Le contrat local ne relaie aucune demande au serveur. Un chemin inconnu échoue localement. Les fichiers publics viennent d’une liste explicite d’assets et les médias temporaires du chat de la mémoire de visite. Le contrôle des profils Enacteur/Alumni parse 156 modèles de production et vérifie l’absence de partage de données entre visites.
 
-Les tests du recrutement sont montés sous une vraie route `/demo/alumni`. La notification initiale du navigateur est attendue ; toute modification ultérieure de l’URL par le formulaire reste interdite et contrôlée. Le test conserve la vérification des six étapes, du code de suivi fictif et de l’absence de création d’un accès réel. La nouvelle exécution Flutter sur Windows doit confirmer ces corrections avant publication.
+Les suites de widgets complètent ces contrôles : vrais types d’écrans pour les 23 rubriques, chargement sans API, formulaires de recrutement, URL du navigateur conservée, sortie sans déconnexion réelle et maintien des parcours existants. La validation Flutter finale doit être faite sur Windows avant le build 1.0.19+22.

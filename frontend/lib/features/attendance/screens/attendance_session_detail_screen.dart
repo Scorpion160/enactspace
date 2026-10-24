@@ -1,6 +1,9 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
@@ -27,8 +30,11 @@ class AttendanceSessionDetailScreen extends StatefulWidget {
 
 class _AttendanceSessionDetailScreenState
     extends State<AttendanceSessionDetailScreen> {
-  final AttendanceService _attendanceService = AttendanceService();
-  final MembersService _membersService = MembersService();
+  late final AttendanceService _attendanceService =
+      (PreviewModeScope.service<AttendanceService>(context) ??
+      AttendanceService());
+  late final MembersService _membersService =
+      (PreviewModeScope.service<MembersService>(context) ?? MembersService());
   final TextEditingController _memberSearchController = TextEditingController();
 
   bool _loading = true;
@@ -836,9 +842,9 @@ class _SessionActionPanel extends StatelessWidget {
                     value: completionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.outlineVariant,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant,
                   ),
                 ),
                 SizedBox(height: 10),
@@ -967,9 +973,9 @@ class _QrAuditTrail extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1314,9 +1320,9 @@ class _ExpectedMembersCard extends StatelessWidget {
                             member.email,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -1684,9 +1690,9 @@ class _AttendanceStatsCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

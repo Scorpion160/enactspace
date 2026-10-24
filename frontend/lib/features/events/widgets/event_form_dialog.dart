@@ -1,7 +1,11 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'package:flutter/material.dart';
+
 import '../../../shared/attachments/attachment_picker.dart';
 
 import '../../../core/widgets/app_form_dialog.dart';
+
 import 'package:intl/intl.dart';
 
 import '../models/event_center_models.dart';
@@ -117,6 +121,10 @@ class _EventFormDialogState extends State<EventFormDialog> {
     setState(() => _submitting = true);
     try {
       if (_reportFile != null && widget.event != null) {
+        if (PreviewModeScope.block(context)) {
+          setState(() => _submitting = false);
+          return;
+        }
         final result = await AttachmentService().upload(
           '/events/${widget.event!.id}/report-file',
           _reportFile!,

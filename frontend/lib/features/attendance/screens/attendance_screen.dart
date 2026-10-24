@@ -1,5 +1,8 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
@@ -18,11 +21,15 @@ import 'attendance_session_detail_screen.dart';
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({
     super.key,
+    this.authService,
+    this.attendanceService,
     @visibleForTesting this.testUser,
     @visibleForTesting this.testSessions,
     @visibleForTesting this.testRecords,
   });
 
+  final AuthService? authService;
+  final AttendanceService? attendanceService;
   final UserExperience? testUser;
   final List<AttendanceSessionModel>? testSessions;
   final List<AttendanceRecordModel>? testRecords;
@@ -32,8 +39,9 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  final AuthService _authService = AuthService();
-  final AttendanceService _attendanceService = AttendanceService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final AttendanceService _attendanceService =
+      widget.attendanceService ?? AttendanceService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -477,9 +485,9 @@ class _AttendanceStatsOverview extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -605,9 +613,9 @@ class _PersonalAttendanceView extends StatelessWidget {
                         Text(
                           'Mes présences, retards et absences uniquement.',
                           style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1361,8 +1369,10 @@ class CreateAttendanceSessionDialog extends StatefulWidget {
 class _CreateAttendanceSessionDialogState
     extends State<CreateAttendanceSessionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
+  late final PolesService _polesService =
+      (PreviewModeScope.service<PolesService>(context) ?? PolesService());
+  late final ProjectsService _projectsService =
+      (PreviewModeScope.service<ProjectsService>(context) ?? ProjectsService());
 
   final _titleController = TextEditingController(text: 'Réunion générale');
   final _descriptionController = TextEditingController(

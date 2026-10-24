@@ -1,3 +1,4 @@
+import '../features/demo/demo_native_experience.dart';
 import '../features/demo/demo_screen.dart';
 import '../features/demo/demo_session.dart';
 
@@ -144,14 +145,16 @@ class AppRouter {
       GoRoute(path: '/demo', builder: (context, state) => const DemoScreen()),
       GoRoute(
         path: '/demo/enacteur',
-        builder: (context, state) => DemoScreen(
+        builder: (context, state) => DemoNativeExperience(
+          key: ValueKey(state.matchedLocation),
           profile: DemoProfile.enacteur,
           initialSection: state.uri.queryParameters['section'] ?? 'home',
         ),
       ),
       GoRoute(
         path: '/demo/alumni',
-        builder: (context, state) => DemoScreen(
+        builder: (context, state) => DemoNativeExperience(
+          key: ValueKey(state.matchedLocation),
           profile: DemoProfile.alumni,
           initialSection: state.uri.queryParameters['section'] ?? 'home',
         ),

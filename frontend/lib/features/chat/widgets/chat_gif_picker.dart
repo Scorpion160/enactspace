@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:convert';
 
 import '../services/chat_giphy_service.dart';
@@ -61,7 +63,8 @@ class _ChatGifPickerState extends State<ChatGifPicker> {
   late Future<List<ChatGif>> _future = loadChatGifs();
   String _query = '';
   @override
-  Widget build(BuildContext context) => ChatGiphyService.configured
+  Widget build(BuildContext context) =>
+      ChatGiphyService.configured && !PreviewModeScope.active(context)
       ? ChatGiphyPanel(
           onImport: widget.onImport,
           onSelected: (item) {

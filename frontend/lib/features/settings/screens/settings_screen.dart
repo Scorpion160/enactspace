@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -177,6 +179,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _logout({required bool all}) async {
+    if (PreviewModeScope.active(context)) {
+      context.go('/login');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

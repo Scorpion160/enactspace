@@ -18,17 +18,29 @@ import '../services/members_service.dart';
 import 'member_import_panel.dart';
 
 class MembersScreen extends StatefulWidget {
-  const MembersScreen({super.key});
+  final AuthService? authService;
+  final MembersService? membersService;
+  final PolesService? polesService;
+  final ProjectsService? projectsService;
+  const MembersScreen({
+    super.key,
+    this.authService,
+    this.membersService,
+    this.polesService,
+    this.projectsService,
+  });
 
   @override
   State<MembersScreen> createState() => _MembersScreenState();
 }
 
 class _MembersScreenState extends State<MembersScreen> {
-  final AuthService _authService = AuthService();
-  final MembersService _membersService = MembersService();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final MembersService _membersService =
+      widget.membersService ?? MembersService();
+  late final PolesService _polesService = widget.polesService ?? PolesService();
+  late final ProjectsService _projectsService =
+      widget.projectsService ?? ProjectsService();
 
   bool _loading = true;
   String? _error;
@@ -2102,9 +2114,8 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
                     color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.error.withValues(alpha: 0.35),
+                      color: Theme.of(context).colorScheme.error
+                          .withValues(alpha: 0.35),
                     ),
                   ),
                   child: Text(
@@ -2926,9 +2937,8 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                         return 'Ce champ est obligatoire.';
                       }
                       if (entry.key == 'email' &&
-                          !RegExp(
-                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                          ).hasMatch(text)) {
+                          !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                              .hasMatch(text)) {
                         return 'Adresse e-mail invalide.';
                       }
                       if (entry.key == 'enactus_join_year' && text.isNotEmpty) {

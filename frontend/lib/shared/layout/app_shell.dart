@@ -21,19 +21,38 @@ import '../../features/tasks/services/tasks_service.dart';
 class AppShell extends StatefulWidget {
   final Widget child;
   final String currentPath;
+  final AuthService? authService;
+  final ChatService? chatService;
+  final NotificationsService? notificationsService;
+  final TasksService? tasksService;
+  final bool presentationMode;
+  final VoidCallback? onExitPresentation;
 
-  const AppShell({super.key, required this.child, required this.currentPath});
+  const AppShell({
+    super.key,
+    required this.child,
+    required this.currentPath,
+    this.authService,
+    this.chatService,
+    this.notificationsService,
+    this.tasksService,
+    this.presentationMode = false,
+    this.onExitPresentation,
+  });
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  final AuthService _authService = AuthService();
-  final ChatService _chatService = ChatService();
-  final NotificationsService _notificationsService = NotificationsService();
-  final TasksService _tasksService = TasksService();
-  final RealtimeService _realtimeService = RealtimeService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final ChatService _chatService = widget.chatService ?? ChatService();
+  late final NotificationsService _notificationsService =
+      widget.notificationsService ?? NotificationsService();
+  late final TasksService _tasksService = widget.tasksService ?? TasksService();
+  late final RealtimeService _realtimeService = RealtimeService(
+    authService: _authService,
+  );
 
   int? _unreadNotifications;
   int? _unreadChatMessages;
@@ -56,6 +75,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _navigationExpanded = !widget.currentPath.startsWith('/chat');
+    if (widget.presentationMode) {
+      unawaited(_loadNavigationMetrics());
+      return;
+    }
     WidgetsBinding.instance.addObserver(this);
     _realtimeSubscription = _realtimeService.events.listen((event) {
       if (event['type'] == 'connected' && event['unread_count'] != null) {
@@ -103,7 +126,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !widget.presentationMode) {
       _loadNavigationMetrics();
       unawaited(PushLifecycleController.instance.reconcileOnResume());
     }
@@ -341,6 +364,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _logout(BuildContext context) async {
+    if (widget.presentationMode) {
+      widget.onExitPresentation?.call();
+      return;
+    }
     final all = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

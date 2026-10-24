@@ -1,3 +1,5 @@
+import 'package:frontend/features/demo/demo_native_experience.dart';
+import 'package:frontend/features/dashboard/screens/dashboard_screen.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -43,8 +45,9 @@ Future<void> _mount(
         brightness: dark ? Brightness.dark : Brightness.light,
       ),
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context)
-            .copyWith(textScaler: TextScaler.linear(scale)),
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(scale)),
         child: child!,
       ),
       home: DemoScreen(
@@ -84,9 +87,9 @@ void main() {
 
   test('every real module route is covered by the public demo inventory', () {
     final source = File('lib/app/app_router.dart').readAsStringSync();
-    final paths = RegExp(r"path:\s*'(/[^']*)'")
-        .allMatches(source)
-        .map((m) => m[1]!);
+    final paths = RegExp(
+      r"path:\s*'(/[^']*)'",
+    ).allMatches(source).map((m) => m[1]!);
     final ids = demoModules.map((m) => m.id).toSet();
     for (final path in paths) {
       if (path == '/login' ||
@@ -201,9 +204,13 @@ void main() {
   test(
     'all forty memories are bundled public photos with attribution',
     () async {
-      final rows = jsonDecode(
-        await rootBundle.loadString('assets/img/alumni_day_heritage.json'),
-      ) as List;
+      final rows =
+          jsonDecode(
+                await rootBundle.loadString(
+                  'assets/img/alumni_day_heritage.json',
+                ),
+              )
+              as List;
       expect(
         demoHeritage,
         equals(rows),
@@ -318,11 +325,12 @@ void main() {
           GoRoute(path: '/demo', builder: (_, _) => const DemoScreen()),
           GoRoute(
             path: '/demo/enacteur',
-            builder: (_, _) => const DemoScreen(profile: DemoProfile.enacteur),
+            builder: (_, _) =>
+                const DemoNativeExperience(profile: DemoProfile.enacteur),
           ),
           GoRoute(
             path: '/demo/alumni',
-            builder: (_, state) => DemoScreen(
+            builder: (_, state) => DemoNativeExperience(
               profile: DemoProfile.alumni,
               initialSection: state.uri.queryParameters['section'] ?? 'home',
             ),
@@ -334,10 +342,11 @@ void main() {
       await tester.pumpAndSettle();
       await _tap(tester, find.text('Découvrir la démo'));
       await _tap(tester, find.byKey(const ValueKey('demo-enter-enacteur')));
-      expect(find.text('Démo · Enacteur'), findsOneWidget);
-      await _tap(tester, find.byTooltip('Changer de parcours'));
-      await _tap(tester, find.text('Parcours Alumni'));
-      expect(find.text('Démo · Alumni'), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsOneWidget);
+      await _tap(tester, find.byTooltip('Changer de profil ou quitter'));
+      await _tap(tester, find.byKey(const ValueKey('demo-enter-alumni')));
+      expect(find.byType(DashboardScreen), findsOneWidget);
+      await _tap(tester, find.byTooltip('Changer de profil ou quitter'));
       await _tap(tester, find.byTooltip('Quitter la démo'));
       expect(find.text('Découvrir la démo'), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -1,7 +1,10 @@
+import '../../../core/widgets/preview_mode_scope.dart';
 // ignore_for_file: curly_braces_in_flow_control_structures, use_null_aware_elements
 
 import 'package:flutter/material.dart';
+
 import '../../../shared/attachments/attachment_picker.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/app_form_dialog.dart';
@@ -926,6 +929,10 @@ class _MetricDialogState extends State<_MetricDialog> {
                 });
                 try {
                   if (_attachment != null && file.text.isEmpty) {
+                    if (PreviewModeScope.block(context)) {
+                      setState(() => busy = false);
+                      return;
+                    }
                     final stored = await AttachmentService().uploadImpact(
                       widget.recordId,
                       _attachment!,
@@ -1085,6 +1092,10 @@ class _EvidenceDialogState extends State<_EvidenceDialog> {
                 });
                 try {
                   if (_attachment != null && file.text.isEmpty) {
+                    if (PreviewModeScope.block(context)) {
+                      setState(() => busy = false);
+                      return;
+                    }
                     final stored = await AttachmentService().uploadImpact(
                       widget.recordId,
                       _attachment!,

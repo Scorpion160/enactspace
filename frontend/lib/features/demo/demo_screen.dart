@@ -37,8 +37,9 @@ class DemoLoginEntry extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'L’histoire continue avec vous.',
-          style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         const Text(
@@ -84,8 +85,9 @@ class _DemoScreenState extends State<DemoScreen> {
   }
 
   String _safeSection(String value) =>
-      modulesFor(widget.profile ?? DemoProfile.alumni)
-          .any((module) => module.id == value)
+      modulesFor(
+        widget.profile ?? DemoProfile.alumni,
+      ).any((module) => module.id == value)
       ? value
       : 'home';
 
@@ -126,9 +128,9 @@ class _DemoScreenState extends State<DemoScreen> {
     if (scroll.hasClients) scroll.jumpTo(0);
   }
 
-  void notice(String message) =>
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+  void notice(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +142,10 @@ class _DemoScreenState extends State<DemoScreen> {
     final theme = Theme.of(context).copyWith(
       brightness: isDark ? Brightness.dark : Brightness.light,
       colorScheme: colors,
-      textTheme: Theme.of(context).textTheme
-          .apply(bodyColor: colors.onSurface, displayColor: colors.onSurface),
+      textTheme: Theme.of(context).textTheme.apply(
+        bodyColor: colors.onSurface,
+        displayColor: colors.onSurface,
+      ),
       scaffoldBackgroundColor: isDark
           ? const Color(0xFF0B1823)
           : const Color(0xFFF5F7F8),
@@ -331,9 +335,9 @@ class _DemoScreenState extends State<DemoScreen> {
                 child: ListTile(
                   dense: true,
                   selected: section == module.id,
-                  selectedTileColor: Theme.of(context)
-                      .colorScheme
-                      .secondaryContainer,
+                  selectedTileColor: Theme.of(
+                    context,
+                  ).colorScheme.secondaryContainer,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -393,7 +397,7 @@ class _DemoScreenState extends State<DemoScreen> {
                   context,
                   DemoProfile.enacteur,
                   'Apprendre. S’engager. Construire.',
-                  'Academy, projets, discussions, tâches, documents, cotisations et vie du club.',
+                  'Le vrai espace d’une responsable de projet : Academy, projets, pôles, discussions, tâches et vie du club.',
                   'assets/heritage/immersion-mars-2025.jpg',
                 ),
                 _profileChoice(
@@ -444,8 +448,9 @@ class _DemoScreenState extends State<DemoScreen> {
         const SizedBox(height: 8),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 10),
         Text(description, style: const TextStyle(height: 1.6)),
@@ -568,8 +573,9 @@ class _DemoScreenState extends State<DemoScreen> {
             const SizedBox(height: 14),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(description, style: const TextStyle(height: 1.6)),
@@ -835,8 +841,9 @@ class _DemoScreenState extends State<DemoScreen> {
                   const SizedBox(height: 16),
                   Text(
                     profile.$1,
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(profile.$2),
@@ -903,8 +910,9 @@ class _DemoScreenState extends State<DemoScreen> {
                   const SizedBox(height: 16),
                   Text(
                     project.$1,
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   const Text(
@@ -913,11 +921,16 @@ class _DemoScreenState extends State<DemoScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(switch (project.$3) {
-                    'terrasen' => 'Micro-jardinage sur table, arrosage automatique et transfert de savoir-faire aux GIE.',
-                    'aquatus' => 'Associer élevage de poissons et cultures : découvrir l’aquaponie.',
-                    'men nan' => 'Transformation de produits locaux et accompagnement des femmes dans leurs activités.',
-                    'shery' => 'Protections réutilisables et sensibilisation à l’hygiène menstruelle.',
-                    _ => 'Formations et séchoirs solaires : découvrir une partie de l’histoire du club.',
+                    'terrasen' =>
+                      'Micro-jardinage sur table, arrosage automatique et transfert de savoir-faire aux GIE.',
+                    'aquatus' =>
+                      'Associer élevage de poissons et cultures : découvrir l’aquaponie.',
+                    'men nan' =>
+                      'Transformation de produits locaux et accompagnement des femmes dans leurs activités.',
+                    'shery' =>
+                      'Protections réutilisables et sensibilisation à l’hygiène menstruelle.',
+                    _ =>
+                      'Formations et séchoirs solaires : découvrir une partie de l’histoire du club.',
                   }, style: const TextStyle(height: 1.6)),
                   const SizedBox(height: 14),
                   OutlinedButton(
@@ -974,7 +987,8 @@ class _DemoScreenState extends State<DemoScreen> {
       DemoHero(
         eyebrow: 'ENACTSPACE ACADEMY · ESSAI INTERACTIF',
         title: 'Apprendre pour agir.',
-        description: 'Explorez une leçon, testez vos connaissances et voyez votre progression évoluer.',
+        description:
+            'Explorez une leçon, testez vos connaissances et voyez votre progression évoluer.',
         action: 'Commencer la première leçon',
         onAction: () => _lesson(
           context,
@@ -1034,8 +1048,9 @@ class _DemoScreenState extends State<DemoScreen> {
                   const SizedBox(height: 12),
                   Text(
                     lesson.$2,
-                    style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text('Leçon découverte · 2 min'),
@@ -1788,8 +1803,9 @@ class _DemoScreenState extends State<DemoScreen> {
               session.profile == DemoProfile.alumni
                   ? 'Alumni · Profil découverte'
                   : 'Enacteur · Profil découverte',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 14),
             const Text(

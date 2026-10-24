@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,8 +14,14 @@ import '../services/members_service.dart';
 class MemberProfileScreen extends StatefulWidget {
   final String memberId;
   final MembersService? service;
+  final GamesService? gamesService;
 
-  const MemberProfileScreen({super.key, required this.memberId, this.service});
+  const MemberProfileScreen({
+    super.key,
+    required this.memberId,
+    this.service,
+    this.gamesService,
+  });
 
   @override
   State<MemberProfileScreen> createState() => _MemberProfileScreenState();
@@ -67,7 +75,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
           else if (_error != null && _member == null)
             _ErrorCard(onRetry: _load)
           else if (_member != null)
-            _MemberProfileContent(member: _member!),
+            _MemberProfileContent(
+              member: _member!,
+              gamesService: widget.gamesService,
+            ),
         ],
       ),
     );
@@ -75,9 +86,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
 }
 
 class _MemberProfileContent extends StatelessWidget {
+  final GamesService? gamesService;
   final MemberModel member;
 
-  const _MemberProfileContent({required this.member});
+  const _MemberProfileContent({required this.member, this.gamesService});
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +201,7 @@ class _MemberProfileContent extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            _ActivityCard(member: member),
+            _ActivityCard(member: member, gamesService: gamesService),
           ],
         ),
       ),
@@ -274,8 +286,9 @@ class _MemberHero extends StatelessWidget {
 }
 
 class _ActivityCard extends StatelessWidget {
+  final GamesService? gamesService;
   final MemberModel member;
-  const _ActivityCard({required this.member});
+  const _ActivityCard({required this.member, this.gamesService});
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +297,11 @@ class _ActivityCard extends StatelessWidget {
       icon: Icons.auto_graph_rounded,
       children: [
         FutureBuilder<Map<String, dynamic>>(
-          future: GamesService().profile(member.id),
+          future:
+              (gamesService ??
+                      PreviewModeScope.service<GamesService>(context) ??
+                      GamesService())
+                  .profile(member.id),
           builder: (context, snapshot) {
             final data = snapshot.data;
             if (data == null) return const SizedBox.shrink();

@@ -21,16 +21,26 @@ import '../widgets/mobile_money_payment_sheet.dart';
 
 class FinanceScreen extends StatefulWidget {
   static final ValueNotifier<int> incomingReceipts = ValueNotifier(0);
-  const FinanceScreen({super.key});
+  final FinanceService? financeService;
+  final AuthService? authService;
+  final MembersService? membersService;
+  const FinanceScreen({
+    super.key,
+    this.financeService,
+    this.authService,
+    this.membersService,
+  });
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
-  final FinanceService _financeService = FinanceService();
-  final AuthService _authService = AuthService();
-  final MembersService _membersService = MembersService();
+  late final FinanceService _financeService =
+      widget.financeService ?? FinanceService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final MembersService _membersService =
+      widget.membersService ?? MembersService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -470,9 +480,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Paiement validé.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Paiement validé.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -503,9 +512,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Paiement rejeté.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Paiement rejeté.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -555,9 +563,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Paiement annulé.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Paiement annulé.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -841,9 +848,9 @@ class _FinanceStatsGrid extends StatelessWidget {
                           stat.label,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -904,9 +911,9 @@ class _FinanceRiskPanel extends StatelessWidget {
                     value: collectionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.outlineVariant,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .outlineVariant,
                   ),
                 ),
                 SizedBox(height: 10),
@@ -1495,9 +1502,9 @@ class _FeesCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -2152,9 +2159,8 @@ class _PaymentDecisionDialogState extends State<PaymentDecisionDialog> {
                   backgroundColor: Colors.deepOrange.shade700,
                 ),
           onPressed: canSubmit
-              ? () => Navigator.of(
-                  context,
-                ).pop(widget.approve ? true : _reasonController.text.trim())
+              ? () => Navigator.of(context)
+                    .pop(widget.approve ? true : _reasonController.text.trim())
               : null,
           icon: Icon(
             widget.approve ? Icons.verified_rounded : Icons.block_rounded,
@@ -2504,9 +2510,8 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                       color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.error.withValues(alpha: 0.35),
+                        color: Theme.of(context).colorScheme.error
+                            .withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(
@@ -2969,9 +2974,8 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                       color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.error.withValues(alpha: 0.35),
+                        color: Theme.of(context).colorScheme.error
+                            .withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(

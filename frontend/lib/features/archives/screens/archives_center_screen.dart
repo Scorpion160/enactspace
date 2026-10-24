@@ -12,11 +12,13 @@ import 'archives_center_sections.dart';
 class ArchivesScreen extends StatefulWidget {
   final ArchivesGateway? gateway;
   final MemoryTimelineFilters initialFilters;
+  final bool initialHistoricalView;
 
   const ArchivesScreen({
     super.key,
     this.gateway,
     this.initialFilters = const MemoryTimelineFilters(),
+    this.initialHistoricalView = false,
   });
 
   @override
@@ -43,6 +45,10 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     _gateway = widget.gateway ?? ApiArchivesGateway();
     _filters = widget.initialFilters;
     _search = TextEditingController(text: _filters.search);
+    if (widget.initialHistoricalView) {
+      _legacyMode = true;
+      _legacyHome = _gateway.loadHome();
+    }
     _loadInitial();
   }
 

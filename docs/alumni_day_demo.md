@@ -1,35 +1,23 @@
-# Démonstration Alumni Day
+# Démonstration Alumni Day — écrans natifs
 
-Depuis la connexion, **Découvrir la démo** ouvre deux parcours publics :
+La page `/demo` conserve le choix des deux profils, accessible depuis la connexion et le QR de l’affiche. Les routes `/demo/enacteur` et `/demo/alumni` montent désormais `DemoNativeExperience`, les écrans de production et le véritable `AppShell`.
 
-- `/demo/enacteur` : la vie d’un membre, ses projets, son apprentissage et ses outils.
-- `/demo/alumni` : la communauté, la transmission et les souvenirs.
-- `/demo/alumni?section=archives` : accès direct à la capsule souvenirs pour la présentation.
+Le profil Enacteur représente une responsable de projet afin de montrer aussi les pôles, les équipes, les tâches, l’Impact et le recrutement. Le profil Alumni conserve la navigation communautaire et ses restrictions réelles. Les gardes de production ne sont pas modifiées. La candidature publique reste essayable pour les deux profils.
 
-Le menu permet de changer de rubrique et de profil. Sur téléphone, le bouton de menu donne accès à toutes les rubriques ; sur grand écran, la navigation reste visible à gauche. Le soleil et la lune changent l’apparence de la visite.
+## Données et interactions
 
-## Ce qui peut être essayé
+`DemoNativeRuntime` fournit explicitement chaque dépendance. Les services et les parseurs de production travaillent sur `DemoNativeApi`, un transport exclusivement local, sans client réseau utilisable ni authentification réelle. Chaque visite possède son propre `DemoNativeData`. Les messages, événements, tâches, profils et réglages modifiés restent dans cette instance.
 
-Les archives proposent 40 photos publiques déjà embarquées, avec recherche, filtres par année, favoris et consultation en grand format avec attribution. Les quatre dossiers de référence des projets restent consultables avec le lecteur existant.
+Les formulaires, filtres, fiches, menus et composants sont ceux de l’application. Les noms de personnes et les chiffres sont fictifs. Les 40 photos et les dossiers des projets sont les ressources publiques déjà embarquées. L’écran Archives ouvre la mémoire historique pour mettre les souvenirs en avant ; la chronologie reste accessible.
 
-Les échanges, inscriptions, favoris, tâches, propositions de mentorat, brouillons et paiements sont des essais locaux. La leçon et le quiz mettent à jour la progression de visite. Le brouillon conserve son texte entre édition et aperçu. Les autres outils présentent leurs usages à travers des exemples ; les réunions et jeux multijoueurs ne lancent pas de session réelle.
+Le recrutement utilise les vrais écrans de campagne, le formulaire en six étapes, le suivi et l’espace de traitement, alimentés par des dossiers fictifs. Aucune candidature ni conversion de compte n’est transmise. Les réunions et les jeux présentent leurs vrais écrans ; aucune session multijoueur ou visioconférence réelle n’est ouverte.
 
-Le recrutement réutilise le vrai formulaire public en six étapes et le vrai écran de suivi, avec un fournisseur de données exclusivement en mémoire. La campagne, les dossiers et les statuts sont fictifs ; aucun fichier n’est téléversé, aucun e-mail n’est envoyé et aucune conversion en compte n’est autorisée. La navigation de ce parcours est isolée pour préserver l’URL publique de la démo, même après un lien vers le suivi ou la connexion.
+Les paiements réels, la caméra, le microphone, le NFC, les notifications push et les envois de fichiers par les assistants de production sont désactivés. Les médias choisis dans le chat restent en mémoire ; son cache, ses favoris et sa file d’envoi ne touchent pas les conversations ou les préférences enregistrées. Les réglages ne déclenchent aucune opération sur la session réelle du navigateur.
 
-Les sept pôles possèdent une fiche de missions et une équipe fictive. Les demandes de participation sont simulées. Les discussions proposent trois conversations distinctes, des essais de photo et de PDF publics, les éléments partagés et le catalogue de 40 GIF animés déjà embarqués. Les historiques et médias d’essai restent propres à chaque conversation.
+La navigation interne utilise un routeur distinct et ne publie pas ses chemins dans l’URL du navigateur. Le lien du QR reste `https://enactspace.kerunjombor.net/#/demo`. Quitter ou changer de profil détruit la visite. La page de sélection permet ensuite de revenir à la connexion.
 
-Les personnes et activités de démonstration sont fictives et signalées comme telles. Les photos et dossiers proviennent de ressources publiques du club. Aucun compte de démonstration n’est créé en base. La visite ne se connecte pas aux services métier, ne possède pas de jeton et n’envoie pas de message ou de paiement. Les essais disparaissent en quittant ou rechargeant le parcours. Les préférences et droits du compte réel ne sont pas modifiés.
+## Validation et publication
 
-L’annuaire Alumni authentifié utilise le nouveau visuel partagé. Les données, filtres, fiches, règles de visibilité, actions de création et actualisation conservent leur fonctionnement. Le nouveau bouton souvenirs ouvre les archives authentifiées.
+La version précédente 1.0.18+21 a été publiée avec succès selon le journal Windows transmis. Cette révision vise 1.0.19+22. L’analyse Dart de tout `lib` et des deux suites de démonstration est effectuée avec les sources Flutter et les versions verrouillées des dépendances. Un contrôle exécutable autonome valide 156 conversions vers les modèles de production, les deux profils, les 40 archives, la pagination, l’isolation, les modifications locales et le refus des chemins non autorisés.
 
-## Validation avant présentation
-
-Le script Windows sauvegarde les fichiers, refuse d’écraser une variante locale inconnue, puis lance l’analyse et les tests ciblés. Il ne construit et ne publie aucun binaire.
-
-Le complément `sync_alumni_day_complete_windows.ps1 -PublishWeb` applique les corrections du journal du 24 octobre, ajoute les parcours manquants, puis lance l’analyse, les tests de démonstration et ceux du recrutement réel. Avec ce paramètre explicite, il enchaîne seulement après succès avec la compilation et la publication web 1.0.18+21 via le programme déjà utilisé pour les versions précédentes. Il vérifie ensuite le catalogue d’archives public et ouvre `https://enactspace.kerunjombor.net/#/demo`, également encodé dans l’affiche. Sans ce paramètre, il s’arrête après les tests.
-
-Les tests couvrent les routes publiques strictement bornées, les deux profils, les ressources locales, l’absence d’appels réseau dans les rubriques, les petites largeurs à 200 % de texte, la discussion, les leçons, le quiz, le brouillon, les photos et la simulation de paiement. L’exécution Flutter doit être confirmée sur le poste de développement. Le formatage Dart et les chemins des ressources ont été vérifiés dans l’environnement de préparation.
-
-Après succès, relancer complètement Flutter (touche **R**, redémarrage à chaud) et vérifier la connexion, les deux profils, une photo, une recherche, une leçon et un brouillon dans Edge. Une nouvelle compilation et la procédure de publication web habituelle sont ensuite nécessaires pour rendre la visite accessible sur le site public.
-
-PayDunya reste en attente. Aucun paramètre de paiement, serveur ou notification n’est changé par cette livraison.
+Les tests Flutter de navigation, affichage et interactions doivent encore passer sous Windows. Le script vérifie les sources locales, conserve leur sauvegarde, lance l’analyse et les tests, puis construit et publie uniquement si tous ces contrôles réussissent. Le backend, Android et PayDunya restent inchangés.
