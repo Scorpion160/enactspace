@@ -256,7 +256,30 @@ void main() {
       );
       await _frames(tester);
       expect(find.byType(entry.value), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is CircularProgressIndicator && widget.value == null,
+        ),
+        findsNothing,
+        reason: 'The screen must finish loading its demo data.',
+      );
+      if (entry.key == 'impact') {
+        expect(find.text('Les résultats des projets suivis'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is CircularProgressIndicator &&
+                widget.value != null &&
+                widget.value!.isFinite &&
+                widget.value! >= 0 &&
+                widget.value! <= 1,
+          ),
+          findsWidgets,
+          reason:
+              'The loaded Impact score is a determinate data visualization.',
+        );
+      }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await _frames(tester);
