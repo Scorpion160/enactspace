@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\Users\DIOP\Documents\EnactSpaceRecovery\enactspace-20260927'
 $frontend = Join-Path $repo 'frontend'
-$baseline = '14507516c14305efb9eb3bf07b35fae14b53777a'
+$baseline = '72a9ac2ed9b34fc1ca23591ae62e00a2d3a8decd'
 $legacy = 'c598339cc444bdc8bf7a1ce845f88dbb654644f9'
 $temp = Join-Path $env:TEMP ('EnactSpace-AlumniDayNative-' + [guid]::NewGuid().ToString('N'))
 $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\alumni-day-native-' + [guid]::NewGuid().ToString('N'))
@@ -38,7 +38,8 @@ $files = @(
     @{ Path = 'frontend/lib/shared/attachments/attachment_picker.dart'; Hash = '5b277d10829eff41c00749aaa3874bdd604d2644634987d84d41d793fb9205fd'; New = $false; BaselineHash = '5b277d10829eff41c00749aaa3874bdd604d2644634987d84d41d793fb9205fd' },
     @{ Path = 'frontend/lib/shared/layout/app_shell.dart'; Hash = 'a1851b51c3e6bd523a4f3717bc6d027300be4e9a285c67c173b63848e40ca181'; New = $false; BaselineHash = 'a1851b51c3e6bd523a4f3717bc6d027300be4e9a285c67c173b63848e40ca181' },
     @{ Path = 'frontend/test/alumni_day_demo_test.dart'; Hash = '7fe8386a91e8fcea593fc989b46a4e6e42c585ca6bed1c17fdefd65db8cb712e'; New = $false; BaselineHash = '7fe8386a91e8fcea593fc989b46a4e6e42c585ca6bed1c17fdefd65db8cb712e' },
-    @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = 'c7a97f32749708d2f809b5e0c11e23d7b91f9edc4a5221a2c6e74058fbf8d4cd'; New = $false; BaselineHash = 'f719e6a09d468aa7a0fd8dea7fdd23b58a50d837e598df7c41a5649d2c3573ae' }
+    @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = 'c7a97f32749708d2f809b5e0c11e23d7b91f9edc4a5221a2c6e74058fbf8d4cd'; New = $false; BaselineHash = 'c7a97f32749708d2f809b5e0c11e23d7b91f9edc4a5221a2c6e74058fbf8d4cd' },
+    @{ Path = 'frontend/test/communication_test.dart'; Hash = 'a6ec6deac361fe2b825174f7fafbab1748521882ed709123ea1a5035c2dcea3e'; New = $false; BaselineHash = '6aceb08c67f045b065c89e8ac0be5a7ed7316d4b8698a6ce544d1035e866007c' }
 )
 function Canonical([string]$Path) {
     [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").TrimEnd()

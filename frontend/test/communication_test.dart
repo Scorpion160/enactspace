@@ -414,14 +414,40 @@ void main() {
       );
     });
 
-    testWidgets('utilise le cache si le réseau des conversations échoue', (
-      tester,
-    ) async {
-      final gateway = _FakeChatGateway(networkFails: true);
-      await _pump(tester, ChatScreen(gateway: gateway), const Size(1200, 800));
-      expect(find.text('Équipe projet'), findsOneWidget);
-      expect(find.text('Disponible localement'), findsWidgets);
-    });
+    for (final width in [390.0, 1200.0]) {
+      testWidgets(
+        'conserve conversations et messages hors connexion à $width px',
+        (tester) async {
+          final gateway = _FakeChatGateway(networkFails: true);
+          await _pump(tester, ChatScreen(gateway: gateway), Size(width, 844));
+
+          expect(gateway.threadLoadCalls, 1);
+          expect(find.text('Équipe projet'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(SnackBar),
+              matching: find.text(
+                'Connexion indisponible. Chats affichés depuis ce support.',
+              ),
+            ),
+            findsOneWidget,
+          );
+
+          await tester.tap(find.text('Équipe projet'));
+          await tester.pumpAndSettle();
+
+          expect(gateway.messageLoadCalls, 1);
+          expect(gateway.markReadCalls, 0);
+          expect(
+            find.text('Message conservé sur cet appareil'),
+            findsOneWidget,
+          );
+          expect(find.text('Message existant'), findsNothing);
+          expect(find.byType(CircularProgressIndicator), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
 
     testWidgets('création propose les six types réels humanisés', (
       tester,
@@ -777,6 +803,9 @@ class _FakeChatGateway implements ChatGateway {
   final StreamController<Map<String, dynamic>> _events =
       StreamController<Map<String, dynamic>>.broadcast(sync: true);
   int sendCalls = 0;
+  int threadLoadCalls = 0;
+  int messageLoadCalls = 0;
+  int markReadCalls = 0;
   Completer<ChatMessageModel>? sendCompleter;
 
   _FakeChatGateway({this.networkFails = false});
@@ -801,6 +830,7 @@ class _FakeChatGateway implements ChatGateway {
   Future<List<ProjectModel>> getProjects() async => [];
   @override
   Future<List<ChatThreadModel>> getThreads() async {
+    threadLoadCalls += 1;
     if (networkFails) throw Exception('hors ligne');
     return [_thread()];
   }
@@ -810,14 +840,23 @@ class _FakeChatGateway implements ChatGateway {
     required String userId,
   }) async => [_thread()];
   @override
-  Future<List<ChatMessageModel>> getMessages(String threadId) async => [
-    _message(),
-  ];
+  Future<List<ChatMessageModel>> getMessages(String threadId) async {
+    messageLoadCalls += 1;
+    if (networkFails) throw Exception('hors ligne');
+    return [_message()];
+  }
+
   @override
   Future<List<ChatMessageModel>> getCachedMessages({
     required String userId,
     required String threadId,
-  }) async => [_message()];
+  }) async => [
+    _message(
+      content: networkFails
+          ? 'Message conservé sur cet appareil'
+          : 'Message existant',
+    ),
+  ];
   @override
   Future<Set<String>> getPinnedThreadIds({required String userId}) async => {};
   @override
@@ -862,7 +901,10 @@ class _FakeChatGateway implements ChatGateway {
     required String clientMessageId,
   }) async {}
   @override
-  Future<void> markThreadAsRead(String threadId) async {}
+  Future<void> markThreadAsRead(String threadId) async {
+    markReadCalls += 1;
+  }
+
   @override
   Future<ChatMessageModel> sendMessage({
     required String threadId,
