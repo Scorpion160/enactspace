@@ -28,3 +28,7 @@ Les leçons ne sont ni résumées ni réécrites. Le découpage des paragraphes 
 - Les tests de refonte peuvent produire 24 captures dans le dossier de sauvegarde avec `--dart-define=ACADEMY_CAPTURE_DIR=...`. La galerie locale permet leur contrôle visuel avant tout build ou publication.
 
 Le script d’intégration vérifie les empreintes, refuse les modifications locales inconnues et sauvegarde tous les fichiers remplacés. Il exécute l’analyse et les tests puis ouvre la galerie. Il ne lance aucun build ou déploiement. Le rendu final et les tests Flutter restent à confirmer sur Windows avant publication.
+
+### Retour des tests Windows du 29 octobre
+
+L’analyse Flutter est passée. La première exécution compte 56 tests réussis et six échecs : quatre interactions avant le rendu du défilement à 200 % sur petit écran, une interaction de quiz avant ce même rendu, et un titre de leçon recherché sans distinguer le lecteur du programme de la fiche restée derrière la boîte de dialogue. Les tests attendent maintenant la nouvelle disposition et vérifient que les boutons reçoivent réellement les appuis ; le titre est recherché dans le contenu du lecteur. Aucun scénario, aucune assertion de progression et aucun prérequis de quiz ne sont retirés. Les tests corrigés et la galerie restent à confirmer sous Windows.

@@ -5,24 +5,25 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\Users\DIOP\Documents\EnactSpaceRecovery\enactspace-20260927'
 $frontend = Join-Path $repo 'frontend'
-$baseline = 'd0208c8d594478b39357eb5b261c721850c92839'
+$baseline = '2ce7acc679231707fc63bcb124320edab7fe16e9'
 $temp = Join-Path $env:TEMP ('EnactSpace-AcademyLearning-' + [guid]::NewGuid().ToString('N'))
 $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\academy-learning-' + [guid]::NewGuid().ToString('N'))
 $observed = @{}
 $files = @(
-    @{ Path = 'frontend/lib/features/academy/models/academy_lesson_sections.dart'; Hash = 'bded3b97f57a2996a498a7e023c1aac1fcc768f9c71896cd603acd5c9ade9875'; New = $true; Binary = $false },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610'; New = $false; Binary = $false; BaselineHash = '9112dd6ad9b41c7372fbba34af24af522a123917076fcb8d33c0fa906d51293c' },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_course_screen.dart'; Hash = '7be1e6d0342c9144381a44a1c3c949e4f3e3e1d88a85c9fee81794422d05dfa0'; New = $false; Binary = $false; BaselineHash = '799233b76333e35854670870de9f3afe7a530d81e5d4948fcf4e5870b5e4ef96' },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_path_screen.dart'; Hash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338'; New = $false; Binary = $false; BaselineHash = '2c049ff8ee77137b3086d486904c8936cea98ae97446cc29089cc6bda4917364' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_artwork.dart'; Hash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea'; New = $false; Binary = $false; BaselineHash = 'e45c8349d295db71d34e508cae30a0337cca857f7402226d4483526b69f9ca5b' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_illustration.dart'; Hash = '0f42c1b3501ecf3dcb53279106366458ba2a7e97b9c2a1aebe31d51f27c19e88'; New = $false; Binary = $false; BaselineHash = 'bc00e5a7ca2022d48cac2ac2638cfb91dae08a6a049a52c71f92b7b089f4d523' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_style.dart'; Hash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849'; New = $true; Binary = $false },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_course_hero.dart'; Hash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f'; New = $true; Binary = $false },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40'; New = $true; Binary = $false },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_quiz_dialog.dart'; Hash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd'; New = $false; Binary = $false; BaselineHash = 'a0e860f5299ade0ca214543e15fe69db0d10ad1288e5a399d21ff2e93f7f3bda' },
-    @{ Path = 'frontend/assets/img/academy_mobile_progression.webp'; Hash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f'; New = $true; Binary = $true },
-    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '5f9d9b78e3b517376d7261cb5a3e15f373cf2ae612ee800a81ab65893d3dc5e0'; New = $true; Binary = $false },
-    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'fd34a00447b6a245e79f9501ff5b10f28278d26d01613bafb17cb530cdbd0cf2'; New = $true; Binary = $false }
+    @{ Path = 'frontend/lib/features/academy/models/academy_lesson_sections.dart'; Hash = 'bded3b97f57a2996a498a7e023c1aac1fcc768f9c71896cd603acd5c9ade9875'; New = $false; Binary = $false; BaselineHash = 'bded3b97f57a2996a498a7e023c1aac1fcc768f9c71896cd603acd5c9ade9875' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610'; New = $false; Binary = $false; BaselineHash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_course_screen.dart'; Hash = '7be1e6d0342c9144381a44a1c3c949e4f3e3e1d88a85c9fee81794422d05dfa0'; New = $false; Binary = $false; BaselineHash = '7be1e6d0342c9144381a44a1c3c949e4f3e3e1d88a85c9fee81794422d05dfa0' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_path_screen.dart'; Hash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338'; New = $false; Binary = $false; BaselineHash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_artwork.dart'; Hash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea'; New = $false; Binary = $false; BaselineHash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_illustration.dart'; Hash = '0f42c1b3501ecf3dcb53279106366458ba2a7e97b9c2a1aebe31d51f27c19e88'; New = $false; Binary = $false; BaselineHash = '0f42c1b3501ecf3dcb53279106366458ba2a7e97b9c2a1aebe31d51f27c19e88' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_style.dart'; Hash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849'; New = $false; Binary = $false; BaselineHash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_course_hero.dart'; Hash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f'; New = $false; Binary = $false; BaselineHash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40'; New = $false; Binary = $false; BaselineHash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_quiz_dialog.dart'; Hash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd'; New = $false; Binary = $false; BaselineHash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd' },
+    @{ Path = 'frontend/assets/img/academy_mobile_progression.webp'; Hash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f'; New = $false; Binary = $true; BaselineHash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f' },
+    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113'; New = $false; Binary = $false; BaselineHash = '5f9d9b78e3b517376d7261cb5a3e15f373cf2ae612ee800a81ab65893d3dc5e0' },
+    @{ Path = 'frontend/test/academy_operational_test.dart'; Hash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828'; New = $false; Binary = $false; BaselineHash = 'e65ee884b5207f796ea26fddbf9963ace646338f249c8afdf4d7d5f6981aaed8' },
+    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'f291b967ec6ec01fd2a3480efb80cc1fe7eae5044db431f01b737b36befa7b48'; New = $false; Binary = $false; BaselineHash = 'fd34a00447b6a245e79f9501ff5b10f28278d26d01613bafb17cb530cdbd0cf2' }
 )
 function Canonical([string]$Path) {
     [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").TrimEnd()
@@ -106,7 +107,7 @@ try {
         $dartFiles = @($files | Where-Object { $_.Path.EndsWith('.dart') } | ForEach-Object { $_.Path.Substring(9) })
         & dart format @dartFiles
         if ($LASTEXITCODE -ne 0) { throw 'Formatage echoue.' }
-        & flutter analyze --no-pub lib/features/academy test/academy_learning_redesign_test.dart
+        & flutter analyze --no-pub lib/features/academy test/academy_learning_redesign_test.dart test/academy_operational_test.dart
         if ($LASTEXITCODE -ne 0) { throw 'Analyse echouee : transmettre le journal.' }
         & flutter test --no-pub --reporter expanded "--dart-define=ACADEMY_CAPTURE_DIR=$previews" test/academy_learning_redesign_test.dart test/academy_home_redesign_test.dart test/academy_operational_test.dart test/alumni_gamification_academy_impact_test.dart
         if ($LASTEXITCODE -ne 0) { throw 'Tests Academy echoues : transmettre le journal.' }

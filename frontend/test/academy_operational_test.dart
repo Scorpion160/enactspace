@@ -303,6 +303,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Ouvrir le quiz'), 220);
+      await tester.pumpAndSettle();
+      expect(find.text('Ouvrir le quiz').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Ouvrir le quiz'));
       await tester.pumpAndSettle();
       expect(find.text('Le changement'), findsOneWidget);

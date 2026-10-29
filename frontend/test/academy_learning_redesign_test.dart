@@ -189,11 +189,10 @@ void main() {
               );
             }
 
-            await tester.ensureVisible(
+            await _tapVisible(
+              tester,
               find.byKey(const Key('academy-course-continue')),
             );
-            await tester.tap(find.byKey(const Key('academy-course-continue')));
-            await tester.pumpAndSettle();
             expect(find.byType(AcademyLessonReader), findsOneWidget);
             expect(gateway.startCalls, ['lesson-a']);
             expect(gateway.completionCalls, isEmpty);
@@ -249,12 +248,17 @@ void main() {
           currentUser: _learner,
         ),
       );
-      await tester.tap(find.byKey(const Key('academy-course-continue')));
-      await tester.pumpAndSettle();
+      await _tapVisible(
+        tester,
+        find.byKey(const Key('academy-course-continue')),
+      );
       await tester.tap(find.byTooltip('Leçon suivante'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Apprendre des retours, puis recommencer'),
+        find.descendant(
+          of: find.byKey(const Key('academy-reader-scroll')),
+          matching: find.text('Apprendre des retours, puis recommencer'),
+        ),
         findsOneWidget,
       );
       await tester.tap(find.byTooltip('Leçon précédente'));
@@ -325,14 +329,10 @@ void main() {
     );
     addTearDown(router.dispose);
     await _pump(tester, const SizedBox.shrink(), router: router);
-    await tester.ensureVisible(find.text('Explorer le parcours'));
-    await tester.tap(find.text('Explorer le parcours'));
-    await tester.pumpAndSettle();
+    await _tapVisible(tester, find.text('Explorer le parcours'));
     expect(find.byType(AcademyPathScreen), findsOneWidget);
     expect(gateway.startCalls, isEmpty);
-    await tester.ensureVisible(find.text('Continuer cette formation'));
-    await tester.tap(find.text('Continuer cette formation'));
-    await tester.pumpAndSettle();
+    await _tapVisible(tester, find.text('Continuer cette formation'));
     expect(find.byType(AcademyLessonReader), findsOneWidget);
     expect(gateway.startCalls, ['lesson-a']);
     expect(gateway.completionCalls, isEmpty);
@@ -370,6 +370,15 @@ void main() {
       });
     }
   }
+}
+
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  // A jump schedules a frame; wait for layout before using screen coordinates.
+  await tester.pumpAndSettle();
+  expect(finder.hitTestable(), findsOneWidget);
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pump(
