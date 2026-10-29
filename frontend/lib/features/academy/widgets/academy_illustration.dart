@@ -25,10 +25,14 @@ enum AcademyDrawing {
 class AcademyIllustration extends StatelessWidget {
   final String courseTitle;
   final String lessonTitle;
+  final bool showPhoto;
+  final bool showHeading;
   const AcademyIllustration({
     super.key,
     required this.courseTitle,
     required this.lessonTitle,
+    this.showPhoto = true,
+    this.showHeading = true,
   });
   @override
   Widget build(BuildContext context) {
@@ -88,13 +92,17 @@ class AcademyIllustration extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            HeritagePhoto(photo: photo),
-            const SizedBox(height: 20),
-            Text(
-              'Les idées en image',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
+            if (showPhoto) ...[
+              HeritagePhoto(photo: photo),
+              const SizedBox(height: 20),
+            ],
+            if (showHeading) ...[
+              Text(
+                'Les idées en image',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+            ],
             LayoutBuilder(
               builder: (context, constraints) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);

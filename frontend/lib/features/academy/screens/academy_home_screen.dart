@@ -8,6 +8,7 @@ import '../models/academy_models.dart';
 import '../services/academy_gateway.dart';
 import '../widgets/academy_quiz_dialog.dart';
 import '../widgets/academy_artwork.dart';
+import '../widgets/academy_style.dart';
 
 class AcademyHomeScreen extends StatefulWidget {
   final AcademyGateway? gateway;
@@ -118,108 +119,108 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final palette = theme.colorScheme.copyWith(
-      primary: dark ? const Color(0xFF35CFDA) : const Color(0xFF008B98),
-      surface: dark ? const Color(0xFF10212D) : Colors.white,
-      surfaceContainerLow: dark ? const Color(0xFF132936) : const Color(0xFFF7F8F8),
-      surfaceContainerHighest: dark ? const Color(0xFF203846) : const Color(0xFFF1F5F5),
-      secondaryContainer: dark ? const Color(0xFF153C49) : const Color(0xFFDFF1F1),
-      onSecondaryContainer: dark ? const Color(0xFFDBF7F8) : const Color(0xFF123B45),
-      onSurface: dark ? const Color(0xFFF0F6F9) : const Color(0xFF10202B),
-      onSurfaceVariant: dark ? const Color(0xFFB8CBD5) : const Color(0xFF52616C),
-      outlineVariant: dark ? const Color(0xFF304652) : const Color(0xFFDEE5E8),
-    );
-    return Theme(data: theme.copyWith(colorScheme: palette,
-      cardTheme: theme.cardTheme.copyWith(color: palette.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: palette.outlineVariant)))),
-      child: RefreshIndicator(
-      onRefresh: _loadAcademy,
-      child: ListView(
-        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 700 ? 12 : 18),
-        children: [
-          LayoutBuilder(builder: (context, constraints) {
-            final hero = _AcademyHeader(
-            onContinue:
-                _loading ||
-                    _data == null ||
-                    !_data!.courses.any((c) => !c.isLocked && !c.isMastered)
-                ? null
-                : _continueLearning,
-          );
-            if (_data == null || _loading || _error != null) return hero;
-            final progress = _ProgressPanel(progress: _data!.progress);
-            if (constraints.maxWidth >= 850 &&
-                MediaQuery.textScalerOf(context).scale(16) <= 24) {
-              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(flex: 3, child: hero),
-                const SizedBox(width: 16),
-                Expanded(flex: 2, child: progress),
-              ]);
-            }
-            return Column(children: [hero, const SizedBox(height: 16), progress]);
-          }),
-          const SizedBox(height: 18),
-          if (_data?.offline == true && !_loading && _error == null) ...[
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.offline_bolt_outlined),
-                title: Text('Cours disponibles hors connexion'),
-                subtitle: Text(
-                  'Tu peux lire les contenus conservés et poursuivre les leçons. Tes réponses et ta progression seront synchronisées au retour de la connexion.',
-                ),
-              ),
+    return AcademyStyle(
+      child: Builder(
+        builder: (context) => RefreshIndicator(
+          onRefresh: _loadAcademy,
+          child: ListView(
+            padding: EdgeInsets.all(
+              MediaQuery.sizeOf(context).width < 700 ? 12 : 18,
             ),
-            const SizedBox(height: 12),
-          ],
-          if ((_data?.pendingActions ?? 0) > 0 && !_loading)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.sync),
-                title: const Text('Tes progrès sont conservés'),
-                subtitle: Text(
-                  'Ils seront envoyés dès que la connexion sera rétablie.',
-                ),
-                trailing: IconButton(
-                  tooltip: 'Réessayer',
-                  onPressed: _loadAcademy,
-                  icon: const Icon(Icons.sync),
-                ),
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final hero = _AcademyHeader(
+                    onContinue:
+                        _loading ||
+                            _data == null ||
+                            !_data!.courses.any(
+                              (c) => !c.isLocked && !c.isMastered,
+                            )
+                        ? null
+                        : _continueLearning,
+                  );
+                  if (_data == null || _loading || _error != null) return hero;
+                  final progress = _ProgressPanel(progress: _data!.progress);
+                  if (constraints.maxWidth >= 850 &&
+                      MediaQuery.textScalerOf(context).scale(16) <= 24) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: hero),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 2, child: progress),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [hero, const SizedBox(height: 16), progress],
+                  );
+                },
               ),
-            ),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(42),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_error != null)
-            _AcademyErrorCard(message: _error!, onRetry: _loadAcademy)
-          else
-            _AcademyContent(
-              data: _data!,
-              searchController: _searchController,
-              courseFilter: _courseFilter,
-              levelFilter: _levelFilter,
-              categoryFilter: _categoryFilter,
-              onFiltersChanged: () => setState(() {}),
-              onCourseFilterChanged: (value) {
-                setState(() => _courseFilter = value);
-              },
-              onLevelChanged: (value) => setState(() => _levelFilter = value),
-              onCategoryChanged: (value) {
-                setState(() => _categoryFilter = value);
-              },
-              rewardingActionId: _rewardingActionId,
-              onCompleteNextLesson: _completeNextLesson,
-              onPassQuiz: _openQuiz,
-            ),
-        ],
+              const SizedBox(height: 18),
+              if (_data?.offline == true && !_loading && _error == null) ...[
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.offline_bolt_outlined),
+                    title: Text('Cours disponibles hors connexion'),
+                    subtitle: Text(
+                      'Tu peux lire les contenus conservés et poursuivre les leçons. Tes réponses et ta progression seront synchronisées au retour de la connexion.',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if ((_data?.pendingActions ?? 0) > 0 && !_loading)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: const Text('Tes progrès sont conservés'),
+                    subtitle: Text(
+                      'Ils seront envoyés dès que la connexion sera rétablie.',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Réessayer',
+                      onPressed: _loadAcademy,
+                      icon: const Icon(Icons.sync),
+                    ),
+                  ),
+                ),
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(42),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_error != null)
+                _AcademyErrorCard(message: _error!, onRetry: _loadAcademy)
+              else
+                _AcademyContent(
+                  gateway: _gateway,
+                  data: _data!,
+                  searchController: _searchController,
+                  courseFilter: _courseFilter,
+                  levelFilter: _levelFilter,
+                  categoryFilter: _categoryFilter,
+                  onFiltersChanged: () => setState(() {}),
+                  onCourseFilterChanged: (value) {
+                    setState(() => _courseFilter = value);
+                  },
+                  onLevelChanged: (value) =>
+                      setState(() => _levelFilter = value),
+                  onCategoryChanged: (value) {
+                    setState(() => _categoryFilter = value);
+                  },
+                  rewardingActionId: _rewardingActionId,
+                  onCompleteNextLesson: _completeNextLesson,
+                  onPassQuiz: _openQuiz,
+                ),
+            ],
+          ),
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -230,49 +231,100 @@ class _AcademyHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [Color(0xFF102B36), Color(0xFF061B28)]),
+      gradient: const LinearGradient(
+        colors: [Color(0xFF102B36), Color(0xFF061B28)],
+      ),
       borderRadius: BorderRadius.circular(22),
       border: Border.all(color: const Color(0xFF31515D)),
     ),
-    child: LayoutBuilder(builder: (context, constraints) {
-      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-      final wide = MediaQuery.sizeOf(context).width >= 900 && constraints.maxWidth >= 400;
-      final sideArt = constraints.maxWidth >= 265 && scale <= 1.3;
-      final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(wide ? 'APPRENDRE POUR AGIR' : 'ENACTSPACE ACADEMY', style: const TextStyle(
-          color: Color(0xFFFFD34D), fontSize: 11,
-          fontWeight: FontWeight.w800, letterSpacing: 1.2)),
-        const SizedBox(height: 12),
-        Text(wide ? 'Fais grandir ton impact.' : 'Apprendre pour agir.',
-          style: TextStyle(color: Colors.white, fontSize: wide ? 32 : 26,
-            fontWeight: FontWeight.w900, height: 1.15)),
-        const SizedBox(height: 12),
-        Text(wide ? 'Des leçons, des projets et de la pratique pour avancer à ton rythme.' : 'Avance à ton rythme, fais grandir ton impact.',
-          style: const TextStyle(color: Color(0xFFD2E2E8), height: 1.5)),
-      ]);
-      final button = ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD34D),
-          foregroundColor: const Color(0xFF151D24),
-          disabledBackgroundColor: const Color(0xFF344A54),
-          disabledForegroundColor: const Color(0xFFCBDAE0),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15)),
-        onPressed: onContinue, icon: const Icon(Icons.play_arrow_rounded),
-        label: const Text('Continuer mon apprentissage', textAlign: TextAlign.center),
-      );
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (sideArt) Row(children: [Expanded(flex: 3, child: copy),
-          const SizedBox(width: 10),
-          Expanded(flex: 2, child: AcademyArtwork(name: 'hero_learning', height: wide ? 160 : 140)),
-        ]) else copy,
-        if (!sideArt) const AcademyArtwork(name: 'hero_learning', height: 100),
-        const SizedBox(height: 18),
-        if (wide) Align(alignment: Alignment.centerLeft, child: button) else button,
-      ]);
-    }),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+        final wide =
+            MediaQuery.sizeOf(context).width >= 900 &&
+            constraints.maxWidth >= 400;
+        final sideArt = constraints.maxWidth >= 280 && scale <= 1.3;
+        final copy = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              wide ? 'APPRENDRE POUR AGIR' : 'ENACTSPACE ACADEMY',
+              style: const TextStyle(
+                color: Color(0xFFFFD34D),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              wide ? 'Fais grandir ton impact.' : 'Apprendre pour agir.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: wide ? 32 : 26,
+                fontWeight: FontWeight.w900,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              wide
+                  ? 'Des leçons, des projets et de la pratique pour avancer à ton rythme.'
+                  : 'Avance à ton rythme, fais grandir ton impact.',
+              style: const TextStyle(color: Color(0xFFD2E2E8), height: 1.5),
+            ),
+          ],
+        );
+        final button = ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFFD34D),
+            foregroundColor: const Color(0xFF151D24),
+            disabledBackgroundColor: const Color(0xFF344A54),
+            disabledForegroundColor: const Color(0xFFCBDAE0),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          ),
+          onPressed: onContinue,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text(
+            'Continuer mon apprentissage',
+            textAlign: TextAlign.center,
+          ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (sideArt)
+              Row(
+                children: [
+                  Expanded(flex: 3, child: copy),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: AcademyArtwork(
+                      name: 'hero_learning',
+                      height: wide ? 178 : 156,
+                    ),
+                  ),
+                ],
+              )
+            else
+              copy,
+            if (!sideArt)
+              const AcademyArtwork(name: 'hero_learning', height: 100),
+            const SizedBox(height: 18),
+            if (wide)
+              Align(alignment: Alignment.centerLeft, child: button)
+            else
+              button,
+          ],
+        );
+      },
+    ),
   );
 }
 
 class _AcademyContent extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyHomeData data;
   final TextEditingController searchController;
   final String courseFilter;
@@ -287,6 +339,7 @@ class _AcademyContent extends StatelessWidget {
   final ValueChanged<AcademyCourseModel> onPassQuiz;
 
   const _AcademyContent({
+    required this.gateway,
     required this.data,
     required this.searchController,
     required this.courseFilter,
@@ -308,7 +361,7 @@ class _AcademyContent extends StatelessWidget {
       final searchable = [
         course.title,
         course.description,
-        course.category,
+        course.categoryLabel,
         course.level,
         ...course.lessons.map((lesson) => lesson.title),
         ...course.lessons.map((lesson) => lesson.summary),
@@ -358,7 +411,6 @@ class _AcademyContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Ton parcours recommandé',
@@ -366,7 +418,7 @@ class _AcademyContent extends StatelessWidget {
               'Des chemins courts pour intégrer, progresser et préparer les temps forts.',
         ),
         const SizedBox(height: 12),
-        _PathGrid(paths: data.paths),
+        _PathGrid(paths: data.paths, gateway: gateway),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Explore les formations',
@@ -388,6 +440,7 @@ class _AcademyContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _CourseGrid(
+          gateway: gateway,
           courses: _filteredCourses,
           rewardingActionId: rewardingActionId,
           onCompleteNextLesson: onCompleteNextLesson,
@@ -404,6 +457,7 @@ class _AcademyContent extends StatelessWidget {
           _CaseStudiesGrid(caseStudies: _filteredCaseStudies)
         else
           _CourseGrid(
+            gateway: gateway,
             courses: _filteredCourses
                 .where(
                   (c) =>
@@ -413,7 +467,7 @@ class _AcademyContent extends StatelessWidget {
                 .toList(),
             rewardingActionId: rewardingActionId,
             onCompleteNextLesson: onCompleteNextLesson,
-          onPassQuiz: onPassQuiz,
+            onPassQuiz: onPassQuiz,
           ),
         const SizedBox(height: 22),
         const _SectionTitle(
@@ -443,49 +497,205 @@ class _AcademyContent extends StatelessWidget {
 class _ProgressPanel extends StatelessWidget {
   final AcademyProgressModel progress;
   const _ProgressPanel({required this.progress});
-
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final ratio = progress.totalLessons == 0 ? 0.0 :
-        (progress.completedLessons / progress.totalLessons).clamp(0.0, 1.0);
-    return Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Ma progression', style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w900)),
-        const SizedBox(height: 18),
-        LayoutBuilder(builder: (context, constraints) {
-          final columns = MediaQuery.textScalerOf(context).scale(16) > 24 ||
-              constraints.maxWidth < 210 ? 1 : 3;
-          final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
-          return Wrap(spacing: 10, runSpacing: 10, children: [
-            for (final stat in [
-              ('${progress.completedLessons}/${progress.totalLessons}', 'Leçons', Icons.menu_book_rounded),
-              ('${progress.passedQuizzes}/${progress.totalQuizzes}', 'Quiz réussis', Icons.task_alt_rounded),
-              ('${progress.points}', 'Points', Icons.star_outline_rounded),
-            ]) SizedBox(width: width, child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              decoration: BoxDecoration(color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14)),
-              child: Column(children: [Icon(stat.$3, color: colors.primary),
-                const SizedBox(height: 8),
-                Text(stat.$1, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4), Text(stat.$2, textAlign: TextAlign.center),
-              ]),
-            )),
-          ]);
-        }),
-        const SizedBox(height: 18),
-        LinearProgressIndicator(value: ratio, minHeight: 9,
-          color: AppTheme.enactusYellow,
-          backgroundColor: colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(99)),
-        const SizedBox(height: 10),
-        Text('${(ratio * 100).round()} % des leçons terminées · Chaque étape compte.',
-          style: TextStyle(color: colors.onSurfaceVariant, height: 1.4)),
-      ],
-    )));
+    final ratio = progress.lessonsProgress.clamp(0.0, 1.0);
+    final expandedPanel = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.bar_chart_rounded, color: colors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ma progression',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked =
+                    constraints.maxWidth < 210 ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                final width = stacked
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 16) / 3;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final stat in [
+                      (
+                        '${progress.completedLessons}/${progress.totalLessons}',
+                        'Leçons',
+                        Icons.menu_book_rounded,
+                      ),
+                      (
+                        '${progress.passedQuizzes}/${progress.totalQuizzes}',
+                        'Quiz réussis',
+                        Icons.task_alt_rounded,
+                      ),
+                      ('${progress.points}', 'Points', Icons.star_rounded),
+                    ])
+                      SizedBox(
+                        width: width,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerLow,
+                            border: Border.all(color: colors.outlineVariant),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                stat.$3,
+                                color: stat.$2 == 'Points'
+                                    ? academyYellow
+                                    : colors.primary,
+                              ),
+                              const SizedBox(height: 9),
+                              Text(
+                                stat.$1,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(stat.$2, textAlign: TextAlign.center),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            AcademyProgressBar(value: ratio),
+            const SizedBox(height: 9),
+            Text(
+              '${(ratio * 100).round()} % des leçons terminées · Chaque étape compte.',
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 440 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3)
+          return expandedPanel;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Ma progression',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final stat in [
+                                (
+                                  '${progress.completedLessons}/${progress.totalLessons}',
+                                  'Leçons',
+                                ),
+                                (
+                                  '${progress.passedQuizzes}/${progress.totalQuizzes}',
+                                  'Quiz réussis',
+                                ),
+                                ('${progress.points}', 'Points'),
+                              ])
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        stat.$1,
+                                        style: const TextStyle(
+                                          fontSize: 21,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        stat.$2,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ExcludeSemantics(
+                      child: Image.asset(
+                        'assets/img/academy_mobile_progression.webp',
+                        width: constraints.maxWidth < 310 ? 52 : 68,
+                        height: 85,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                AcademyProgressBar(value: ratio),
+                const SizedBox(height: 7),
+                Text(
+                  '${(ratio * 100).round()} % des leçons terminées',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -513,57 +723,139 @@ class _AcademyFiltersCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
-    final colors = Theme.of(context).colorScheme;
-    Widget menu(String label, List<(String, String)> values,
-        ValueChanged<String> changed) => PopupMenuButton<String>(
-      tooltip: label, onSelected: changed,
-      itemBuilder: (_) => [for (final value in values)
-        PopupMenuItem(value: value.$1, child: Text(value.$2))],
-      child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(color: colors.surfaceContainerLow,
-          border: Border.all(color: colors.outlineVariant),
-          borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [Expanded(child: Text(label)),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 20)])),
-    );
-    final levels = <(String, String)>[('all', 'Tous niveaux'),
-      ('debutant', 'Débutant'), ('intermediaire', 'Intermédiaire'),
-      ('avance', 'Avancé'), ('responsable', 'Responsable')];
-    final levelLabel = levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ?? 'Tous niveaux';
-    final search = TextField(controller: controller, onChanged: (_) => onChanged(),
-      decoration: InputDecoration(hintText: 'Rechercher une formation…',
-        prefixIcon: const Icon(Icons.search_rounded),
-        suffixIcon: controller.text.isEmpty ? null : IconButton(
-          tooltip: 'Effacer', icon: const Icon(Icons.close_rounded),
-          onPressed: () { controller.clear(); onChanged(); })),
-    );
-    final statuses = Wrap(spacing: 8, runSpacing: 8, children: [
-      for (final item in [('all', 'Tous'), ('required', 'Obligatoires'),
-          ('in_progress', 'En cours'), ('completed', 'Terminés')])
-        _AcademyChoiceChip(label: item.$2, selected: courseFilter == item.$1,
-          onSelected: () => onCourseFilterChanged(item.$1)),
-    ]);
-    final split = constraints.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(16) <= 24;
-    final menuWidth = split ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth;
-    if (constraints.maxWidth >= 900 && MediaQuery.textScalerOf(context).scale(16) <= 18) {
-      return Row(children: [Expanded(child: search), const SizedBox(width: 12),
-        SizedBox(width: 300, child: statuses), const SizedBox(width: 12),
-        SizedBox(width: 135, child: menu(levelLabel, levels, onLevelChanged)),
-        const SizedBox(width: 8), SizedBox(width: 175, child: menu(_academyCategoryLabel(categoryFilter),
-          [('all', 'Toutes les catégories'), for (final c in categories) (_academyKey(c), c)], onCategoryChanged)),
-      ]);
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      search, const SizedBox(height: 10), statuses, const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        SizedBox(width: menuWidth, child: menu(levelLabel, levels, onLevelChanged)),
-        SizedBox(width: menuWidth, child: menu(_academyCategoryLabel(categoryFilter),
-          [('all', 'Toutes les catégories'), for (final c in categories) (_academyKey(c), c)],
-          onCategoryChanged)),
-      ]),
-    ]);
-  });
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final colors = Theme.of(context).colorScheme;
+      Widget menu(
+        String label,
+        List<(String, String)> values,
+        ValueChanged<String> changed,
+      ) => PopupMenuButton<String>(
+        tooltip: label,
+        onSelected: changed,
+        itemBuilder: (_) => [
+          for (final value in values)
+            PopupMenuItem(value: value.$1, child: Text(value.$2)),
+        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            border: Border.all(color: colors.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: Text(label)),
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+            ],
+          ),
+        ),
+      );
+      final levels = <(String, String)>[
+        ('all', 'Tous niveaux'),
+        ('debutant', 'Débutant'),
+        ('intermediaire', 'Intermédiaire'),
+        ('avance', 'Avancé'),
+        ('responsable', 'Responsable'),
+      ];
+      final levelLabel =
+          levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ??
+          'Tous niveaux';
+      final search = TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          hintText: 'Rechercher une formation…',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Effacer',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged();
+                  },
+                ),
+        ),
+      );
+      final statuses = Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final item in [
+            ('all', 'Tous'),
+            ('required', 'Obligatoires'),
+            ('in_progress', 'En cours'),
+            ('completed', 'Terminés'),
+          ])
+            _AcademyChoiceChip(
+              label: item.$2,
+              selected: courseFilter == item.$1,
+              onSelected: () => onCourseFilterChanged(item.$1),
+            ),
+        ],
+      );
+      final split =
+          constraints.maxWidth >= 300 &&
+          MediaQuery.textScalerOf(context).scale(16) <= 24;
+      final menuWidth = split
+          ? (constraints.maxWidth - 8) / 2
+          : constraints.maxWidth;
+      if (constraints.maxWidth >= 900 &&
+          MediaQuery.textScalerOf(context).scale(16) <= 18) {
+        return Row(
+          children: [
+            Expanded(child: search),
+            const SizedBox(width: 12),
+            SizedBox(width: 300, child: statuses),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 135,
+              child: menu(levelLabel, levels, onLevelChanged),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 175,
+              child: menu(_academyCategoryLabel(categoryFilter), [
+                ('all', 'Toutes les catégories'),
+                for (final c in categories)
+                  (_academyKey(c), academyCategoryLabel(c)),
+              ], onCategoryChanged),
+            ),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          search,
+          const SizedBox(height: 10),
+          statuses,
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: menuWidth,
+                child: menu(levelLabel, levels, onLevelChanged),
+              ),
+              SizedBox(
+                width: menuWidth,
+                child: menu(_academyCategoryLabel(categoryFilter), [
+                  ('all', 'Toutes les catégories'),
+                  for (final c in categories)
+                    (_academyKey(c), academyCategoryLabel(c)),
+                ], onCategoryChanged),
+              ),
+            ],
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _AcademyChoiceChip extends StatelessWidget {
@@ -583,8 +875,13 @@ class _AcademyChoiceChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       selectedColor: AppTheme.enactusYellow,
-      labelStyle: TextStyle(color: selected ? const Color(0xFF17212A) :
-          Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600),
+      labelStyle: TextStyle(
+        color: selected
+            ? const Color(0xFF17212A)
+            : Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
       showCheckmark: false,
       onSelected: (_) => onSelected(),
     );
@@ -592,63 +889,119 @@ class _AcademyChoiceChip extends StatelessWidget {
 }
 
 class _PathGrid extends StatelessWidget {
+  final AcademyGateway gateway;
   final List<AcademyPathModel> paths;
-  const _PathGrid({required this.paths});
+  const _PathGrid({required this.paths, required this.gateway});
   @override
   Widget build(BuildContext context) {
     if (paths.isEmpty) return const SizedBox.shrink();
-    final recommended = paths.where((p) => p.id == 'new-enacteur').firstOrNull ?? paths.first;
+    final recommended =
+        paths.where((p) => p.id == 'new-enacteur').firstOrNull ?? paths.first;
     final others = paths.where((p) => p.id != recommended.id).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _PathCard(path: recommended),
-      if (others.isNotEmpty) ExpansionTile(title: const Text('Autres parcours'),
-        children: [for (final path in others) _PathCard(path: path)]),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PathCard(path: recommended, gateway: gateway),
+        if (others.isNotEmpty)
+          ExpansionTile(
+            title: const Text('Autres parcours'),
+            children: [
+              for (final path in others)
+                _PathCard(path: path, gateway: gateway),
+            ],
+          ),
+      ],
+    );
   }
 }
 
 class _PathCard extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyPathModel path;
-  const _PathCard({required this.path});
+  const _PathCard({required this.path, required this.gateway});
   @override
-  Widget build(BuildContext context) => Card(child: Padding(
-    padding: const EdgeInsets.all(14), child: LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 700;
-      final sideArt = constraints.maxWidth >= 270 && MediaQuery.textScalerOf(context).scale(16) <= 24;
-      final action = OutlinedButton.icon(
-        onPressed: path.courseIds.isEmpty ? null : () => context.go('/academy/paths/${path.id}'),
-        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-        label: const Text('Explorer le parcours', textAlign: TextAlign.center));
-      final copy = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(path.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 6),
-        if (wide) ...[Text(path.description), const SizedBox(height: 8)],
-        Text('${path.courseIds.length} formations · ${path.progress.toStringAsFixed(0)} % complété'),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(value: (path.progress / 100).clamp(0.0, 1.0),
-          minHeight: 6, color: AppTheme.enactusYellow,
-          borderRadius: BorderRadius.circular(99)),
-        if (!wide) ...[const SizedBox(height: 10), action],
-      ]);
-      if (!sideArt) return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [const AcademyArtwork(name: 'recommended_path', height: 85),
-          const SizedBox(height: 8), copy]);
-      return Row(children: [SizedBox(width: wide ? 150 : 88,
-        child: const AcademyArtwork(name: 'recommended_path', height: 100)),
-        const SizedBox(width: 14), Expanded(child: copy),
-        if (wide) ...[const SizedBox(width: 20), action],
-      ]);
-    }),
-  ));
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 700;
+          final sideArt =
+              constraints.maxWidth >= 270 &&
+              MediaQuery.textScalerOf(context).scale(16) <= 24;
+          final action = OutlinedButton.icon(
+            onPressed: path.courseIds.isEmpty
+                ? null
+                : () => context.go('/academy/paths/${path.id}', extra: gateway),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text(
+              'Explorer le parcours',
+              textAlign: TextAlign.center,
+            ),
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                path.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (wide) ...[Text(path.description), const SizedBox(height: 8)],
+              Text(
+                '${path.courseIds.length} formations · ${path.progress.toStringAsFixed(0)} % complété',
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: (path.progress / 100).clamp(0.0, 1.0),
+                minHeight: 6,
+                color: AppTheme.enactusYellow,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              if (!wide) ...[const SizedBox(height: 10), action],
+            ],
+          );
+          if (!sideArt)
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AcademyArtwork(name: 'recommended_path', height: 85),
+                const SizedBox(height: 8),
+                copy,
+              ],
+            );
+          return Row(
+            children: [
+              SizedBox(
+                width: wide ? 150 : 88,
+                child: const AcademyArtwork(
+                  name: 'recommended_path',
+                  height: 100,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: copy),
+              if (wide) ...[const SizedBox(width: 20), action],
+            ],
+          );
+        },
+      ),
+    ),
+  );
 }
 
 class _CourseGrid extends StatelessWidget {
+  final AcademyGateway gateway;
   final List<AcademyCourseModel> courses;
   final ValueChanged<AcademyCourseModel> onPassQuiz;
   final String? rewardingActionId;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
 
   const _CourseGrid({
+    required this.gateway,
     required this.courses,
     required this.onPassQuiz,
     required this.rewardingActionId,
@@ -668,6 +1021,7 @@ class _CourseGrid extends StatelessWidget {
       children: [
         for (final course in courses)
           _CourseCard(
+            gateway: gateway,
             course: course,
             onPassQuiz: onPassQuiz,
             busy: rewardingActionId == 'lesson-${course.id}',
@@ -679,74 +1033,176 @@ class _CourseGrid extends StatelessWidget {
 }
 
 class _CourseCard extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyCourseModel course;
   final bool busy;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
   final ValueChanged<AcademyCourseModel> onPassQuiz;
-  const _CourseCard({required this.course, required this.busy,
-    required this.onCompleteNextLesson, required this.onPassQuiz});
+  const _CourseCard({
+    required this.gateway,
+    required this.course,
+    required this.busy,
+    required this.onCompleteNextLesson,
+    required this.onPassQuiz,
+  });
 
   @override
-  Widget build(BuildContext context) => Card(child: Padding(
-    padding: const EdgeInsets.all(12), child: LayoutBuilder(builder: (context, constraints) {
-      final mobile = MediaQuery.sizeOf(context).width < 700;
-      final compact = mobile && constraints.maxWidth >= 270 &&
-          MediaQuery.textScalerOf(context).scale(16) <= 24;
-      final colors = Theme.of(context).colorScheme;
-      final started = course.lessons.any((l) => l.started || l.completed);
-      final label = course.isLocked ? 'Voir les prérequis' : course.isMastered ? 'Relire' :
-          course.canTakeQuiz ? 'Passer le quiz' : started ? 'Reprendre' : 'Commencer';
-      final title = Text(course.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900));
-      final chips = Wrap(spacing: 6, runSpacing: 5, children: [
-        for (final text in [course.levelLabel, course.category, if (course.isRequired) 'Obligatoire'])
-          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: colors.secondaryContainer,
-              borderRadius: BorderRadius.circular(8)),
-            child: Text(text, style: TextStyle(fontSize: 11, color: colors.onSecondaryContainer))),
-      ]);
-      final progress = Column(children: [
-        LinearProgressIndicator(value: course.progress.clamp(0.0, 1.0), minHeight: 6,
-          color: AppTheme.enactusYellow, borderRadius: BorderRadius.circular(99)),
-        const SizedBox(height: 5), Align(alignment: Alignment.centerRight,
-          child: Text('${course.completedLessonCount}/${course.lessonCount} fait',
-            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant))),
-      ]);
-      final action = FilledButton.icon(
-        style: FilledButton.styleFrom(backgroundColor: course.isLocked ? colors.secondaryContainer :
-          AppTheme.enactusYellow, foregroundColor: course.isLocked ? colors.onSecondaryContainer :
-          const Color(0xFF17212A)),
-        onPressed: busy ? null : () {
-          if (course.isLocked || course.isMastered) {
-            context.go('/academy/courses/${course.id}');
-          } else if (course.canTakeQuiz) {
-            onPassQuiz(course);
-          } else {
-            onCompleteNextLesson(course);
-          }
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final mobile = MediaQuery.sizeOf(context).width < 700;
+          final compact =
+              mobile &&
+              constraints.maxWidth >= 270 &&
+              MediaQuery.textScalerOf(context).scale(16) <= 24;
+          final colors = Theme.of(context).colorScheme;
+          final started = course.lessons.any((l) => l.started || l.completed);
+          final label = course.isLocked
+              ? 'Voir les prérequis'
+              : course.isMastered
+              ? 'Relire'
+              : course.canTakeQuiz
+              ? 'Passer le quiz'
+              : started
+              ? 'Reprendre'
+              : 'Commencer';
+          final title = Text(
+            course.title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          );
+          final chips = Wrap(
+            spacing: 6,
+            runSpacing: 5,
+            children: [
+              for (final text in [
+                course.levelLabel,
+                course.categoryLabel,
+                if (course.isRequired) 'Obligatoire',
+              ])
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+            ],
+          );
+          final progress = Column(
+            children: [
+              LinearProgressIndicator(
+                value: course.progress.clamp(0.0, 1.0),
+                minHeight: 6,
+                color: AppTheme.enactusYellow,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              const SizedBox(height: 5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${course.completedLessonCount}/${course.lessonCount} fait',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          );
+          final action = FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: course.isLocked
+                  ? colors.secondaryContainer
+                  : AppTheme.enactusYellow,
+              foregroundColor: course.isLocked
+                  ? colors.onSecondaryContainer
+                  : const Color(0xFF17212A),
+            ),
+            onPressed: busy
+                ? null
+                : () {
+                    if (course.isLocked || course.isMastered) {
+                      context.go(
+                        '/academy/courses/${course.id}',
+                        extra: gateway,
+                      );
+                    } else if (course.canTakeQuiz) {
+                      onPassQuiz(course);
+                    } else {
+                      onCompleteNextLesson(course);
+                    }
+                  },
+            icon: Icon(
+              course.isLocked
+                  ? Icons.lock_outline_rounded
+                  : Icons.arrow_forward_rounded,
+              size: 17,
+            ),
+            label: Text(label, textAlign: TextAlign.center),
+          );
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              chips,
+              const SizedBox(height: 8),
+              title,
+              const SizedBox(height: 6),
+              if (!compact) ...[
+                Text(
+                  course.description,
+                  style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                '${course.lessonCount} leçons · ${course.durationMinutes} min${compact ? '' : ' · +${course.points} pts'}',
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              progress,
+              const SizedBox(height: 8),
+              action,
+            ],
+          );
+          final image = Container(
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: AcademyArtwork(
+              name: academyCourseArtwork(course.title, course.category),
+              height: compact ? 130 : 110,
+            ),
+          );
+          if (compact)
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 88, child: image),
+                const SizedBox(width: 12),
+                Expanded(child: details),
+              ],
+            );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [image, const SizedBox(height: 12), details],
+          );
         },
-        icon: Icon(course.isLocked ? Icons.lock_outline_rounded : Icons.arrow_forward_rounded, size: 17),
-        label: Text(label, textAlign: TextAlign.center),
-      );
-      final details = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        chips, const SizedBox(height: 8), title, const SizedBox(height: 6),
-        if (!compact) ...[Text(course.description, style: TextStyle(color: colors.onSurfaceVariant,
-          height: 1.4)), const SizedBox(height: 10)],
-        Text('${course.lessonCount} leçons · ${course.durationMinutes} min${compact ? '' : ' · +${course.points} pts'}',
-          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
-        const SizedBox(height: 8), progress, const SizedBox(height: 8), action,
-      ]);
-      final image = Container(decoration: BoxDecoration(
-        color: colors.secondaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12)),
-        child: AcademyArtwork(name: academyCourseArtwork(course.title, course.category),
-          height: compact ? 130 : 110));
-      if (compact) return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 88, child: image), const SizedBox(width: 12), Expanded(child: details),
-      ]);
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [image, const SizedBox(height: 12), details]);
-    }),
-  ));
+      ),
+    ),
+  );
 }
 
 class _QuizStrip extends StatelessWidget {
@@ -1157,8 +1613,10 @@ class _ResponsiveWrap extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-        final count = (constraints.maxWidth / (minWidth * scale.clamp(1.0, 2.0)))
-            .floor().clamp(1, 3);
+        final count =
+            (constraints.maxWidth / (minWidth * scale.clamp(1.0, 2.0)))
+                .floor()
+                .clamp(1, 3);
         const spacing = 12.0;
         final width = (constraints.maxWidth - spacing * (count - 1)) / count;
 
@@ -1284,7 +1742,7 @@ String _academyCategoryLabel(String value) {
     case 'impact':
       return 'Impact';
     case 'business_principles':
-      return 'Business Principles';
+      return 'Principes entrepreneuriaux';
     case 'competition':
       return 'Compétition';
     case 'leadership':
@@ -1318,4 +1776,3 @@ String _academyKey(String value) {
       .replaceAll('-', '_')
       .replaceAll(' ', '_');
 }
-
