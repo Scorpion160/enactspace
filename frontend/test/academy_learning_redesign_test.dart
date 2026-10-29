@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/core/auth/user_experience.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -15,6 +16,7 @@ import 'package:frontend/features/academy/screens/academy_path_screen.dart';
 import 'package:frontend/features/academy/services/academy_gateway.dart';
 import 'package:frontend/features/academy/widgets/academy_lesson_reader.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 const _learner = UserExperience(
   id: 'learner',
@@ -124,6 +126,18 @@ class _Gateway implements AcademyGateway {
 }
 
 void main() {
+  setUpAll(() async {
+    const directory = String.fromEnvironment('ACADEMY_CAPTURE_DIR');
+    if (directory.isEmpty) return;
+    for (final weight in FontWeight.values) {
+      GoogleFonts.poppins(fontWeight: weight);
+      GoogleFonts.poppins(fontWeight: weight, fontStyle: FontStyle.italic);
+    }
+    await GoogleFonts.pendingFonts();
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    await icons.load();
+  });
   test('reading sections preserve paragraphs and support separate headings', () {
     final sections = AcademyLessonSection.parse(_firstBody);
     expect(sections.map((s) => s.heading), [
@@ -399,12 +413,22 @@ Future<void> _capture(WidgetTester tester, String name) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const Key('academy-redesign-capture')),
   );
-  final image = await boundary.toImage(pixelRatio: 1);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  if (bytes == null) throw StateError('Screenshot unavailable');
+  for (final element in find.byType(Image).evaluate()) {
+    final widget = element.widget as Image;
+    await tester.runAsync(() => precacheImage(widget.image, element));
+  }
+  await tester.pumpAndSettle();
   await tester.runAsync(() async {
-    await Directory(directory).create(recursive: true);
-    await File('$directory/$name.png').writeAsBytes(bytes.buffer.asUint8List());
+    final image = await boundary.toImage(pixelRatio: 1);
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw StateError('Screenshot unavailable');
+      await Directory(directory).create(recursive: true);
+      await File(
+        '$directory/$name.png',
+      ).writeAsBytes(bytes.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
   });
 }

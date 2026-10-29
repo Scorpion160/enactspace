@@ -21,7 +21,7 @@ $files = @(
     @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40'; New = $true; Binary = $false },
     @{ Path = 'frontend/lib/features/academy/widgets/academy_quiz_dialog.dart'; Hash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd'; New = $false; Binary = $false; BaselineHash = 'a0e860f5299ade0ca214543e15fe69db0d10ad1288e5a399d21ff2e93f7f3bda' },
     @{ Path = 'frontend/assets/img/academy_mobile_progression.webp'; Hash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f'; New = $true; Binary = $true },
-    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '955ed57394f75d251c5f6e89b1937c86960b16b48af9fbdeeb67b948fec47322'; New = $true; Binary = $false },
+    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '5f9d9b78e3b517376d7261cb5a3e15f373cf2ae612ee800a81ab65893d3dc5e0'; New = $true; Binary = $false },
     @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'fd34a00447b6a245e79f9501ff5b10f28278d26d01613bafb17cb530cdbd0cf2'; New = $true; Binary = $false }
 )
 function Canonical([string]$Path) {
