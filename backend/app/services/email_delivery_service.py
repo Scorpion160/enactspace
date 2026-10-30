@@ -156,6 +156,12 @@ def _notification_delivery_still_allowed(
     ).first()
     if notification is None:
         return False
+    if notification.type == 'application_received':
+        from app.api.deps import can_access_recruitment
+        from app.models.user import User
+        recipient = db.get(User, notification.user_id)
+        if recipient is None or not recipient.email_verified or not can_access_recruitment(db, recipient):
+            return False
     preference = db.query(UserPreference).filter(
         UserPreference.user_id == notification.user_id
     ).first()

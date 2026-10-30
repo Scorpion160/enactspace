@@ -170,7 +170,7 @@ class RecruitmentCampaignPublicRead(BaseModel):
 
 class RecruitmentCampaignCreate(BaseModel):
     season_id: Optional[UUID] = None
-    title: str
+    title: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -183,6 +183,11 @@ class RecruitmentCampaignCreate(BaseModel):
     _question_ids = field_validator('application_questions')(validate_question_list)
     is_active: bool = True
 
+    @field_validator('title', mode='before')
+    @classmethod
+    def clean_title(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("target_profiles")
     @classmethod
     def clean_target_profiles(cls, values: list[str]) -> list[str]:
@@ -190,7 +195,7 @@ class RecruitmentCampaignCreate(BaseModel):
 
 
 class RecruitmentCampaignUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -202,6 +207,11 @@ class RecruitmentCampaignUpdate(BaseModel):
     application_questions: Optional[list[RecruitmentApplicationQuestion]] = Field(default=None, max_length=40)
     _question_ids = field_validator('application_questions')(validate_question_list)
     is_active: Optional[bool] = None
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def clean_title(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("target_profiles")
     @classmethod
@@ -243,17 +253,17 @@ class ApplicationCreate(BaseModel):
             raise ValueError('Choisis le canal Autre avant de préciser le moyen.')
         return self
 
-    questionnaire_answers: Optional[dict[str, str]] = None
-    questionnaire_version: Optional[str] = None
+    questionnaire_answers: Optional[dict[str, str]] = Field(default=None, max_length=40)
+    questionnaire_version: Optional[str] = Field(default=None, max_length=64)
     campaign_id: UUID
-    first_name: str
-    last_name: str
-    gender: str
-    email: EmailStr
-    phone: str
-    department: str
-    study_level: str
-    class_name: Optional[str] = None
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    gender: str = Field(min_length=1, max_length=40)
+    email: EmailStr = Field(max_length=150)
+    phone: str = Field(min_length=6, max_length=30)
+    department: str = Field(min_length=1, max_length=150)
+    study_level: str = Field(min_length=1, max_length=100)
+    class_name: Optional[str] = Field(default=None, max_length=120)
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
@@ -261,8 +271,8 @@ class ApplicationCreate(BaseModel):
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
-    preferred_pole: Optional[str] = None
-    project_interest: Optional[str] = None
+    preferred_pole: Optional[str] = Field(default=None, max_length=150)
+    project_interest: Optional[str] = Field(default=None, max_length=180)
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
@@ -270,13 +280,18 @@ class ApplicationCreate(BaseModel):
     motivation_letter_url: Optional[str] = None
     attachment_url: Optional[str] = None
 
+    @field_validator('first_name', 'last_name', 'phone', 'department', 'study_level', mode='before')
+    @classmethod
+    def clean_identity(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 
 class ApplicationUpdate(BaseModel):
-    gender: Optional[str] = None
-    phone: Optional[str] = None
-    department: Optional[str] = None
-    study_level: Optional[str] = None
-    class_name: Optional[str] = None
+    gender: Optional[str] = Field(default=None, max_length=40)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    department: Optional[str] = Field(default=None, max_length=150)
+    study_level: Optional[str] = Field(default=None, max_length=100)
+    class_name: Optional[str] = Field(default=None, max_length=120)
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
@@ -284,8 +299,8 @@ class ApplicationUpdate(BaseModel):
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
-    preferred_pole: Optional[str] = None
-    project_interest: Optional[str] = None
+    preferred_pole: Optional[str] = Field(default=None, max_length=150)
+    project_interest: Optional[str] = Field(default=None, max_length=180)
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
@@ -297,7 +312,7 @@ class ApplicationUpdate(BaseModel):
 
 class ApplicationInterviewSchedule(BaseModel):
     interview_at: datetime
-    interview_location: Optional[str] = None
+    interview_location: Optional[str] = Field(default=None, max_length=180)
     interview_link: Optional[str] = None
     interview_jury: Optional[str] = None
     interview_note: Optional[str] = None
@@ -371,8 +386,8 @@ class ApplicationStatusChange(BaseModel):
 
 
 class ApplicationTrackingRequest(BaseModel):
-    application_id: str
-    email: EmailStr
+    application_id: str = Field(min_length=1, max_length=64)
+    email: EmailStr = Field(max_length=150)
 
 
 class ApplicationTrackingRead(BaseModel):

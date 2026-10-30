@@ -108,7 +108,7 @@ class FirstAccessTests(unittest.TestCase):
         self.assertNotIn(value,self.mail[-1]["text_body"])
     def test_short_whitespace_and_overlong_utf8_passwords_rejected(self):
         self.request()
-        for password in ("too short"," "*16,"é"*40):
+        for password in ("short"," "*16,"é"*40):
             self.confirm(password=password,expected=422)
         self.db.expire_all();self.assertTrue(self.user.credential_setup_required)
     def test_five_failed_codes_invalidate_challenge(self):

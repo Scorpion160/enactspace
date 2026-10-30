@@ -49,7 +49,7 @@ from app.api.deps import (
     user_has_any_role,
 )
 from app.core.config import settings
-from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES
+from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES, is_veille_pole_name
 from app.services.notification_service import notify_user, notify_users
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.email_delivery_service import enqueue_email_delivery
@@ -196,10 +196,14 @@ def apply_application_status(application: Application, value: str) -> bool:
     return True
 
 
-def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
-    campaign = db.query(RecruitmentCampaign).filter(
+def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool = False) -> RecruitmentCampaign:
+    query = db.query(RecruitmentCampaign).filter(
         RecruitmentCampaign.id == campaign_id
-    ).first()
+    )
+    if submission_lock:
+        # Shared locks allow parallel submissions and serialize campaign edits/closure.
+        query = query.populate_existing().with_for_update(read=True)
+    campaign = query.first()
 
     if not campaign:
         raise HTTPException(
@@ -211,7 +215,7 @@ def get_campaign_or_404(db: Session, campaign_id: str) -> RecruitmentCampaign:
 
 
 def campaign_is_open(campaign: RecruitmentCampaign) -> bool:
-    today = date.today()
+    today = utc_now().date()
     return (
         campaign.is_active
         and (campaign.start_date is None or campaign.start_date <= today)
@@ -271,12 +275,22 @@ def notify_recruitment_responsibles(
         .join(UserRole, UserRole.user_id == User.id)
         .join(Role, Role.id == UserRole.role_id)
         .filter(
-            User.is_active == True,
+            User.is_active.is_(True),
+            User.status == 'active',
+            User.email_verified.is_(True),
             Role.name.in_(RECRUITMENT_NOTIFICATION_ROLES),
         )
         .distinct()
         .all()
     )
+    veille_poles = [pole_id for pole_id, name in db.query(Pole.id, Pole.name).all()
+                    if is_veille_pole_name(name)]
+    if veille_poles:
+        recipients.extend(db.query(User).join(PoleMember, PoleMember.user_id == User.id).filter(
+            User.is_active.is_(True), User.status == 'active', User.email_verified.is_(True),
+            PoleMember.pole_id.in_(veille_poles), PoleMember.is_active.is_(True),
+            PoleMember.left_at.is_(None),
+        ).all())
 
     if not recipients:
         return
@@ -395,7 +409,9 @@ def update_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    campaign = get_campaign_or_404(db, campaign_id)
+    campaign = lock_row(db, RecruitmentCampaign, campaign_id)
+    if campaign is None:
+        raise HTTPException(404, 'Campagne de recrutement introuvable')
     validate_campaign_dates(
         payload.start_date or campaign.start_date,
         payload.end_date or campaign.end_date,
@@ -462,10 +478,10 @@ def delete_campaign(
         .with_for_update()
         .all()
     )
-    if any(application.converted_user_id for application in applications):
+    if applications:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Une campagne avec des candidatures converties doit être clôturée, pas supprimée",
+            detail="Une campagne contenant des candidatures doit être clôturée, pas supprimée",
         )
 
     db.delete(campaign)
@@ -486,7 +502,7 @@ def submit_application(
 
 
 def create_application(payload, db, attachments=None, created_files=None):
-    campaign = get_campaign_or_404(db, str(payload.campaign_id))
+    campaign = get_campaign_or_404(db, str(payload.campaign_id), submission_lock=True)
 
     if not campaign_is_open(campaign):
         raise HTTPException(
@@ -527,9 +543,12 @@ def create_application(payload, db, attachments=None, created_files=None):
     answer_snapshot = None
     if payload.questionnaire_version and payload.questionnaire_version != questionnaire_version(campaign.application_questions):
         raise HTTPException(status_code=409, detail="Le questionnaire a changé. Recharge la campagne pour relire tes réponses.")
-    if payload.questionnaire_answers is None and campaign.application_questions is not None:
+    if payload.questionnaire_answers is None:
         # Older clients can still answer existing fields; new required questions cannot be skipped.
         for q in effective_questions(campaign.application_questions):
+            if campaign.application_questions is None and not q.get('legacy_field'):
+                # Unmapped questions cannot be expressed by a legacy client.
+                continue
             answer = (getattr(payload, q.get('legacy_field') or '', '') or '').strip()
             if q.get('required') and not answer:
                 raise HTTPException(422, "Une réponse obligatoire est manquante : " + q['label'])
@@ -1002,6 +1021,7 @@ def list_applications(
 def export_applications_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
+    campaign_id: uuid.UUID | None = None,
 ):
     del current_user
     output = StringIO()
@@ -1013,7 +1033,7 @@ def export_applications_csv(
             "Genre",
             "Email",
             "Téléphone",
-            "Classe",
+            "Promotion",
             "Département",
             "Pôle souhaité",
             "Projet d'intérêt",
@@ -1023,20 +1043,34 @@ def export_applications_csv(
             "Date soumission",
             "Date entretien",
             "Décision",
+            "Campagne",
+            "Niveau d’études",
+            "Canal de découverte",
         ]
     )
 
-    applications = db.query(Application).order_by(Application.created_at.desc()).all()
+    query = db.query(Application)
+    if campaign_id is not None:
+        query = query.filter(Application.campaign_id == campaign_id)
+    applications = query.order_by(Application.created_at.desc()).all()
+    campaigns = {row.id: row.title for row in db.query(RecruitmentCampaign).filter(
+        RecruitmentCampaign.id.in_({row.campaign_id for row in applications})).all()} if applications else {}
+    latest_reviews = {}
+    if applications:
+        for review in db.query(ApplicationReview).filter(
+            ApplicationReview.application_id.in_([row.id for row in applications])
+        ).order_by(ApplicationReview.updated_at.desc(), ApplicationReview.id.desc()).all():
+            latest_reviews.setdefault(review.application_id, review)
     for application in applications:
-        latest_review = (
-            db.query(ApplicationReview)
-            .filter(ApplicationReview.application_id == application.id)
-            .order_by(ApplicationReview.updated_at.desc())
-            .first()
-        )
+        latest_review = latest_reviews.get(application.id)
         status_value = normalize_application_status(application.status)
         writer.writerow(
             [
+                "'" + value if isinstance(value, str) and (
+                    value.startswith(('\t', '\r', '\n'))
+                    or value.lstrip().startswith(('=', '+', '-', '@'))
+                ) else value
+                for value in [
                 application.last_name,
                 application.first_name,
                 application.gender,
@@ -1052,6 +1086,10 @@ def export_applications_csv(
                 application.created_at.isoformat() if application.created_at else "",
                 application.interview_at.isoformat() if application.interview_at else "",
                 APPLICATION_FINAL_RESULTS.get(status_value, ""),
+                campaigns.get(application.campaign_id, ''),
+                application.study_level,
+                application.known_enactus_from,
+                ]
             ]
         )
 
