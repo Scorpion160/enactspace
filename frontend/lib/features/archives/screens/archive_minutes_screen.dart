@@ -1,6 +1,8 @@
 import '../../../shared/ui/project_photo_gallery.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import '../../../shared/ui/reading_blocks.dart';
 import '../models/archive_models.dart';
@@ -157,19 +159,16 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
           ],
         ),
         const SizedBox(height: 20),
-        TextField(
-          key: const Key('minute_search'),
-          onChanged: (value) => setState(() => search = value),
-          decoration: const InputDecoration(
-            labelText: 'Une personne, un thème, une année…',
-            prefixIcon: Icon(Icons.search),
+        AppFilterToolbar(
+          search: TextField(
+            key: const Key('minute_search'),
+            onChanged: (value) => setState(() => search = value),
+            decoration: const InputDecoration(
+              labelText: 'Une personne, un thème, une année…',
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+          quickFilters: [
             ChoiceChip(
               label: const Text('Toutes les voix'),
               selected: theme == null,
@@ -182,6 +181,9 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
                 onSelected: (_) => setState(() => theme = value),
               ),
           ],
+          filters: const [],
+          actions: const [],
+          activeFilterCount: 0,
         ),
         const SizedBox(height: 24),
         if (visible.isEmpty)

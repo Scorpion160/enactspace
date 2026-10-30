@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/api/api_client.dart';
@@ -220,31 +222,38 @@ class _HelpManagementScreenState extends State<HelpManagementScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Rechercher',
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  onChanged: (text) => setState(() => query = text),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  key: ValueKey('help-filter-$showFeedback'),
-                  initialValue: filter,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'État'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: 'all',
-                      child: Text('Tous les états'),
+                AppFilterToolbar(
+                  search: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher',
+                      prefixIcon: Icon(Icons.search),
                     ),
-                    for (final entry in labels.entries)
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value),
-                      ),
+                    onChanged: (text) => setState(() => query = text),
+                  ),
+                  quickFilters: const [],
+                  filters: [
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('help-filter-$showFeedback'),
+                      initialValue: filter,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'État'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'all',
+                          child: Text('Tous les états'),
+                        ),
+                        for (final entry in labels.entries)
+                          DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => filter = value ?? 'all'),
+                    ),
                   ],
-                  onChanged: (value) => setState(() => filter = value ?? 'all'),
+                  actions: const [],
+                  activeFilterCount: filter == 'all' ? 0 : 1,
                 ),
                 const SizedBox(height: 16),
                 if (loading)

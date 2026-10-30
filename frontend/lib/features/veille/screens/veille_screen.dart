@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/ui/reading_blocks.dart';
@@ -320,10 +322,8 @@ class _VeilleScreenState extends State<VeilleScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
+          AppFilterToolbar(
+            quickFilters: [
               for (final entry in {
                 'all': 'Toutes',
                 'due': 'Dues sur cette période',
@@ -338,6 +338,9 @@ class _VeilleScreenState extends State<VeilleScreen> {
                   onSelected: (_) => setState(() => _taskFilter = entry.key),
                 ),
             ],
+            filters: const [],
+            actions: const [],
+            activeFilterCount: 0,
           ),
           const SizedBox(height: 16),
           if (tasks.isEmpty)
@@ -841,74 +844,58 @@ class _VeilleScreenState extends State<VeilleScreen> {
                 if (_data != null) ...[
                   VeilleCard(
                     title: 'Période des indicateurs et des bilans',
-                    child: LayoutBuilder(
-                      builder: (context, c) {
-                        final width =
-                            c.maxWidth < 700 ||
-                                MediaQuery.textScalerOf(context).scale(16) > 22
-                            ? c.maxWidth
-                            : (c.maxWidth - 12) / 2;
-                        return Wrap(
-                          spacing: 12,
-                          runSpacing: 16,
-                          children: [
-                            SizedBox(
-                              width: width,
-                              child: OutlinedButton.icon(
-                                onPressed: _loading ? null : _period,
-                                icon: const Icon(Icons.date_range_rounded),
-                                label: Text(
-                                  '${veilleDate(_start)} — ${veilleDate(_end)}',
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: _filter(
-                                'Enacteur / Enactrice',
-                                _member,
-                                veilleRows(_ctx['members']),
-                                (v) => setState(() => _member = v),
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: _filter(
-                                'Pôle',
-                                _pole,
-                                veilleRows(_ctx['poles']),
-                                (v) => setState(() {
-                                  _pole = v;
-                                  _project = null;
-                                  _member = null;
-                                }),
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: _filter(
-                                'Projet',
-                                _project,
-                                veilleRows(_ctx['projects']),
-                                (v) => setState(() {
-                                  _project = v;
-                                  _pole = null;
-                                  _member = null;
-                                }),
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: _filter(
-                                'Année',
-                                _season,
-                                veilleRows(_ctx['seasons']),
-                                (v) => setState(() => _season = v),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                    child: AppFilterToolbar(
+                      quickFiltersWidth: 280,
+                      quickFilters: [
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : _period,
+                          icon: const Icon(Icons.date_range_rounded),
+                          label: Text(
+                            '${veilleDate(_start)} — ${veilleDate(_end)}',
+                          ),
+                        ),
+                      ],
+                      filters: [
+                        _filter(
+                          'Enacteur / Enactrice',
+                          _member,
+                          veilleRows(_ctx['members']),
+                          (v) => setState(() => _member = v),
+                        ),
+                        _filter(
+                          'Pôle',
+                          _pole,
+                          veilleRows(_ctx['poles']),
+                          (v) => setState(() {
+                            _pole = v;
+                            _project = null;
+                            _member = null;
+                          }),
+                        ),
+                        _filter(
+                          'Projet',
+                          _project,
+                          veilleRows(_ctx['projects']),
+                          (v) => setState(() {
+                            _project = v;
+                            _pole = null;
+                            _member = null;
+                          }),
+                        ),
+                        _filter(
+                          'Année',
+                          _season,
+                          veilleRows(_ctx['seasons']),
+                          (v) => setState(() => _season = v),
+                        ),
+                      ],
+                      actions: const [],
+                      activeFilterCount: [
+                        _member,
+                        _pole,
+                        _project,
+                        _season,
+                      ].where((v) => v != null).length,
                     ),
                   ),
                   Padding(

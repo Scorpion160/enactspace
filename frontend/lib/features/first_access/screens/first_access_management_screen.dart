@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import '../services/first_access_service.dart';
 
@@ -166,26 +168,33 @@ class _FirstAccessManagementScreenState
                 style: TextStyle(height: 1.6),
               ),
               const SizedBox(height: 16),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Rechercher un membre',
-                  prefixIcon: Icon(Icons.search),
+              AppFilterToolbar(
+                search: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Rechercher un membre',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (value) => setState(() => search = value),
                 ),
-                onChanged: (value) => setState(() => search = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: filter,
-                isExpanded: true,
-                items: labels.entries
-                    .map(
-                      (entry) => DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => filter = value ?? 'all'),
+                quickFilters: const [],
+                filters: [
+                  DropdownButtonFormField<String>(
+                    initialValue: filter,
+                    isExpanded: true,
+                    items: labels.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => filter = value ?? 'all'),
+                  ),
+                ],
+                actions: const [],
+                activeFilterCount: filter == 'all' ? 0 : 1,
               ),
               const SizedBox(height: 16),
               if (loading)

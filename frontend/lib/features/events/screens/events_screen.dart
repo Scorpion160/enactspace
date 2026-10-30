@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../models/event_center_models.dart';
@@ -159,22 +161,18 @@ class _EventsScreenState extends State<EventsScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    TextField(
-                      controller: _search,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search_rounded),
-                        labelText: 'Rechercher un événement',
+                    AppFilterToolbar(
+                      quickFiltersWidth: 300,
+                      search: TextField(
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search_rounded),
+                          hintText: 'Rechercher un événement',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
+                      quickFilters: [
                         SegmentedButton<EventCenterPeriod>(
-                          expandedInsets: EdgeInsets.zero,
                           showSelectedIcon: false,
                           segments: const [
                             ButtonSegment(
@@ -194,53 +192,51 @@ class _EventsScreenState extends State<EventsScreen> {
                           onSelectionChanged: (values) =>
                               setState(() => _period = values.first),
                         ),
-                        SizedBox(
-                          width: compact ? double.infinity : 240,
-                          child: DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            initialValue: _type,
-                            decoration: const InputDecoration(
-                              labelText: 'Type',
+                      ],
+                      filters: [
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: _type,
+                          decoration: const InputDecoration(labelText: 'Type'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Tous les types'),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('Tous les types'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'meeting',
-                                child: Text('Réunion'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'training',
-                                child: Text('Formation'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'competition',
-                                child: Text('Compétition'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'field_trip',
-                                child: Text('Terrain'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'campaign',
-                                child: Text('Campagne'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'presentation',
-                                child: Text('Présentation'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'social',
-                                child: Text('Social'),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _type = value!),
-                          ),
+                            DropdownMenuItem(
+                              value: 'meeting',
+                              child: Text('Réunion'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'training',
+                              child: Text('Formation'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'competition',
+                              child: Text('Compétition'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'field_trip',
+                              child: Text('Terrain'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'campaign',
+                              child: Text('Campagne'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'presentation',
+                              child: Text('Présentation'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'social',
+                              child: Text('Social'),
+                            ),
+                          ],
+                          onChanged: (value) => setState(() => _type = value!),
                         ),
                       ],
+                      actions: const [],
+                      activeFilterCount: _type == 'all' ? 0 : 1,
                     ),
                   ],
                 ),

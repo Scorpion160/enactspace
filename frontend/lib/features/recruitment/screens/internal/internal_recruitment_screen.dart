@@ -297,8 +297,9 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             status: _status,
             gender: _gender,
             anonymized: _anonymized,
-            expanded:
-                _filtersExpanded || MediaQuery.sizeOf(context).width >= 1100,
+            expanded: _filtersExpanded,
+            onExpandedChanged: (value) =>
+                setState(() => _filtersExpanded = value),
             submittedFrom: _submittedFrom,
             submittedTo: _submittedTo,
             onSearchChanged: (_) => setState(() => _page = 0),

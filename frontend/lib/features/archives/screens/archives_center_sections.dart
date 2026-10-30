@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -271,11 +273,10 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
               'Contenus documentés, sources et fichiers conservés par le club.',
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -310,6 +311,13 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
               onChanged: (value) => setState(() => _visibility = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount: [
+            _year,
+            _category,
+            _status,
+            _visibility,
+          ].where((v) => v != null).length,
         ),
         const SizedBox(height: 20),
         if (values.isEmpty)
@@ -349,15 +357,12 @@ class SearchField extends StatelessWidget {
   const SearchField({super.key, required this.controller});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 280,
-    child: TextField(
-      key: const Key('archives_search'),
-      controller: controller,
-      decoration: const InputDecoration(
-        labelText: 'Rechercher',
-        prefixIcon: Icon(Icons.search),
-      ),
+  Widget build(BuildContext context) => TextField(
+    key: const Key('archives_search'),
+    controller: controller,
+    decoration: const InputDecoration(
+      hintText: 'Rechercher',
+      prefixIcon: Icon(Icons.search),
     ),
   );
 }
@@ -378,22 +383,19 @@ class FilterDropdown<T> extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 190,
-    child: DropdownButtonFormField<T>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: [
-        DropdownMenuItem<T>(value: null, child: const Text('Tous')),
-        for (final item in values)
-          DropdownMenuItem<T>(
-            value: item,
-            child: Text(itemLabel?.call(item) ?? '$item'),
-          ),
-      ],
-      onChanged: onChanged,
-    ),
+  Widget build(BuildContext context) => DropdownButtonFormField<T>(
+    initialValue: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      DropdownMenuItem<T>(value: null, child: const Text('Tous')),
+      for (final item in values)
+        DropdownMenuItem<T>(
+          value: item,
+          child: Text(itemLabel?.call(item) ?? '$item'),
+        ),
+    ],
+    onChanged: onChanged,
   );
 }
 
@@ -475,11 +477,10 @@ class _HistoricalProjectsCenterState extends State<HistoricalProjectsCenter> {
           ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -502,6 +503,8 @@ class _HistoricalProjectsCenterState extends State<HistoricalProjectsCenter> {
               onChanged: (value) => setState(() => _status = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount: [_year, _status].where((v) => v != null).length,
         ),
         const SizedBox(height: 20),
         ResponsiveArchiveGrid(
@@ -633,11 +636,16 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
           ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: [
+            FilterChip(
+              label: const Text('Mis en avant'),
+              selected: _featured,
+              onSelected: (value) => setState(() => _featured = value),
+            ),
+          ],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -651,12 +659,9 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
               itemLabel: hallOfFameEntryTypeLabel,
               onChanged: (value) => setState(() => _type = value),
             ),
-            FilterChip(
-              label: const Text('Mis en avant'),
-              selected: _featured,
-              onSelected: (value) => setState(() => _featured = value),
-            ),
           ],
+          actions: const [],
+          activeFilterCount: [_year, _type].where((v) => v != null).length,
         ),
         const SizedBox(height: 20),
         ResponsiveArchiveGrid(
@@ -825,11 +830,10 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
           ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -850,6 +854,12 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
               onChanged: (value) => setState(() => _projectId = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount: [
+            _year,
+            _type,
+            _projectId,
+          ].where((v) => v != null).length,
         ),
         const SizedBox(height: 20),
         if (values.isEmpty)

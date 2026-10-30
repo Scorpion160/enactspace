@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -1206,26 +1208,21 @@ class _PostQuickFilters extends StatelessWidget {
       ('mine', 'Mes posts', Icons.person_rounded),
     ];
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final filter in filters) ...[
-                ChoiceChip(
-                  selected: selected == filter.$1,
-                  avatar: Icon(filter.$3, size: 16),
-                  label: Text(filter.$2),
-                  onSelected: (_) => onChanged(filter.$1),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ],
+    return AppFilterToolbar(
+      quickFilters: [
+        for (final filter in filters) ...[
+          ChoiceChip(
+            selected: selected == filter.$1,
+            avatar: Icon(filter.$3, size: 16),
+            label: Text(filter.$2),
+            onSelected: (_) => onChanged(filter.$1),
           ),
-        ),
-      ),
+          const SizedBox(width: 8),
+        ],
+      ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }
@@ -1593,114 +1590,76 @@ class _PostFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 560;
-
-    final controls = Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        SizedBox(
-          width: _responsiveControlWidth(context, 320),
-          child: TextField(
-            controller: searchController,
-            decoration: InputDecoration(
-              hintText: 'Rechercher dans le fil…',
-              prefixIcon: Icon(Icons.search_rounded),
-              suffixIcon: IconButton(
-                onPressed: onSearch,
-                icon: Icon(Icons.arrow_forward_rounded),
-              ),
-            ),
-            onSubmitted: (_) => onSearch(),
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        decoration: InputDecoration(
+          hintText: 'Rechercher dans le fil…',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: IconButton(
+            onPressed: onSearch,
+            icon: Icon(Icons.arrow_forward_rounded),
           ),
         ),
+        onSubmitted: (_) => onSearch(),
+      ),
+      quickFilters: const [],
+      filters: [
         if (visibility == 'pole_only')
-          SizedBox(
-            width: _responsiveControlWidth(context, 220),
-            child: DropdownButtonFormField<String>(
-              initialValue: selectedPoleId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Pôle'),
-              items: poles
-                  .map(
-                    (pole) => DropdownMenuItem(
-                      value: pole.id,
-                      child: Text(pole.name, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: onPoleChanged,
-            ),
+          DropdownButtonFormField<String>(
+            initialValue: selectedPoleId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Pôle'),
+            items: poles
+                .map(
+                  (pole) => DropdownMenuItem(
+                    value: pole.id,
+                    child: Text(pole.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: onPoleChanged,
           ),
         if (visibility == 'project_only')
-          SizedBox(
-            width: _responsiveControlWidth(context, 220),
-            child: DropdownButtonFormField<String>(
-              initialValue: selectedProjectId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Projet'),
-              items: projects
-                  .map(
-                    (project) => DropdownMenuItem(
-                      value: project.id,
-                      child: Text(
-                        project.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: onProjectChanged,
-            ),
-          ),
-        SizedBox(
-          width: _responsiveControlWidth(context, 220),
-          child: DropdownButtonFormField<String>(
-            initialValue: postType,
+          DropdownButtonFormField<String>(
+            initialValue: selectedProjectId,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Type'),
-            items: _postTypeItems(),
-            onChanged: (value) {
-              if (value != null) onPostTypeChanged(value);
-            },
+            decoration: const InputDecoration(labelText: 'Projet'),
+            items: projects
+                .map(
+                  (project) => DropdownMenuItem(
+                    value: project.id,
+                    child: Text(project.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: onProjectChanged,
           ),
+        DropdownButtonFormField<String>(
+          initialValue: postType,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Type'),
+          items: _postTypeItems(),
+          onChanged: (value) {
+            if (value != null) onPostTypeChanged(value);
+          },
         ),
-        SizedBox(
-          width: _responsiveControlWidth(context, 220),
-          child: DropdownButtonFormField<String>(
-            initialValue: visibility,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Audience'),
-            items: _visibilityItems(),
-            onChanged: (value) {
-              if (value != null) onVisibilityChanged(value);
-            },
-          ),
+        DropdownButtonFormField<String>(
+          initialValue: visibility,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Audience'),
+          items: _visibilityItems(),
+          onChanged: (value) {
+            if (value != null) onVisibilityChanged(value);
+          },
         ),
       ],
-    );
-
-    if (compact) {
-      return Card(
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: ExpansionTile(
-          leading: Icon(Icons.tune_rounded),
-          title: Text(
-            'Rechercher et filtrer',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          children: [controls],
-        ),
-      );
-    }
-
-    return Card(
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(padding: const EdgeInsets.all(18), child: controls),
+      actions: const [],
+      activeFilterCount:
+          (postType == 'all' ? 0 : 1) +
+          (visibility == 'all' ? 0 : 1) +
+          (selectedPoleId == null ? 0 : 1) +
+          (selectedProjectId == null ? 0 : 1),
     );
   }
 }

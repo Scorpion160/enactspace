@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -1867,8 +1869,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showInfo(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -2171,13 +2174,19 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
-          TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-              hintText: 'Rechercher une discussion',
-              prefixIcon: Icon(Icons.search_rounded),
+          AppFilterToolbar(
+            search: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Rechercher une discussion',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) => setState(() => _query = value),
             ),
-            onChanged: (value) => setState(() => _query = value),
+            quickFilters: const [],
+            filters: const [],
+            actions: const [],
+            activeFilterCount: 0,
           ),
           const SizedBox(height: 8),
           const Divider(height: 1),
@@ -2627,13 +2636,14 @@ class _MessagesList extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(alpha: 0.06),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.06),
                       ),
                     ),
                     child: Text(reaction),
@@ -2647,8 +2657,9 @@ class _MessagesList extends StatelessWidget {
                   Text(
                     DateFormat('HH:mm').format(message.createdAt),
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface
-                          .withValues(alpha: 0.48),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.48),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -2697,16 +2708,18 @@ class _MessageStatusIndicator extends StatelessWidget {
               height: 12,
               child: CircularProgressIndicator(
                 strokeWidth: 1.8,
-                color: Theme.of(context).colorScheme.onSurface
-                    .withValues(alpha: 0.48),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.48),
               ),
             ),
             const SizedBox(width: 3),
             Text(
               'Envoi',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface
-                    .withValues(alpha: 0.48),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.48),
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
               ),
@@ -2837,8 +2850,9 @@ class _PollMessageBody extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface
-              .withValues(alpha: 0.07),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.07),
         ),
       ),
       child: Column(
@@ -2912,9 +2926,9 @@ class _PollMessageBody extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -2927,8 +2941,9 @@ class _PollMessageBody extends StatelessWidget {
                         value: poll.totalVoters == 0
                             ? 0
                             : (option.votesCount / denominator).clamp(0.0, 1.0),
-                        backgroundColor: Theme.of(context).colorScheme.onSurface
-                            .withValues(alpha: 0.06),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.06),
                         color: AppTheme.enactusYellow,
                       ),
                     ),
@@ -3145,8 +3160,9 @@ class _AudioMessageBodyState extends State<_AudioMessageBody> {
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface
-              .withValues(alpha: 0.07),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.07),
         ),
       ),
       child: Column(
@@ -3195,9 +3211,9 @@ class _AudioMessageBodyState extends State<_AudioMessageBody> {
                           overlayRadius: 12,
                         ),
                         activeTrackColor: AppTheme.softBlack,
-                        inactiveTrackColor: Theme.of(context)
-                            .colorScheme
-                            .outlineVariant,
+                        inactiveTrackColor: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant,
                         thumbColor: AppTheme.softBlack,
                       ),
                       child: Slider(
@@ -3215,9 +3231,9 @@ class _AudioMessageBodyState extends State<_AudioMessageBody> {
                             currentLabel,
                             style: TextStyle(
                               fontSize: 10,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -3226,9 +3242,9 @@ class _AudioMessageBodyState extends State<_AudioMessageBody> {
                             durationLabel,
                             style: TextStyle(
                               fontSize: 10,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -3359,9 +3375,9 @@ class _MessageComposer extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                     border: Border(
                       left: BorderSide(color: AppTheme.enactusYellow, width: 4),
@@ -3409,8 +3425,9 @@ class _MessageComposer extends StatelessWidget {
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(26),
                               border: Border.all(
-                                color: Theme.of(context).colorScheme.onSurface
-                                    .withValues(alpha: 0.08),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.08),
                               ),
                             ),
                             child: Row(
@@ -3526,8 +3543,9 @@ class _VoiceRecordingComposer extends StatelessWidget {
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(26),
               border: Border.all(
-                color: Theme.of(context).colorScheme.onSurface
-                    .withValues(alpha: 0.08),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.08),
               ),
             ),
             child: Row(
@@ -3903,24 +3921,24 @@ class _ChatExpressionSheet extends StatelessWidget {
                   _ExpressionGrid(
                     values: _emojis,
                     fontSize: 30,
-                    onSelected: (value) =>
-                        Navigator.of(context)
-                            .pop(_ExpressionChoice('emoji', value)),
+                    onSelected: (value) => Navigator.of(
+                      context,
+                    ).pop(_ExpressionChoice('emoji', value)),
                   ),
                   _ExpressionGrid(
                     values: _stickers,
                     fontSize: 48,
-                    onSelected: (value) =>
-                        Navigator.of(context)
-                            .pop(_ExpressionChoice('sticker', value)),
+                    onSelected: (value) => Navigator.of(
+                      context,
+                    ).pop(_ExpressionChoice('sticker', value)),
                   ),
                   ChatGifPicker(
-                    onSelected: (gif) =>
-                        Navigator.of(context)
-                            .pop(_ExpressionChoice('catalog_gif', gif.id)),
-                    onImport: () =>
-                        Navigator.of(context)
-                            .pop(const _ExpressionChoice('gif', '')),
+                    onSelected: (gif) => Navigator.of(
+                      context,
+                    ).pop(_ExpressionChoice('catalog_gif', gif.id)),
+                    onImport: () => Navigator.of(
+                      context,
+                    ).pop(const _ExpressionChoice('gif', '')),
                   ),
                 ],
               ),
@@ -4056,8 +4074,9 @@ class _MediaCacheControlsDialogState extends State<_MediaCacheControlsDialog> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Mode éphémère',
-                style: Theme.of(context).textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
               ),
             ),
             const SizedBox(height: 8),
@@ -4420,8 +4439,9 @@ class _ConversationInfoTile extends StatelessWidget {
         color: AppTheme.enactusYellow.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface
-              .withValues(alpha: 0.06),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.06),
         ),
       ),
       child: Padding(
@@ -4794,8 +4814,9 @@ class _PickedFilePreview extends StatelessWidget {
                   Text(
                     _formatBytes(sizeBytes!),
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface
-                          .withValues(alpha: 0.56),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.56),
                       fontSize: 12,
                     ),
                   ),

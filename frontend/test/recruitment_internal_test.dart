@@ -462,6 +462,11 @@ void main() {
 
   testWidgets('filtre statut puis réinitialisation', (tester) async {
     await _pump(tester, _FakeGateway());
+    final expand = find.byTooltip('Afficher les filtres');
+    if (expand.evaluate().isNotEmpty) {
+      await tester.tap(expand);
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.byKey(const Key('internal-status-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Candidature retenue').last);

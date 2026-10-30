@@ -3,6 +3,7 @@ import '../../../core/widgets/preview_mode_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/theme/app_theme.dart';
@@ -842,9 +843,9 @@ class _SessionActionPanel extends StatelessWidget {
                     value: completionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .outlineVariant,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant,
                   ),
                 ),
                 SizedBox(height: 10),
@@ -973,9 +974,9 @@ class _QrAuditTrail extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1148,80 +1149,56 @@ class _AttendanceMemberFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 760;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Rechercher un membre',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _StatusFilterChip(
-                  label: 'Tous',
-                  value: 'all',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Présents',
-                  value: 'present',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Retards',
-                  value: 'late',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Justifiées',
-                  value: 'justified',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Non justifiées',
-                  value: 'unjustified',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Non saisis',
-                  value: 'not_filled',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, SizedBox(height: 12), filters],
-            );
-          },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher un membre',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      quickFilters: [
+        _StatusFilterChip(
+          label: 'Tous',
+          value: 'all',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Présents',
+          value: 'present',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Retards',
+          value: 'late',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Justifiées',
+          value: 'justified',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Non justifiées',
+          value: 'unjustified',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Non saisis',
+          value: 'not_filled',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+      ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }
@@ -1244,7 +1221,7 @@ class _StatusFilterChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: current == value,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
       onSelected: (_) => onSelected(value),
     );
   }
@@ -1320,9 +1297,9 @@ class _ExpectedMembersCard extends StatelessWidget {
                             member.email,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -1690,9 +1667,9 @@ class _AttendanceStatsCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../models/pole_portfolio_models.dart';
 
@@ -68,131 +69,105 @@ class PolePortfolioFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fields = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        SizedBox(
-          width: compact ? double.infinity : 280,
-          child: TextField(
-            controller: searchController,
-            decoration: const InputDecoration(
-              labelText: 'Rechercher un pôle',
-              prefixIcon: Icon(Icons.search_rounded),
-              border: OutlineInputBorder(),
-            ),
-          ),
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        decoration: const InputDecoration(
+          hintText: 'Rechercher un pôle',
+          prefixIcon: Icon(Icons.search_rounded),
+          border: OutlineInputBorder(),
         ),
-        SizedBox(
-          width: compact ? double.infinity : 190,
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: selectedType,
-            decoration: const InputDecoration(
-              labelText: 'Type',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'all', child: Text('Tous les types')),
-              DropdownMenuItem(value: 'metier', child: Text('Pôle cœur')),
-              DropdownMenuItem(value: 'support', child: Text('Pôle support')),
-              DropdownMenuItem(
-                value: 'unknown',
-                child: Text('Type non reconnu'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) onTypeChanged(value);
-            },
+      ),
+      quickFilters: const [],
+      filters: [
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: selectedType,
+          decoration: const InputDecoration(
+            labelText: 'Type',
+            border: OutlineInputBorder(),
           ),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Tous les types')),
+            DropdownMenuItem(value: 'metier', child: Text('Pôle cœur')),
+            DropdownMenuItem(value: 'support', child: Text('Pôle support')),
+            DropdownMenuItem(value: 'unknown', child: Text('Type non reconnu')),
+          ],
+          onChanged: (value) {
+            if (value != null) onTypeChanged(value);
+          },
         ),
-        SizedBox(
-          width: compact ? double.infinity : 220,
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: selectedResponsible,
-            decoration: const InputDecoration(
-              labelText: 'Responsable',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: 'all',
-                child: Text('Tous les responsables'),
-              ),
-              ...responsibleOptions.entries.map(
-                (entry) => DropdownMenuItem(
-                  value: entry.key,
-                  child: Text(entry.value, overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) onResponsibleChanged(value);
-            },
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: selectedResponsible,
+          decoration: const InputDecoration(
+            labelText: 'Responsable',
+            border: OutlineInputBorder(),
           ),
-        ),
-        SizedBox(
-          width: compact ? double.infinity : 220,
-          child: DropdownButtonFormField<PoleAlertFilter>(
-            isExpanded: true,
-            initialValue: selectedAlert,
-            decoration: const InputDecoration(
-              labelText: 'Alertes',
-              border: OutlineInputBorder(),
+          items: [
+            const DropdownMenuItem(
+              value: 'all',
+              child: Text('Tous les responsables'),
             ),
-            items: const [
-              DropdownMenuItem(
-                value: PoleAlertFilter.all,
-                child: Text('Toutes les situations'),
+            ...responsibleOptions.entries.map(
+              (entry) => DropdownMenuItem(
+                value: entry.key,
+                child: Text(entry.value, overflow: TextOverflow.ellipsis),
               ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.blocked,
-                child: Text('Avec blocage'),
-              ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.overdue,
-                child: Text('En retard'),
-              ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.noNextAction,
-                child: Text('Sans prochaine action'),
-              ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.noLead,
-                child: Text('Sans chef'),
-              ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.noDeputy,
-                child: Text('Sans adjoint'),
-              ),
-              DropdownMenuItem(
-                value: PoleAlertFilter.noTeam,
-                child: Text('Sans équipe'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) onAlertChanged(value);
-            },
-          ),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) onResponsibleChanged(value);
+          },
         ),
-        TextButton.icon(
-          onPressed: onReset,
-          icon: const Icon(Icons.restart_alt_rounded),
-          label: const Text('Réinitialiser'),
+        DropdownButtonFormField<PoleAlertFilter>(
+          isExpanded: true,
+          initialValue: selectedAlert,
+          decoration: const InputDecoration(
+            labelText: 'Alertes',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: PoleAlertFilter.all,
+              child: Text('Toutes les situations'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.blocked,
+              child: Text('Avec blocage'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.overdue,
+              child: Text('En retard'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.noNextAction,
+              child: Text('Sans prochaine action'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.noLead,
+              child: Text('Sans chef'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.noDeputy,
+              child: Text('Sans adjoint'),
+            ),
+            DropdownMenuItem(
+              value: PoleAlertFilter.noTeam,
+              child: Text('Sans équipe'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) onAlertChanged(value);
+          },
         ),
       ],
-    );
-    if (!compact) return fields;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ExpansionTile(
-        title: const Text('Filtres et recherche'),
-        leading: const Icon(Icons.tune_rounded),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-        children: [fields],
-      ),
+      actions: const [],
+      activeFilterCount:
+          (selectedType == 'all' ? 0 : 1) +
+          (selectedResponsible == 'all' ? 0 : 1) +
+          (selectedAlert == PoleAlertFilter.all ? 0 : 1),
+      onReset: onReset,
     );
   }
 }

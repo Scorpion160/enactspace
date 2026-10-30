@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../models/project_portfolio_models.dart';
 
@@ -96,17 +97,7 @@ class ProjectPortfolioFilters extends StatelessWidget {
       onReset: onReset,
       vertical: compact,
     );
-    if (!compact) return content;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ExpansionTile(
-        minTileHeight: 52,
-        title: const Text('Filtres et recherche'),
-        leading: const Icon(Icons.tune_rounded),
-        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        children: [content],
-      ),
-    );
+    return content;
   }
 }
 
@@ -137,65 +128,51 @@ class _FilterContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fields = <Widget>[
-      SizedBox(
-        width: vertical ? double.infinity : 260,
-        child: TextField(
-          controller: searchController,
-          decoration: const InputDecoration(
-            labelText: 'Rechercher un projet',
-            prefixIcon: Icon(Icons.search_rounded),
-          ),
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        decoration: const InputDecoration(
+          hintText: 'Rechercher un projet',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
-      _dropdown<String>(
-        value: selectedStatus,
-        label: 'Statut',
-        items: {
-          'all': 'Tous les statuts',
-          for (final status in ProjectStatusPresentation.values)
-            status: ProjectStatusPresentation.label(status),
-        },
-        onChanged: onStatusChanged,
-      ),
-      _dropdown<String>(
-        value: selectedResponsible,
-        label: 'Responsable',
-        items: {'all': 'Tous les responsables', ...responsibleOptions},
-        onChanged: onResponsibleChanged,
-      ),
-      _dropdown<ProjectAlertFilter>(
-        value: selectedAlert,
-        label: 'Alerte',
-        items: const {
-          ProjectAlertFilter.all: 'Toutes les situations',
-          ProjectAlertFilter.blocked: 'Avec blocage',
-          ProjectAlertFilter.overdue: 'En retard',
-          ProjectAlertFilter.noNextAction: 'Sans prochaine action',
-          ProjectAlertFilter.incomplete: 'Données incomplètes',
-        },
-        onChanged: onAlertChanged,
-      ),
-      TextButton.icon(
-        onPressed: onReset,
-        icon: const Icon(Icons.restart_alt_rounded),
-        label: const Text('Réinitialiser'),
-      ),
-    ];
-    if (vertical) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children:
-            fields.expand((item) => [item, const SizedBox(height: 10)]).toList()
-              ..removeLast(),
-      );
-    }
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Wrap(spacing: 10, runSpacing: 10, children: fields),
-      ),
+      quickFilters: const [],
+      filters: [
+        _dropdown<String>(
+          value: selectedStatus,
+          label: 'Statut',
+          items: {
+            'all': 'Tous les statuts',
+            for (final status in ProjectStatusPresentation.values)
+              status: ProjectStatusPresentation.label(status),
+          },
+          onChanged: onStatusChanged,
+        ),
+        _dropdown<String>(
+          value: selectedResponsible,
+          label: 'Responsable',
+          items: {'all': 'Tous les responsables', ...responsibleOptions},
+          onChanged: onResponsibleChanged,
+        ),
+        _dropdown<ProjectAlertFilter>(
+          value: selectedAlert,
+          label: 'Alerte',
+          items: const {
+            ProjectAlertFilter.all: 'Toutes les situations',
+            ProjectAlertFilter.blocked: 'Avec blocage',
+            ProjectAlertFilter.overdue: 'En retard',
+            ProjectAlertFilter.noNextAction: 'Sans prochaine action',
+            ProjectAlertFilter.incomplete: 'Données incomplètes',
+          },
+          onChanged: onAlertChanged,
+        ),
+      ],
+      actions: const [],
+      activeFilterCount:
+          (selectedStatus == 'all' ? 0 : 1) +
+          (selectedResponsible == 'all' ? 0 : 1) +
+          (selectedAlert == ProjectAlertFilter.all ? 0 : 1),
+      onReset: onReset,
     );
   }
 
@@ -204,24 +181,21 @@ class _FilterContent extends StatelessWidget {
     required String label,
     required Map<T, String> items,
     required ValueChanged<T> onChanged,
-  }) => SizedBox(
-    width: vertical ? double.infinity : 190,
-    child: DropdownButtonFormField<T>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: items.entries
-          .map(
-            (entry) => DropdownMenuItem<T>(
-              value: entry.key,
-              child: Text(entry.value, overflow: TextOverflow.ellipsis),
-            ),
-          )
-          .toList(),
-      onChanged: (value) {
-        if (value != null) onChanged(value);
-      },
-    ),
+  }) => DropdownButtonFormField<T>(
+    initialValue: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: items.entries
+        .map(
+          (entry) => DropdownMenuItem<T>(
+            value: entry.key,
+            child: Text(entry.value, overflow: TextOverflow.ellipsis),
+          ),
+        )
+        .toList(),
+    onChanged: (value) {
+      if (value != null) onChanged(value);
+    },
   );
 }
 

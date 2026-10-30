@@ -1,6 +1,8 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -723,46 +725,49 @@ class _AcademyFiltersCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final colors = Theme.of(context).colorScheme;
-      Widget menu(
-        String label,
-        List<(String, String)> values,
-        ValueChanged<String> changed,
-      ) => PopupMenuButton<String>(
-        tooltip: label,
-        onSelected: changed,
-        itemBuilder: (_) => [
-          for (final value in values)
-            PopupMenuItem(value: value.$1, child: Text(value.$2)),
-        ],
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: colors.surfaceContainerLow,
-            border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Expanded(child: Text(label)),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-            ],
-          ),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    Widget menu(
+      String label,
+      List<(String, String)> values,
+      ValueChanged<String> changed,
+    ) => PopupMenuButton<String>(
+      tooltip: label,
+      onSelected: changed,
+      itemBuilder: (_) => [
+        for (final value in values)
+          PopupMenuItem(value: value.$1, child: Text(value.$2)),
+      ],
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLow,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
         ),
-      );
-      final levels = <(String, String)>[
-        ('all', 'Tous niveaux'),
-        ('debutant', 'Débutant'),
-        ('intermediaire', 'Intermédiaire'),
-        ('avance', 'Avancé'),
-        ('responsable', 'Responsable'),
-      ];
-      final levelLabel =
-          levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ??
-          'Tous niveaux';
-      final search = TextField(
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+          ],
+        ),
+      ),
+    );
+    final levels = <(String, String)>[
+      ('all', 'Tous niveaux'),
+      ('debutant', 'Débutant'),
+      ('intermediaire', 'Intermédiaire'),
+      ('avance', 'Avancé'),
+      ('responsable', 'Responsable'),
+    ];
+    final levelLabel =
+        levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ??
+        'Tous niveaux';
+    return AppFilterToolbar(
+      search: TextField(
         controller: controller,
         onChanged: (_) => onChanged(),
         decoration: InputDecoration(
@@ -779,83 +784,38 @@ class _AcademyFiltersCard extends StatelessWidget {
                   },
                 ),
         ),
-      );
-      final statuses = Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final item in [
-            ('all', 'Tous'),
-            ('required', 'Obligatoires'),
-            ('in_progress', 'En cours'),
-            ('completed', 'Terminés'),
-          ])
-            _AcademyChoiceChip(
-              label: item.$2,
-              selected: courseFilter == item.$1,
-              onSelected: () => onCourseFilterChanged(item.$1),
-            ),
-        ],
-      );
-      final split =
-          constraints.maxWidth >= 300 &&
-          MediaQuery.textScalerOf(context).scale(16) <= 24;
-      final menuWidth = split
-          ? (constraints.maxWidth - 8) / 2
-          : constraints.maxWidth;
-      if (constraints.maxWidth >= 900 &&
-          MediaQuery.textScalerOf(context).scale(16) <= 18) {
-        return Row(
-          children: [
-            Expanded(child: search),
-            const SizedBox(width: 12),
-            SizedBox(width: 300, child: statuses),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 135,
-              child: menu(levelLabel, levels, onLevelChanged),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 175,
-              child: menu(_academyCategoryLabel(categoryFilter), [
-                ('all', 'Toutes les catégories'),
-                for (final c in categories)
-                  (_academyKey(c), academyCategoryLabel(c)),
-              ], onCategoryChanged),
-            ),
-          ],
-        );
-      }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          search,
-          const SizedBox(height: 10),
-          statuses,
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              SizedBox(
-                width: menuWidth,
-                child: menu(levelLabel, levels, onLevelChanged),
-              ),
-              SizedBox(
-                width: menuWidth,
-                child: menu(_academyCategoryLabel(categoryFilter), [
-                  ('all', 'Toutes les catégories'),
-                  for (final c in categories)
-                    (_academyKey(c), academyCategoryLabel(c)),
-                ], onCategoryChanged),
-              ),
-            ],
+      ),
+      quickFilters: [
+        for (final item in [
+          ('all', 'Tous'),
+          ('required', 'Obligatoires'),
+          ('in_progress', 'En cours'),
+          ('completed', 'Terminés'),
+        ])
+          _AcademyChoiceChip(
+            label: item.$2,
+            selected: courseFilter == item.$1,
+            onSelected: () => onCourseFilterChanged(item.$1),
           ),
-        ],
-      );
-    },
-  );
+      ],
+      filters: [
+        menu(levelLabel, levels, onLevelChanged),
+        menu(_academyCategoryLabel(categoryFilter), [
+          ('all', 'Toutes les catégories'),
+          for (final c in categories) (_academyKey(c), academyCategoryLabel(c)),
+        ], onCategoryChanged),
+      ],
+      actions: const [],
+      activeFilterCount: [
+        levelFilter,
+        categoryFilter,
+      ].where((v) => v != 'all').length,
+      onReset: () {
+        onLevelChanged('all');
+        onCategoryChanged('all');
+      },
+    );
+  }
 }
 
 class _AcademyChoiceChip extends StatelessWidget {
@@ -875,7 +835,7 @@ class _AcademyChoiceChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       selectedColor: AppTheme.enactusYellow,
-      labelStyle: TextStyle(
+      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
         color: selected
             ? const Color(0xFF17212A)
             : Theme.of(context).colorScheme.onSurface,

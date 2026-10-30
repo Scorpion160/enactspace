@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -411,50 +413,29 @@ class _ProjectsToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final searchWidth = constraints.maxWidth >= 760
-                ? 360.0
-                : constraints.maxWidth;
-            final statusWidth = constraints.maxWidth >= 520
-                ? 240.0
-                : constraints.maxWidth;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: searchWidth,
-                  child: TextField(
-                    controller: searchController,
-                    onChanged: onSearchChanged,
-                    decoration: const InputDecoration(
-                      labelText: 'Rechercher un projet',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: statusWidth,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: status,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Statut'),
-                    items: _statusItems(includeAll: true),
-                    onChanged: (value) {
-                      if (value != null) onStatusChanged(value);
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        onChanged: onSearchChanged,
+        decoration: const InputDecoration(
+          hintText: 'Rechercher un projet',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      quickFilters: const [],
+      filters: [
+        DropdownButtonFormField<String>(
+          initialValue: status,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Statut'),
+          items: _statusItems(includeAll: true),
+          onChanged: (value) {
+            if (value != null) onStatusChanged(value);
+          },
+        ),
+      ],
+      actions: const [],
+      activeFilterCount: status == 'all' ? 0 : 1,
     );
   }
 }

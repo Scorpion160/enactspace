@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/academic/esp_academic_catalog.dart';
@@ -702,8 +704,6 @@ class _SearchAndActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 1180;
-
     final searchField = TextField(
       onChanged: onChanged,
       decoration: const InputDecoration(
@@ -780,90 +780,17 @@ class _SearchAndActions extends StatelessWidget {
             label: Text('Importer'),
           );
 
-    if (isWide && importButton != null) {
-      return Row(
-        children: [
-          Expanded(child: searchField),
-          SizedBox(width: 14),
-          SizedBox(width: 145, child: statusFilterField),
-          SizedBox(width: 12),
-          SizedBox(width: 170, child: roleFilterField),
-          SizedBox(width: 14),
-          SizedBox(width: 150, child: poleFilterField),
-          SizedBox(width: 14),
-          importButton,
-        ],
-      );
-    }
-
-    final actionButtons = [?importButton];
-
-    if (actionButtons.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          searchField,
-          SizedBox(height: 12),
-          AppDataCard(
-            padding: EdgeInsets.zero,
-            child: ExpansionTile(
-              title: Text('Filtres avancés'),
-              subtitle: Text('Statut, rôle et département'),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              children: [
-                statusFilterField,
-                SizedBox(height: 12),
-                roleFilterField,
-                SizedBox(height: 12),
-                poleFilterField,
-                SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: onReset,
-                    icon: Icon(Icons.restart_alt_rounded),
-                    label: Text('Réinitialiser'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        searchField,
-        SizedBox(height: 12),
-        AppDataCard(
-          padding: EdgeInsets.zero,
-          child: ExpansionTile(
-            title: Text('Filtres avancés'),
-            subtitle: Text('Statut, rôle et département'),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            children: [
-              statusFilterField,
-              SizedBox(height: 12),
-              roleFilterField,
-              SizedBox(height: 12),
-              poleFilterField,
-              SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onReset,
-                  icon: Icon(Icons.restart_alt_rounded),
-                  label: Text('Réinitialiser'),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 12),
-        Wrap(spacing: 10, runSpacing: 10, children: actionButtons),
-      ],
+    return AppFilterToolbar(
+      search: searchField,
+      quickFilters: const [],
+      filters: [statusFilterField, roleFilterField, poleFilterField],
+      actions: [?importButton],
+      activeFilterCount: [
+        statusFilter,
+        roleFilter,
+        poleFilter,
+      ].where((v) => v != 'all').length,
+      onReset: onReset,
     );
   }
 }
@@ -2114,8 +2041,9 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
                     color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.error
-                          .withValues(alpha: 0.35),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.35),
                     ),
                   ),
                   child: Text(
@@ -2937,8 +2865,9 @@ class _EditMemberDialogState extends State<EditMemberDialog> {
                         return 'Ce champ est obligatoire.';
                       }
                       if (entry.key == 'email' &&
-                          !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                              .hasMatch(text)) {
+                          !RegExp(
+                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                          ).hasMatch(text)) {
                         return 'Adresse e-mail invalide.';
                       }
                       if (entry.key == 'enactus_join_year' && text.isNotEmpty) {

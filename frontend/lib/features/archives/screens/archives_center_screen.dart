@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -363,32 +365,28 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
             'Les projets, les rencontres et les moments qui racontent Enactus ESP.',
           ),
           const SizedBox(height: 16),
-          TextField(
-            key: const Key('archives_search'),
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            onSubmitted: _applySearch,
-            decoration: InputDecoration(
-              hintText: 'Rechercher dans la mémoire',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                tooltip: 'Effacer la recherche',
-                onPressed: () {
-                  _search.clear();
-                  _applySearch('');
-                },
-                icon: const Icon(Icons.clear),
+          AppFilterToolbar(
+            search: TextField(
+              key: const Key('archives_search'),
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              onSubmitted: _applySearch,
+              decoration: InputDecoration(
+                hintText: 'Rechercher dans la mémoire',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  tooltip: 'Effacer la recherche',
+                  onPressed: () {
+                    _search.clear();
+                    _applySearch('');
+                  },
+                  icon: const Icon(Icons.clear),
+                ),
+                filled: true,
+                border: const OutlineInputBorder(),
               ),
-              filled: true,
-              border: const OutlineInputBorder(),
             ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
+            quickFilters: [
               if (_filters.isFiltered)
                 const Chip(
                   avatar: Icon(Icons.filter_alt_outlined, size: 18),
@@ -401,6 +399,9 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
                   onSelected: _setReview,
                   label: const Text('Mode révision'),
                 ),
+            ],
+            filters: const [],
+            actions: [
               OutlinedButton.icon(
                 key: const Key('memory_filters'),
                 onPressed: _showFilters,
@@ -421,6 +422,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
                 label: const Text('L’histoire du club'),
               ),
             ],
+            activeFilterCount: 0,
           ),
         ],
       ),

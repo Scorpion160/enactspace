@@ -313,6 +313,8 @@ void main() {
       await _pump(tester, DocumentsScreen(gateway: gateway));
       expect(find.text('Rapport annuel'), findsOneWidget);
       expect(find.text('En attente de validation'), findsOneWidget);
+      await tester.tap(find.byTooltip('Afficher les filtres'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Tous les statuts'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Validé').last);
@@ -415,7 +417,7 @@ void main() {
           gateway: MemoryDocumentsGateway(documents: [_document()]),
         ),
       );
-      expect(find.text('Filtres'), findsOneWidget);
+      expect(find.byTooltip('Afficher les filtres'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

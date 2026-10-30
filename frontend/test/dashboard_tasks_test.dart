@@ -178,6 +178,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('tasks-reset')));
       await tester.pump();
+      await tester.tap(find.byTooltip('Afficher les filtres'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('tasks-status-filter')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Annulé').last);

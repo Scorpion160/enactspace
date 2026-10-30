@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:nfc_manager/nfc_manager.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -334,13 +336,19 @@ class _AttendanceNfcEnrollmentScreenState
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'Recherche',
-                prefixIcon: Icon(Icons.search_rounded),
+            AppFilterToolbar(
+              search: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Recherche',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
               ),
+              quickFilters: const [],
+              filters: const [],
+              actions: const [],
+              activeFilterCount: 0,
             ),
             SizedBox(height: 12),
             if (memberLoadState == NfcMemberLoadState.failed)

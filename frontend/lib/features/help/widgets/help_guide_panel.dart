@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 class HelpArticle {
   final String title, body;
@@ -140,13 +141,19 @@ class _HelpGuidePanelState extends State<HelpGuidePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          key: const Key('help-search'),
-          decoration: const InputDecoration(
-            labelText: 'Rechercher dans le guide et la FAQ',
-            prefixIcon: Icon(Icons.search),
+        AppFilterToolbar(
+          search: TextField(
+            key: const Key('help-search'),
+            decoration: const InputDecoration(
+              hintText: 'Rechercher dans le guide et la FAQ',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) => setState(() => query = value),
           ),
-          onChanged: (value) => setState(() => query = value),
+          quickFilters: const [],
+          filters: const [],
+          actions: const [],
+          activeFilterCount: 0,
         ),
         const SizedBox(height: 20),
         Text(

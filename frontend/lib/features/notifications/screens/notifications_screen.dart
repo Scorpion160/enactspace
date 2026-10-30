@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/notification_model.dart';
@@ -362,6 +364,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           ),
           SizedBox(height: 18),
           _NotificationsFilters(
+            controller: _searchController,
+            onChanged: () => setState(() {}),
             unreadOnly: _unreadOnly,
             type: _type,
             onUnreadOnlyChanged: (value) async {
@@ -372,11 +376,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               setState(() => _type = value);
             },
           ),
-          SizedBox(height: 18),
-          _NotificationSearchCard(
-            controller: _searchController,
-            onChanged: () => setState(() {}),
-          ),
+
           SizedBox(height: 22),
           if (_loading)
             Center(
@@ -562,12 +562,16 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _NotificationsFilters extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onChanged;
   final bool unreadOnly;
   final String type;
   final ValueChanged<bool> onUnreadOnlyChanged;
   final ValueChanged<String> onTypeChanged;
 
   const _NotificationsFilters({
+    required this.controller,
+    required this.onChanged,
     required this.unreadOnly,
     required this.type,
     required this.onUnreadOnlyChanged,
@@ -576,97 +580,60 @@ class _NotificationsFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final typeWidth = constraints.maxWidth < 560
-                ? constraints.maxWidth
-                : 260.0;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  selected: !unreadOnly,
-                  label: Text('Toutes'),
-                  avatar: Icon(Icons.list_rounded, size: 18),
-                  onSelected: (_) => onUnreadOnlyChanged(false),
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          hintText: 'Rechercher une notification',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: controller.text.trim().isEmpty
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    controller.clear();
+                    onChanged();
+                  },
+                  icon: Icon(Icons.close_rounded),
+                  tooltip: 'Effacer',
                 ),
-                ChoiceChip(
-                  selected: unreadOnly,
-                  label: Text('Non lues'),
-                  avatar: Icon(Icons.mark_email_unread_rounded, size: 18),
-                  onSelected: (_) => onUnreadOnlyChanged(true),
-                ),
-                SizedBox(
-                  width: typeWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Tous les types'),
-                      ),
-                      ...NotificationFamily.values.map(
-                        (family) => DropdownMenuItem(
-                          value: family.value,
-                          child: Text(family.label),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onTypeChanged(value);
-                    },
-                  ),
-                ),
-              ],
-            );
+        ),
+      ),
+      quickFilters: [
+        ChoiceChip(
+          selected: !unreadOnly,
+          label: Text('Toutes'),
+          avatar: Icon(Icons.list_rounded, size: 18),
+          onSelected: (_) => onUnreadOnlyChanged(false),
+        ),
+        ChoiceChip(
+          selected: unreadOnly,
+          label: Text('Non lues'),
+          avatar: Icon(Icons.mark_email_unread_rounded, size: 18),
+          onSelected: (_) => onUnreadOnlyChanged(true),
+        ),
+      ],
+      filters: [
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: type,
+          decoration: const InputDecoration(labelText: 'Type'),
+          items: [
+            const DropdownMenuItem(value: 'all', child: Text('Tous les types')),
+            ...NotificationFamily.values.map(
+              (family) => DropdownMenuItem(
+                value: family.value,
+                child: Text(family.label),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) onTypeChanged(value);
           },
         ),
-      ),
-    );
-  }
-}
-
-class _NotificationSearchCard extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onChanged;
-
-  const _NotificationSearchCard({
-    required this.controller,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: TextField(
-          controller: controller,
-          onChanged: (_) => onChanged(),
-          decoration: InputDecoration(
-            labelText: 'Rechercher une notification',
-            prefixIcon: Icon(Icons.search_rounded),
-            suffixIcon: controller.text.trim().isEmpty
-                ? null
-                : IconButton(
-                    onPressed: () {
-                      controller.clear();
-                      onChanged();
-                    },
-                    icon: Icon(Icons.close_rounded),
-                    tooltip: 'Effacer',
-                  ),
-          ),
-        ),
-      ),
+      ],
+      actions: const [],
+      activeFilterCount: type == 'all' ? 0 : 1,
     );
   }
 }

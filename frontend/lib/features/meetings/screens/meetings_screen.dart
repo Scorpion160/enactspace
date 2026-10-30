@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
@@ -306,10 +308,8 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
+    return AppFilterToolbar(
+      quickFilters: [
         ChoiceChip(
           label: const Text('En direct & à venir'),
           selected: selected == 'active',
@@ -326,6 +326,9 @@ class _FilterBar extends StatelessWidget {
           onSelected: (_) => onChanged('all'),
         ),
       ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_element
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../widgets/alumni_community_hero.dart';
 
@@ -200,7 +201,8 @@ class _AlumniScreenState extends State<AlumniScreen> {
             content: Text(
               alumniErrorMessage(
                 error,
-                fallback: 'Impossible de mettre à jour le mentorat. Réessayez dans quelques instants.',
+                fallback:
+                    'Impossible de mettre à jour le mentorat. Réessayez dans quelques instants.',
               ),
             ),
           ),
@@ -558,76 +560,46 @@ class _AlumniToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final searchWidth = constraints.maxWidth >= 760
-                ? 360.0
-                : constraints.maxWidth;
-            final filterWidth = constraints.maxWidth >= 520
-                ? 240.0
-                : constraints.maxWidth;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: searchWidth,
-                  child: TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Rechercher alumni',
-                      prefixIcon: Icon(Icons.search_rounded),
-                      suffixIcon: IconButton(
-                        onPressed: onSearch,
-                        icon: Icon(Icons.arrow_forward_rounded),
-                      ),
-                    ),
-                    onSubmitted: (_) => onSearch(),
-                  ),
-                ),
-                FilterChip(
-                  selected: mentorsOnly,
-                  onSelected: onMentorsOnlyChanged,
-                  avatar: Icon(Icons.handshake_rounded),
-                  label: Text('Mentors disponibles'),
-                ),
-                SizedBox(
-                  width: filterWidth,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: mentorshipStatus,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Mentorats'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Tous')),
-                      DropdownMenuItem(value: 'active', child: Text('Actifs')),
-                      DropdownMenuItem(
-                        value: 'paused',
-                        child: Text('En pause'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'completed',
-                        child: Text('Terminés'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'cancelled',
-                        child: Text('Annulés'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onMentorshipStatusChanged(value);
-                    },
-                  ),
-                ),
-              ],
-            );
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        decoration: InputDecoration(
+          hintText: 'Rechercher alumni',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: IconButton(
+            onPressed: onSearch,
+            icon: Icon(Icons.arrow_forward_rounded),
+          ),
+        ),
+        onSubmitted: (_) => onSearch(),
+      ),
+      quickFilters: [
+        FilterChip(
+          selected: mentorsOnly,
+          onSelected: onMentorsOnlyChanged,
+          avatar: Icon(Icons.handshake_rounded),
+          label: Text('Mentors disponibles'),
+        ),
+      ],
+      filters: [
+        DropdownButtonFormField<String>(
+          initialValue: mentorshipStatus,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Mentorats'),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Tous')),
+            DropdownMenuItem(value: 'active', child: Text('Actifs')),
+            DropdownMenuItem(value: 'paused', child: Text('En pause')),
+            DropdownMenuItem(value: 'completed', child: Text('Terminés')),
+            DropdownMenuItem(value: 'cancelled', child: Text('Annulés')),
+          ],
+          onChanged: (value) {
+            if (value != null) onMentorshipStatusChanged(value);
           },
         ),
-      ),
+      ],
+      actions: const [],
+      activeFilterCount: mentorshipStatus == 'all' ? 0 : 1,
     );
   }
 }
@@ -738,9 +710,9 @@ class _ProfileCard extends StatelessWidget {
                           ),
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],

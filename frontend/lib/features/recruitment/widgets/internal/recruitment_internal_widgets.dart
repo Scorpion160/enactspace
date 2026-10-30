@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../models/application_model.dart';
@@ -154,6 +155,7 @@ class InternalFilterBar extends StatelessWidget {
   final String gender;
   final bool anonymized;
   final bool expanded;
+  final ValueChanged<bool> onExpandedChanged;
   final DateTime? submittedFrom;
   final DateTime? submittedTo;
   final ValueChanged<String> onSearchChanged;
@@ -179,6 +181,7 @@ class InternalFilterBar extends StatelessWidget {
     required this.gender,
     required this.anonymized,
     required this.expanded,
+    required this.onExpandedChanged,
     required this.submittedFrom,
     required this.submittedTo,
     required this.onSearchChanged,
@@ -194,7 +197,6 @@ class InternalFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 760;
     final primary = <Widget>[
       TextField(
         key: const Key('internal-search'),
@@ -241,128 +243,87 @@ class InternalFilterBar extends StatelessWidget {
         onChanged: onStatusChanged,
       ),
     ];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return AppFilterToolbar(
+      search: primary.first,
+      quickFilters: const [],
+      filters: [...primary.skip(1)],
+      actions: const [],
+      activeFilterCount:
+          [campaignId, status, gender].where((v) => v != 'all').length +
+          [
+            poleController,
+            projectController,
+            departmentController,
+            classController,
+          ].where((v) => v.text.trim().isNotEmpty).length +
+          (submittedFrom == null ? 0 : 1) +
+          (submittedTo == null ? 0 : 1),
+      expanded: expanded,
+      onExpandedChanged: onExpandedChanged,
+      details: Padding(
+        padding: const EdgeInsets.only(top: 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (compact)
-              ...primary.map(
-                (child) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: child,
+            AppFilterToolbar(
+              filters: [
+                _TextFilter(controller: poleController, label: 'Pôle'),
+                _TextFilter(controller: projectController, label: 'Projet'),
+                _TextFilter(
+                  controller: departmentController,
+                  label: 'Département',
                 ),
-              )
-            else
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: primary
-                    .map(
-                      (child) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: child,
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 180),
-              crossFadeState: expanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              firstChild: const SizedBox.shrink(),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Column(
-                  children: [
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _TextFilter(controller: poleController, label: 'Pôle'),
-                        _TextFilter(
-                          controller: projectController,
-                          label: 'Projet',
-                        ),
-                        _TextFilter(
-                          controller: departmentController,
-                          label: 'Département',
-                        ),
-                        _TextFilter(
-                          controller: classController,
-                          label: 'Promotion',
-                        ),
-                        _DateFilter(
-                          label: 'Soumise à partir du',
-                          value: submittedFrom,
-                          onPressed: onPickSubmittedFrom,
-                        ),
-                        _DateFilter(
-                          label: 'Soumise jusqu’au',
-                          value: submittedTo,
-                          onPressed: onPickSubmittedTo,
-                        ),
-                        SizedBox(
-                          width: 210,
-                          child: DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            initialValue: gender,
-                            decoration: const InputDecoration(
-                              labelText: 'Genre',
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('Tous'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'female',
-                                child: Text('Femme'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'male',
-                                child: Text('Homme'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'other',
-                                child: Text('Autre'),
-                              ),
-                            ],
-                            onChanged: onGenderChanged,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      value: anonymized,
-                      onChanged: onAnonymizedChanged,
-                      title: const Text('Mode anonymisé'),
-                      subtitle: const Text(
-                        'Masque l’identité dans la liste et la fiche.',
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          key: const Key('internal-reset-filters'),
-                          onPressed: onReset,
-                          child: const Text('Réinitialiser'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: onApply,
-                          child: const Text('Appliquer'),
-                        ),
-                      ],
-                    ),
+                _TextFilter(controller: classController, label: 'Promotion'),
+                _DateFilter(
+                  label: 'Soumise à partir du',
+                  value: submittedFrom,
+                  onPressed: onPickSubmittedFrom,
+                ),
+                _DateFilter(
+                  label: 'Soumise jusqu’au',
+                  value: submittedTo,
+                  onPressed: onPickSubmittedTo,
+                ),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: gender,
+                  decoration: const InputDecoration(labelText: 'Genre'),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('Tous')),
+                    DropdownMenuItem(value: 'female', child: Text('Femme')),
+                    DropdownMenuItem(value: 'male', child: Text('Homme')),
+                    DropdownMenuItem(value: 'other', child: Text('Autre')),
                   ],
+                  onChanged: onGenderChanged,
                 ),
+              ],
+              expanded: true,
+              collapsible: false,
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: anonymized,
+              onChanged: onAnonymizedChanged,
+              title: const Text('Mode anonymisé'),
+              subtitle: const Text(
+                'Masque l’identité dans la liste et la fiche.',
               ),
+            ),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                TextButton(
+                  key: const Key('internal-reset-filters'),
+                  onPressed: onReset,
+                  child: const Text('Réinitialiser'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: onApply,
+                  child: const Text('Appliquer'),
+                ),
+              ],
             ),
           ],
         ),

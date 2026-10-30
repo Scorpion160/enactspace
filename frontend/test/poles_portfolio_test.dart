@@ -270,7 +270,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Filtres et recherche'), findsOneWidget);
+      expect(find.byTooltip('Afficher les filtres'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
     });
   });
 

@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -604,20 +606,17 @@ class _DemoScreenState extends State<DemoScreen> {
         asset: 'assets/heritage/world-cup-2022-emotion.jpg',
       ),
       const SizedBox(height: 22),
-      TextField(
-        key: const ValueKey('demo-archive-search'),
-        onChanged: (value) => setState(() => query = value),
-        decoration: const InputDecoration(
-          labelText: 'Rechercher un projet, une année, un souvenir',
-          prefixIcon: Icon(Icons.search),
-          border: OutlineInputBorder(),
+      AppFilterToolbar(
+        search: TextField(
+          key: const ValueKey('demo-archive-search'),
+          onChanged: (value) => setState(() => query = value),
+          decoration: const InputDecoration(
+            hintText: 'Rechercher un projet, une année, un souvenir',
+            prefixIcon: Icon(Icons.search),
+            border: OutlineInputBorder(),
+          ),
         ),
-      ),
-      const SizedBox(height: 14),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
+        quickFilters: [
           for (final value in [
             'Tout',
             '2016',
@@ -634,6 +633,9 @@ class _DemoScreenState extends State<DemoScreen> {
               onSelected: (_) => setState(() => year = value),
             ),
         ],
+        filters: const [],
+        actions: const [],
+        activeFilterCount: 0,
       ),
       const SizedBox(height: 18),
       Builder(

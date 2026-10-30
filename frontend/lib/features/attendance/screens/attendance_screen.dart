@@ -1,6 +1,8 @@
 import '../../../core/widgets/preview_mode_scope.dart';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
@@ -485,9 +487,9 @@ class _AttendanceStatsOverview extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -613,9 +615,9 @@ class _PersonalAttendanceView extends StatelessWidget {
                         Text(
                           'Mes présences, retards et absences uniquement.',
                           style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1066,102 +1068,63 @@ class _AttendanceFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppFilterBar(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 760;
-          final search = TextField(
-            controller: controller,
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(
-              labelText: 'Rechercher une session',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-          );
-          final filters = Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _FilterChoice(
-                label: 'Toutes',
-                selected: statusFilter == 'all',
-                onSelected: () => onStatusChanged('all'),
-              ),
-              _FilterChoice(
-                label: 'Ouvertes',
-                selected: statusFilter == 'open',
-                onSelected: () => onStatusChanged('open'),
-              ),
-              _FilterChoice(
-                label: 'Clôturées',
-                selected: statusFilter == 'closed',
-                onSelected: () => onStatusChanged('closed'),
-              ),
-              _FilterChoice(
-                label: 'Planifiées',
-                selected: statusFilter == 'scheduled',
-                onSelected: () => onStatusChanged('scheduled'),
-              ),
-              PopupMenuButton<String>(
-                tooltip: 'Filtrer par type',
-                onSelected: onTypeChanged,
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'all', child: Text('Tous les types')),
-                  PopupMenuItem(
-                    value: 'general_meeting',
-                    child: Text('Réunions générales'),
-                  ),
-                  PopupMenuItem(
-                    value: 'pole_meeting',
-                    child: Text('Réunions pôle'),
-                  ),
-                  PopupMenuItem(
-                    value: 'project_meeting',
-                    child: Text('Réunions projet'),
-                  ),
-                  PopupMenuItem(value: 'training', child: Text('Formations')),
-                  PopupMenuItem(value: 'activity', child: Text('Activités')),
-                ],
-                child: Chip(
-                  avatar: Icon(Icons.tune_rounded, size: 16),
-                  label: Text(_typeFilterLabel(typeFilter)),
-                ),
-              ),
-            ],
-          );
-
-          if (isWide) {
-            return Row(
-              children: [
-                Expanded(child: search),
-                SizedBox(width: 14),
-                Flexible(child: filters),
-              ],
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              search,
-              SizedBox(height: 10),
-              AppDataCard(
-                padding: EdgeInsets.zero,
-                child: ExpansionTile(
-                  title: Text('Filtres de session'),
-                  subtitle: Text(
-                    '$statusFilter • ${_typeFilterLabel(typeFilter)}',
-                  ),
-                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-                  children: [
-                    Align(alignment: Alignment.centerLeft, child: filters),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher une session',
+          prefixIcon: Icon(Icons.search_rounded),
+        ),
       ),
+      quickFilters: [
+        _FilterChoice(
+          label: 'Toutes',
+          selected: statusFilter == 'all',
+          onSelected: () => onStatusChanged('all'),
+        ),
+        _FilterChoice(
+          label: 'Ouvertes',
+          selected: statusFilter == 'open',
+          onSelected: () => onStatusChanged('open'),
+        ),
+        _FilterChoice(
+          label: 'Clôturées',
+          selected: statusFilter == 'closed',
+          onSelected: () => onStatusChanged('closed'),
+        ),
+        _FilterChoice(
+          label: 'Planifiées',
+          selected: statusFilter == 'scheduled',
+          onSelected: () => onStatusChanged('scheduled'),
+        ),
+      ],
+      filters: [
+        PopupMenuButton<String>(
+          tooltip: 'Filtrer par type',
+          onSelected: onTypeChanged,
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 'all', child: Text('Tous les types')),
+            PopupMenuItem(
+              value: 'general_meeting',
+              child: Text('Réunions générales'),
+            ),
+            PopupMenuItem(value: 'pole_meeting', child: Text('Réunions pôle')),
+            PopupMenuItem(
+              value: 'project_meeting',
+              child: Text('Réunions projet'),
+            ),
+            PopupMenuItem(value: 'training', child: Text('Formations')),
+            PopupMenuItem(value: 'activity', child: Text('Activités')),
+          ],
+          child: Chip(
+            avatar: Icon(Icons.tune_rounded, size: 16),
+            label: Text(_typeFilterLabel(typeFilter)),
+          ),
+        ),
+      ],
+      actions: const [],
+      activeFilterCount: typeFilter == 'all' ? 0 : 1,
     );
   }
 }
@@ -1183,7 +1146,7 @@ class _FilterChoice extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
     );
   }
 }

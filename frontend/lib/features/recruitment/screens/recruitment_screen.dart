@@ -2,6 +2,7 @@ import '../widgets/internal/human_assessment_editor.dart';
 import '../services/recruitment_message.dart';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import '../../../shared/attachments/attachment_picker.dart';
 
@@ -715,165 +716,141 @@ class _RecruitmentFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 760;
-            final searchWidth = isCompact ? constraints.maxWidth : 280.0;
-            final campaignWidth = isCompact ? constraints.maxWidth : 260.0;
-            final statusWidth = isCompact ? constraints.maxWidth : 230.0;
-            final textFilterWidth = isCompact ? constraints.maxWidth : 180.0;
-            final switchWidth = isCompact ? constraints.maxWidth : 250.0;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: searchWidth,
-                  child: TextField(
-                    controller: searchController,
-                    enabled: !anonymousReview,
-                    decoration: InputDecoration(
-                      labelText: anonymousReview
-                          ? 'Recherche désactivée en mode anonymisé'
-                          : 'Rechercher',
-                      prefixIcon: Icon(Icons.search_rounded),
-                      suffixIcon: IconButton(
-                        onPressed: onSearch,
-                        icon: Icon(Icons.arrow_forward_rounded),
-                      ),
-                    ),
-                    onSubmitted: (_) => onSearch(),
-                  ),
-                ),
-                SizedBox(
-                  width: campaignWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: selectedCampaign,
-                    decoration: const InputDecoration(labelText: 'Campagne'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Toutes les campagnes'),
-                      ),
-                      ...campaigns.map(
-                        (campaign) => DropdownMenuItem(
-                          value: campaign.id,
-                          child: Text(campaign.title),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onCampaignChanged(value);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: statusWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: selectedStatus,
-                    decoration: const InputDecoration(labelText: 'Statut'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Tous')),
-                      DropdownMenuItem(
-                        value: 'submitted',
-                        child: Text('Reçues'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'under_review',
-                        child: Text('En étude'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'interview_scheduled',
-                        child: Text('Entretiens'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'accepted',
-                        child: Text('Acceptées'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'waiting_list',
-                        child: Text('Liste d’attente'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'rejected',
-                        child: Text('Rejetées'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'cancelled',
-                        child: Text('Clôturées'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onStatusChanged(value);
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: statusWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: selectedGender,
-                    decoration: const InputDecoration(labelText: 'Genre'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Tous')),
-                      DropdownMenuItem(value: 'femme', child: Text('Femme')),
-                      DropdownMenuItem(value: 'homme', child: Text('Homme')),
-                      DropdownMenuItem(value: 'autre', child: Text('Autre')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onGenderChanged(value);
-                    },
-                  ),
-                ),
-                _RecruitmentTextFilter(
-                  width: textFilterWidth,
-                  controller: poleController,
-                  label: 'Pôle souhaité',
-                  onSearch: onSearch,
-                ),
-                _RecruitmentTextFilter(
-                  width: textFilterWidth,
-                  controller: projectController,
-                  label: 'Projet',
-                  onSearch: onSearch,
-                ),
-                _RecruitmentTextFilter(
-                  width: textFilterWidth,
-                  controller: departmentController,
-                  label: 'Département',
-                  onSearch: onSearch,
-                ),
-                _RecruitmentTextFilter(
-                  width: textFilterWidth,
-                  controller: classController,
-                  label: 'Promotion',
-                  onSearch: onSearch,
-                ),
-                SizedBox(
-                  width: switchWidth,
-                  child: SwitchListTile(
-                    value: anonymousReview,
-                    onChanged: onAnonymousChanged,
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    title: Text(
-                      'Mode anonymisé',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text('Masquer identité pendant le tri'),
-                  ),
-                ),
-              ],
-            );
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        enabled: !anonymousReview,
+        decoration: InputDecoration(
+          labelText: anonymousReview
+              ? 'Recherche désactivée en mode anonymisé'
+              : 'Rechercher',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: IconButton(
+            onPressed: onSearch,
+            icon: Icon(Icons.arrow_forward_rounded),
+          ),
+        ),
+        onSubmitted: (_) => onSearch(),
+      ),
+      quickFilters: const [],
+      filters: [
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: selectedCampaign,
+          decoration: const InputDecoration(labelText: 'Campagne'),
+          items: [
+            const DropdownMenuItem(
+              value: 'all',
+              child: Text('Toutes les campagnes'),
+            ),
+            ...campaigns.map(
+              (campaign) => DropdownMenuItem(
+                value: campaign.id,
+                child: Text(campaign.title),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) onCampaignChanged(value);
           },
         ),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: selectedStatus,
+          decoration: const InputDecoration(labelText: 'Statut'),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Tous')),
+            DropdownMenuItem(value: 'submitted', child: Text('Reçues')),
+            DropdownMenuItem(value: 'under_review', child: Text('En étude')),
+            DropdownMenuItem(
+              value: 'interview_scheduled',
+              child: Text('Entretiens'),
+            ),
+            DropdownMenuItem(value: 'accepted', child: Text('Acceptées')),
+            DropdownMenuItem(
+              value: 'waiting_list',
+              child: Text('Liste d’attente'),
+            ),
+            DropdownMenuItem(value: 'rejected', child: Text('Rejetées')),
+            DropdownMenuItem(value: 'cancelled', child: Text('Clôturées')),
+          ],
+          onChanged: (value) {
+            if (value != null) onStatusChanged(value);
+          },
+        ),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: selectedGender,
+          decoration: const InputDecoration(labelText: 'Genre'),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Tous')),
+            DropdownMenuItem(value: 'femme', child: Text('Femme')),
+            DropdownMenuItem(value: 'homme', child: Text('Homme')),
+            DropdownMenuItem(value: 'autre', child: Text('Autre')),
+          ],
+          onChanged: (value) {
+            if (value != null) onGenderChanged(value);
+          },
+        ),
+      ],
+      actions: const [],
+      activeFilterCount:
+          [
+            selectedCampaign,
+            selectedStatus,
+            selectedGender,
+          ].where((v) => v != 'all').length +
+          [
+            poleController,
+            projectController,
+            departmentController,
+            classController,
+          ].where((v) => v.text.trim().isNotEmpty).length,
+      details: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppFilterToolbar(
+            filters: [
+              _RecruitmentTextFilter(
+                width: double.infinity,
+                controller: poleController,
+                label: 'Pôle souhaité',
+                onSearch: onSearch,
+              ),
+              _RecruitmentTextFilter(
+                width: double.infinity,
+                controller: projectController,
+                label: 'Projet',
+                onSearch: onSearch,
+              ),
+              _RecruitmentTextFilter(
+                width: double.infinity,
+                controller: departmentController,
+                label: 'Département',
+                onSearch: onSearch,
+              ),
+              _RecruitmentTextFilter(
+                width: double.infinity,
+                controller: classController,
+                label: 'Promotion',
+                onSearch: onSearch,
+              ),
+            ],
+            expanded: true,
+            collapsible: false,
+          ),
+          SwitchListTile(
+            value: anonymousReview,
+            onChanged: onAnonymousChanged,
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            title: Text(
+              'Mode anonymisé',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text('Masquer identité pendant le tri'),
+          ),
+        ],
       ),
     );
   }

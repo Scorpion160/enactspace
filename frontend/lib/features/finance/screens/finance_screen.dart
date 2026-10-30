@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -480,8 +482,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Paiement validé.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Paiement validé.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -512,8 +515,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Paiement rejeté.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Paiement rejeté.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -563,8 +567,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Paiement annulé.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Paiement annulé.')));
     } catch (e) {
       if (!mounted) return;
 
@@ -848,9 +853,9 @@ class _FinanceStatsGrid extends StatelessWidget {
                           stat.label,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -911,9 +916,9 @@ class _FinanceRiskPanel extends StatelessWidget {
                     value: collectionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .outlineVariant,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant,
                   ),
                 ),
                 SizedBox(height: 10),
@@ -1280,105 +1285,55 @@ class _FinanceFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 820;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Rechercher membre, frais, référence',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _FinanceChoiceChip(
-                  label: 'Tous paiements',
-                  selected: paymentFilter == 'all',
-                  onSelected: () => onPaymentFilterChanged('all'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'À valider',
-                  selected: paymentFilter == 'pending',
-                  onSelected: () => onPaymentFilterChanged('pending'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Validés',
-                  selected: paymentFilter == 'validated',
-                  onSelected: () => onPaymentFilterChanged('validated'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Annulés',
-                  selected: paymentFilter == 'cancelled',
-                  onSelected: () => onPaymentFilterChanged('cancelled'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Tous comptes',
-                  selected: accountFilter == 'all',
-                  onSelected: () => onAccountFilterChanged('all'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Débiteurs',
-                  selected: accountFilter == 'debt',
-                  onSelected: () => onAccountFilterChanged('debt'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Soldés',
-                  selected: accountFilter == 'clear',
-                  onSelected: () => onAccountFilterChanged('clear'),
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Semantics(
-              button: true,
-              label: 'Filtres et recherche',
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                minTileHeight: 44,
-                leading: Icon(Icons.filter_list_rounded),
-                title: Text('Filtres et recherche'),
-                childrenPadding: const EdgeInsets.only(bottom: 4),
-                children: [
-                  search,
-                  SizedBox(height: 12),
-                  filters,
-                  SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        controller.clear();
-                        onPaymentFilterChanged('all');
-                        onAccountFilterChanged('all');
-                        onChanged();
-                      },
-                      icon: Icon(Icons.restart_alt_rounded),
-                      label: Text('Réinitialiser'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher membre, frais, référence',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      quickFilters: [
+        _FinanceChoiceChip(
+          label: 'Tous paiements',
+          selected: paymentFilter == 'all',
+          onSelected: () => onPaymentFilterChanged('all'),
+        ),
+        _FinanceChoiceChip(
+          label: 'À valider',
+          selected: paymentFilter == 'pending',
+          onSelected: () => onPaymentFilterChanged('pending'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Validés',
+          selected: paymentFilter == 'validated',
+          onSelected: () => onPaymentFilterChanged('validated'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Annulés',
+          selected: paymentFilter == 'cancelled',
+          onSelected: () => onPaymentFilterChanged('cancelled'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Tous comptes',
+          selected: accountFilter == 'all',
+          onSelected: () => onAccountFilterChanged('all'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Débiteurs',
+          selected: accountFilter == 'debt',
+          onSelected: () => onAccountFilterChanged('debt'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Soldés',
+          selected: accountFilter == 'clear',
+          onSelected: () => onAccountFilterChanged('clear'),
+        ),
+      ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }
@@ -1399,7 +1354,7 @@ class _FinanceChoiceChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
       onSelected: (_) => onSelected(),
     );
   }
@@ -1502,9 +1457,9 @@ class _FeesCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -2159,8 +2114,9 @@ class _PaymentDecisionDialogState extends State<PaymentDecisionDialog> {
                   backgroundColor: Colors.deepOrange.shade700,
                 ),
           onPressed: canSubmit
-              ? () => Navigator.of(context)
-                    .pop(widget.approve ? true : _reasonController.text.trim())
+              ? () => Navigator.of(
+                  context,
+                ).pop(widget.approve ? true : _reasonController.text.trim())
               : null,
           icon: Icon(
             widget.approve ? Icons.verified_rounded : Icons.block_rounded,
@@ -2510,8 +2466,9 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                       color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.error
-                            .withValues(alpha: 0.35),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(
@@ -2974,8 +2931,9 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                       color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.error
-                            .withValues(alpha: 0.35),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(
