@@ -164,6 +164,7 @@ class PolePortfolioFilters extends StatelessWidget {
       ],
       actions: const [],
       activeFilterCount:
+          (searchController.text.trim().isEmpty ? 0 : 1) +
           (selectedType == 'all' ? 0 : 1) +
           (selectedResponsible == 'all' ? 0 : 1) +
           (selectedAlert == PoleAlertFilter.all ? 0 : 1),

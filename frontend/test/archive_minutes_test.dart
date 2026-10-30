@@ -76,7 +76,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Oser essayer'), findsNothing);
     expect(find.text('Se faire confiance'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Curiosité'));
+    final choice = find.widgetWithText(ChoiceChip, 'Curiosité');
+    await tester.ensureVisible(choice);
+    await tester.pumpAndSettle();
+    expect(choice.hitTestable(), findsOneWidget);
+    await tester.tap(choice);
     await tester.pumpAndSettle();
     expect(find.textContaining('Aucune Minute'), findsOneWidget);
   });

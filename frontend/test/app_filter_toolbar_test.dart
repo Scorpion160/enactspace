@@ -25,6 +25,48 @@ void main() {
     )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
   });
 
+  testWidgets(
+    'toolbar supplies Material when its page is mounted without Scaffold',
+    (tester) async {
+      String? selected;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SingleChildScrollView(
+            child: AppFilterToolbar(
+              search: const TextField(key: Key('standalone-search')),
+              filters: [
+                DropdownButtonFormField<String>(
+                  initialValue: 'all',
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Toutes les tâches'),
+                    ),
+                    DropdownMenuItem(value: 'blocked', child: Text('Bloquées')),
+                  ],
+                  onChanged: (value) => selected = value,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.enterText(
+        find.byKey(const Key('standalone-search')),
+        'atelier',
+      );
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bloquées').last);
+      await tester.pumpAndSettle();
+      expect(selected, 'blocked');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final width in [320.0, 390.0, 768.0, 1440.0]) {
     for (final scale in [1.0, 2.0]) {
       for (final dark in [false, true]) {

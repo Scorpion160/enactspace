@@ -169,6 +169,7 @@ class _FilterContent extends StatelessWidget {
       ],
       actions: const [],
       activeFilterCount:
+          (searchController.text.trim().isEmpty ? 0 : 1) +
           (selectedStatus == 'all' ? 0 : 1) +
           (selectedResponsible == 'all' ? 0 : 1) +
           (selectedAlert == ProjectAlertFilter.all ? 0 : 1),

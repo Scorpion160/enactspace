@@ -140,7 +140,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'absent');
       await tester.pump();
       expect(find.text('Aucun résultat'), findsOneWidget);
-      await tester.tap(find.text('Réinitialiser'));
+      await tester.tap(find.byTooltip('Effacer les filtres'));
       await tester.pump();
       expect(find.text('Audit Horizon'), findsOneWidget);
     });

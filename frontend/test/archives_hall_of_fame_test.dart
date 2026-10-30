@@ -368,7 +368,11 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.textContaining('Ouvrir la source'));
+      final sourceAction = find.textContaining('Ouvrir la source');
+      await tester.ensureVisible(sourceAction);
+      await tester.pumpAndSettle();
+      expect(sourceAction.hitTestable(), findsOneWidget);
+      await tester.tap(sourceAction);
       await tester.pumpAndSettle();
 
       expect(launchedUrls, isEmpty);
@@ -403,7 +407,11 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.textContaining('Ouvrir la source'));
+      final sourceAction = find.textContaining('Ouvrir la source');
+      await tester.ensureVisible(sourceAction);
+      await tester.pumpAndSettle();
+      expect(sourceAction.hitTestable(), findsOneWidget);
+      await tester.tap(sourceAction);
       await tester.pumpAndSettle();
 
       expect(launchedUrls, ['https://example.test/source-publique']);

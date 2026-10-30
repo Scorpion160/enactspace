@@ -33,10 +33,9 @@ void main() {
   group('matrice routes', () {
     test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
-      final declared = RegExp(r"path:\s*'([^']+)'")
-          .allMatches(source)
-          .map((match) => match.group(1)!)
-          .toList();
+      final declared = RegExp(
+        r"path:\s*'([^']+)'",
+      ).allMatches(source).map((match) => match.group(1)!).toList();
 
       const expectedRoutes = [
         '/demo',
@@ -360,8 +359,9 @@ void main() {
     test(
       'le drawer reste le point d’entrée de toutes les routes autorisées',
       () {
-        final source = File('lib/shared/layout/app_shell.dart')
-            .readAsStringSync();
+        final source = File(
+          'lib/shared/layout/app_shell.dart',
+        ).readAsStringSync();
         expect(source, contains('drawer: Drawer('));
         for (final path in const [
           '/attendance',
@@ -525,7 +525,7 @@ void main() {
       }
     });
 
-    test('frontend/lib ne contient aucun dataset démo silencieux nommé', () {
+    test('aucun dataset démo silencieux hors du parcours démo explicite', () {
       final files = Directory('lib')
           .listSync(recursive: true)
           .whereType<File>()
@@ -540,6 +540,13 @@ void main() {
         'sampledata',
       ];
       for (final file in files) {
+        // The opt-in demo has its own isolated data and explicit entry banner.
+        // All regular application modules still reject silent example datasets.
+        if (file.path
+            .replaceAll(Platform.pathSeparator, '/')
+            .startsWith('lib/features/demo/')) {
+          continue;
+        }
         final source = file.readAsStringSync().toLowerCase();
         for (final marker in forbidden) {
           expect(
@@ -661,8 +668,9 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(2)),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
             child: child!,
           ),
           home: Scaffold(
@@ -677,9 +685,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Gestion Academy'), findsOneWidget);
       expect(find.text('Culture Enactus'), findsWidgets);
-      expect(find.text('Team Leader'), findsOneWidget);
-      expect(find.text('Pôle associé'), findsOneWidget);
-      expect(find.text('Projet associé'), findsOneWidget);
+      final about = find.text('À propos de cette formation');
+      await tester.ensureVisible(about);
+      await tester.pumpAndSettle();
+      expect(about.hitTestable(), findsOneWidget);
+      await tester.tap(about);
+      await tester.pumpAndSettle();
+      expect(find.text('Pour : Team Leader'), findsOneWidget);
+      expect(
+        find.text('Cette formation est associée à un pôle.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Cette formation est associée à un projet.'),
+        findsOneWidget,
+      );
       expect(find.text('culture_enactus'), findsNothing);
       expect(find.text('team_leader'), findsNothing);
       expect(find.text('00000000-0000-4000-8000-000000000001'), findsNothing);
@@ -702,8 +722,9 @@ void main() {
     });
 
     test('les commandes Chat ambiguës disposent de tooltips', () {
-      final source = File('lib/features/chat/screens/chat_screen.dart')
-          .readAsStringSync();
+      final source = File(
+        'lib/features/chat/screens/chat_screen.dart',
+      ).readAsStringSync();
       expect(source, contains("tooltip: 'Annuler la réponse'"));
       expect(
         RegExp("tooltip: 'Rechercher des membres'").allMatches(source),
@@ -744,8 +765,9 @@ Future<void> _pumpScaled(
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, content) => MediaQuery(
-        data: MediaQuery.of(context)
-            .copyWith(textScaler: const TextScaler.linear(2)),
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: const TextScaler.linear(2)),
         child: content!,
       ),
       home: scaffold ? Scaffold(body: child) : child,
