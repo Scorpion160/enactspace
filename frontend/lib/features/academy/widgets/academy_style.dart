@@ -67,6 +67,12 @@ class AcademyStyle extends StatelessWidget {
         backgroundColor: colors.surfaceContainerLowest,
         foregroundColor: colors.onSurface,
         surfaceTintColor: Colors.transparent,
+        titleTextStyle: inherited.appBarTheme.titleTextStyle?.copyWith(
+          color: colors.onSurface,
+        ),
+        toolbarTextStyle: inherited.appBarTheme.toolbarTextStyle?.copyWith(
+          color: colors.onSurface,
+        ),
       ),
       cardTheme: inherited.cardTheme.copyWith(
         color: colors.surface,
@@ -85,7 +91,10 @@ class AcademyStyle extends StatelessWidget {
           disabledForegroundColor: colors.onSurfaceVariant,
           minimumSize: const Size(48, 46),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800, height: 1.3),
+          textStyle: inherited.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.3,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

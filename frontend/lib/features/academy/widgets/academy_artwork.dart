@@ -5,11 +5,15 @@ class AcademyArtwork extends StatelessWidget {
   final String name;
   final double height;
   final bool panoramic;
+  final BoxFit? fit;
+  final Alignment alignment;
   const AcademyArtwork({
     super.key,
     required this.name,
     this.height = 120,
     this.panoramic = true,
+    this.fit,
+    this.alignment = Alignment.center,
   });
 
   @override
@@ -34,7 +38,8 @@ class AcademyArtwork extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
               path,
-              fit: banner ? BoxFit.cover : BoxFit.contain,
+              fit: fit ?? (banner ? BoxFit.cover : BoxFit.contain),
+              alignment: alignment,
               width: double.infinity,
               errorBuilder: (context, error, stack) => Center(
                 child: Icon(

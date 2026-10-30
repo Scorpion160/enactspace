@@ -5,26 +5,26 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\Users\DIOP\Documents\EnactSpaceRecovery\enactspace-20260927'
 $frontend = Join-Path $repo 'frontend'
-$baseline = '1341134d40927473a8d184e4e62f85ebf97dc2a1'
+$baseline = 'afb07d64e9fd11d82dabde707bd3373f4dd2ff5d'
 $temp = Join-Path $env:TEMP ('EnactSpace-AcademyLearning-' + [guid]::NewGuid().ToString('N'))
 $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\academy-learning-' + [guid]::NewGuid().ToString('N'))
 $observed = @{}
 $files = @(
     @{ Path = 'frontend/lib/features/academy/models/academy_lesson_sections.dart'; Hash = 'bded3b97f57a2996a498a7e023c1aac1fcc768f9c71896cd603acd5c9ade9875'; New = $false; Binary = $false; BaselineHash = 'bded3b97f57a2996a498a7e023c1aac1fcc768f9c71896cd603acd5c9ade9875' },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610'; New = $false; Binary = $false; BaselineHash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = 'd5fa047199b210bd7206b27a5ffea9d9f947a9936897f4d5f761479a20c3ad14'; New = $false; Binary = $false; BaselineHash = 'a77b47505d59221eb01e0c29aec46f1c16bdfcf9cefd41f1525e2f6499ddb610' },
     @{ Path = 'frontend/lib/features/academy/screens/academy_course_screen.dart'; Hash = '7be1e6d0342c9144381a44a1c3c949e4f3e3e1d88a85c9fee81794422d05dfa0'; New = $false; Binary = $false; BaselineHash = '7be1e6d0342c9144381a44a1c3c949e4f3e3e1d88a85c9fee81794422d05dfa0' },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_path_screen.dart'; Hash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338'; New = $false; Binary = $false; BaselineHash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_artwork.dart'; Hash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea'; New = $false; Binary = $false; BaselineHash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_path_screen.dart'; Hash = '9bc569fdc55a986465835965ce9f75253c6791ca6970bc652194e1f74aafaae6'; New = $false; Binary = $false; BaselineHash = '8da4c7f40d58ef5621829e88a790814557418e20e85662857fc7611f9871d338' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_artwork.dart'; Hash = '1091c06495a3583c3cecf90c8605f491ecbbd1e9b6420fa3ea3ee646b810326c'; New = $false; Binary = $false; BaselineHash = '4dd1e7137d28c3020f5c7a17e04ff7fbb65df1dc3542d282576ec39f75dbdfea' },
     @{ Path = 'frontend/lib/features/academy/widgets/academy_illustration.dart'; Hash = '0f42c1b3501ecf3dcb53279106366458ba2a7e97b9c2a1aebe31d51f27c19e88'; New = $false; Binary = $false; BaselineHash = '0f42c1b3501ecf3dcb53279106366458ba2a7e97b9c2a1aebe31d51f27c19e88' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_style.dart'; Hash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849'; New = $false; Binary = $false; BaselineHash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_course_hero.dart'; Hash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f'; New = $false; Binary = $false; BaselineHash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f' },
-    @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40'; New = $false; Binary = $false; BaselineHash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_style.dart'; Hash = 'f0c0cc8124239efbbcc4a552565a58f48e7d415efb7c95ebc490942d1fde82c4'; New = $false; Binary = $false; BaselineHash = 'e3bad86c6303892dfdbb7e4b2ac84da9d9117cfa010a3062efd81bd437695849' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_course_hero.dart'; Hash = 'a77730eab9f75fe109420753c2e31aebf8b49d9817bd12558d5ca413ac1dbe08'; New = $false; Binary = $false; BaselineHash = 'e30529b50b4fdcc69c83b4477640265c7da1d3211e0ab6cfac9340395cfa714f' },
+    @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'dda523d3ebb83e33d8a322f89c02cb1f3b54c9ee7730c4d9a39a56f38eeee9ae'; New = $false; Binary = $false; BaselineHash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40' },
     @{ Path = 'frontend/lib/features/academy/widgets/academy_quiz_dialog.dart'; Hash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd'; New = $false; Binary = $false; BaselineHash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd' },
     @{ Path = 'frontend/assets/img/academy_mobile_progression.webp'; Hash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f'; New = $false; Binary = $true; BaselineHash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f' },
-    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113'; New = $false; Binary = $false; BaselineHash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113' },
+    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '98cb13e4ca798d3ab706101849fafe70ce78e3be296758ffb12e4393cd389e83'; New = $false; Binary = $false; BaselineHash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113' },
     @{ Path = 'frontend/test/academy_operational_test.dart'; Hash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828'; New = $false; Binary = $false; BaselineHash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828' },
-    @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0'; New = $false; Binary = $false; BaselineHash = 'c7a97f32749708d2f809b5e0c11e23d7b91f9edc4a5221a2c6e74058fbf8d4cd' },
-    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = '56ad7da342d2bf74ecb5eaab5cc5fa01ca0b29b3d72fc1c16c0665c9faa8286b'; New = $false; Binary = $false; BaselineHash = 'f291b967ec6ec01fd2a3480efb80cc1fe7eae5044db431f01b737b36befa7b48' }
+    @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0'; New = $false; Binary = $false; BaselineHash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0' },
+    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'dc51708a6140cd6d1962428f7ba537240e89e551afd10f4ddd6f8ab07a61f5b9'; New = $false; Binary = $false; BaselineHash = '56ad7da342d2bf74ecb5eaab5cc5fa01ca0b29b3d72fc1c16c0665c9faa8286b' }
 )
 function Canonical([string]$Path) {
     [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").TrimEnd()

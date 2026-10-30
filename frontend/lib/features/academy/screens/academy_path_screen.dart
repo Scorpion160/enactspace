@@ -117,7 +117,7 @@ class _AcademyPathScreenState extends State<AcademyPathScreen> {
                                 AcademyProgressBar(
                                   value: path.progress / 100,
                                   label:
-                                      '${path.courseIds.length} formations · ${path.progress.toStringAsFixed(0)} % complété',
+                                      '${path.courseIds.length} ${path.courseIds.length == 1 ? 'formation' : 'formations'} · ${path.progress.toStringAsFixed(0)} % complété',
                                 ),
                               ],
                             );

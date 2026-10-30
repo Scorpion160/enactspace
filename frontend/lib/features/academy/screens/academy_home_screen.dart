@@ -952,7 +952,7 @@ class _PathCard extends StatelessWidget {
               const SizedBox(height: 6),
               if (wide) ...[Text(path.description), const SizedBox(height: 8)],
               Text(
-                '${path.courseIds.length} formations · ${path.progress.toStringAsFixed(0)} % complété',
+                '${path.courseIds.length} ${path.courseIds.length == 1 ? 'formation' : 'formations'} · ${path.progress.toStringAsFixed(0)} % complété',
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(

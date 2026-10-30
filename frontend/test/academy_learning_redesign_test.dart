@@ -180,6 +180,18 @@ void main() {
             );
             expect(find.text(_title), findsOneWidget);
             expect(find.text('Gestion Academy'), findsNothing);
+            final continueLabel = find.descendant(
+              of: find.byKey(const Key('academy-course-continue')),
+              matching: find.text('Commencer la formation'),
+            );
+            expect(
+              DefaultTextStyle.of(
+                tester.element(continueLabel),
+              ).style.fontFamily,
+              contains('Poppins'),
+              reason:
+                  'The action must keep the app typography in captures and in the reader.',
+            );
             expect(gateway.completionCalls, isEmpty);
             expect(tester.takeException(), isNull);
             if (scale == 1) {
@@ -194,12 +206,19 @@ void main() {
               find.byKey(const Key('academy-course-continue')),
             );
             expect(find.byType(AcademyLessonReader), findsOneWidget);
+            _expectReaderTitleContrast(tester);
             expect(gateway.startCalls, ['lesson-a']);
             expect(gateway.completionCalls, isEmpty);
             expect(
               find.byKey(const Key('complete-reading-lesson')).hitTestable(),
               findsOneWidget,
             );
+            if (scale == 1) {
+              await _capture(
+                tester,
+                'lecture-${dark ? 'dark' : 'light'}-${width.toInt()}',
+              );
+            }
             final scroller = find
                 .descendant(
                   of: find.byKey(const Key('academy-reader-scroll')),
@@ -218,12 +237,6 @@ void main() {
               findsOneWidget,
             );
             expect(tester.takeException(), isNull);
-            if (scale == 1) {
-              await _capture(
-                tester,
-                'lecture-${dark ? 'dark' : 'light'}-${width.toInt()}',
-              );
-            }
 
             await tester.tap(find.byTooltip('Fermer la leçon'));
             await tester.pumpAndSettle();
@@ -252,6 +265,12 @@ void main() {
         tester,
         find.byKey(const Key('academy-course-continue')),
       );
+      await tester.tap(find.byTooltip('Lire en sombre'));
+      await tester.pumpAndSettle();
+      _expectReaderTitleContrast(tester);
+      await tester.tap(find.byTooltip('Lire en clair'));
+      await tester.pumpAndSettle();
+      _expectReaderTitleContrast(tester);
       await tester.tap(find.byTooltip('Leçon suivante'));
       await tester.pumpAndSettle();
       expect(
@@ -372,6 +391,20 @@ void main() {
   }
 }
 
+void _expectReaderTitleContrast(WidgetTester tester) {
+  final title = find.descendant(
+    of: find.byType(AcademyLessonReader),
+    matching: find.text('La leçon'),
+  );
+  final context = tester.element(title);
+  final foreground = DefaultTextStyle.of(context).style.color!;
+  final background = Theme.of(context).appBarTheme.backgroundColor!;
+  final ratio =
+      (foreground.computeLuminance() + 0.05) /
+      (background.computeLuminance() + 0.05);
+  expect(ratio >= 1 ? ratio : 1 / ratio, greaterThanOrEqualTo(4.5));
+}
+
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   // A jump schedules a frame; wait for layout before using screen coordinates.
@@ -402,11 +435,13 @@ Future<void> _pump(
       key: const Key('academy-redesign-capture'),
       child: router == null
           ? MaterialApp(
+              debugShowCheckedModeBanner: false,
               theme: theme,
               builder: media,
               home: Scaffold(body: child),
             )
           : MaterialApp.router(
+              debugShowCheckedModeBanner: false,
               theme: theme,
               builder: media,
               routerConfig: router,

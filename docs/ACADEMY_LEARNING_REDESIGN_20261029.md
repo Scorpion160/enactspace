@@ -36,3 +36,15 @@ L’analyse Flutter est passée. La première exécution compte 56 tests réussi
 ### Retour des tests Windows du 30 octobre
 
 L’analyse Flutter et les 62 tests Academy, fonctionnement pédagogique, Alumni, gamification et Impact sont passés. Dans la série de démo native, 28 tests passent et le seul échec concerne les dates françaises du chat : le test monte les écrans sans exécuter `main()`, qui appelle déjà `initializeDateFormatting('fr_FR')` dans l’application. Le test initialise maintenant les mêmes données locales avant ses scénarios, comme les tests Communication existants. Aucun comportement de production ni contrôle d’isolation de la démo n’est modifié. La relance de la démo et le contrôle visuel des 24 captures restent à confirmer avant le build.
+
+### Contrôle visuel des 24 captures du 30 octobre
+
+Les 24 images transmises (accueil, formation, parcours et lecteur, en clair/sombre, de 320 à 1440 pixels) ont été comparées aux maquettes du pack original. Le lot correspond au code `afb07d64e9fd11d82dabde707bd3373f4dd2ff5d` et à la série de 91 tests réussis (62 + 29), avec analyse Flutter sans erreur.
+
+Le contrôle a relevé des libellés de boutons rendus avec la police de test en blocs, un titre de lecteur blanc sur fond clair, une illustration trop petite dans la bannière de formation web et des titres mobiles inutilement comprimés par l’image. Les corrections conservent explicitement la police du thème et la couleur du titre, utilisent mieux la surface de l’illustration originale sans changer les fichiers d’images, et réservent toute la largeur aux titres longs. L’objectif et la photo sont côte à côte sur grand écran, comme dans la référence ; les paragraphes et leur ordre restent conservés. Le singulier « 1 formation » est corrigé dans les parcours.
+
+Les tests vérifient également la police du bouton et un contraste du titre du lecteur d’au moins 4,5:1, y compris lors du changement local clair/sombre. Les captures du lecteur sont prises à son ouverture, avant le défilement de contrôle, et sans le bandeau de débogage du harnais.
+
+L’analyse Dart des sources Academy et des tests concernés passe pour cette itération visuelle, avec Flutter 3.47.5 et les dépendances verrouillées. La relance des tests Flutter et la vérification des nouvelles captures restent à effectuer sous Windows. Aucun build ni déploiement de cette itération n’est effectué.
+
+Empreinte SHA-256 du lot reçu : `667b38d96a996c32514b42f4fe76590302fc3cbf7002ded250d2464c351b9150`.

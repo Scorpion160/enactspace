@@ -278,6 +278,13 @@ class _AcademyLessonReaderState extends State<AcademyLessonReader> {
   Widget _program({required ValueChanged<int> onSelect}) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
+      const AcademyArtwork(
+        name: 'hero_learning',
+        height: 155,
+        panoramic: false,
+        fit: BoxFit.cover,
+      ),
+      const SizedBox(height: 14),
       Text(
         widget.course.title,
         style: const TextStyle(
@@ -285,12 +292,6 @@ class _AcademyLessonReaderState extends State<AcademyLessonReader> {
           fontSize: 18,
           height: 1.3,
         ),
-      ),
-      const SizedBox(height: 12),
-      AcademyArtwork(
-        name: academyCourseArtwork(widget.course.title, widget.course.category),
-        height: 105,
-        panoramic: false,
       ),
       const SizedBox(height: 12),
       Text(
@@ -419,78 +420,111 @@ class _AcademyLessonReaderState extends State<AcademyLessonReader> {
           constraints: const BoxConstraints(maxWidth: 850),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
-            child: SelectionArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (showProgram)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _showProgram,
-                        icon: const Icon(Icons.format_list_numbered_rounded),
-                        label: const Text('Le programme'),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'LEÇON ${(_index + 1).toString().padLeft(2, '0')} / ${widget.course.lessonCount.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    lesson.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final pairedIntroduction =
+                    constraints.maxWidth >= 720 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.3 &&
+                    sections.isNotEmpty &&
+                    (sections.first.heading?.toLowerCase().contains(
+                          'objectif',
+                        ) ??
+                        false);
+                Widget sectionAt(int index) => Padding(
+                  key: _sectionKeys.putIfAbsent(index, GlobalKey.new),
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _LessonSection(section: sections[index]),
+                );
+                final photoView = HeritagePhoto(photo: photo, height: 220);
+                return SelectionArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AcademyPill(lesson.typeLabel),
-                      AcademyPill(
-                        'Lecture : environ ${lesson.readingMinutes} min',
-                      ),
-                      if (lesson.practiceMinutes > 0)
-                        AcademyPill(
-                          'Pratique : environ ${lesson.practiceMinutes} min',
-                          warm: true,
+                      if (showProgram)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: _busy ? null : _showProgram,
+                            icon: const Icon(
+                              Icons.format_list_numbered_rounded,
+                            ),
+                            label: const Text('Le programme'),
+                          ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  HeritagePhoto(photo: photo, height: 220),
-                  const SizedBox(height: 22),
-                  for (var index = 0; index < sections.length; index++)
-                    Padding(
-                      key: _sectionKeys.putIfAbsent(index, GlobalKey.new),
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: _LessonSection(section: sections[index]),
-                    ),
-                  if (sections.isEmpty)
-                    const Text(
-                      'Le contenu de cette leçon n’est pas encore disponible.',
-                    ),
-                  ExpansionTile(
-                    title: const Text('Les idées en image'),
-                    children: [
-                      AcademyIllustration(
-                        courseTitle: widget.course.title,
-                        lessonTitle: lesson.title,
-                        showPhoto: false,
-                        showHeading: false,
+                      const SizedBox(height: 12),
+                      Text(
+                        'LEÇON ${(_index + 1).toString().padLeft(2, '0')} / ${widget.course.lessonCount.toString().padLeft(2, '0')}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        lesson.title,
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          AcademyPill(lesson.typeLabel),
+                          AcademyPill(
+                            'Lecture : environ ${lesson.readingMinutes} min',
+                          ),
+                          if (lesson.practiceMinutes > 0)
+                            AcademyPill(
+                              'Pratique : environ ${lesson.practiceMinutes} min',
+                              warm: true,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+                      if (pairedIntroduction)
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(flex: 2, child: sectionAt(0)),
+                              const SizedBox(width: 20),
+                              Expanded(flex: 3, child: photoView),
+                            ],
+                          ),
+                        )
+                      else
+                        photoView,
+                      const SizedBox(height: 22),
+                      for (
+                        var index = pairedIntroduction ? 1 : 0;
+                        index < sections.length;
+                        index++
+                      )
+                        sectionAt(index),
+                      if (sections.isEmpty)
+                        const Text(
+                          'Le contenu de cette leçon n’est pas encore disponible.',
+                        ),
+                      ExpansionTile(
+                        title: const Text('Les idées en image'),
+                        children: [
+                          AcademyIllustration(
+                            courseTitle: widget.course.title,
+                            lessonTitle: lesson.title,
+                            showPhoto: false,
+                            showHeading: false,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),
