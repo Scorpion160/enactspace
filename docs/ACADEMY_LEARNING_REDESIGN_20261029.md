@@ -45,6 +45,8 @@ Le contrôle a relevé des libellés de boutons rendus avec la police de test en
 
 Les tests vérifient également la police du bouton et un contraste du titre du lecteur d’au moins 4,5:1, y compris lors du changement local clair/sombre. Les captures du lecteur sont prises à son ouverture, avant le défilement de contrôle, et sans le bandeau de débogage du harnais.
 
+Après les tests réussis, le script prépare également `academy-captures.zip` avec les seules 24 images et affiche son chemin pour faciliter le prochain contrôle visuel.
+
 L’analyse Dart des sources Academy et des tests concernés passe pour cette itération visuelle, avec Flutter 3.47.5 et les dépendances verrouillées. La relance des tests Flutter et la vérification des nouvelles captures restent à effectuer sous Windows. Aucun build ni déploiement de cette itération n’est effectué.
 
 Empreinte SHA-256 du lot reçu : `667b38d96a996c32514b42f4fe76590302fc3cbf7002ded250d2464c351b9150`.

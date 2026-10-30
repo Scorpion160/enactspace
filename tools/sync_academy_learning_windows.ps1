@@ -24,7 +24,7 @@ $files = @(
     @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '98cb13e4ca798d3ab706101849fafe70ce78e3be296758ffb12e4393cd389e83'; New = $false; Binary = $false; BaselineHash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113' },
     @{ Path = 'frontend/test/academy_operational_test.dart'; Hash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828'; New = $false; Binary = $false; BaselineHash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828' },
     @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0'; New = $false; Binary = $false; BaselineHash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0' },
-    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'dc51708a6140cd6d1962428f7ba537240e89e551afd10f4ddd6f8ab07a61f5b9'; New = $false; Binary = $false; BaselineHash = '56ad7da342d2bf74ecb5eaab5cc5fa01ca0b29b3d72fc1c16c0665c9faa8286b' }
+    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'c524fc3fb14f1748c731a7940a23d2653f6c62b6cd8f0f7529db814255a7a451'; New = $false; Binary = $false; BaselineHash = '56ad7da342d2bf74ecb5eaab5cc5fa01ca0b29b3d72fc1c16c0665c9faa8286b' }
 )
 function Canonical([string]$Path) {
     [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").TrimEnd()
@@ -131,8 +131,11 @@ try {
 "@
     $gallery = Join-Path $previews 'academy-preview.html'
     [IO.File]::WriteAllText($gallery, $html, [Text.UTF8Encoding]::new($false))
+    $archive = Join-Path $backup 'academy-captures.zip'
+    Compress-Archive -LiteralPath $pictures.FullName -DestinationPath $archive
     'ACADEMY_REFONTE_SOURCES_ET_TESTS_OK'
     "CAPTURES_ACADEMY=$gallery"
+    "ARCHIVE_CAPTURES_A_PARTAGER=$archive"
     'BUILD_ET_DEPLOIEMENT_NON_EFFECTUES'
     if (!$NoPreview) { Start-Process $gallery }
 } finally {
