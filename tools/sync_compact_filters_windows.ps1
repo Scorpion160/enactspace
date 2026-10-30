@@ -11,7 +11,7 @@ $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\compact-filters-
 $observed = @{}
 $files = @(
     @{ Path = 'docs/COMPACT_FILTERS_20261030.md'; Hash = 'fa239d76817a478b830d3a3d94ca739f78418ca715bd1197b82ec480f09937e8'; New = $true; Binary = $false; BaselineHash = '' },
-    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = '9bfeb015eb256fd397e3f6a87a3876550c5b33792720002bbe6a50d213f0cb5d'; New = $false; Binary = $false; BaselineHash = 'd5fa047199b210bd7206b27a5ffea9d9f947a9936897f4d5f761479a20c3ad14' },
+    @{ Path = 'frontend/lib/features/academy/screens/academy_home_screen.dart'; Hash = '0be615ce0351558a24a5ef5ca3e4b609e6a46e225123e251c7d1872001525a51'; New = $false; Binary = $false; BaselineHash = 'd5fa047199b210bd7206b27a5ffea9d9f947a9936897f4d5f761479a20c3ad14' },
     @{ Path = 'frontend/lib/features/alumni/screens/alumni_screen.dart'; Hash = 'f2f6cff8b6fb3ae2d173c91fe59bbd65330879b0162ea42d92f3eb076b1ab924'; New = $false; Binary = $false; BaselineHash = '984b6b686354fa792997457567b3c19594bd3b1388bdb33a635781f56064ee8b' },
     @{ Path = 'frontend/lib/features/archives/screens/archive_minutes_screen.dart'; Hash = '01ace108f5129580fa36353b16b7288fda2dfcd0b2e8d1a478cc4fce144afb62'; New = $false; Binary = $false; BaselineHash = '8fb214d470ce005662b6f8ba7e4c658e0c341630f1cbfe75ac856d00530abd5d' },
     @{ Path = 'frontend/lib/features/archives/screens/archives_center_screen.dart'; Hash = 'a3ab4eb436306fc6b64e61e6ad276d1786ddfae50a2097891e49ddc646dddf76'; New = $false; Binary = $false; BaselineHash = '58dabdc6f194ea528c625cb8ed2f0db0aab40b00d159423b72cd45e4871b395e' },

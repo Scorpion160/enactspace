@@ -807,10 +807,12 @@ class _AcademyFiltersCard extends StatelessWidget {
       ],
       actions: const [],
       activeFilterCount: [
+        courseFilter,
         levelFilter,
         categoryFilter,
       ].where((v) => v != 'all').length,
       onReset: () {
+        onCourseFilterChanged('all');
         onLevelChanged('all');
         onCategoryChanged('all');
       },
