@@ -32,3 +32,7 @@ Le script d’intégration vérifie les empreintes, refuse les modifications loc
 ### Retour des tests Windows du 29 octobre
 
 L’analyse Flutter est passée. La première exécution compte 56 tests réussis et six échecs : quatre interactions avant le rendu du défilement à 200 % sur petit écran, une interaction de quiz avant ce même rendu, et un titre de leçon recherché sans distinguer le lecteur du programme de la fiche restée derrière la boîte de dialogue. Les tests attendent maintenant la nouvelle disposition et vérifient que les boutons reçoivent réellement les appuis ; le titre est recherché dans le contenu du lecteur. Aucun scénario, aucune assertion de progression et aucun prérequis de quiz ne sont retirés. Les tests corrigés et la galerie restent à confirmer sous Windows.
+
+### Retour des tests Windows du 30 octobre
+
+L’analyse Flutter et les 62 tests Academy, fonctionnement pédagogique, Alumni, gamification et Impact sont passés. Dans la série de démo native, 28 tests passent et le seul échec concerne les dates françaises du chat : le test monte les écrans sans exécuter `main()`, qui appelle déjà `initializeDateFormatting('fr_FR')` dans l’application. Le test initialise maintenant les mêmes données locales avant ses scénarios, comme les tests Communication existants. Aucun comportement de production ni contrôle d’isolation de la démo n’est modifié. La relance de la démo et le contrôle visuel des 24 captures restent à confirmer avant le build.

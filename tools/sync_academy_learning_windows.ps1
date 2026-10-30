@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\Users\DIOP\Documents\EnactSpaceRecovery\enactspace-20260927'
 $frontend = Join-Path $repo 'frontend'
-$baseline = '2ce7acc679231707fc63bcb124320edab7fe16e9'
+$baseline = '1341134d40927473a8d184e4e62f85ebf97dc2a1'
 $temp = Join-Path $env:TEMP ('EnactSpace-AcademyLearning-' + [guid]::NewGuid().ToString('N'))
 $backup = Join-Path $env:LOCALAPPDATA ('EnactSpace\CodeRollback\academy-learning-' + [guid]::NewGuid().ToString('N'))
 $observed = @{}
@@ -21,9 +21,10 @@ $files = @(
     @{ Path = 'frontend/lib/features/academy/widgets/academy_lesson_reader.dart'; Hash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40'; New = $false; Binary = $false; BaselineHash = 'a52c5b35ed1fab7ff7d0d48b7651a18f597f51c939515ec9a54b700d705e5f40' },
     @{ Path = 'frontend/lib/features/academy/widgets/academy_quiz_dialog.dart'; Hash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd'; New = $false; Binary = $false; BaselineHash = '0a00964bbbeeaaaceab3da7540b8bed2d2d4962191bae7f3bf951e6a896650fd' },
     @{ Path = 'frontend/assets/img/academy_mobile_progression.webp'; Hash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f'; New = $false; Binary = $true; BaselineHash = '93c4180853be51536fa98f60c59b3aa3906793f02edadda61d4b60d93c928d9f' },
-    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113'; New = $false; Binary = $false; BaselineHash = '5f9d9b78e3b517376d7261cb5a3e15f373cf2ae612ee800a81ab65893d3dc5e0' },
-    @{ Path = 'frontend/test/academy_operational_test.dart'; Hash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828'; New = $false; Binary = $false; BaselineHash = 'e65ee884b5207f796ea26fddbf9963ace646338f249c8afdf4d7d5f6981aaed8' },
-    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = 'f291b967ec6ec01fd2a3480efb80cc1fe7eae5044db431f01b737b36befa7b48'; New = $false; Binary = $false; BaselineHash = 'fd34a00447b6a245e79f9501ff5b10f28278d26d01613bafb17cb530cdbd0cf2' }
+    @{ Path = 'frontend/test/academy_learning_redesign_test.dart'; Hash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113'; New = $false; Binary = $false; BaselineHash = '82cfe8f19d40ad5f0e6353d0cb8cc46c028c8557c012e54952095fff74fb7113' },
+    @{ Path = 'frontend/test/academy_operational_test.dart'; Hash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828'; New = $false; Binary = $false; BaselineHash = '5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828' },
+    @{ Path = 'frontend/test/alumni_day_native_test.dart'; Hash = '27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0'; New = $false; Binary = $false; BaselineHash = 'c7a97f32749708d2f809b5e0c11e23d7b91f9edc4a5221a2c6e74058fbf8d4cd' },
+    @{ Path = 'docs/ACADEMY_LEARNING_REDESIGN_20261029.md'; Hash = '56ad7da342d2bf74ecb5eaab5cc5fa01ca0b29b3d72fc1c16c0665c9faa8286b'; New = $false; Binary = $false; BaselineHash = 'f291b967ec6ec01fd2a3480efb80cc1fe7eae5044db431f01b737b36befa7b48' }
 )
 function Canonical([string]$Path) {
     [IO.File]::ReadAllText($Path).Replace("`r`n", "`n").TrimEnd()
@@ -107,7 +108,7 @@ try {
         $dartFiles = @($files | Where-Object { $_.Path.EndsWith('.dart') } | ForEach-Object { $_.Path.Substring(9) })
         & dart format @dartFiles
         if ($LASTEXITCODE -ne 0) { throw 'Formatage echoue.' }
-        & flutter analyze --no-pub lib/features/academy test/academy_learning_redesign_test.dart test/academy_operational_test.dart
+        & flutter analyze --no-pub lib/features/academy test/academy_learning_redesign_test.dart test/academy_operational_test.dart test/alumni_day_native_test.dart
         if ($LASTEXITCODE -ne 0) { throw 'Analyse echouee : transmettre le journal.' }
         & flutter test --no-pub --reporter expanded "--dart-define=ACADEMY_CAPTURE_DIR=$previews" test/academy_learning_redesign_test.dart test/academy_home_redesign_test.dart test/academy_operational_test.dart test/alumni_gamification_academy_impact_test.dart
         if ($LASTEXITCODE -ne 0) { throw 'Tests Academy echoues : transmettre le journal.' }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:frontend/core/api/api_client.dart';
 import 'package:frontend/core/auth/user_experience.dart';
 import 'package:frontend/features/demo/demo_native_data.dart';
@@ -54,6 +55,7 @@ Future<void> _frames(WidgetTester tester) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() => initializeDateFormatting('fr_FR'));
 
   test(
     'production router uses the native experience for both public profiles',
