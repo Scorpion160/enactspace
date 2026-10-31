@@ -14,6 +14,30 @@ spec.loader.exec_module(rehearsal)
 
 
 class RehearsalSafetyTests(unittest.TestCase):
+    def test_candidate_tools_are_traversable_and_base_user_is_restored(self):
+        manifest = {'patch_revision': 'a' * 40, 'files': {'tools/audit_recruitment_campaign.py': 'unused'}}
+        source = rehearsal.candidate_dockerfile('owned-base', 'b' * 32, manifest, 'enactspace:enactspace')
+        self.assertIn('RUN chmod 0755 /app/tools', source)
+        self.assertLess(source.index('COPY '), source.index('RUN chmod 0755 /app/tools'))
+        self.assertTrue(source.endswith('USER enactspace:enactspace\n'))
+        with self.assertRaisesRegex(RuntimeError, 'Non_root'):
+            rehearsal.candidate_dockerfile('owned-base', 'b' * 32, manifest, 'root')
+
+    def test_previous_cleanup_is_bound_to_the_exact_candidate_image(self):
+        owner = 'a' * 32
+        tag = 'enactspace-backend:recruitment-hardening-' + owner[:12]
+        image = {'Id': 'sha256:' + 'b' * 64, 'Config': {'Labels': {'net.enactspace.rehearsal': owner}}}
+        with patch.object(rehearsal, 'run', return_value=json.dumps([image])), patch.object(rehearsal, 'remove_owned_container') as remove:
+            with self.assertRaisesRegex(RuntimeError, 'image_changed'):
+                rehearsal.cleanup_previous(tag, 'sha256:' + 'c' * 64)
+            remove.assert_not_called()
+            body = rehearsal.cleanup_previous(tag, image['Id'])
+            self.assertTrue(body['owned_runtime_resources_removed'])
+            self.assertEqual(remove.call_count, 2)
+            self.assertEqual({call.args[0] for call in remove.call_args_list}, {
+                'enactspace-recruitment-rehearsal-test-' + owner,
+                'enactspace-recruitment-rehearsal-db-' + owner})
+
     def test_volume_refuses_production_or_remote_database_urls(self):
         for url in ['postgresql://user@127.0.0.1/enactspace', 'postgresql://user@production/enactspace_pr2b_test_x', 'sqlite://']:
             with self.subTest(url=url), self.assertRaises(RuntimeError):

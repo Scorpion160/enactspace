@@ -11,35 +11,45 @@ import uuid
 
 
 TEST_PROGRAM = r'''
-import json, sys, unittest
-modules = [
-    'test_recruitment_readiness_audit', 'test_recruitment_campaign_readiness',
-    'test_recruitment_questionnaire', 'test_recruitment_preparation', 'test_recruitment_history',
-    'test_recruitment_rubric', 'test_attachments_lifecycle', 'test_password_reset_guard',
-    'test_prelaunch_email_lifecycle', 'test_prelaunch_first_access', 'test_request_rate_limit',
-    'test_recruitment_campaign_postgresql.RecruitmentCampaignPostgreSQLTests',
-    'test_recruitment_history_postgresql.RecruitmentHistoryPostgreSQLTests',
-    'test_recruitment_rubric_postgresql.RecruitmentRubricPostgreSQLTests',
-    'test_request_rate_limit_postgresql.PostgreSQLQuotaTests',
-]
-for name in ('test_12_concurrent_candidate_conversion_returns_one_user',
-             'test_13_duplicate_campaign_email_application_has_one_row',
-             'test_17_conversion_vs_application_delete_preserves_provenance',
-             'test_18_conversion_vs_campaign_delete_preserves_provenance',
-             'test_19_cross_campaign_case_insensitive_conversion_has_one_user'):
-    modules.append('test_operational_integrity_postgresql.OperationalIntegrityPostgreSQLTests.' + name)
-suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromName(name) for name in modules)
-result = unittest.TextTestRunner(verbosity=1).run(suite)
-report = {'tests_run': result.testsRun, 'failures': len(result.failures), 'errors': len(result.errors),
-          'skipped': len(result.skipped), 'production_database_access': False, 'emails_sent': False}
-if not result.wasSuccessful() or result.skipped:
-    report['status'] = 'REHEARSAL_TESTS_FAILED_OR_SKIPPED'
-else:
-    from rehearse_recruitment_volume import run
-    report['volume'] = run()
-    report['status'] = 'RECRUITMENT_POSTGRESQL_AND_VOLUME_REHEARSAL_PASSED'
-print(json.dumps(report))
-sys.exit(0 if report['status'] == 'RECRUITMENT_POSTGRESQL_AND_VOLUME_REHEARSAL_PASSED' else 1)
+import json,sys,traceback
+stage='initialization'
+try:
+    import json, sys, unittest
+    modules = [
+        'test_recruitment_readiness_audit', 'test_recruitment_campaign_readiness',
+        'test_recruitment_questionnaire', 'test_recruitment_preparation', 'test_recruitment_history',
+        'test_recruitment_rubric', 'test_attachments_lifecycle', 'test_password_reset_guard',
+        'test_prelaunch_email_lifecycle', 'test_prelaunch_first_access', 'test_request_rate_limit',
+        'test_recruitment_campaign_postgresql.RecruitmentCampaignPostgreSQLTests',
+        'test_recruitment_history_postgresql.RecruitmentHistoryPostgreSQLTests',
+        'test_recruitment_rubric_postgresql.RecruitmentRubricPostgreSQLTests',
+        'test_request_rate_limit_postgresql.PostgreSQLQuotaTests',
+    ]
+    for name in ('test_12_concurrent_candidate_conversion_returns_one_user',
+                 'test_13_duplicate_campaign_email_application_has_one_row',
+                 'test_17_conversion_vs_application_delete_preserves_provenance',
+                 'test_18_conversion_vs_campaign_delete_preserves_provenance',
+                 'test_19_cross_campaign_case_insensitive_conversion_has_one_user'):
+        modules.append('test_operational_integrity_postgresql.OperationalIntegrityPostgreSQLTests.' + name)
+    stage = 'test_loading'
+    suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromName(name) for name in modules)
+    stage = 'functional_tests'
+    result = unittest.TextTestRunner(verbosity=1).run(suite)
+    report = {'tests_run': result.testsRun, 'failures': len(result.failures), 'errors': len(result.errors),
+              'skipped': len(result.skipped), 'production_database_access': False, 'emails_sent': False}
+    if not result.wasSuccessful() or result.skipped:
+        report['status'] = 'REHEARSAL_TESTS_FAILED_OR_SKIPPED'
+    else:
+        stage = 'volume_tests'
+        from rehearse_recruitment_volume import run
+        report['volume'] = run()
+        report['status'] = 'RECRUITMENT_POSTGRESQL_AND_VOLUME_REHEARSAL_PASSED'
+    print(json.dumps(report))
+    sys.exit(0 if report['status'] == 'RECRUITMENT_POSTGRESQL_AND_VOLUME_REHEARSAL_PASSED' else 1)
+except Exception as error:
+    traceback.print_exc()
+    print(json.dumps({'status':'REHEARSAL_PROGRAM_FAILED','stage':stage,'error_type':type(error).__name__,'production_database_access':False,'emails_sent':False}))
+    sys.exit(1)
 '''
 
 
@@ -85,10 +95,53 @@ def remove_owned_container(name, owner):
     run(['docker', 'rm', '-f', '-v', name])
 
 
+def cleanup_previous(candidate, expected_image_id):
+    if not re.fullmatch(r'enactspace-backend:recruitment-hardening-[a-f0-9]{12}', candidate) or not re.fullmatch(r'sha256:[a-f0-9]{64}', expected_image_id):
+        raise RuntimeError('Invalid_previous_candidate_identity')
+    image = json.loads(run(['docker', 'image', 'inspect', candidate]))[0]
+    if image['Id'] != expected_image_id:
+        raise RuntimeError('Previous_candidate_image_changed')
+    owner = (image['Config'].get('Labels') or {}).get('net.enactspace.rehearsal', '')
+    if not re.fullmatch(r'[a-f0-9]{32}', owner) or not candidate.endswith(owner[:12]):
+        raise RuntimeError('Previous_candidate_ownership_unverified')
+    names = ['enactspace-recruitment-rehearsal-' + kind + '-' + owner for kind in ('test', 'db')]
+    for name in names:
+        remove_owned_container(name, owner)
+    return {'status': 'PREVIOUS_OWNED_RUNTIME_CLEANED', 'operation_id': owner,
+            'production_services_changed': False, 'production_database_access': False,
+            'owned_runtime_resources_removed': True, 'candidate_and_base_images_retained': True}
+
+
+def candidate_dockerfile(base_tag, owner, manifest, original_user):
+    if not re.fullmatch(r'[a-zA-Z0-9_.:-]+', original_user) or original_user in {'0', 'root', '0:0', 'root:root'}:
+        raise RuntimeError('Non_root_base_user_required')
+    lines = ['FROM ' + base_tag, 'USER root',
+             'LABEL net.enactspace.rehearsal="' + owner + '"',
+             'LABEL net.enactspace.patch_revision="' + manifest['patch_revision'] + '"']
+    for path in manifest['files']:
+        lines.append('COPY --chmod=0644 ' + path + ' /app/' + path)
+    # COPY can create a tools directory without traversal rights for the image user.
+    lines += ['RUN chmod 0755 /app/tools && chmod 0644 /app/tools/audit_recruitment_campaign.py',
+              'USER ' + original_user]
+    return '\n'.join(lines) + '\n'
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--directory', required=True, type=Path)
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument('--directory', type=Path)
+    action.add_argument('--cleanup-candidate')
+    parser.add_argument('--expected-image-id')
     args = parser.parse_args(argv)
+    if args.cleanup_candidate:
+        try:
+            result = cleanup_previous(args.cleanup_candidate, args.expected_image_id or '')
+        except Exception as error:
+            result = {'status': 'PREVIOUS_CLEANUP_BLOCKED', 'error_type': type(error).__name__,
+                      'reason': str(error) if isinstance(error, RuntimeError) else 'Details_hidden',
+                      'production_services_changed': False}
+        print(json.dumps(result, indent=2))
+        return 0 if result['status'] == 'PREVIOUS_OWNED_RUNTIME_CLEANED' else 1
     directory = args.directory.resolve()
     if not re.fullmatch(r'recruitment-rehearsal-[a-f0-9]{32}', directory.name) or directory.parent != Path('/opt/enactspace/staging'):
         parser.error('Owned staging directory required')
@@ -101,7 +154,8 @@ def main(argv=None):
     db_owned = runner_owned = base_tag_created = False
     report = {'production_database_access': False, 'production_services_changed': False,
               'production_migration_performed': False, 'emails_sent': False, 'campaign_created': False,
-              'deployment_performed': False, 'public_load_test_performed': False}
+              'deployment_performed': False, 'public_load_test_performed': False,
+              'operation_id': owner, 'runtime_containers': [runner_name, db_name]}
     try:
         manifest = validate_payload(directory)
         stage = 'baseline_verification'
@@ -122,19 +176,23 @@ def main(argv=None):
         report['base_image_id'] = backend['Image']
         run(['docker', 'image', 'tag', backend['Image'], base_tag])
         base_tag_created = True
-        dockerfile = ['FROM ' + base_tag,
-            'LABEL net.enactspace.rehearsal="' + owner + '"',
-            'LABEL net.enactspace.patch_revision="' + manifest['patch_revision'] + '"']
-        for path in manifest['files']:
-            target = '/app/' + path
-            dockerfile.append('COPY --chmod=0644 ' + path + ' ' + target)
+        original_user = backend['Config'].get('User') or 'root'
+        dockerfile = candidate_dockerfile(base_tag, owner, manifest, original_user)
         context = directory / 'payload'
-        (context / 'Dockerfile').write_text('\n'.join(dockerfile) + '\n')
+        (context / 'Dockerfile').write_text(dockerfile)
         stage = 'candidate_image_build'
         print('RECRUITMENT_CANDIDATE_IMAGE_BUILD', flush=True)
         run(['docker', 'build', '--pull=false', '--network=none', '-t', candidate, str(context)], timeout=300)
         report['candidate_image'] = candidate
         report['candidate_image_id'] = json.loads(run(['docker', 'image', 'inspect', candidate]))[0]['Id']
+        stage = 'non_root_payload_readability'
+        readability = ('import os,json\nfrom pathlib import Path\n'
+                       'assert os.geteuid() != 0\n'
+                       'paths=' + repr(['/app/' + path for path in manifest['files']]) + '\n'
+                       'for p in paths: Path(p).read_bytes()\n'
+                       'print(json.dumps({"uid":os.geteuid(),"readable_files":len(paths)}))')
+        report['payload_readability'] = json.loads(run(['docker', 'run', '--rm', '-i', '--network=none',
+            '--read-only', '--entrypoint', 'python', candidate, '-'], input=readability))
         stage = 'isolated_postgresql'
         database = 'enactspace_pr2b_test_recruitment_' + owner[:12]
         db_owned = True
@@ -193,18 +251,22 @@ def main(argv=None):
             report['reason'] = str(error)
     finally:
         clean = True
+        cleanup_errors = []
         for name, owned in [(runner_name, runner_owned), (db_name, db_owned)]:
             if owned:
                 try:
                     remove_owned_container(name, owner)
-                except Exception:
+                except Exception as error:
                     clean = False
+                    cleanup_errors.append({'resource': name, 'error_type': type(error).__name__})
         if base_tag_created:
             try:
                 run(['docker', 'image', 'rm', base_tag])
             except Exception:
-                clean = False
+                # The base image is also used by production; never force its removal.
+                report['temporary_base_alias_retained'] = base_tag
         report['owned_runtime_resources_removed'] = clean
+        report['cleanup_errors'] = cleanup_errors
         if not clean:
             report['status'] = 'RECRUITMENT_REHEARSAL_BLOCKED'
             report['cleanup_requires_review'] = True

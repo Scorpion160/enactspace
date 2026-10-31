@@ -2,11 +2,16 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[a-f0-9]{40}$')]
-    [string]$Commit
+    [string]$Commit,
+    [ValidatePattern('^enactspace-backend:recruitment-hardening-[a-f0-9]{12}$')]
+    [string]$PreviousCandidate,
+    [ValidatePattern('^sha256:[a-f0-9]{64}$')]
+    [string]$PreviousImageId
 )
 $ErrorActionPreference = 'Stop'
+if ([bool]$PreviousCandidate -ne [bool]$PreviousImageId) { throw 'Les deux identifiants de repetition precedente sont requis.' }
 $manifestHash = '81cf5f8e77c24238e5c6dbe33aaa9f8c00a476fb6851dcd966602c3c60016286'
-$runnerHash = 'f0a07a1551defab25f30e0c82da6398d2095cee9bf5991ce51fcd7ac8c992024'
+$runnerHash = '4fc1c80d8c70d530df06b0e3338b133f15ebe3d6c8ac210b5154dce4cd14e38e'
 $id = [guid]::NewGuid().ToString('N')
 $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentRehearsals\$id"
 $payload = Join-Path $local 'payload'
@@ -46,6 +51,10 @@ if (([string]$integrity[0] -split '\s+')[0] -ne $manifestHash -or
 
 "DOSSIER_REPETITION=$local"
 'REPETITION_ISOLEE_SANS_DEPLOIEMENT'
+if ($PreviousCandidate) {
+    & ssh vps "python3 $remote/rehearse_recruitment_candidate.py --cleanup-candidate $PreviousCandidate --expected-image-id $PreviousImageId"
+    if ($LASTEXITCODE -ne 0) { throw 'Nettoyage precedent bloque : transmettre le compte rendu.' }
+}
 & ssh vps "python3 $remote/rehearse_recruitment_candidate.py --directory $remote"
 if ($LASTEXITCODE -ne 0) { throw 'Repetition bloquee : transmettre le compte rendu.' }
 'REPETITION_TERMINEE_TRANSMETTRE_LE_COMPTE_RENDU'
