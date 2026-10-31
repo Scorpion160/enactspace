@@ -174,6 +174,7 @@ def audit(expected_candidates=500):
         'health': (item['State'].get('Health') or {}).get('Status', 'not_configured'),
         'restart_count': item['RestartCount'],
         'source_revision': (item['Config'].get('Labels') or {}).get('org.opencontainers.image.revision'),
+        'patch_revision': (item['Config'].get('Labels') or {}).get('net.enactspace.patch_revision'),
     } for item in containers]
     if not all(c['running'] and c['health'] in ('healthy', 'not_configured') for c in report['containers']):
         blockers.append('Container_unhealthy_or_stopped')

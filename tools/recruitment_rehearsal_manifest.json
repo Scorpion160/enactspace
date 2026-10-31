@@ -1,0 +1,20 @@
+{
+  "base_revision": "1ccbb0ac2b8220ee8eb19d24a9114790e7bf2b95",
+  "patch_revision": "4c76a68efe393952f52ecba058db3a3d78abf582",
+  "base_hashes": {
+    "app/api/routes/recruitment.py": "c6861eb6de84e52b14ea66eb767f386a280b4deb1049dd4faac226bd2e76bf04",
+    "app/schemas/recruitment.py": "678b6239aa38dc3938a91463ecd9f4c50b53d20f0dce58cc89c766ccee36b20e",
+    "app/services/email_delivery_service.py": "498cb3e68ff2793590a7a7276d690d6a75654679f89d2a4d494c0db77f19003e"
+  },
+  "files": {
+    "backend/app/api/routes/recruitment.py": "7005e74f022cbc5c94ed573f372fe30d314fa7e38bf490ee70235d4e0f96e749",
+    "backend/app/schemas/recruitment.py": "6e5508b4f70739083dfd145f082be542df5d4c6f9d4a6c588e8c80e4f8244f93",
+    "backend/app/services/email_delivery_service.py": "1c888bc48727ace582c5cfb1a625072b361d9a64045e49138aee60a59ff87277",
+    "backend/test_prelaunch_first_access.py": "9e6b8edd851c97f99bd9a3da0dac2e59f1ee552415cdc8337a6810c960843c92",
+    "backend/test_recruitment_campaign_readiness.py": "f004d83a4973837dcd4899027f2bf3b1f7d9e4bd6ae23267818d9eec4c9664de",
+    "backend/test_recruitment_readiness_audit.py": "a834528b331c01286ddc51f5a504dc5c397c14cf73a5fbfbd495fd19026a5eb8",
+    "backend/test_recruitment_campaign_postgresql.py": "a39a7978e29ce3ce84f9417f7ec9eb42ecece3e3b32906798dc9ee5d2f2627bc",
+    "backend/rehearse_recruitment_volume.py": "d9a93590db395dd9db937eb224441e971901906f7a972a9944cd7253c9904f1b",
+    "tools/audit_recruitment_campaign.py": "56a5338e1b67da245f97a81508681e77ec225e6973d39f879f02fbc775a05030"
+  }
+}
