@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "base_revision": "1ccbb0ac2b8220ee8eb19d24a9114790e7bf2b95",
-  "patch_revision": "2ea92ff0d0291503b3fbc42009e6d2dfc5fc1ca9",
+  "patch_revision": "be81a48f50c6eb06e9c34b60d84c6e2cdf654209",
   "required_schema": "20261031_0033",
   "base_hashes": {
     "app/api/routes/recruitment.py": "c6861eb6de84e52b14ea66eb767f386a280b4deb1049dd4faac226bd2e76bf04",
@@ -35,12 +35,12 @@
     "backend/test_recruitment_jury_personality.py": "8a836f771ca7579b9493d8437012d83aaaf9eaabbeecfe65723b7c627e9a94fe",
     "backend/test_recruitment_jury_postgresql.py": "7a3ee85cd72d78fd5d0ac4508c3c3addbf6e7e107a8ae38876df86fb44e60e78",
     "backend/test_recruitment_readiness_audit.py": "18c35dbadaeec5a23f97c67fa42c4c525dc20657cc6732dc491511fad5604067",
-    "backend/test_recruitment_rehearsal_safety.py": "9b62027329d79a42b49b3f04f048b9b34b6e62eb45316fef682262110a9cc551",
+    "backend/test_recruitment_rehearsal_safety.py": "59d0727a89b78504c18af1f69fd825d0a707eeb479ac4b15019651082d86e96c",
     "backend/test_recruitment_teams.py": "4bd312baa7c075503440663d5bc32796bda31086d800d565ba96658170781cc0",
     "backend/test_recruitment_teams_migration.py": "f9bb96f6292aefc879edac9b8e59931e7980977997d87eab2a84218d082a5d1c",
     "tools/audit_recruitment_campaign.py": "a330bec2ddfeb6a95b619a2391775dc8913596f6d39a8f2a13d8667533dbd46c",
-    "tools/rehearse_recruitment_campaign_v2.py": "ae99b029bc4c09b9ce8281c67f9d981e24574844fd5a883e0fd954fd531f9ea3",
-    "tools/rehearse_recruitment_candidate.py": "aa551248eb1ecf4e228fdd924d0a67c1ace41696b473a04ef4161196043a1d64"
+    "tools/rehearse_recruitment_campaign_v2.py": "0217d70cb035458f862bcaf0c6ea8b620011387d033e6e95d7343bcaf0390bf6",
+    "tools/rehearse_recruitment_candidate.py": "73b13af8cbb7f69b2b42b003fccccf7a7babc0dc1ba22bbe8d10ff699bf07815"
   },
   "frontend_base_revision": "d42f10d88916bd784a5224ef3b7b72adc601c1a2",
   "frontend": [

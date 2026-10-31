@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ([bool]$PreviousCandidate -ne [bool]$PreviousImageId) { throw 'Les deux identifiants precedents sont requis.' }
-$manifestHash = 'bc5d607b2aeb0702d6bdef394f470c16d4be616f9eb8d229e8eb247e531a8c64'
+$manifestHash = 'd568f622ac9369c46caa639154bdf47c0f677b6ae0fe4844e65e69cc11bc46d6'
 $id = [guid]::NewGuid().ToString('N')
 $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentRehearsals\$id"
 $payload = Join-Path $local 'payload'
