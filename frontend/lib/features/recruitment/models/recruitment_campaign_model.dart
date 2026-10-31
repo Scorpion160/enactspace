@@ -13,6 +13,10 @@ class RecruitmentCampaignModel {
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
+  final DateTime? serverTime;
+  final DateTime? receivedAt;
+  final DateTime? opensAt;
+  final DateTime? closesAt;
 
   const RecruitmentCampaignModel({
     this.applicationQuestions = defaultRecruitmentQuestions,
@@ -27,6 +31,10 @@ class RecruitmentCampaignModel {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.serverTime,
+    this.receivedAt,
+    this.opensAt,
+    this.closesAt,
   });
 
   factory RecruitmentCampaignModel.fromJson(Map<String, dynamic> json) {
@@ -52,12 +60,41 @@ class RecruitmentCampaignModel {
       createdBy: json['created_by']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      serverTime: DateTime.tryParse(
+        json['server_time']?.toString() ?? '',
+      )?.toUtc(),
+      receivedAt: DateTime.now().toUtc(),
+      opensAt: DateTime.tryParse(json['opens_at']?.toString() ?? '')?.toUtc(),
+      closesAt: DateTime.tryParse(json['closes_at']?.toString() ?? '')?.toUtc(),
     );
   }
 
   DateTime? get startDateValue => DateTime.tryParse(startDate ?? '');
 
   DateTime? get endDateValue => DateTime.tryParse(endDate ?? '');
+
+  DateTime get currentTime => serverTime != null && receivedAt != null
+      ? serverTime!.add(DateTime.now().toUtc().difference(receivedAt!))
+      : DateTime.now().toUtc();
+
+  DateTime? get openingInstant {
+    final date = startDateValue;
+    return opensAt ??
+        (date == null ? null : DateTime.utc(date.year, date.month, date.day));
+  }
+
+  DateTime? get closingInstant {
+    final date = endDateValue;
+    return closesAt ??
+        (date == null
+            ? null
+            : DateTime.utc(date.year, date.month, date.day + 1));
+  }
+
+  bool isOpenAt(DateTime now) =>
+      isActive &&
+      (openingInstant == null || !now.isBefore(openingInstant!)) &&
+      (closingInstant == null || now.isBefore(closingInstant!));
 
   RecruitmentCampaignModel copyWith({
     String? title,
@@ -79,6 +116,10 @@ class RecruitmentCampaignModel {
     createdBy: createdBy,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    serverTime: serverTime,
+    receivedAt: receivedAt,
+    opensAt: startDate == null ? opensAt : null,
+    closesAt: endDate == null ? closesAt : null,
   );
 
   String get periodLabel {

@@ -321,7 +321,9 @@ class ApplicationInterviewSchedule(BaseModel):
     interview_at: datetime
     interview_end_at: Optional[datetime] = None
     interview_mode: Optional[Literal["in_person", "online", "hybrid"]] = None
-    jury_member_ids: Optional[list[UUID]] = Field(default=None, min_length=1, max_length=20)
+    jury_member_ids: Optional[list[UUID]] = Field(default=None, min_length=1, max_length=200)
+    jury_team_id: Optional[UUID] = None
+    jury_team_revision: Optional[int] = Field(default=None, ge=1, strict=True)
     interview_location: Optional[str] = Field(default=None, max_length=180)
     interview_link: Optional[str] = None
     interview_jury: Optional[str] = None
@@ -352,6 +354,8 @@ class ApplicationInterviewSchedule(BaseModel):
                 raise ValueError("La durée de l’entretien doit être comprise entre 5 et 180 minutes.")
         if self.jury_member_ids is not None and len(set(self.jury_member_ids)) != len(self.jury_member_ids):
             raise ValueError("Un membre du jury ne peut être choisi qu’une fois.")
+        if self.jury_team_id is not None and (self.jury_team_revision is None or self.jury_member_ids is not None):
+            raise ValueError("Choisis une équipe avec sa version, ou une composition personnalisée.")
         return self
 
 
@@ -403,6 +407,7 @@ class ApplicationRead(BaseModel):
     interview_mode: Optional[str] = None
     interview_jurors: list[dict] = Field(default_factory=list)
     interview_needs_reassignment: bool = False
+    interview_team: Optional[dict] = None
     permissions: dict = Field(default_factory=dict)
     personality_status: Optional[str] = None
     interview_at: Optional[datetime]

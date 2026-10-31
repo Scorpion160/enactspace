@@ -1,6 +1,6 @@
 # Campagne Enactus ESP — jury, entretiens et questionnaire
 
-État au 31 octobre 2026 : sources préparées ; cette extension ne constitue pas encore un déploiement ni un feu vert de campagne. Le rapport de recette PostgreSQL sur le VPS reste nécessaire. Aucun paiement n’est réactivé par ce chantier.
+État au 31 octobre 2026 : la recette 0032 a réussi sur le VPS (233 tests, volumes 500 et 1 000 dossiers, nettoyage confirmé). Les équipes réutilisables de jury et le compte à rebours décrits ci-dessous sont préparés dans une extension 0033 ; leur nouvelle recette PostgreSQL et les tests Flutter Windows restent nécessaires. Les sources préparées ne constituent pas encore un déploiement ni un feu vert de campagne. Aucun paiement n’est réactivé par ce chantier.
 
 ## Planning confirmé et paramètres encore ouverts
 
@@ -25,7 +25,18 @@ Les durées et le nombre de jurys servent au calcul de capacité, pas à autoris
 - Les accès de recrutement déjà attachés à une responsabilité restent distincts de la nomination au jury. Retirer un administrateur du jury ne lui retire pas ses droits d’administration.
 - Un retrait coupe l’accès donné par la nomination dès la requête suivante, conserve les avis et signale les entretiens à réattribuer dans une liste permettant d’ouvrir directement chaque dossier. Réintégrer une personne réactive la même nomination sans effacer l’historique.
 - Le serveur vérifie les conflits de créneaux d’un juré, même entre deux campagnes. Les écritures prennent des verrous de campagne et de juré pour empêcher une double réservation concurrente. Le jury choisi doit encore être actif lors de l’enregistrement.
+- Les responsables autorisés peuvent constituer une ou plusieurs équipes nommées par campagne, en changer les membres, les renommer ou les mettre en pause. Les membres proviennent du jury de la campagne. « Réunir tout le jury » propose tous les membres disponibles ; pour fonctionner en jury unique, conserver cette équipe active et mettre les autres en pause.
+- Chaque candidat reçoit son propre rendez-vous, avec une équipe enregistrée ou une composition personnalisée. Deux équipes sans membre commun peuvent travailler au même moment. Une équipe ou un juré commun ne peut pas recevoir deux candidats sur des créneaux qui se chevauchent ; deux créneaux adjacents sont possibles. Prévoir des salles distinctes pour les équipes en présentiel : le nom libre du lieu n’est pas un système de réservation de salles.
+- Les modifications d’équipe utilisent une version pour éviter que deux responsables écrasent leur travail. Les rendez-vous existants conservent le nom, la version d’équipe et les jurés choisis. Les entretiens à venir sont signalés si l’équipe change ou est mise en pause ; le responsable ouvre le dossier et confirme sa composition actuelle ou choisit une autre équipe. Aucune nouvelle convocation n’est envoyée pour un simple changement interne de jury ; les changements d’horaire, format ou lieu continuent à prévenir le candidat.
 - Les anciens champs d’entretien restent lisibles. Le nouveau planning utilise des jurés identifiés ; les rendez-vous historiques reposant seulement sur du texte doivent être revus avant la campagne.
+
+## Compte à rebours public
+
+La page Postuler affiche les campagnes actives à venir et ouvertes, avec quatre cases : jours, heures, minutes et secondes. Les campagnes inactives ou déjà terminées ne sont pas annoncées par ce calendrier public. Les informations internes de préparation et les données du jury restent privées.
+
+Le compteur part de l’heure du serveur puis avance localement, sans requête à chaque seconde. La page recharge les dates chaque minute pour reprendre une modification de campagne. Avant l’ouverture, l’action de candidature est désactivée ; à l’ouverture le compteur vise la clôture, puis le bouton devient indisponible. Le serveur reste l’autorité pour accepter ou refuser un dépôt, même en cas de page ancienne ou d’horloge locale incorrecte.
+
+Les dates existantes sont interprétées à l’heure de Dakar : ouverture le 4 novembre 2026 à 00 h et clôture le 9 novembre à 00 h, donc tout le dimanche 8 reste disponible. Une autre date de campagne produit automatiquement un autre compte à rebours. Aucune candidature anticipée ni activation de campagne n’est créée par le widget. Le compteur n’affiche pas de durée négative ; ses quatre cases passent sur deux colonnes lorsque la largeur ou le grossissement du texte le demande. Il n’annonce pas chaque seconde comme une alerte de lecteur d’écran.
 
 ## Benchmark et choix du questionnaire
 
@@ -73,7 +84,7 @@ Sources primaires consultées le 31 octobre 2026 :
 |---|---|
 | Recette de l’extension | Tests SQLite, migration, frontières d’accès, PostgreSQL, doubles réservations, sauvegardes concurrentes et volumes 500/1 000 sur données fictives ; aucun test sauté accepté |
 | Interface Windows | Analyse Flutter et suites recrutement, démonstration et autorisations sur une copie du frontend avant remplacement des sources |
-| Migration 0032 | Sauvegarde vérifiée, maintenance API/workers, migration contrôlée puis redémarrage de la version candidate ; ne pas publier le frontend avant que les nouveaux endpoints soient disponibles |
+| Migrations 0032 puis 0033 | Sauvegarde vérifiée, maintenance API/workers, migration contrôlée puis redémarrage de la version candidate ; ne pas publier le frontend avant que les nouveaux endpoints soient disponibles |
 | Retour arrière | Garder l’image et la configuration précédentes ; les ajouts de schéma sont compatibles avec l’ancienne application. Ne pas supprimer les réponses ou nominations pour revenir au code précédent |
 | Campagne | Une seule campagne active avec dates du 4 au 8 novembre ; confirmer questionnaire, contacts, message public et absence de campagne d’essai accessible |
 | Candidat de contrôle | Déposer un dossier fictif identifié, recevoir réellement l’e-mail à une adresse maîtrisée, retrouver le suivi, être invité, sauvegarder/reprendre le questionnaire, planifier/replanifier un entretien et vérifier le message reçu |
@@ -96,7 +107,7 @@ Le lanceur utilise une image candidate et des conteneurs PostgreSQL temporaires 
 Le statut attendu de la recette complète est `RECRUITMENT_CANDIDATE_REHEARSED_NOT_DEPLOYED`, avec zéro échec/erreur/test sauté, les deux volumes réussis et `owned_runtime_resources_removed=true`. Ce statut ouvre la préparation du déploiement ; il n’atteste pas encore les contrôles publics, la réception réelle des courriels ou l’activation de campagne.
 
 
-Validation locale après correction de la migration et de la recherche du code de suivi : 184 tests backend réussis, dont les frontières de jury, la reprise du questionnaire, la migration SQLite et les gardes du lanceur ; analyse Dart précédente sans erreur ni avertissement sur le recrutement, les démonstrations et les tests, sans modification de l’interface dans ce correctif. Les neuf nouveaux tests Flutter sont livrés pour exécution dans la copie Windows. La recette Docker/PostgreSQL corrigée et les deux volumes doivent encore produire leur compte rendu sur le VPS.
+Validation locale de l’extension équipes et compte à rebours : 197 tests backend réussis, dont les frontières de jury, la reprise du questionnaire, les migrations SQLite et les gardes du lanceur ; analyse Dart sans problème sur le recrutement, les démonstrations et les tests. Un contrôle exécuté avec Dart vérifie aussi les instants d’ouverture, de clôture et l’ancrage sur l’heure du serveur. Les 17 nouveaux tests Flutter du compteur et des équipes s’ajoutent aux neuf précédents et restent à exécuter dans la copie Windows. La nouvelle recette Docker/PostgreSQL comporte 257 tests puis les deux volumes.
 
 
 ## Compte rendu du 31 octobre — compatibilité de la migration 0032
@@ -118,3 +129,13 @@ Le compte rendu suivant, opération `c60ad100500343fabe01d1dc1ef9f63d`, exécute
 La référence du candidat de ce test est un code de suivi de 32 caractères hexadécimaux. La recherche précédente le traitait exclusivement comme l’identifiant historique d’une candidature parce qu’il peut être converti en UUID. Le correctif recherche le code de suivi et, lorsque le format le permet, l’identifiant historique, toujours avec l’e-mail du candidat. Une référence qui correspondrait à deux dossiers distincts est refusée plutôt que de sélectionner arbitrairement une campagne. Les codes habituels `ESP-…` conservent leur comportement.
 
 Trois nouveaux tests reproduisent le chargement et l’enregistrement avec un code de cette forme, le maintien des références historiques et de la vérification de l’e-mail, ainsi que le refus d’une référence ambiguë entre campagnes. Le test PostgreSQL vérifie désormais aussi que le code retrouve le bon candidat avant de lancer les deux écritures. Son attente reste une réponse 200 et une réponse 409 ; le contrôle de concurrence n’est pas assoupli. La recette complète à relancer contient 233 tests, puis les deux volumes. Ce résultat PostgreSQL reste à obtenir sur le VPS avant de préparer le déploiement.
+
+## Compte rendu suivant — recette 0032 réussie et extension équipes
+
+Le journal transmis pour l’opération `3b9e686206e4475397b3a02ac21e7a56`, commit `324ecb21982be5c682db4ad08c8ea80857e532c2`, confirme 233 tests, zéro échec/erreur/test sauté et les deux volumes. Le statut final est `RECRUITMENT_CANDIDATE_REHEARSED_NOT_DEPLOYED`, avec `owned_runtime_resources_removed=true`. L’image conservée est `enactspace-backend:recruitment-hardening-3b9e686206e4`, identifiant `sha256:41784ddcfcada82216f97515f2ba2bd533cd17e628833e6dca39b6e403e9cd18`. Aucun nettoyage supplémentaire n’est requis pour ces conteneurs.
+
+Les 500 et 1 000 dossiers correspondent bien aux codes de suivi et aux pièces fictives. Le 95e percentile de soumission est respectivement de 2,502 s et 2,194 s ; les lectures internes des listes prennent 1,085 s et 1,854 s. La liste complète de 1 000 dossiers reste volumineuse (environ 11,2 Mo). Ces mesures isolées avec de petits PDF ne démontrent pas le débit du proxy public, les fichiers maximaux ni le confort sur tous les réseaux mobiles.
+
+L’extension 0033 ajoute trois tables pour les équipes, leurs membres et l’équipe retenue pour chaque rendez-vous. Sa migration conserve les chemins base neuve et ancienne 0032 et refuse un retour arrière qui effacerait un historique d’équipe. Treize tests locaux supplémentaires couvrent les équipes, les dates et cette migration. La nouvelle recette ajoute leurs contrôles PostgreSQL ainsi que les courses de deux rendez-vous du même jury, de deux équipes distinctes et de deux modifications de composition.
+
+Le script de synchronisation Windows vérifie une copie complète du frontend avant de remplacer les fichiers, et accepte les sources de base ou la version précédente explicitement épinglée. Une modification locale différente bloque le remplacement. Les sources du compte à rebours ne seront publiées sur le web qu’après disponibilité des nouveaux endpoints et validation du parcours réel.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -21,24 +22,47 @@ class _PublicRecruitmentCampaignsScreenState
   late final PublicRecruitmentGateway _gateway;
   List<RecruitmentCampaignModel>? _campaigns;
   bool _failed = false;
+  Timer? _refresh;
+  int _generation = 0;
 
   @override
   void initState() {
     super.initState();
     _gateway = widget.gateway ?? RecruitmentPublicGateway();
     _load();
+    _refresh = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _load(silent: true),
+    );
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _campaigns = null;
-      _failed = false;
-    });
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    _generation++;
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    final generation = ++_generation;
+    if (!silent) {
+      setState(() {
+        _campaigns = null;
+        _failed = false;
+      });
+    }
     try {
       final campaigns = await _gateway.loadCampaigns();
-      if (mounted) setState(() => _campaigns = campaigns);
+      if (mounted && generation == _generation) {
+        setState(() {
+          _campaigns = campaigns;
+          _failed = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && generation == _generation && !silent) {
+        setState(() => _failed = true);
+      }
     }
   }
 
@@ -137,7 +161,8 @@ class _CampaignListState extends State<_CampaignList> {
   }
 
   void _start() {
-    if (widget.campaigns.length == 1) {
+    if (widget.campaigns.length == 1 &&
+        widget.campaigns.single.isOpenAt(widget.campaigns.single.currentTime)) {
       context.go('/recruitment/apply/${widget.campaigns.single.id}');
     } else {
       _discover();
@@ -186,7 +211,7 @@ class _CampaignListState extends State<_CampaignList> {
                           key: _campaignsKey,
                           header: true,
                           child: Text(
-                            'Les candidatures ouvertes',
+                            'Les campagnes de recrutement',
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
@@ -262,7 +287,9 @@ class _CampaignListState extends State<_CampaignList> {
               icon: const Icon(Icons.arrow_forward_rounded),
               label: Text(
                 campaigns.length == 1
-                    ? 'Commencer ma candidature'
+                    ? (campaigns.single.isOpenAt(campaigns.single.currentTime)
+                          ? 'Commencer ma candidature'
+                          : 'Voir les dates')
                     : 'Choisir ma campagne',
               ),
             ),

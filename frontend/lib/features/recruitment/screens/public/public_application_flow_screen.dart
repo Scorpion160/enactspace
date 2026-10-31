@@ -282,6 +282,23 @@ class _PublicApplicationFlowScreenState
       );
     }
 
+    if (!_campaign!.isOpenAt(_campaign!.currentTime)) {
+      return PublicRecruitmentShell(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: CampaignPublicCard(
+                campaign: _campaign!,
+                onStart: _loadCampaign,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return PublicRecruitmentShell(
       child: Column(
         children: [

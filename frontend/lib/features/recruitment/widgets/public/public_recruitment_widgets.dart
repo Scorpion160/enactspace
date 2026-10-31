@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../../../../shared/ui/app_back_button.dart';
 import '../../models/application_status_presentation.dart';
 import '../../models/application_tracking_model.dart';
 import '../../models/recruitment_campaign_model.dart';
+import 'recruitment_countdown.dart';
 
 class PublicRecruitmentShell extends StatelessWidget {
   final Widget child;
@@ -25,20 +28,63 @@ class PublicRecruitmentShell extends StatelessWidget {
   }
 }
 
-class CampaignPublicCard extends StatelessWidget {
+class CampaignPublicCard extends StatefulWidget {
   final RecruitmentCampaignModel campaign;
   final VoidCallback onStart;
   final Key? actionKey;
+  final DateTime Function()? now;
 
   const CampaignPublicCard({
     super.key,
     required this.campaign,
     required this.onStart,
     this.actionKey,
+    this.now,
   });
 
   @override
+  State<CampaignPublicCard> createState() => _CampaignPublicCardState();
+}
+
+class _CampaignPublicCardState extends State<CampaignPublicCard> {
+  Timer? _timer;
+  late DateTime _anchor;
+  final _elapsed = Stopwatch();
+  RecruitmentCampaignModel get campaign => widget.campaign;
+  @override
+  void initState() {
+    super.initState();
+    _anchor = campaign.currentTime;
+    _elapsed.start();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(CampaignPublicCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.campaign != campaign) {
+      _anchor = campaign.currentTime;
+      _elapsed.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _elapsed.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final now = widget.now?.call() ?? _anchor.add(_elapsed.elapsed);
+    final open = campaign.isOpenAt(now);
+    final upcoming =
+        campaign.isActive &&
+        campaign.openingInstant != null &&
+        now.isBefore(campaign.openingInstant!);
     return Semantics(
       container: true,
       label: 'Campagne ${campaign.title}',
@@ -49,7 +95,11 @@ class CampaignPublicCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'CANDIDATURES OUVERTES',
+                upcoming
+                    ? 'BIENTÔT, À TOI DE JOUER !'
+                    : open
+                    ? 'CANDIDATURES OUVERTES'
+                    : 'CANDIDATURES TERMINÉES',
                 style: TextStyle(
                   color: Theme.of(context).brightness == Brightness.dark
                       ? Colors.green.shade200
@@ -62,8 +112,9 @@ class CampaignPublicCard extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 campaign.title,
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
               ),
               if (campaign.description?.trim().isNotEmpty == true) ...[
                 const SizedBox(height: 10),
@@ -94,16 +145,26 @@ class CampaignPublicCard extends StatelessWidget {
                 button: true,
                 label: 'Commencer ma candidature pour ${campaign.title}',
                 child: FilledButton.icon(
-                  key: actionKey,
+                  key: widget.actionKey,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD34D),
                     foregroundColor: const Color(0xFF211B0B),
                   ),
-                  onPressed: onStart,
+                  onPressed: open ? widget.onStart : null,
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: Text('Commencer ma candidature'),
+                  label: Text(
+                    upcoming
+                        ? 'Bientôt disponible'
+                        : open
+                        ? 'Commencer ma candidature'
+                        : 'Inscriptions clôturées',
+                  ),
                 ),
               ),
+              if (upcoming || (open && campaign.closingInstant != null)) ...[
+                const SizedBox(height: 20),
+                RecruitmentCountdown(campaign: campaign, now: now),
+              ],
             ],
           ),
         ),
@@ -165,7 +226,8 @@ class PublicRecruitmentEmptyState extends StatelessWidget {
   Widget build(BuildContext context) => _PublicState(
     icon: Icons.event_busy_outlined,
     title: 'Aucune campagne n’est ouverte pour le moment',
-    message: 'Les prochaines opportunités seront publiées ici. Si tu as déjà postulé, ton suivi reste disponible.',
+    message:
+        'Les prochaines opportunités seront publiées ici. Si tu as déjà postulé, ton suivi reste disponible.',
     actions: [
       FilledButton(
         onPressed: () => context.go('/application-tracking'),
@@ -187,7 +249,8 @@ class PublicRecruitmentErrorState extends StatelessWidget {
   Widget build(BuildContext context) => _PublicState(
     icon: Icons.cloud_off_outlined,
     title: 'Impossible de charger les campagnes',
-    message: 'Le service est momentanément indisponible. Tes informations n’ont pas été modifiées.',
+    message:
+        'Le service est momentanément indisponible. Tes informations n’ont pas été modifiées.',
     actions: [
       FilledButton.icon(
         onPressed: onRetry,

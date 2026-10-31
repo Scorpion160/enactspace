@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 
-EXPECTED_HARDENING = {'app/api/deps.py': 'b45bf8d1ae3ab62b6c8164552238475a555045eb3ba7092cb5c52fbfbd70580a', 'app/api/routes/files.py': '91a33350d35b6fa3ded199c61b50c3af1c153100c1eb7ce8c080e0f91ccf9b3b', 'app/api/routes/recruitment.py': '7196c06df36f2639f0c05f1f9d20ffd1b1191328c68450503acc63498f4d6f8f', 'app/api/routes/recruitment_extensions.py': '002eb246623cefdb6772f0df9fc714cf03688ddcbae028c2ea4773a57eb97934', 'app/models/recruitment.py': 'cd9be7c29b09d76bb8f2d71e49e2d28967375b7d90f29162fcc44b955a9a4e7c', 'app/schemas/recruitment.py': '0768b20f9517b4d861c6474454710894eeaef2c391853556fe1f292040e09bdc', 'app/services/email_delivery_service.py': 'ba6bcd3b4a8fc14ef5c8e188b1bf4a77a8d51d0e92bb1c70e7833b48a5a5d186', 'app/services/public_request_protection.py': '4284e6c63da06b0abed4132c7ae3b205895251e7e1d91fca316f19dbb9fd929a', 'app/services/recruitment_access.py': 'df000ab8b7f7486b74bd60fe025af5bc3a27ec9e293739af56f09cbae512794b', 'app/services/recruitment_emails.py': 'cb8d5bc64b06a7a11c2d942e1a2b1254557e861418162278e90be72463384bbc', 'app/services/recruitment_interviews.py': '5d233fb6dc7a33cfbc596cfcd9cb5081a4f1b2a071b94c06af0491db09e608cd', 'app/services/recruitment_personality.py': '40632b9a4d80061941eac4c5d772f9551c03153bb65a5f28d02ea65265310f78', 'app/services/request_rate_limit.py': 'a3c0d1f7514f84a8a212c61e94897d7c79c8aefab560725d3f284842994d1a1e'}
+EXPECTED_HARDENING = {'app/api/deps.py': 'b45bf8d1ae3ab62b6c8164552238475a555045eb3ba7092cb5c52fbfbd70580a', 'app/api/routes/files.py': '91a33350d35b6fa3ded199c61b50c3af1c153100c1eb7ce8c080e0f91ccf9b3b', 'app/api/routes/recruitment.py': '37442fb6942da15ae2e02cdede2a92816a1f1df1d0f8c56de759765901747179', 'app/api/routes/recruitment_extensions.py': '9decabb0e7be3c9143bc40a7f4ddf17bb4ba9f238aa21d5e273b80851b5e5326', 'app/models/recruitment.py': '7e6f66a5e67f8cb5ed8865937930bd44f94ec91c3f08f682b55a397a1f5dd7bd', 'app/schemas/recruitment.py': '7159d537c8c15c13dc833f36c68ca08b13a6e1d9f35780c7d571b6a5d791b6fc', 'app/services/email_delivery_service.py': 'ba6bcd3b4a8fc14ef5c8e188b1bf4a77a8d51d0e92bb1c70e7833b48a5a5d186', 'app/services/public_request_protection.py': '4284e6c63da06b0abed4132c7ae3b205895251e7e1d91fca316f19dbb9fd929a', 'app/services/recruitment_access.py': 'df000ab8b7f7486b74bd60fe025af5bc3a27ec9e293739af56f09cbae512794b', 'app/services/recruitment_emails.py': 'cb8d5bc64b06a7a11c2d942e1a2b1254557e861418162278e90be72463384bbc', 'app/services/recruitment_interviews.py': 'e221373aae19965c4a0cabedb8c437dde2f35a83cf9792c412dd70e00a2fe928', 'app/services/recruitment_personality.py': '40632b9a4d80061941eac4c5d772f9551c03153bb65a5f28d02ea65265310f78', 'app/services/request_rate_limit.py': 'a3c0d1f7514f84a8a212c61e94897d7c79c8aefab560725d3f284842994d1a1e', 'app/services/recruitment_teams.py': '631f53e5bd4fb4b5661fab4bfdfd1f8d4fc49adda33c5f63e08ccec99496e5c9'}
 
 CONTAINER_PROBE = r'''
 import hashlib, json, os
@@ -36,7 +36,7 @@ try:
         "storage_writable_by_backend": os.access(settings.FILE_STORAGE_PATH, os.W_OK),
     }
     report["source_sha256"] = {name: hashlib.sha256((Path("/app/backend") / name).read_bytes()).hexdigest()
-                               for name in ['app/api/deps.py', 'app/api/routes/files.py', 'app/api/routes/recruitment.py', 'app/api/routes/recruitment_extensions.py', 'app/models/recruitment.py', 'app/schemas/recruitment.py', 'app/services/email_delivery_service.py', 'app/services/public_request_protection.py', 'app/services/recruitment_access.py', 'app/services/recruitment_emails.py', 'app/services/recruitment_interviews.py', 'app/services/recruitment_personality.py', 'app/services/request_rate_limit.py']}
+                               for name in ['app/api/deps.py', 'app/api/routes/files.py', 'app/api/routes/recruitment.py', 'app/api/routes/recruitment_extensions.py', 'app/models/recruitment.py', 'app/schemas/recruitment.py', 'app/services/email_delivery_service.py', 'app/services/public_request_protection.py', 'app/services/recruitment_access.py', 'app/services/recruitment_emails.py', 'app/services/recruitment_interviews.py', 'app/services/recruitment_personality.py', 'app/services/request_rate_limit.py', 'app/services/recruitment_teams.py']}
     if engine.dialect.name != "postgresql":
         raise RuntimeError("PostgreSQL_required")
     stage = "read_only_queries"
@@ -211,7 +211,7 @@ def audit(expected_candidates=500):
             blockers.append('Read_only_transaction_not_verified')
         if not all(database['configuration'].values()):
             blockers.append('Configuration_check_failed')
-        if database.get('schema') != ['20261031_0032']:
+        if database.get('schema') != ['20261031_0033']:
             blockers.append('Unexpected_database_schema')
         matching = [c for c in database['campaigns'] if c['matches_november_dates'] and c['active']]
         if len(matching) != 1:

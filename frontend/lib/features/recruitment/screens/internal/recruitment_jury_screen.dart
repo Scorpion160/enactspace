@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../../models/recruitment_campaign_model.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
+import '../../widgets/internal/jury_teams_section.dart';
 
 class RecruitmentJuryScreen extends StatefulWidget {
   final RecruitmentCampaignTools tools;
@@ -239,6 +241,20 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                   child: Text(_feedback!, semanticsLabel: _feedback),
                 ),
               const SizedBox(height: 18),
+              if (_campaign != null && _roster != null)
+                JuryTeamsSection(
+                  campaignId: _campaign!,
+                  teams: (_roster?['teams'] as List? ?? const [])
+                      .whereType<Map>()
+                      .map((row) => Map<String, dynamic>.from(row))
+                      .toList(),
+                  members: members,
+                  canManage: canManage,
+                  tools: widget.tools,
+                  busy: _busy,
+                  onChanged: _load,
+                  onOpenApplication: widget.onOpenApplication,
+                ),
               if ((_roster?['interviews_needing_reassignment'] as List? ??
                       const [])
                   .isNotEmpty) ...[

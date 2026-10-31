@@ -14,6 +14,7 @@ from sqlalchemy.engine import make_url
 
 import test_veille as fixture
 import test_operational_integrity_postgresql as pg_fixture
+import test_recruitment_teams as teams_fixture
 from test_recruitment_jury_personality import RecruitmentJuryPersonalityTests
 from app.api.routes import recruitment
 from app.api.routes.recruitment_extensions import PersonalitySave, public_attempt, editable, save_answers
@@ -60,10 +61,107 @@ class RecruitmentJuryHttpPostgreSQLTests(RecruitmentJuryPersonalityTests):
             self.admin.dispose()
 
 
+class RecruitmentTeamsHttpPostgreSQLTests(teams_fixture.RecruitmentTeamsTests):
+    def setUp(self):
+        url = test_url()
+        self.admin = create_engine(url)
+        self.schema = 'recruitment_teams_' + uuid.uuid4().hex
+        with self.admin.begin() as connection:
+            connection.execute(text('CREATE SCHEMA ' + self.schema))
+        engine = create_engine(url)
+        @event.listens_for(engine, 'connect')
+        def select_schema(connection, _):
+            with connection.cursor() as cursor:
+                cursor.execute('SET search_path TO ' + self.schema)
+            connection.commit()
+        with patch.object(fixture, 'create_engine', return_value=engine), patch.object(fixture, 'event', SimpleNamespace(listens_for=lambda *_: lambda fn: fn)):
+            super().setUp()
+
+    def tearDown(self):
+        try:
+            super().tearDown()
+        finally:
+            with self.admin.begin() as connection:
+                connection.execute(text('DROP SCHEMA ' + self.schema + ' CASCADE'))
+            self.admin.dispose()
+
+
 class RecruitmentJuryRacesPostgreSQLTests(TestCase):
     setUpClass = classmethod(pg_fixture.OperationalIntegrityPostgreSQLTests.setUpClass.__func__)
     tearDownClass = classmethod(pg_fixture.OperationalIntegrityPostgreSQLTests.tearDownClass.__func__)
     _user = pg_fixture.OperationalIntegrityPostgreSQLTests._user
+
+    def _team_race(self, same_team):
+        from app.models.recruitment import RecruitmentJuryTeam, RecruitmentJuryTeamMember
+        staff_id = self._user(roles=('administrateur',))
+        jurors = [self._user(status='alumni'), self._user(status='alumni')]
+        pairs = []
+        with self.Session() as db:
+            campaign = RecruitmentCampaign(title='Synthetic parallel teams')
+            db.add(campaign); db.flush()
+            first_team = None
+            for index in range(2):
+                team = first_team if same_team and index else RecruitmentJuryTeam(campaign_id=campaign.id, name=f'Team {index}', name_key=f'team {index}')
+                if first_team is None or not same_team:
+                    member = RecruitmentJuryMember(campaign_id=campaign.id, user_id=jurors[index])
+                    db.add_all([team, member]); db.flush()
+                    db.add(RecruitmentJuryTeamMember(team_id=team.id, jury_member_id=member.id))
+                first_team = first_team or team
+                app = Application(campaign_id=campaign.id, first_name='Synthetic', last_name='Candidate', email=uuid.uuid4().hex+'@example.org', status='under_review')
+                db.add(app); db.flush()
+                pairs.append((app.id, team.id))
+            db.commit()
+        barrier = Barrier(2)
+        start = (utc_now()+timedelta(days=4)).replace(hour=12, minute=0, second=0, microsecond=0)
+        def schedule(pair):
+            with self.Session() as db:
+                actor = db.get(User, staff_id)
+                barrier.wait(5)
+                try:
+                    recruitment.schedule_application_interview(str(pair[0]), ApplicationInterviewSchedule(
+                        interview_at=start, interview_mode='online', interview_link='https://example.org/synthetic',
+                        jury_team_id=pair[1], jury_team_revision=1), Request({'type':'http','headers':[]}), db, actor)
+                    return 200
+                except HTTPException as error:
+                    db.rollback()
+                    return error.status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            return sorted(pool.map(schedule, pairs))
+
+    def test_same_team_parallel_appointments_accept_exactly_one(self):
+        self.assertEqual(self._team_race(True), [200,409])
+
+    def test_two_independent_teams_can_interview_in_parallel(self):
+        self.assertEqual(self._team_race(False), [200,200])
+
+    def test_parallel_team_edits_cannot_overwrite_the_other_composition(self):
+        from app.models.recruitment import RecruitmentJuryTeam, RecruitmentJuryTeamMember
+        from app.services.recruitment_teams import JuryTeamSave, save_team
+        staff_id, juror_id = self._user(roles=('administrateur',)), self._user(status='alumni')
+        with self.Session() as db:
+            campaign = RecruitmentCampaign(title='Synthetic team edits')
+            db.add(campaign); db.flush()
+            member = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror_id)
+            team = RecruitmentJuryTeam(campaign_id=campaign.id, name='Before', name_key='before')
+            db.add_all([member,team]); db.flush()
+            db.add(RecruitmentJuryTeamMember(team_id=team.id,jury_member_id=member.id))
+            campaign_id, team_id, member_id = campaign.id, team.id, member.id
+            db.commit()
+        barrier = Barrier(2)
+        def edit(number):
+            with self.Session() as db:
+                actor = db.get(User,staff_id)
+                barrier.wait(5)
+                try:
+                    save_team(db,campaign_id,JuryTeamSave(name=f'After {number}',member_ids=[member_id],revision=1),actor,team_id)
+                    return 200
+                except HTTPException as error:
+                    db.rollback()
+                    return error.status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(edit,[1,2])),[200,409])
+        with self.Session() as db:
+            self.assertEqual(db.get(RecruitmentJuryTeam,team_id).revision,2)
 
     def test_upgrade_from_a_0031_schema_preserves_candidate_and_private_cv_reference(self):
         from alembic import command
@@ -82,7 +180,7 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
                     # Remove only the extension objects in this new, owned schema.
                     # 0001 creates them from current metadata, but deployed 0031
                     # predates those models. This reconstructs that upgrade path.
-                    for name in ('application_interview_jurors', 'application_personality', 'recruitment_jury_members'):
+                    for name in ('application_interview_teams', 'recruitment_jury_team_members', 'recruitment_jury_teams', 'application_interview_jurors', 'application_personality', 'recruitment_jury_members'):
                         connection.execute(text('DROP TABLE ' + name))
                     for name in ('campus_resident', 'interview_preferences', 'interview_availability', 'interview_end_at', 'interview_mode'):
                         connection.execute(text('ALTER TABLE applications DROP COLUMN ' + name))
@@ -94,7 +192,7 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
                     row = connection.execute(text('SELECT id, status, tracking_code, cv_url, campus_resident FROM applications')).one()
                     self.assertEqual(str(row.id), application_id)
                     self.assertEqual((row.status, row.tracking_code, row.cv_url, row.campus_resident), ('under_review', 'SYNTHETIC-TRACKING-CODE', 'private-cv-reference', None))
-                    self.assertEqual(connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one(), '20261031_0032')
+                    self.assertEqual(connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one(), '20261031_0033')
         finally:
             engine.dispose()
             with self.admin_engine.begin() as connection:

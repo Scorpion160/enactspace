@@ -15,6 +15,11 @@ abstract interface class RecruitmentCampaignTools {
   );
   Future<void> appointJury(String campaignId, String userId);
   Future<Map<String, dynamic>> revokeJury(String campaignId, String memberId);
+  Future<Map<String, dynamic>> saveJuryTeam(
+    String campaignId,
+    Map<String, dynamic> body, {
+    String? teamId,
+  });
   Future<Map<String, dynamic>> loadPersonality(String applicationId);
   Future<void> invitePersonality(String applicationId, DateTime? dueAt);
   Future<ApplicationModel> scheduleWithJury(
@@ -34,6 +39,20 @@ class ApiRecruitmentCampaignTools implements RecruitmentCampaignTools {
     final token = await _auth.getToken();
     if (token == null) throw StateError('Connecte-toi pour poursuivre.');
     return token;
+  }
+
+  @override
+  Future<Map<String, dynamic>> saveJuryTeam(
+    String campaignId,
+    Map<String, dynamic> body, {
+    String? teamId,
+  }) async {
+    final path = '/recruitment/campaigns/$campaignId/jury/teams';
+    final token = await _token();
+    final response = teamId == null
+        ? await _api.postJson(path, token: token, data: body)
+        : await _api.patchJson('$path/$teamId', token: token, data: body);
+    return Map<String, dynamic>.from(response as Map);
   }
 
   @override

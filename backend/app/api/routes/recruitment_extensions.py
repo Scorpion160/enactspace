@@ -124,6 +124,8 @@ def save_answers(row, payload, *, complete):
 
 
 def register_recruitment_extensions(router):
+    from app.services.recruitment_teams import campaign_teams, register_jury_teams
+    register_jury_teams(router)
     @router.get("/access")
     def access(db: Session = Depends(get_db), user: User = Depends(require_recruitment_access)):
         return capabilities(db, user)
@@ -134,6 +136,7 @@ def register_recruitment_extensions(router):
         rows = db.query(RecruitmentJuryMember, User).join(User, User.id == RecruitmentJuryMember.user_id).filter(
             RecruitmentJuryMember.campaign_id == campaign_id).order_by(User.last_name, User.first_name).all()
         return {"can_manage": can_manage_jury(db, user), "members": [member_payload(m, u) for m, u in rows],
+                "teams": campaign_teams(db, campaign_id),
                 "interviews_needing_reassignment": interviews_needing_reassignment(db, campaign_id)}
 
     @router.get("/campaigns/{campaign_id}/jury/eligible")

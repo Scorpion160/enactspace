@@ -65,11 +65,34 @@ class _Questionnaire implements PublicPersonalityGateway {
 class _Tools implements RecruitmentCampaignTools {
   bool appointed = true;
   Map<String, dynamic>? saved;
+  final List<Map<String, dynamic>> teams = [];
+  @override
+  Future<Map<String, dynamic>> saveJuryTeam(
+    String campaignId,
+    Map<String, dynamic> body, {
+    String? teamId,
+  }) async {
+    final team = {
+      'id': teamId ?? 'team-${teams.length}',
+      'name': body['name'],
+      'revision': 1,
+      'active': body['active'],
+      'available': true,
+      'members': [
+        {'id': 'member-1', 'name': 'Alumni Test', 'active': true},
+      ],
+      'interviews': <Map<String, dynamic>>[],
+    };
+    teams.add(team);
+    return team;
+  }
+
   @override
   Future<Map<String, dynamic>> loadAccess() async => {'can_manage_jury': true};
   @override
   Future<Map<String, dynamic>> loadJury(String campaignId) async => {
     'can_manage': true,
+    'teams': teams,
     'members': [
       {
         'id': 'member-1',

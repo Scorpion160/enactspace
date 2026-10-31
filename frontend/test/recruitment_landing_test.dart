@@ -6,12 +6,14 @@ import 'package:frontend/features/recruitment/models/recruitment_campaign_model.
 import 'package:frontend/features/recruitment/services/public_recruitment_gateway.dart';
 import 'package:frontend/features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
 
-const _campaign = RecruitmentCampaignModel(
+final _campaign = RecruitmentCampaignModel(
   id: 'landing-test',
   title: 'Une campagne de test',
   startDate: '2026-10-16',
   endDate: '2026-10-29',
   isActive: true,
+  serverTime: DateTime.utc(2026, 10, 20),
+  receivedAt: DateTime.now().toUtc(),
 );
 
 class _LandingGateway implements PublicRecruitmentGateway {

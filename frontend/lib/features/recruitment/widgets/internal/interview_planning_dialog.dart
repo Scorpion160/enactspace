@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../models/application_model.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
@@ -28,6 +29,9 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
       _note = TextEditingController();
   final Set<String> _selected = {};
   List<Map<String, dynamic>> _members = [];
+  List<Map<String, dynamic>> _teams = [];
+  String _teamId = '';
+  bool _needsTeamChoice = false;
   String _mode = 'in_person';
   bool _loading = true, _sending = false;
   String? _error;
@@ -75,13 +79,28 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
     try {
       final result = await widget.tools.loadJury(widget.application.campaignId);
       if (!mounted) return;
-      setState(
-        () => _members = (result['members'] as List)
+      setState(() {
+        _members = (result['members'] as List)
             .whereType<Map>()
             .where((row) => row['active'] == true)
             .map((row) => Map<String, dynamic>.from(row))
-            .toList(),
-      );
+            .toList();
+        _teams = (result['teams'] as List? ?? const [])
+            .whereType<Map>()
+            .where((row) => row['available'] == true)
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+        final assigned = widget.application.interviewTeam;
+        final team = _teams
+            .where((row) => row['id'] == assigned?['id'])
+            .firstOrNull;
+        _needsTeamChoice =
+            assigned != null &&
+            (team == null || assigned['revision'] != team['revision']);
+        _teamId = team != null && !_needsTeamChoice
+            ? team['id'].toString()
+            : '';
+      });
     } catch (error) {
       if (mounted) {
         setState(
@@ -123,6 +142,13 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
 
   Future<void> _save() async {
     if (_sending || !_form.currentState!.validate()) return;
+    if (_needsTeamChoice) {
+      setState(
+        () => _error =
+            'La composition a changé. Choisis une équipe ou confirme une composition personnalisée.',
+      );
+      return;
+    }
     if (_selected.isEmpty) {
       setState(() => _error = 'Choisis au moins un membre du jury.');
       return;
@@ -133,20 +159,28 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
     });
     try {
       final start = _start()!;
-      final updated = await widget.tools
-          .scheduleWithJury(widget.application.id, {
-            'interview_at': start.toIso8601String(),
-            'interview_end_at': start
-                .add(Duration(minutes: int.parse(_duration.text)))
-                .toIso8601String(),
-            'interview_mode': _mode,
-            'interview_location': _mode == 'online'
-                ? null
-                : _location.text.trim(),
-            'interview_link': _mode == 'in_person' ? null : _link.text.trim(),
-            'interview_note': _note.text.trim(),
-            'jury_member_ids': _selected.toList(),
-          });
+      final updated = await widget.tools.scheduleWithJury(
+        widget.application.id,
+        {
+          'interview_at': start.toIso8601String(),
+          'interview_end_at': start
+              .add(Duration(minutes: int.parse(_duration.text)))
+              .toIso8601String(),
+          'interview_mode': _mode,
+          'interview_location': _mode == 'online'
+              ? null
+              : _location.text.trim(),
+          'interview_link': _mode == 'in_person' ? null : _link.text.trim(),
+          'interview_note': _note.text.trim(),
+          if (_teamId.isEmpty) 'jury_member_ids': _selected.toList(),
+          if (_teamId.isNotEmpty) ...{
+            'jury_team_id': _teamId,
+            'jury_team_revision': _teams.firstWhere(
+              (row) => row['id'] == _teamId,
+            )['revision'],
+          },
+        },
+      );
       if (!mounted) return;
       widget.onSaved(updated);
       Navigator.pop(context);
@@ -287,6 +321,52 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (_loading) const LinearProgressIndicator(),
+              if (!_loading) ...[
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('interview-team-$_teamId'),
+                  initialValue: _teamId,
+                  isExpanded: true,
+                  itemHeight: null,
+                  decoration: const InputDecoration(
+                    labelText: 'Équipe chargée de cet entretien',
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Composition personnalisée'),
+                    ),
+                    for (final team in _teams)
+                      DropdownMenuItem(
+                        value: team['id'].toString(),
+                        child: Text(team['name'].toString()),
+                      ),
+                  ],
+                  onChanged: _sending
+                      ? null
+                      : (value) => setState(() {
+                          _teamId = value ?? '';
+                          _needsTeamChoice = false;
+                          if (_teamId.isNotEmpty) {
+                            final team = _teams.firstWhere(
+                              (row) => row['id'] == _teamId,
+                            );
+                            _selected
+                              ..clear()
+                              ..addAll(
+                                (team['members'] as List).whereType<Map>().map(
+                                  (row) => row['id'].toString(),
+                                ),
+                              );
+                          }
+                        }),
+                ),
+                if (_needsTeamChoice)
+                  const Text(
+                    'L’équipe prévue a changé. Choisis à nouveau sa composition avant de confirmer.',
+                  ),
+                const SizedBox(height: 8),
+              ],
               if (!_loading && _members.isEmpty)
                 const Text(
                   'Aucun membre disponible. Constitue d’abord le jury de cette campagne.',
@@ -299,9 +379,10 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                   subtitle: Text(
                     member['status'] == 'alumni' ? 'Alumni' : 'Enacteur',
                   ),
-                  onChanged: _sending
+                  onChanged: _sending || _teamId.isNotEmpty
                       ? null
                       : (value) => setState(() {
+                          _needsTeamChoice = false;
                           value == true
                               ? _selected.add(member['id'].toString())
                               : _selected.remove(member['id'].toString());

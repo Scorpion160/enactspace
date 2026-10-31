@@ -456,6 +456,10 @@ class _DetailBody extends StatelessWidget {
                 'Date': application.interviewLabel,
                 'Lieu': _value(application.interviewLocation),
                 'Jury': _value(application.interviewJury),
+                if (application.interviewTeam != null)
+                  'Équipe': _value(
+                    application.interviewTeam!['name']?.toString(),
+                  ),
                 'Détails': _value(application.interviewNote),
               },
             ),
@@ -510,7 +514,7 @@ class _DetailBody extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'Un membre du jury n’est plus disponible. Modifie l’entretien pour réattribuer le jury.',
+              'La composition du jury a changé. Modifie l’entretien pour confirmer une équipe disponible.',
             ),
           ),
         ),

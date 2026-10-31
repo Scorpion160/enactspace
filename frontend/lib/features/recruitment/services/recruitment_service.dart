@@ -36,13 +36,20 @@ class RecruitmentService {
   }
 
   Future<List<RecruitmentCampaignModel>> getPublicCampaigns() async {
-    final response = await _apiClient.get('/recruitment/campaigns/public');
-
-    final rawList = _extractList(response);
+    final response = await _apiClient.get('/recruitment/campaigns/timeline');
+    if (response is! Map || response['campaigns'] is! List) {
+      throw StateError('Les dates des campagnes n’ont pas pu être chargées.');
+    }
+    final rawList = response['campaigns'] as List;
 
     return rawList
         .whereType<Map<String, dynamic>>()
-        .map(RecruitmentCampaignModel.fromJson)
+        .map(
+          (row) => RecruitmentCampaignModel.fromJson({
+            ...row,
+            'server_time': response['server_time'],
+          }),
+        )
         .toList();
   }
 

@@ -196,6 +196,35 @@ class ApplicationInterviewJuror(Base):
     jury_member_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_members.id", ondelete="CASCADE"), primary_key=True)
 
 
+class RecruitmentJuryTeam(Base):
+    __tablename__ = "recruitment_jury_teams"
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_campaigns.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(240), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    __table_args__ = (UniqueConstraint("campaign_id", "name_key", name="uq_recruitment_team_name"),)
+
+
+class RecruitmentJuryTeamMember(Base):
+    __tablename__ = "recruitment_jury_team_members"
+    team_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_teams.id", ondelete="CASCADE"), primary_key=True)
+    jury_member_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_members.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ApplicationInterviewTeam(Base):
+    __tablename__ = "application_interview_teams"
+    application_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True)
+    team_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_teams.id", ondelete="CASCADE"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    __table_args__ = (Index("ix_application_interview_team", "team_id"),)
+
+
 class ApplicationPersonality(Base):
     __tablename__ = "application_personality"
     application_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True)

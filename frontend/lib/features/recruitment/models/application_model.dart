@@ -34,6 +34,7 @@ class ApplicationModel {
   final String? interviewMode;
   final List<Map<String, dynamic>> interviewJurors;
   final bool interviewNeedsReassignment;
+  final Map<String, dynamic>? interviewTeam;
   final Map<String, dynamic> permissions;
   final String? personalityStatus;
   final DateTime? interviewAt;
@@ -91,6 +92,7 @@ class ApplicationModel {
     this.interviewMode,
     this.interviewJurors = const [],
     this.interviewNeedsReassignment = false,
+    this.interviewTeam,
     this.permissions = const {},
     this.personalityStatus,
     this.interviewAt,
@@ -171,6 +173,9 @@ class ApplicationModel {
           .map((v) => Map<String, dynamic>.from(v))
           .toList(),
       interviewNeedsReassignment: json['interview_needs_reassignment'] == true,
+      interviewTeam: json['interview_team'] is Map
+          ? Map<String, dynamic>.from(json['interview_team'] as Map)
+          : null,
       permissions: Map<String, dynamic>.from(
         json['permissions'] as Map? ?? const {},
       ),

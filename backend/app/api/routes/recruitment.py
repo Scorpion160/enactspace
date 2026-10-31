@@ -401,6 +401,25 @@ def list_public_active_campaigns(
     return [campaign for campaign in campaigns if campaign_is_open(campaign)]
 
 
+@router.get("/campaigns/timeline")
+def public_campaign_timeline(db: Session = Depends(get_db)):
+    # Dakar is UTC year-round. End dates are inclusive, with closure at midnight
+    # on the following day. Submission authorization still uses the server date.
+    now = utc_now()
+    campaigns = db.query(RecruitmentCampaign).filter(
+        RecruitmentCampaign.is_active.is_(True),
+        or_(RecruitmentCampaign.end_date.is_(None), RecruitmentCampaign.end_date >= now.date()),
+    ).order_by(RecruitmentCampaign.start_date, RecruitmentCampaign.created_at.desc()).all()
+    return {"server_time": now.isoformat() + "Z", "timezone": "Africa/Dakar", "campaigns": [
+        {"id": str(row.id), "title": row.title, "description": row.description,
+         "start_date": row.start_date, "end_date": row.end_date, "is_active": True,
+         "application_questions": effective_questions(row.application_questions),
+         "questionnaire_version": questionnaire_version(effective_questions(row.application_questions)),
+         "opens_at": datetime.combine(row.start_date, datetime.min.time()).isoformat() + "Z" if row.start_date else None,
+         "closes_at": datetime.combine(row.end_date + timedelta(days=1), datetime.min.time()).isoformat() + "Z" if row.end_date else None}
+        for row in campaigns]}
+
+
 @router.get("/campaigns/{campaign_id}", response_model=RecruitmentCampaignRead)
 def get_campaign(
     campaign_id: str,
@@ -882,7 +901,10 @@ def application_payload(
         data["permissions"] = permission_data
         if include_history:
             data["interview_jurors"] = interview_roster(db, application)
-            data["interview_needs_reassignment"] = any(not row["active"] for row in data["interview_jurors"])
+            from app.services.recruitment_teams import interview_team_details
+            data["interview_team"] = interview_team_details(db, application)
+            data["interview_needs_reassignment"] = (any(not row["active"] for row in data["interview_jurors"])
+                or bool(data["interview_team"] and data["interview_team"]["needs_update"]))
             attempt = db.get(ApplicationPersonality, application.id)
             data["personality_status"] = ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None
     if anonymized:
@@ -1226,7 +1248,7 @@ def schedule_application_interview(
     db.commit()
     db.refresh(application)
 
-    return application_payload(db, current_user, application)
+    return application_payload(db, current_user, application, include_history=True)
 
 
 @router.patch("/applications/{application_id}", response_model=ApplicationRead)

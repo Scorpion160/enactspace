@@ -47,7 +47,7 @@ class CampaignUpgradeSafetyTests(TestCase):
     def test_pinned_helper_is_non_root_and_all_postgresql_suites_are_requested(self):
         helper = runner.configure(runner.load_helper())
         self.assertIn('RecruitmentJuryRacesPostgreSQLTests', helper.TEST_PROGRAM)
-        self.assertIn("['20261031_0032']", helper.TEST_PROGRAM)
+        self.assertIn("['20261031_0033']", helper.TEST_PROGRAM)
         self.assertIn('result.skipped', helper.TEST_PROGRAM)
         source = helper.candidate_dockerfile('owned-base', 'b' * 32,
             {'patch_revision': 'a' * 40, 'files': {'tools/audit_recruitment_campaign.py': 'fixture'}}, 'enactspace')

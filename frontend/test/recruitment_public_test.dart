@@ -20,13 +20,15 @@ import 'package:frontend/features/recruitment/screens/public/public_recruitment_
 import 'package:frontend/features/recruitment/services/public_recruitment_gateway.dart';
 import 'package:frontend/features/recruitment/widgets/public/public_recruitment_widgets.dart';
 
-const _campaign = RecruitmentCampaignModel(
+final _campaign = RecruitmentCampaignModel(
   id: 'campaign-open',
   title: 'Campagne publique synthétique',
   description: 'Une campagne destinée uniquement aux tests widgets.',
   startDate: '2026-08-01',
   endDate: '2026-09-30',
   isActive: true,
+  serverTime: DateTime.utc(2026, 8, 15),
+  receivedAt: DateTime.now().toUtc(),
 );
 
 class _FakeGateway implements PublicRecruitmentGateway {
@@ -39,7 +41,7 @@ class _FakeGateway implements PublicRecruitmentGateway {
 
   @override
   Future<List<RecruitmentCampaignModel>> loadCampaigns() =>
-      campaigns?.call() ?? Future.value(const [_campaign]);
+      campaigns?.call() ?? Future.value([_campaign]);
 
   @override
   Future<ApplicationModel> submitApplication(PublicApplicationDraft draft) {
@@ -457,7 +459,7 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    completer.complete(const [_campaign]);
+    completer.complete([_campaign]);
     await tester.pumpAndSettle();
 
     expect(find.text(_campaign.title), findsOneWidget);

@@ -10,6 +10,7 @@ $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentClients\$id"
 $stage = Join-Path $local 'frontend'
 $payload = Join-Path $local 'candidate'
 $baseline = Join-Path $local 'baseline'
+$previous = Join-Path $local 'previous'
 $canonical = Join-Path $local 'current'
 $before = @{}
 $Frontend = [IO.Path]::GetFullPath($Frontend)
@@ -47,6 +48,12 @@ foreach ($entry in $data.frontend) {
         Copy-Item -LiteralPath $currentFile -Destination $currentCopy
         FormatChecked $currentCopy
         if ((Hash $currentCopy) -eq (Hash $candidateFile)) { continue }
+        if ($entry.previous_sha256) {
+            $previousFile = Join-Path $previous $relative
+            DownloadChecked $data.frontend_previous_revision $entry.path $previousFile $entry.previous_sha256
+            FormatChecked $previousFile
+            if ((Hash $currentCopy) -eq (Hash $previousFile)) { continue }
+        }
         if (!$entry.baseline_sha256) { throw "Un fichier local different existe deja : $relative" }
         $baselineFile = Join-Path $baseline $relative
         DownloadChecked $data.frontend_base_revision $entry.path $baselineFile $entry.baseline_sha256
