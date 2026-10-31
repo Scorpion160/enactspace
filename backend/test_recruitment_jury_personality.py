@@ -2,6 +2,7 @@
 from datetime import timedelta
 from unittest import TestCase
 from unittest.mock import patch
+import uuid
 
 import test_attachments_lifecycle as fixture
 from app.core.config import settings
@@ -47,6 +48,38 @@ class RecruitmentJuryPersonalityTests(TestCase):
                     answers={item['id']: 4 for item in state['instrument']['items']},
                     scenario_answers={item['id']: 'Je vérifie les faits avec l’équipe et les personnes concernées.'
                                       for item in state['instrument']['scenarios']}, **extra)
+
+    def test_uuid_shaped_tracking_code_can_load_and_save_candidate_questionnaire(self):
+        app, credentials, state = self.prepare_assessment()
+        row = self.db.get(Application, app['id'])
+        row.tracking_code = uuid.uuid4().hex
+        self.db.commit()
+        credentials = dict(credentials, application_id=row.tracking_code.lower(), email=app['email'].upper())
+        loaded = self.post('/personality/load', credentials)
+        self.assertEqual(loaded['version'], state['version'])
+        saved = self.post('/personality/save', dict(credentials, **self.answers(loaded)))
+        self.assertEqual(saved['revision'], 1)
+        self.assertEqual(self.db.query(ApplicationPersonality).count(), 1)
+        self.post('/personality/load', dict(credentials, email='someone-else@example.org'), 404)
+
+    def test_normal_tracking_and_legacy_identifiers_keep_the_same_email_boundary(self):
+        app = self.application()
+        for reference in (app['tracking_code'].lower(), app['id'], uuid.UUID(app['id']).hex):
+            with self.subTest(reference=reference):
+                tracked = self.post('/applications/track', {'application_id': ' ' + reference + ' ', 'email': app['email'].upper()})
+                self.assertEqual(tracked['application_id'], app['id'])
+                self.post('/applications/track', {'application_id': reference, 'email': 'someone-else@example.org'}, 404)
+
+    def test_ambiguous_public_reference_does_not_choose_an_arbitrary_campaign(self):
+        first = self.application()
+        second = self.application(self.campaign())
+        other = self.db.get(Application, second['id'])
+        other.tracking_code = uuid.UUID(first['id']).hex
+        self.db.commit()
+        self.post('/applications/track', {'application_id': other.tracking_code, 'email': first['email']}, 404)
+        # The explicit historical UUID still identifies only the first record.
+        tracked = self.post('/applications/track', {'application_id': first['id'], 'email': first['email']})
+        self.assertEqual(tracked['application_id'], first['id'])
 
     def test_alumni_only_assigned_campaign_is_visible_and_no_role_is_granted(self):
         one, two = self.campaign(), self.campaign()

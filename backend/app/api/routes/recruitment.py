@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, F
 from pydantic import ValidationError
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from app.db.database import get_db
@@ -727,17 +727,21 @@ def get_application_by_public_reference(
         return None
 
     query = db.query(Application).filter(
-        func.lower(Application.email) == email.lower(),
+        func.lower(Application.email) == email.strip().lower(),
     )
-
+    references = [func.upper(Application.tracking_code) == normalized_reference.upper()]
     try:
         application_uuid = uuid.UUID(normalized_reference)
     except ValueError:
-        return query.filter(
-            func.upper(Application.tracking_code) == normalized_reference.upper()
-        ).first()
-
-    return query.filter(Application.id == application_uuid).first()
+        pass
+    else:
+        # UUID-shaped tracking codes remain tracking codes. Also preserve the
+        # historical application-ID reference, always behind the email check.
+        references.append(Application.id == application_uuid)
+    matches = query.filter(or_(*references)).limit(2).all()
+    # An ambiguous legacy ID / tracking-code combination must not select an
+    # arbitrary campaign. No result is disclosed unless exactly one matches.
+    return matches[0] if len(matches) == 1 else None
 
 
 def candidate_email_ready() -> bool:

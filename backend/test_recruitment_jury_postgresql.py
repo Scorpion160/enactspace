@@ -146,6 +146,12 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
             credentials = {'application_id': app.tracking_code, 'email': app.email, 'version': snapshot['version'], 'revision': 0, 'consent': True}
             app_id = app.id
             db.commit()
+        # Resolve the same UUID-shaped code before racing the two writes, so a
+        # reference lookup failure cannot masquerade as a concurrency result.
+        with self.Session() as db:
+            resolved = recruitment.get_application_by_public_reference(db, credentials['application_id'], credentials['email'])
+            self.assertIsNotNone(resolved, 'UUID-shaped tracking code must identify the invited candidate')
+            self.assertEqual(resolved.id, app_id)
         barrier = Barrier(2)
         def save(value):
             with self.Session() as db:
