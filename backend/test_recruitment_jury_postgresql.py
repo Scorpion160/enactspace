@@ -65,6 +65,41 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
     tearDownClass = classmethod(pg_fixture.OperationalIntegrityPostgreSQLTests.tearDownClass.__func__)
     _user = pg_fixture.OperationalIntegrityPostgreSQLTests._user
 
+    def test_upgrade_from_a_0031_schema_preserves_candidate_and_private_cv_reference(self):
+        from alembic import command
+        from alembic.config import Config
+        from app.core.config import settings
+        schema = 'recruitment_0031_upgrade_' + uuid.uuid4().hex
+        isolated_url = make_url(self.url).update_query_dict({'options': '-csearch_path=' + schema}).render_as_string(hide_password=False)
+        engine = create_engine(isolated_url)
+        with self.admin_engine.begin() as connection:
+            connection.execute(text('CREATE SCHEMA ' + schema))
+        try:
+            config = Config('alembic.ini')
+            with patch.object(settings, 'DATABASE_URL', isolated_url):
+                command.upgrade(config, '20261007_0031')
+                with engine.begin() as connection:
+                    # Remove only the extension objects in this new, owned schema.
+                    # 0001 creates them from current metadata, but deployed 0031
+                    # predates those models. This reconstructs that upgrade path.
+                    for name in ('application_interview_jurors', 'application_personality', 'recruitment_jury_members'):
+                        connection.execute(text('DROP TABLE ' + name))
+                    for name in ('campus_resident', 'interview_preferences', 'interview_availability', 'interview_end_at', 'interview_mode'):
+                        connection.execute(text('ALTER TABLE applications DROP COLUMN ' + name))
+                    campaign_id, application_id = str(uuid.uuid4()), str(uuid.uuid4())
+                    connection.execute(text("INSERT INTO recruitment_campaigns (id, title, is_active, created_at, updated_at) VALUES (:id, 'Synthetic legacy campaign', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"), {'id': campaign_id})
+                    connection.execute(text("INSERT INTO applications (id, campaign_id, first_name, last_name, email, status, tracking_code, cv_url, created_at, updated_at) VALUES (:id, :campaign, 'Synthetic', 'Candidate', 'legacy@example.org', 'under_review', 'SYNTHETIC-TRACKING-CODE', 'private-cv-reference', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"), {'id': application_id, 'campaign': campaign_id})
+                command.upgrade(config, 'head')
+                with engine.connect() as connection:
+                    row = connection.execute(text('SELECT id, status, tracking_code, cv_url, campus_resident FROM applications')).one()
+                    self.assertEqual(str(row.id), application_id)
+                    self.assertEqual((row.status, row.tracking_code, row.cv_url, row.campus_resident), ('under_review', 'SYNTHETIC-TRACKING-CODE', 'private-cv-reference', None))
+                    self.assertEqual(connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one(), '20261031_0032')
+        finally:
+            engine.dispose()
+            with self.admin_engine.begin() as connection:
+                connection.execute(text('DROP SCHEMA ' + schema + ' CASCADE'))
+
     def test_parallel_appointments_in_different_campaigns_cannot_double_book_one_juror(self):
         staff_id = self._user(roles=('administrateur',))
         juror_id = self._user(status='alumni')
