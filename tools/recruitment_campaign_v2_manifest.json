@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "base_revision": "1ccbb0ac2b8220ee8eb19d24a9114790e7bf2b95",
-  "patch_revision": "722f223df449f49ff9a17fbe004d2a63c7ce2b9f",
+  "patch_revision": "9e1f18b74e2a83e32e2b1fa887c615e64d0cc652",
   "required_schema": "20261031_0032",
   "base_hashes": {
     "app/api/routes/recruitment.py": "c6861eb6de84e52b14ea66eb767f386a280b4deb1049dd4faac226bd2e76bf04",
@@ -9,7 +9,7 @@
     "app/services/email_delivery_service.py": "498cb3e68ff2793590a7a7276d690d6a75654679f89d2a4d494c0db77f19003e"
   },
   "files": {
-    "backend/alembic/versions/20261031_0032_recruitment_jury_personality.py": "06f3e6a9934c9b81bc70b23f97047324d97fe19421bd7838cd56888c3c7cbbb1",
+    "backend/alembic/versions/20261031_0032_recruitment_jury_personality.py": "c8d1290a07c6658ba334aca4c0f1d48bcea33a18b200b2450c6377e50b37b643",
     "backend/app/api/deps.py": "b45bf8d1ae3ab62b6c8164552238475a555045eb3ba7092cb5c52fbfbd70580a",
     "backend/app/api/routes/files.py": "91a33350d35b6fa3ded199c61b50c3af1c153100c1eb7ce8c080e0f91ccf9b3b",
     "backend/app/api/routes/recruitment.py": "ae8f81bf5f5e1661b1ffac30d09ea54e644e9addd76fa473d03a24a4ae74087a",
@@ -29,9 +29,9 @@
     "backend/test_recruitment_campaign_postgresql.py": "a39a7978e29ce3ce84f9417f7ec9eb42ecece3e3b32906798dc9ee5d2f2627bc",
     "backend/test_recruitment_campaign_readiness.py": "f004d83a4973837dcd4899027f2bf3b1f7d9e4bd6ae23267818d9eec4c9664de",
     "backend/test_recruitment_campaign_upgrade_safety.py": "b11e076a87636e5c505883360d9ee2e1d46efa5243d2e310d9de3121f0cc9bdc",
-    "backend/test_recruitment_jury_migration.py": "3e077139da150c948246baf7e3c2047dd7655e38a515c6cc2469d3943c4b2837",
+    "backend/test_recruitment_jury_migration.py": "3cc8b1575fcd70a70b7c6fb5e3d993659aa357c922379a905334651bf0c039e7",
     "backend/test_recruitment_jury_personality.py": "ca6764a3b109fe4d9fd685a72a6584e6c3fe2a0e98801b775c06ecf233194926",
-    "backend/test_recruitment_jury_postgresql.py": "2dd1eb3e2551388c9136576aeecb40b18299fe60fb3f8999b27e405d87bb5d0c",
+    "backend/test_recruitment_jury_postgresql.py": "ae46395aa7a0136b7e195f2a835c0553dab96b3de46dfb2f208e83a938894731",
     "backend/test_recruitment_readiness_audit.py": "bf565256570eb48551b955fe514819708f149a38e8b5b3136b27867aa06584ca",
     "backend/test_recruitment_rehearsal_safety.py": "9b62027329d79a42b49b3f04f048b9b34b6e62eb45316fef682262110a9cc551",
     "tools/audit_recruitment_campaign.py": "ee0ab0da050f91d2f6e72321b97aad8ad8b2cba9172de57ad4582928f2deae0b",
