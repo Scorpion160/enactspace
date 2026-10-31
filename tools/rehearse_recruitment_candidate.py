@@ -2,10 +2,14 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -40,6 +44,8 @@ try:
     if not result.wasSuccessful() or result.skipped:
         report['status'] = 'REHEARSAL_TESTS_FAILED_OR_SKIPPED'
     else:
+        report['status'] = 'FUNCTIONAL_TESTS_PASSED_VOLUME_PENDING'
+        print(json.dumps(report), flush=True)
         stage = 'volume_tests'
         from rehearse_recruitment_volume import run
         report['volume'] = run()
@@ -48,7 +54,10 @@ try:
     sys.exit(0 if report['status'] == 'RECRUITMENT_POSTGRESQL_AND_VOLUME_REHEARSAL_PASSED' else 1)
 except Exception as error:
     traceback.print_exc()
-    print(json.dumps({'status':'REHEARSAL_PROGRAM_FAILED','stage':stage,'error_type':type(error).__name__,'production_database_access':False,'emails_sent':False}))
+    report = dict(locals().get('report', {}))
+    report.update(status='REHEARSAL_PROGRAM_FAILED', stage=stage, error_type=type(error).__name__,
+                  production_database_access=False, emails_sent=False)
+    print(json.dumps(report))
     sys.exit(1)
 '''
 
@@ -114,6 +123,163 @@ def remove_owned_container(name, owner):
     run(['docker', 'container', 'rm', '-f', '-v', identifier])
 
 
+MIN_FREE_DISK_BYTES = 8 * 1024**3
+MAX_REHEARSAL_DATA_BYTES = 2 * 1024**3
+
+
+def owned_volume_name(owner):
+    if not re.fullmatch(r'[a-f0-9]{32}', owner):
+        raise RuntimeError('Invalid_rehearsal_owner')
+    return 'enactspace-recruitment-rehearsal-data-' + owner
+
+
+def volume_inventory():
+    result = subprocess.run(['docker', 'volume', 'ls', '--format', '{{.Name}}'],
+                            capture_output=True, text=True, timeout=30)
+    if result.returncode:
+        raise RuntimeError('Volume_inventory_failed')
+    return result.stdout.split()
+
+
+def inspect_owned_volume(name, owner):
+    if name != owned_volume_name(owner):
+        raise RuntimeError('Volume_name_mismatch')
+    rows = json.loads(run(['docker', 'volume', 'inspect', name]))
+    if len(rows) != 1:
+        raise RuntimeError('Volume_identity_ambiguous')
+    row = rows[0]
+    if (row.get('Name') != name or row.get('Driver') != 'local' or row.get('Options')
+            or (row.get('Labels') or {}).get('net.enactspace.rehearsal') != owner):
+        raise RuntimeError('Volume_ownership_mismatch')
+    return row
+
+
+def remove_owned_volume(name, owner):
+    if name != owned_volume_name(owner):
+        raise RuntimeError('Volume_name_mismatch')
+    if name not in volume_inventory():
+        return
+    inspect_owned_volume(name, owner)
+    # No force, prune or production mount is involved. A volume still in use
+    # must block cleanup rather than deleting another container's data.
+    run(['docker', 'volume', 'rm', name])
+
+
+def owned_data_size(mountpoint):
+    if not Path(mountpoint).is_dir():
+        raise RuntimeError('Owned_rehearsal_volume_unavailable')
+    total = 0
+    pending = [mountpoint]
+    deadline = time.monotonic() + 10
+    while pending:
+        if time.monotonic() > deadline:
+            raise RuntimeError('Owned_data_measurement_time_budget_reached')
+        try:
+            with os.scandir(pending.pop()) as entries:
+                for entry in entries:
+                    if time.monotonic() > deadline:
+                        raise RuntimeError('Owned_data_measurement_time_budget_reached')
+                    try:
+                        item = entry.stat(follow_symlinks=False)
+                    except FileNotFoundError:
+                        # PostgreSQL drops relation files during normal tests.
+                        continue
+                    total += item.st_size
+                    if total > MAX_REHEARSAL_DATA_BYTES:
+                        return total
+                    if stat.S_ISDIR(item.st_mode):
+                        pending.append(entry.path)
+        except FileNotFoundError:
+            continue
+    return total
+
+
+def storage_observation(mountpoint):
+    free = shutil.disk_usage(mountpoint).free
+    if free < MIN_FREE_DISK_BYTES:
+        raise RuntimeError('Rehearsal_disk_reserve_reached')
+    size = owned_data_size(mountpoint)
+    if size > MAX_REHEARSAL_DATA_BYTES:
+        raise RuntimeError('Rehearsal_owned_data_limit_reached')
+    return {'free_bytes': free, 'owned_data_bytes': size}
+
+
+def database_command(name, owner, volume, database, image):
+    if name != 'enactspace-recruitment-rehearsal-db-' + owner or volume != owned_volume_name(owner):
+        raise RuntimeError('Volume_name_mismatch')
+    if not re.fullmatch(r'enactspace_pr2b_test_recruitment_[a-f0-9]{12}', database):
+        raise RuntimeError('Disposable_test_database_required')
+    return ['docker', 'run', '-d', '--name', name, '--label', 'net.enactspace.rehearsal=' + owner,
+            '--network=none', '--memory=512m', '--cpus=0.5', '--pids-limit=128', '--read-only',
+            '--mount', 'type=volume,source=' + volume + ',target=/var/lib/postgresql/data',
+            '--tmpfs', '/var/run/postgresql:rw,mode=1777', '--tmpfs', '/tmp:rw,size=32m,mode=1777',
+            '-e', 'POSTGRES_PASSWORD=isolated-rehearsal-only-not-production', '-e', 'POSTGRES_DB=' + database, image]
+
+
+def owned_database_diagnostic(name, owner):
+    try:
+        rows = json.loads(run(['docker', 'container', 'inspect', name], timeout=15))
+        if len(rows) != 1:
+            raise RuntimeError('Diagnostic_identity_ambiguous')
+        row = rows[0]
+        if (row.get('Name') != '/' + name
+                or (row.get('Config', {}).get('Labels') or {}).get('net.enactspace.rehearsal') != owner):
+            raise RuntimeError('Diagnostic_ownership_mismatch')
+        state = row.get('State') or {}
+        result = {'available': True, 'running': state.get('Running'), 'oom_killed': state.get('OOMKilled'),
+                  'exit_code': state.get('ExitCode'), 'restart_count': row.get('RestartCount'),
+                  'memory_limit_bytes': (row.get('HostConfig') or {}).get('Memory')}
+        logs = subprocess.run(['docker', 'logs', '--tail', '120', row['Id']],
+                              capture_output=True, text=True, timeout=15)
+        text = (logs.stdout + logs.stderr).lower()
+        result['log_signals'] = {'no_space': 'no space left on device' in text,
+                                'out_of_memory': 'out of memory' in text,
+                                'signal_9': 'signal 9' in text,
+                                'panic': 'panic:' in text}
+        if state.get('Running'):
+            events = subprocess.run(['docker', 'exec', row['Id'], 'cat', '/sys/fs/cgroup/memory.events'],
+                                    capture_output=True, text=True, timeout=15)
+            if events.returncode == 0:
+                result['memory_events'] = {key: int(value) for key, value in
+                    (line.split() for line in events.stdout.splitlines()) if key in {'oom', 'oom_kill', 'max', 'high'}}
+        return result
+    except Exception as error:
+        return {'available': False, 'error_type': type(error).__name__}
+
+
+def guarded_test_process(command, program, mountpoint, runner_name, owner, report):
+    # File-backed output avoids pipe deadlocks during long migration logs.
+    # Monitor only the verified rehearsal volume and stop only its owned runner.
+    with tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        source.write(program.encode()); source.seek(0)
+        process = subprocess.Popen(command, stdin=source, stdout=out, stderr=err)
+        deadline = time.monotonic() + 1200
+        try:
+            while process.poll() is None:
+                try:
+                    report['storage_last_observation'] = storage_observation(mountpoint)
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError('Rehearsal_time_budget_reached')
+                except Exception as error:
+                    report['resource_guard_stopped_runner'] = True
+                    report['resource_guard_reason'] = str(error) if isinstance(error, RuntimeError) else type(error).__name__
+                    remove_owned_container(runner_name, owner)
+                    break
+                time.sleep(2)
+            process.wait(timeout=30)
+        finally:
+            if process.poll() is None:
+                remove_owned_container(runner_name, owner)
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill(); process.wait(timeout=10)
+        out.seek(0); err.seek(0)
+        return subprocess.CompletedProcess(command, process.returncode,
+            out.read().decode('utf-8', errors='replace'), err.read().decode('utf-8', errors='replace'))
+
+
 def cleanup_previous(candidate, expected_image_id):
     if not re.fullmatch(r'enactspace-backend:recruitment-hardening-[a-f0-9]{12}', candidate) or not re.fullmatch(r'sha256:[a-f0-9]{64}', expected_image_id):
         raise RuntimeError('Invalid_previous_candidate_identity')
@@ -126,6 +292,7 @@ def cleanup_previous(candidate, expected_image_id):
     names = ['enactspace-recruitment-rehearsal-' + kind + '-' + owner for kind in ('test', 'db')]
     for name in names:
         remove_owned_container(name, owner)
+    remove_owned_volume(owned_volume_name(owner), owner)
     return {'status': 'PREVIOUS_OWNED_RUNTIME_CLEANED', 'operation_id': owner,
             'production_services_changed': False, 'production_database_access': False,
             'owned_runtime_resources_removed': True, 'candidate_and_base_images_retained': True}
@@ -166,15 +333,17 @@ def main(argv=None):
         parser.error('Owned staging directory required')
     owner = uuid.uuid4().hex
     db_name = 'enactspace-recruitment-rehearsal-db-' + owner
+    volume_name = owned_volume_name(owner)
     runner_name = 'enactspace-recruitment-rehearsal-test-' + owner
     base_tag = 'enactspace-backend:rehearsal-base-' + owner
     candidate = 'enactspace-backend:recruitment-hardening-' + owner[:12]
     stage = 'payload_integrity'
-    db_owned = runner_owned = base_tag_created = False
+    db_owned = runner_owned = volume_owned = base_tag_created = False
     report = {'production_database_access': False, 'production_services_changed': False,
               'production_migration_performed': False, 'emails_sent': False, 'campaign_created': False,
               'deployment_performed': False, 'public_load_test_performed': False,
-              'operation_id': owner, 'runtime_containers': [runner_name, db_name]}
+              'operation_id': owner, 'runtime_containers': [runner_name, db_name],
+              'runtime_volumes': [volume_name]}
     try:
         manifest = validate_payload(directory)
         stage = 'baseline_verification'
@@ -192,6 +361,12 @@ def main(argv=None):
         available = next(int(line.split()[1]) * 1024 for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:'))
         if available < 2 * 1024**3:
             raise RuntimeError('At_least_2_GiB_available_memory_required')
+        docker_root = Path(run(['docker', 'info', '--format', '{{.DockerRootDir}}']).strip())
+        if not docker_root.is_absolute():
+            raise RuntimeError('Invalid_Docker_data_root')
+        docker_root = docker_root.resolve()
+        if shutil.disk_usage(docker_root).free < MIN_FREE_DISK_BYTES:
+            raise RuntimeError('At_least_8_GiB_free_Docker_disk_required')
         report['base_image_id'] = backend['Image']
         run(['docker', 'image', 'tag', backend['Image'], base_tag])
         base_tag_created = True
@@ -214,13 +389,18 @@ def main(argv=None):
             '--read-only', '--entrypoint', 'python', candidate, '-'], input=readability))
         stage = 'isolated_postgresql'
         database = 'enactspace_pr2b_test_recruitment_' + owner[:12]
+        if volume_name in volume_inventory():
+            raise RuntimeError('Rehearsal_volume_already_exists')
+        run(['docker', 'volume', 'create', '--driver', 'local', '--label', 'net.enactspace.rehearsal=' + owner, volume_name])
+        volume_owned = True
+        volume = inspect_owned_volume(volume_name, owner)
+        mountpoint = Path(volume.get('Mountpoint') or '').resolve()
+        if mountpoint != (docker_root / 'volumes' / volume_name / '_data').resolve():
+            raise RuntimeError('Unexpected_rehearsal_volume_mountpoint')
+        report['temporary_database_storage'] = 'owned_disk_volume'
+        report['storage_limits'] = {'minimum_free_bytes': MIN_FREE_DISK_BYTES, 'maximum_owned_data_bytes': MAX_REHEARSAL_DATA_BYTES}
         db_owned = True
-        run(['docker', 'run', '-d', '--name', db_name, '--label', 'net.enactspace.rehearsal=' + owner,
-             '--network=none', '--memory=512m', '--cpus=0.5', '--pids-limit=128', '--read-only',
-             '--tmpfs', '/var/lib/postgresql/data:rw,size=768m', '--tmpfs', '/var/run/postgresql:rw,mode=1777',
-             '--tmpfs', '/tmp:rw,size=32m,mode=1777',
-             '-e', 'POSTGRES_PASSWORD=isolated-rehearsal-only-not-production', '-e', 'POSTGRES_DB=' + database,
-             postgres['Image']])
+        run(database_command(db_name, owner, volume_name, database, postgres['Image']))
         for attempt in range(40):
             ready = subprocess.run(['docker', 'exec', db_name, 'pg_isready', '-U', 'postgres', '-d', database],
                                    capture_output=True, timeout=5)
@@ -242,7 +422,7 @@ def main(argv=None):
             'PYTHONDONTWRITEBYTECODE': '1', 'TEST_DATABASE_URL': url, 'VEILLE_TEST_POSTGRESQL_URL': url,
             'GOOGLE_APPLICATION_CREDENTIALS': '/nonexistent-isolated-rehearsal',
         }
-        command = ['docker', 'run', '--rm', '-i', '--name', runner_name,
+        command = ['docker', 'run', '-i', '--name', runner_name,
                    '--label', 'net.enactspace.rehearsal=' + owner, '--network', 'container:' + db_name,
                    '--memory=1g', '--cpus=0.5', '--pids-limit=256', '--read-only',
                    '--tmpfs', '/tmp:rw,size=384m,mode=1777', '--tmpfs', '/app/uploads:rw,size=64m,mode=1777',
@@ -253,7 +433,8 @@ def main(argv=None):
         stage = 'isolated_tests_and_volume'
         print('SQLITE_POSTGRESQL_AND_500_1000_DOSSIERS_REHEARSAL', flush=True)
         runner_owned = True
-        outcome = subprocess.run(command, input=TEST_PROGRAM, text=True, capture_output=True, timeout=1200)
+        outcome = guarded_test_process(command, TEST_PROGRAM, mountpoint, runner_name, owner, report)
+        report['test_runner_exit_code'] = outcome.returncode
         if outcome.stderr:
             print(outcome.stderr, end='', file=sys.stderr)
         lines = outcome.stdout.strip().splitlines()
@@ -269,6 +450,10 @@ def main(argv=None):
         if isinstance(error, RuntimeError):
             report['reason'] = str(error)
     finally:
+        if db_owned:
+            report['temporary_database_diagnostic'] = owned_database_diagnostic(db_name, owner)
+        if runner_owned:
+            report['temporary_runner_diagnostic'] = owned_database_diagnostic(runner_name, owner)
         clean = True
         cleanup_errors = []
         for name, owned in [(runner_name, runner_owned), (db_name, db_owned)]:
@@ -278,6 +463,12 @@ def main(argv=None):
                 except Exception as error:
                     clean = False
                     cleanup_errors.append({'resource': name, 'error_type': type(error).__name__})
+        if volume_owned:
+            try:
+                remove_owned_volume(volume_name, owner)
+            except Exception as error:
+                clean = False
+                cleanup_errors.append({'resource': volume_name, 'error_type': type(error).__name__})
         if base_tag_created:
             try:
                 run(['docker', 'image', 'rm', base_tag])
