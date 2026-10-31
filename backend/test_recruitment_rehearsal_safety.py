@@ -45,23 +45,45 @@ class RehearsalSafetyTests(unittest.TestCase):
         self.assertEqual(guarded_url('postgresql://user@127.0.0.1/enactspace_pr2b_test_owned').host, '127.0.0.1')
 
     def test_cleanup_refuses_an_unowned_container(self):
-        result = SimpleNamespace(returncode=0, stdout=json.dumps([{'Config': {'Labels': {'net.enactspace.rehearsal': 'other'}}}]))
-        with patch.object(rehearsal.subprocess, 'run', return_value=result), patch.object(rehearsal, 'run') as mutate:
+        results = [SimpleNamespace(returncode=0, stdout='d' * 64), SimpleNamespace(returncode=0, stdout=json.dumps([{'Id': 'd' * 64, 'Name': '/owned-name', 'Config': {'Labels': {'net.enactspace.rehearsal': 'other'}}}]))]
+        with patch.object(rehearsal.subprocess, 'run', side_effect=results), patch.object(rehearsal, 'run') as mutate:
             with self.assertRaisesRegex(RuntimeError, 'ownership'):
                 rehearsal.remove_owned_container('owned-name', 'our-id')
             mutate.assert_not_called()
 
     def test_cleanup_removes_only_the_matching_owned_name(self):
-        result = SimpleNamespace(returncode=0, stdout=json.dumps([{'Config': {'Labels': {'net.enactspace.rehearsal': 'our-id'}}}]))
-        with patch.object(rehearsal.subprocess, 'run', return_value=result), patch.object(rehearsal, 'run') as mutate:
+        results = [SimpleNamespace(returncode=0, stdout='d' * 64), SimpleNamespace(returncode=0, stdout=json.dumps([{'Id': 'd' * 64, 'Name': '/owned-name', 'Config': {'Labels': {'net.enactspace.rehearsal': 'our-id'}}}]))]
+        with patch.object(rehearsal.subprocess, 'run', side_effect=results), patch.object(rehearsal, 'run') as mutate:
             rehearsal.remove_owned_container('owned-name', 'our-id')
-            mutate.assert_called_once_with(['docker', 'rm', '-f', '-v', 'owned-name'])
+            mutate.assert_called_once_with(['docker', 'container', 'rm', '-f', '-v', 'd' * 64])
 
     def test_failed_inspection_cannot_be_reported_as_successful_cleanup(self):
-        result = SimpleNamespace(returncode=1, stderr='Docker daemon unavailable')
-        with patch.object(rehearsal.subprocess, 'run', return_value=result):
+        results = [SimpleNamespace(returncode=0, stdout='d' * 64), SimpleNamespace(returncode=1, stderr='Docker daemon unavailable')]
+        with patch.object(rehearsal.subprocess, 'run', side_effect=results):
             with self.assertRaisesRegex(RuntimeError, 'Cleanup_inspection_failed'):
                 rehearsal.remove_owned_container('owned-name', 'our-id')
+
+    def test_successful_empty_inventory_needs_no_inspection_or_deletion(self):
+        result = SimpleNamespace(returncode=0, stdout='')
+        with patch.object(rehearsal.subprocess, 'run', return_value=result) as inspect, patch.object(rehearsal, 'run') as mutate:
+            rehearsal.remove_owned_container('already-absent', 'our-id')
+            self.assertEqual(inspect.call_count, 1)
+            mutate.assert_not_called()
+
+    def test_failed_inventory_cannot_be_reported_as_successful_cleanup(self):
+        result = SimpleNamespace(returncode=1, stderr='Untranslated daemon error')
+        with patch.object(rehearsal.subprocess, 'run', return_value=result), patch.object(rehearsal, 'run') as mutate:
+            with self.assertRaisesRegex(RuntimeError, 'Cleanup_inventory_failed'):
+                rehearsal.remove_owned_container('owned-name', 'our-id')
+            mutate.assert_not_called()
+
+    def test_reused_name_and_ambiguous_inventory_never_authorize_removal(self):
+        for results in ([SimpleNamespace(returncode=0, stdout='d' * 64), SimpleNamespace(returncode=0, stdout=json.dumps([{'Id': 'd' * 64, 'Name': '/other-name', 'Config': {'Labels': {'net.enactspace.rehearsal': 'our-id'}}}]))],
+                        [SimpleNamespace(returncode=0, stdout='d' * 64 + '\n' + 'e' * 64)]):
+            with patch.object(rehearsal.subprocess, 'run', side_effect=results), patch.object(rehearsal, 'run') as mutate:
+                with self.assertRaises(RuntimeError):
+                    rehearsal.remove_owned_container('owned-name', 'our-id')
+                mutate.assert_not_called()
 
 
 if __name__ == '__main__':

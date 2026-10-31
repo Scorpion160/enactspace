@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ([bool]$PreviousCandidate -ne [bool]$PreviousImageId) { throw 'Les deux identifiants de repetition precedente sont requis.' }
 $manifestHash = '81cf5f8e77c24238e5c6dbe33aaa9f8c00a476fb6851dcd966602c3c60016286'
-$runnerHash = '4fc1c80d8c70d530df06b0e3338b133f15ebe3d6c8ac210b5154dce4cd14e38e'
+$runnerHash = 'aa551248eb1ecf4e228fdd924d0a67c1ace41696b473a04ef4161196043a1d64'
 $id = [guid]::NewGuid().ToString('N')
 $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentRehearsals\$id"
 $payload = Join-Path $local 'payload'

@@ -84,15 +84,34 @@ def validate_payload(directory):
 
 
 def remove_owned_container(name, owner):
-    result = subprocess.run(['docker', 'inspect', name], capture_output=True, text=True, timeout=30)
+    if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}', name):
+        raise RuntimeError('Cleanup_invalid_container_name')
+    # Absence requires a successful inventory, never an interpretation of an
+    # inspect error. Docker error wording varies across versions and locales.
+    listed = subprocess.run(['docker', 'container', 'ls', '--all', '--no-trunc',
+        '--filter', 'name=^/' + re.escape(name) + '$', '--format', '{{.ID}}'],
+        capture_output=True, text=True, timeout=30)
+    if listed.returncode:
+        raise RuntimeError('Cleanup_inventory_failed_exit_' + str(listed.returncode))
+    identifiers = listed.stdout.split()
+    if not identifiers:
+        return
+    if len(identifiers) != 1 or not re.fullmatch(r'[a-f0-9]{64}', identifiers[0]):
+        raise RuntimeError('Cleanup_inventory_identity_ambiguous')
+    identifier = identifiers[0]
+    result = subprocess.run(['docker', 'container', 'inspect', identifier],
+                            capture_output=True, text=True, timeout=30)
     if result.returncode:
-        if 'No such' in result.stderr:
-            return
-        raise RuntimeError('Cleanup_inspection_failed')
-    data = json.loads(result.stdout)[0]
-    if (data['Config'].get('Labels') or {}).get('net.enactspace.rehearsal') != owner:
+        raise RuntimeError('Cleanup_inspection_failed_exit_' + str(result.returncode))
+    inspected = json.loads(result.stdout)
+    if len(inspected) != 1:
+        raise RuntimeError('Cleanup_inspection_identity_ambiguous')
+    data = inspected[0]
+    if (data.get('Id') != identifier or data.get('Name') != '/' + name
+            or (data['Config'].get('Labels') or {}).get('net.enactspace.rehearsal') != owner):
         raise RuntimeError('Cleanup_ownership_mismatch')
-    run(['docker', 'rm', '-f', '-v', name])
+    # The name could be reused; remove only the ID whose ownership was checked.
+    run(['docker', 'container', 'rm', '-f', '-v', identifier])
 
 
 def cleanup_previous(candidate, expected_image_id):

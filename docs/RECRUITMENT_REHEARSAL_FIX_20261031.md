@@ -17,3 +17,6 @@ Le correctif :
 Empreinte attendue de l'ancienne image candidate : `sha256:095feb02436af1f3c661d8b57e802162c6081738e3c1bd0615f68f128aa100cc`.
 
 Six tests locaux des gardes du lanceur réussissent, dont la restauration de l'utilisateur, les droits du répertoire et le refus de nettoyer une image ou un conteneur dont l'identité ne correspond pas. La syntaxe du programme de test est contrôlée. Le correctif n'atteste pas encore son exécution Docker sur le VPS.
+
+
+Complément : le contrôle du nettoyage n’analyse plus le texte d’erreur de `docker inspect`. Il utilise d’abord un inventaire Docker réussi avec un filtre de nom exact. Une liste vide signifie que le conteneur est déjà absent ; un échec d’accès au démon reste bloquant. Si le conteneur existe, son ID, son nom et son étiquette sont vérifiés, puis seul cet ID est supprimé. Neuf tests locaux couvrent aussi l’absence déjà effective, l’échec d’inventaire, l’échec d’inspection, la réutilisation d’un nom et une réponse ambiguë.
