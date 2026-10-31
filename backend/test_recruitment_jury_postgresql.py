@@ -1,0 +1,133 @@
+"""Jury boundaries plus real PostgreSQL races in disposable, guarded schemas."""
+from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
+from threading import Barrier
+from types import SimpleNamespace
+from unittest import TestCase
+from unittest.mock import patch
+import os
+import uuid
+
+from fastapi import HTTPException, Request
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import make_url
+
+import test_veille as fixture
+import test_operational_integrity_postgresql as pg_fixture
+from test_recruitment_jury_personality import RecruitmentJuryPersonalityTests
+from app.api.routes import recruitment
+from app.api.routes.recruitment_extensions import PersonalitySave, public_attempt, editable, save_answers
+from app.core.time import utc_now
+from app.models.recruitment import Application, ApplicationInterviewJuror, ApplicationPersonality, RecruitmentCampaign, RecruitmentJuryMember
+from app.models.user import User
+from app.schemas.recruitment import ApplicationInterviewSchedule
+from app.services.recruitment_personality import instrument
+
+
+def test_url():
+    value = os.environ.get('TEST_DATABASE_URL')
+    if not value:
+        import unittest
+        raise unittest.SkipTest('Dedicated local PostgreSQL test DB required')
+    url = make_url(value)
+    if url.get_backend_name() != 'postgresql' or url.host not in {'localhost', '127.0.0.1', '::1'} or not (url.database or '').startswith('enactspace_pr2b_test'):
+        raise RuntimeError('Refusing a non-local or non-test database')
+    return value
+
+
+class RecruitmentJuryHttpPostgreSQLTests(RecruitmentJuryPersonalityTests):
+    def setUp(self):
+        url = test_url()
+        self.admin = create_engine(url)
+        self.schema = 'recruitment_jury_' + uuid.uuid4().hex
+        with self.admin.begin() as connection:
+            connection.execute(text('CREATE SCHEMA ' + self.schema))
+        engine = create_engine(url)
+        @event.listens_for(engine, 'connect')
+        def select_schema(connection, _):
+            with connection.cursor() as cursor:
+                cursor.execute('SET search_path TO ' + self.schema)
+            connection.commit()
+        with patch.object(fixture, 'create_engine', return_value=engine), patch.object(fixture, 'event', SimpleNamespace(listens_for=lambda *_: lambda fn: fn)):
+            super().setUp()
+
+    def tearDown(self):
+        try:
+            super().tearDown()
+        finally:
+            with self.admin.begin() as connection:
+                connection.execute(text('DROP SCHEMA ' + self.schema + ' CASCADE'))
+            self.admin.dispose()
+
+
+class RecruitmentJuryRacesPostgreSQLTests(TestCase):
+    setUpClass = classmethod(pg_fixture.OperationalIntegrityPostgreSQLTests.setUpClass.__func__)
+    tearDownClass = classmethod(pg_fixture.OperationalIntegrityPostgreSQLTests.tearDownClass.__func__)
+    _user = pg_fixture.OperationalIntegrityPostgreSQLTests._user
+
+    def test_parallel_appointments_in_different_campaigns_cannot_double_book_one_juror(self):
+        staff_id = self._user(roles=('administrateur',))
+        juror_id = self._user(status='alumni')
+        pairs = []
+        with self.Session() as db:
+            for _ in range(2):
+                campaign = RecruitmentCampaign(title='Fictional jury concurrency', is_active=True)
+                db.add(campaign); db.flush()
+                member = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror_id)
+                app = Application(campaign_id=campaign.id, first_name='Synthetic', last_name='Candidate', email=str(uuid.uuid4()) + '@example.org', status='under_review')
+                db.add_all([member, app]); db.flush()
+                pairs.append((app.id, member.id))
+            db.commit()
+        when = (utc_now() + timedelta(days=2)).replace(hour=19, minute=0, second=0, microsecond=0)
+        barrier = Barrier(2)
+        def schedule(pair):
+            with self.Session() as db:
+                user = db.get(User, staff_id)
+                barrier.wait(5)
+                try:
+                    recruitment.schedule_application_interview(str(pair[0]), ApplicationInterviewSchedule(
+                        interview_at=when, interview_end_at=when + timedelta(minutes=30),
+                        interview_mode='online', interview_link='https://example.org/isolated-meet',
+                        jury_member_ids=[pair[1]]), Request({'type': 'http', 'headers': []}), db, user)
+                    return 200
+                except HTTPException as error:
+                    db.rollback()
+                    return error.status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(schedule, pairs))
+        self.assertEqual(sorted(outcomes), [200, 409])
+        with self.Session() as db:
+            self.assertEqual(db.query(ApplicationInterviewJuror).filter(ApplicationInterviewJuror.application_id.in_([p[0] for p in pairs])).count(), 1)
+
+    def test_parallel_draft_saves_do_not_erase_each_other(self):
+        with self.Session() as db:
+            campaign = RecruitmentCampaign(title='Fictional draft concurrency', is_active=True)
+            db.add(campaign); db.flush()
+            app = Application(campaign_id=campaign.id, first_name='Synthetic', last_name='Candidate',
+                email='draft-' + str(uuid.uuid4()) + '@example.org', tracking_code=uuid.uuid4().hex, status='under_review')
+            db.add(app); db.flush()
+            snapshot = instrument()
+            db.add(ApplicationPersonality(application_id=app.id, instrument_version=snapshot['version'], instrument_snapshot=snapshot))
+            credentials = {'application_id': app.tracking_code, 'email': app.email, 'version': snapshot['version'], 'revision': 0, 'consent': True}
+            app_id = app.id
+            db.commit()
+        barrier = Barrier(2)
+        def save(value):
+            with self.Session() as db:
+                barrier.wait(5)
+                payload = PersonalitySave(**credentials, answers={'p01': value})
+                try:
+                    app, row = public_attempt(db, payload, lock=True)
+                    editable(app, row)
+                    save_answers(row, payload, complete=False)
+                    db.commit()
+                    return 200
+                except HTTPException as error:
+                    db.rollback()
+                    return error.status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(save, [1, 5])), [200, 409])
+        with self.Session() as db:
+            row = db.get(ApplicationPersonality, app_id)
+            self.assertEqual(row.revision, 1)
+            self.assertIn(row.answers['p01'], (1, 5))

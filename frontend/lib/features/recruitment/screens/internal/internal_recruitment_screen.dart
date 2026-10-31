@@ -1,3 +1,5 @@
+import '../../services/recruitment_campaign_tools.dart';
+import 'recruitment_jury_screen.dart';
 import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
@@ -31,6 +33,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   final _className = TextEditingController();
   List<RecruitmentCampaignModel> _campaigns = const [];
   List<ApplicationModel> _applications = const [];
+  Map<String, dynamic> _access = const {};
   bool _loading = true;
   bool _refreshing = false;
   bool _filtersExpanded = false;
@@ -73,11 +76,16 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       final result = await Future.wait<dynamic>([
         _gateway.loadCampaigns(),
         _gateway.loadApplications(),
+        if (_gateway is CampaignToolsProvider)
+          (_gateway as CampaignToolsProvider).campaignTools.loadAccess(),
       ]);
       if (!mounted) return;
       setState(() {
         _campaigns = result[0] as List<RecruitmentCampaignModel>;
         _applications = result[1] as List<ApplicationModel>;
+        _access = result.length > 2
+            ? result[2] as Map<String, dynamic>
+            : const {};
         _page = 0;
       });
     } catch (error) {
@@ -284,7 +292,42 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onToggleFilters: () =>
                 setState(() => _filtersExpanded = !_filtersExpanded),
             onManageCampaigns: _openCampaignManagement,
+            canManageCampaigns: _access['can_manage_campaigns'] != false,
           ),
+          if (_gateway is CampaignToolsProvider && _campaigns.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.groups_outlined),
+                  label: const Text('Jury de la campagne'),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => RecruitmentJuryScreen(
+                          tools:
+                              (_gateway as CampaignToolsProvider).campaignTools,
+                          campaigns: _campaigns,
+                          onOpenApplication: (id) async {
+                            final application = _applications
+                                .where((row) => row.id == id)
+                                .firstOrNull;
+                            if (application != null) {
+                              await _openApplication(application);
+                            }
+                          },
+                          initialCampaignId: _campaignId == 'all'
+                              ? null
+                              : _campaignId,
+                        ),
+                      ),
+                    );
+                    if (mounted) await _load(initial: false);
+                  },
+                ),
+              ),
+            ),
           SizedBox(height: 14),
           InternalFilterBar(
             searchController: _search,

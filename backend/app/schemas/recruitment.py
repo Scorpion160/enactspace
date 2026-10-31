@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from uuid import UUID
 from datetime import date, datetime
 from typing import Optional, Literal
+from urllib.parse import urlsplit
 from app.services.recruitment_application_metadata import academic_year, discovery_answer
 from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
 
@@ -276,6 +277,9 @@ class ApplicationCreate(BaseModel):
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
+    campus_resident: Optional[bool] = Field(default=None, strict=True)
+    interview_preferences: Optional[list[Literal["in_person", "online", "hybrid"]]] = Field(default=None, max_length=3)
+    interview_availability: Optional[str] = Field(default=None, max_length=2000)
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
     attachment_url: Optional[str] = None
@@ -304,6 +308,9 @@ class ApplicationUpdate(BaseModel):
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
+    campus_resident: Optional[bool] = Field(default=None, strict=True)
+    interview_preferences: Optional[list[Literal["in_person", "online", "hybrid"]]] = Field(default=None, max_length=3)
+    interview_availability: Optional[str] = Field(default=None, max_length=2000)
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
     attachment_url: Optional[str] = None
@@ -312,10 +319,40 @@ class ApplicationUpdate(BaseModel):
 
 class ApplicationInterviewSchedule(BaseModel):
     interview_at: datetime
+    interview_end_at: Optional[datetime] = None
+    interview_mode: Optional[Literal["in_person", "online", "hybrid"]] = None
+    jury_member_ids: Optional[list[UUID]] = Field(default=None, min_length=1, max_length=20)
     interview_location: Optional[str] = Field(default=None, max_length=180)
     interview_link: Optional[str] = None
     interview_jury: Optional[str] = None
-    interview_note: Optional[str] = None
+    interview_note: Optional[str] = Field(default=None, max_length=4000)
+
+    @field_validator("interview_link")
+    @classmethod
+    def safe_interview_link(cls, value):
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        parts = urlsplit(value)
+        if (len(value) > 2000 or parts.scheme != "https" or not parts.hostname
+                or parts.username or parts.password or any(c.isspace() for c in value)):
+            raise ValueError("Le lien d’entretien doit être une adresse HTTPS valide.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_schedule(self):
+        if self.interview_mode in {"in_person", "hybrid"} and not (self.interview_location or "").strip():
+            raise ValueError("Précise le lieu de l’entretien.")
+        if self.interview_mode in {"online", "hybrid"} and not self.interview_link:
+            raise ValueError("Précise le lien de l’entretien.")
+        if self.interview_end_at is not None:
+            from app.services.operational_integrity import to_naive_utc
+            minutes = (to_naive_utc(self.interview_end_at) - to_naive_utc(self.interview_at)).total_seconds() / 60
+            if not 5 <= minutes <= 180:
+                raise ValueError("La durée de l’entretien doit être comprise entre 5 et 180 minutes.")
+        if self.jury_member_ids is not None and len(set(self.jury_member_ids)) != len(self.jury_member_ids):
+            raise ValueError("Un membre du jury ne peut être choisi qu’une fois.")
+        return self
 
 
 class ApplicationHistoryRead(BaseModel):
@@ -359,6 +396,15 @@ class ApplicationRead(BaseModel):
     associative_experience: Optional[str]
     availability: Optional[str]
     public_comment: Optional[str]
+    campus_resident: Optional[bool] = None
+    interview_preferences: Optional[list[str]] = None
+    interview_availability: Optional[str] = None
+    interview_end_at: Optional[datetime] = None
+    interview_mode: Optional[str] = None
+    interview_jurors: list[dict] = Field(default_factory=list)
+    interview_needs_reassignment: bool = False
+    permissions: dict = Field(default_factory=dict)
+    personality_status: Optional[str] = None
     interview_at: Optional[datetime]
     interview_location: Optional[str]
     interview_link: Optional[str]
@@ -409,6 +455,8 @@ class ApplicationTrackingRead(BaseModel):
     interview_details: Optional[str] = None
     final_result: Optional[str] = None
     account_created: bool
+    personality_status: Optional[str] = None
+    personality_due_at: Optional[datetime] = None
 
 
 class ApplicationReviewCreate(BaseModel):

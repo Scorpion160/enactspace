@@ -14,6 +14,10 @@ from app.db.database import get_db
 from app.models.security_rate_limit import SecurityRateLimit
 
 POLICIES={
+ "/api/recruitment/personality/decline":("personality",600,60,120,900),
+ "/api/recruitment/personality/submit":("personality",600,60,120,900),
+ "/api/recruitment/personality/save":("personality",600,60,120,900),
+ "/api/recruitment/personality/load":("personality",600,60,120,900),
  "/api/auth/activation/request":("activation_request",20,60,4,900),
  "/api/auth/activation/confirm":("activation_confirm",30,60,20,900),
  "/api/payments/paydunya/ipn":("paydunya_callback",240,60,0,0),
@@ -85,7 +89,7 @@ async def protect_public_request(request:Request,db:Session=Depends(get_db)):
             data=dict(await request.form())
         else:
             body=await request.body()
-            maximum=128*1024 if scope=="application" else 65536 if scope=="join" else 16384
+            maximum=128*1024 if scope=="application" else 65536 if scope in {"join", "personality"} else 16384
             if len(body)>maximum:raise HTTPException(413,"Cette demande est trop volumineuse.")
             try:data=json.loads(body)
             except (ValueError,UnicodeDecodeError):return

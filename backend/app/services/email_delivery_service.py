@@ -157,10 +157,11 @@ def _notification_delivery_still_allowed(
     if notification is None:
         return False
     if notification.type == 'application_received':
-        from app.api.deps import can_access_recruitment
+        from app.services.recruitment_access import is_recruitment_staff
         from app.models.user import User
         recipient = db.get(User, notification.user_id)
-        if recipient is None or not recipient.email_verified or not can_access_recruitment(db, recipient):
+        # New jurors receive no global recruitment notification privilege.
+        if recipient is None or not is_recruitment_staff(db, recipient):
             return False
     preference = db.query(UserPreference).filter(
         UserPreference.user_id == notification.user_id

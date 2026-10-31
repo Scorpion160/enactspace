@@ -24,6 +24,9 @@ class PublicApplicationDraft {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final bool? campusResident;
+  final List<String>? interviewPreferences;
+  final String? interviewAvailability;
   final SelectedAttachment? cvFile;
   final SelectedAttachment? motivationLetterFile;
   final SelectedAttachment? attachmentFile;
@@ -55,6 +58,9 @@ class PublicApplicationDraft {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.campusResident,
+    this.interviewPreferences,
+    this.interviewAvailability,
     this.cvFile,
     this.motivationLetterFile,
     this.attachmentFile,

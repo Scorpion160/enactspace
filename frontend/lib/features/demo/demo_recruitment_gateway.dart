@@ -12,7 +12,8 @@ class DemoRecruitmentGateway extends ChangeNotifier
   static const campaign = RecruitmentCampaignModel(
     id: 'demo-alumni-day',
     title: 'Découvrir Enactus ESP · Campagne de démonstration',
-    description: 'Un exemple pour découvrir le parcours de candidature. Aucun recrutement réel n’est annoncé ici.',
+    description:
+        'Un exemple pour découvrir le parcours de candidature. Aucun recrutement réel n’est annoncé ici.',
     isActive: true,
   );
   static const code = 'DEMO-ALUMNI-2026';
@@ -54,6 +55,9 @@ class DemoRecruitmentGateway extends ChangeNotifier
       department: draft.department,
       studyLevel: draft.studyLevel,
       className: draft.className,
+      campusResident: draft.campusResident,
+      interviewPreferences: draft.interviewPreferences ?? const [],
+      interviewAvailability: draft.interviewAvailability,
       knownEnactusFrom: draft.knownEnactusFrom,
       status: 'submitted',
       trackingCode: code,
@@ -104,7 +108,8 @@ class DemoRecruitmentGateway extends ChangeNotifier
       status: status,
       submittedAt: null,
       updatedAt: null,
-      nextStep: 'Exemple local : le statut évolue depuis les cartes de démonstration de l’équipe.',
+      nextStep:
+          'Exemple local : le statut évolue depuis les cartes de démonstration de l’équipe.',
       candidateMessage:
           'Dossier fictif. Aucun e-mail, document ou compte réel n’a été créé.',
       interviewDetails: status == 'interview_scheduled'

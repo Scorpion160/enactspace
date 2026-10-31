@@ -59,6 +59,11 @@ from app.services.operational_integrity import lock_row, to_naive_utc
 
 from app.services.recruitment_rubric import VERSION as RUBRIC_VERSION, rubric_payload, assess_ratings, structured_summary
 
+from app.services.recruitment_access import (
+    assigned_campaign_ids, capabilities, is_recruitment_staff,
+    require_campaign_access, require_staff,
+)
+
 router = APIRouter(prefix="/recruitment", dependencies=[Depends(protect_public_request)], tags=["Recrutement"])
 
 
@@ -345,6 +350,7 @@ def create_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     validate_campaign_dates(payload.start_date, payload.end_date)
     campaign = RecruitmentCampaign(
         season_id=payload.season_id,
@@ -376,6 +382,8 @@ def list_campaigns(
     is_active: bool | None = Query(default=None),
 ):
     query = db.query(RecruitmentCampaign)
+    if not is_recruitment_staff(db, current_user):
+        query = query.filter(RecruitmentCampaign.id.in_(assigned_campaign_ids(db, current_user)))
 
     if is_active is not None:
         query = query.filter(RecruitmentCampaign.is_active == is_active)
@@ -399,7 +407,9 @@ def get_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    return get_campaign_or_404(db, campaign_id)
+    campaign = get_campaign_or_404(db, campaign_id)
+    require_campaign_access(db, current_user, campaign.id)
+    return campaign
 
 
 @router.patch("/campaigns/{campaign_id}", response_model=RecruitmentCampaignRead)
@@ -409,6 +419,7 @@ def update_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     campaign = lock_row(db, RecruitmentCampaign, campaign_id)
     if campaign is None:
         raise HTTPException(404, 'Campagne de recrutement introuvable')
@@ -467,6 +478,7 @@ def delete_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     campaign = lock_row(db, RecruitmentCampaign, campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campagne introuvable")
@@ -587,6 +599,9 @@ def create_application(payload, db, attachments=None, created_files=None):
         study_level=study_level,
         class_name=payload.class_name,
         questionnaire_answers=answer_snapshot,
+        campus_resident=payload.campus_resident,
+        interview_preferences=payload.interview_preferences,
+        interview_availability=payload.interview_availability,
         motivation=payload.motivation,
         known_enactus_from=payload.known_enactus_from,
         enactus_knowledge=payload.enactus_knowledge,
@@ -733,7 +748,11 @@ def public_interview_details(application: Application) -> str | None:
     if not application.interview_at:
         return None
 
-    parts = [f"Entretien prévu le {application.interview_at:%d/%m/%Y à %H:%M}"]
+    parts = [f"Entretien prévu le {application.interview_at:%d/%m/%Y à %H:%M} (heure de Dakar)"]
+    if application.interview_end_at:
+        parts.append(f"Fin prévue à {application.interview_end_at:%H:%M}")
+    if application.interview_mode:
+        parts.append({"in_person": "En présentiel", "online": "En ligne", "hybrid": "Format mixte"}.get(application.interview_mode, "Entretien"))
     if application.interview_location:
         parts.append(f"Lieu: {application.interview_location}")
     if application.interview_link:
@@ -831,8 +850,10 @@ def application_payload(
     include_history: bool = False,
     prefetched_campaigns: dict | None = None,
     prefetched_reviews: dict | None = None,
+    prefetched_permissions: dict | None = None,
 ) -> dict:
     data = ApplicationRead.model_validate(application).model_dump()
+    permission_data = (prefetched_permissions if prefetched_permissions is not None else capabilities(db, current_user)) if current_user is not None else {}
     if current_user is not None:
         campaign = (prefetched_campaigns.get(application.campaign_id) if prefetched_campaigns is not None
                     else get_campaign_or_404(db, str(application.campaign_id)))
@@ -849,11 +870,17 @@ def application_payload(
     data["tracking_code"] = application.tracking_code or str(application.id)
     data["is_anonymized"] = anonymized
     data["anonymous_code"] = anonymous_code(application)
-    data["can_convert"] = bool(current_user) and not anonymized and user_has_any_role(
-        db,
-        current_user.id,
-        RECRUITMENT_CONVERSION_ROLES,
-    )
+    data["can_convert"] = bool(current_user) and not anonymized and permission_data.get("can_convert", False)
+
+    if current_user is not None:
+        from app.services.recruitment_interviews import interview_roster
+        from app.models.recruitment import ApplicationPersonality
+        data["permissions"] = permission_data
+        if include_history:
+            data["interview_jurors"] = interview_roster(db, application)
+            data["interview_needs_reassignment"] = any(not row["active"] for row in data["interview_jurors"])
+            attempt = db.get(ApplicationPersonality, application.id)
+            data["personality_status"] = ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None
     if anonymized:
         code = str(application.id).replace("-", "")[:12]
         data.update(
@@ -862,6 +889,9 @@ def application_payload(
                 "last_name": anonymous_code(application).split("#")[-1].strip(),
                 "email": f"candidate-{code}@example.com",
                 "phone": None,
+                "campus_resident": None,
+                "interview_availability": None,
+                "interview_preferences": None,
                 "tracking_code": anonymous_code(application),
                 "cv_url": None,
                 "motivation_letter_url": None,
@@ -878,11 +908,11 @@ def application_payload(
 
 
 def can_manage_review(db: Session, current_user: User, review) -> bool:
-    return review.reviewer_id == current_user.id or user_has_any_role(
+    return review.reviewer_id == current_user.id or (is_recruitment_staff(db, current_user) and user_has_any_role(
         db,
         current_user.id,
         REVIEW_ADMIN_ROLES,
-    )
+    ))
 
 
 @router.post("/applications/track", response_model=ApplicationTrackingRead)
@@ -905,6 +935,8 @@ def track_application(
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     normalized_status = normalize_application_status(application.status)
     tracking_code = ensure_tracking_code(db, application)
+    from app.models.recruitment import ApplicationPersonality
+    attempt = db.get(ApplicationPersonality, application.id)
     db.commit()
     return {
         "application_id": application.id,
@@ -935,6 +967,8 @@ def track_application(
         ),
         "final_result": APPLICATION_FINAL_RESULTS.get(normalized_status),
         "account_created": application.converted_user_id is not None,
+        "personality_status": ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None,
+        "personality_due_at": attempt.due_at if attempt else None,
     }
 
 
@@ -955,6 +989,8 @@ def list_applications(
     anonymized: bool = Query(default=False),
 ):
     query = db.query(Application)
+    if not is_recruitment_staff(db, current_user):
+        query = query.filter(Application.campaign_id.in_(assigned_campaign_ids(db, current_user)))
 
     if campaign_id:
         query = query.filter(Application.campaign_id == campaign_id)
@@ -1004,6 +1040,7 @@ def list_applications(
         for review in db.query(ApplicationReview).filter(ApplicationReview.application_id.in_(
                 [row.id for row in applications])).all():
             reviews_by_application.setdefault(review.application_id, []).append(review)
+    permissions = capabilities(db, current_user)
     return [
         application_payload(
             db,
@@ -1012,6 +1049,7 @@ def list_applications(
             anonymized=anonymized,
             prefetched_campaigns=campaigns,
             prefetched_reviews=reviews_by_application,
+            prefetched_permissions=permissions,
         )
         for application in applications
     ]
@@ -1023,6 +1061,7 @@ def export_applications_csv(
     current_user: User = Depends(require_recruitment_access),
     campaign_id: uuid.UUID | None = None,
 ):
+    require_staff(db, current_user)
     del current_user
     output = StringIO()
     writer = csv.writer(output)
@@ -1046,6 +1085,9 @@ def export_applications_csv(
             "Campagne",
             "Niveau d’études",
             "Canal de découverte",
+            "Résidence au campus",
+            "Formats d’entretien souhaités",
+            "Disponibilités pour l’entretien",
         ]
     )
 
@@ -1089,6 +1131,9 @@ def export_applications_csv(
                 campaigns.get(application.campaign_id, ''),
                 application.study_level,
                 application.known_enactus_from,
+                "Oui" if application.campus_resident is True else "Non" if application.campus_resident is False else "Non renseigné",
+                ", ".join(application.interview_preferences or []),
+                application.interview_availability,
                 ]
             ]
         )
@@ -1110,6 +1155,7 @@ def get_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
+    require_campaign_access(db, current_user, application.campaign_id)
     return application_payload(db, current_user, application, anonymized=anonymized, include_history=True)
 
 
@@ -1121,14 +1167,17 @@ def schedule_application_interview(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    application = lock_row(db, Application, application_id)
+    require_staff(db, current_user)
+    application = lock_review_application(db, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
 
+    from app.services.recruitment_interviews import assign_interview
     old_interview = {
         name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
-        for name in ("interview_at", "interview_location", "interview_link", "interview_jury", "interview_note")
+        for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link", "interview_jury", "interview_note")
     }
+    assign_interview(db, application, payload)
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, "interview_scheduled")
 
@@ -1158,7 +1207,7 @@ def schedule_application_interview(
         public_interview_changed = any(
             old_interview[name] != (getattr(application, name).isoformat()
                 if isinstance(getattr(application, name), datetime) else getattr(application, name))
-            for name in ("interview_at", "interview_location", "interview_link")
+            for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link")
         )
         if public_interview_changed:
             notify_application_status(db, application)
@@ -1184,6 +1233,7 @@ def update_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     application = lock_row(db, Application, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
@@ -1216,6 +1266,9 @@ def update_application(
         "associative_experience",
         "availability",
         "public_comment",
+        "campus_resident",
+        "interview_preferences",
+        "interview_availability",
         "cv_url",
         "motivation_letter_url",
         "attachment_url",
@@ -1223,7 +1276,7 @@ def update_application(
 
     for field in fields:
         value = getattr(payload, field)
-        if value is not None:
+        if value is not None or (field in {"campus_resident", "interview_preferences", "interview_availability"} and field in payload.model_fields_set):
             setattr(application, field, value)
 
     application.updated_at = utc_now()
@@ -1254,6 +1307,7 @@ def change_application_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     application = lock_row(db, Application, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
@@ -1284,6 +1338,7 @@ def delete_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
+    require_staff(db, current_user)
     application = lock_row(db, Application, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
@@ -1332,6 +1387,7 @@ def create_or_update_review(
         )
 
     application = lock_review_application(db, str(payload.application_id))
+    require_campaign_access(db, current_user, application.campaign_id)
     snapshot = None
     score = payload.score
     if payload.criteria_assessment is not None:
@@ -1386,7 +1442,8 @@ def list_application_reviews(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_recruitment_access),
 ):
-    get_application_or_404(db, application_id)
+    application = get_application_or_404(db, application_id)
+    require_campaign_access(db, current_user, application.campaign_id)
 
     rows = db.query(ApplicationReview, User).outerjoin(User, User.id == ApplicationReview.reviewer_id).filter(
         ApplicationReview.application_id == application_id
@@ -1417,6 +1474,7 @@ def update_review(
         )
 
     application = lock_review_application(db, str(review.application_id))
+    require_campaign_access(db, current_user, application.campaign_id)
     db.refresh(review)
     if payload.recommendation is not None:
         if payload.recommendation not in VALID_RECOMMENDATIONS:
@@ -1484,6 +1542,7 @@ def delete_review(
         )
 
     application = lock_review_application(db, str(review.application_id))
+    require_campaign_access(db, current_user, application.campaign_id)
 
     db.delete(review)
     db.flush()
@@ -1506,6 +1565,7 @@ def convert_application_to_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sg_or_admin),
 ):
+    require_staff(db, current_user)
     campaign_id = db.query(Application.campaign_id).filter(
         Application.id == application_id
     ).scalar()
@@ -1732,3 +1792,8 @@ def convert_application_to_user(
         "onboarding": member_onboarding_payload(),
     }
 
+
+
+# Register on this same router so embedded test/demo apps receive the same routes.
+from app.api.routes.recruitment_extensions import register_recruitment_extensions
+register_recruitment_extensions(router)

@@ -1,3 +1,6 @@
+import '../../services/recruitment_campaign_tools.dart';
+import '../../widgets/internal/interview_planning_dialog.dart';
+import '../../widgets/internal/personality_review_card.dart';
 import '../../models/application_history_model.dart';
 import '../../models/application_status_presentation.dart';
 import '../../services/recruitment_message.dart';
@@ -321,6 +324,28 @@ class _DetailBody extends StatelessWidget {
               if (application.projectInterest?.trim().isNotEmpty == true)
                 'Projet évoqué auparavant': application.projectInterest!,
               'Disponibilité': _value(application.availability),
+              if (!anonymized)
+                'Résidence au campus': application.campusResident == null
+                    ? 'Non renseignée'
+                    : application.campusResident!
+                    ? 'Oui'
+                    : 'Non',
+              if (!anonymized &&
+                  application.interviewAvailability?.isNotEmpty == true)
+                'Disponibilités pour l’entretien':
+                    application.interviewAvailability!,
+              if (!anonymized && application.interviewPreferences.isNotEmpty)
+                'Formats souhaités': application.interviewPreferences
+                    .map(
+                      (v) =>
+                          const {
+                            'in_person': 'Présentiel',
+                            'online': 'En ligne',
+                            'hybrid': 'Mixte',
+                          }[v] ??
+                          v,
+                    )
+                    .join(', '),
               'Évaluation selon la grille': application.screeningScore == null
                   ? 'À réaliser'
                   : '${application.screeningScore!.toStringAsFixed(1)}/100',
@@ -446,23 +471,49 @@ class _DetailBody extends StatelessWidget {
             ...application.history.map(_HistoryEntry.new),
         ],
       ),
-      _Section(
-        title: 'Actions sur la candidature',
-        icon: Icons.admin_panel_settings_outlined,
-        children: [
-          CandidateActionsSection(
-            application: application,
-            campaignTitle: campaignTitle,
-            reviewCount: application.screeningReviewCount,
-            reviewAverage: application.screeningScore == null
-                ? null
-                : application.screeningScore! / 5,
-            onStatusChange: onStatusChange,
-            onInterview: onInterview,
-            feedback: actionFeedback,
+      if (application.permissions['can_decide'] != false)
+        _Section(
+          title: 'Actions sur la candidature',
+          icon: Icons.admin_panel_settings_outlined,
+          children: [
+            CandidateActionsSection(
+              application: application,
+              campaignTitle: campaignTitle,
+              reviewCount: application.screeningReviewCount,
+              reviewAverage: application.screeningScore == null
+                  ? null
+                  : application.screeningScore! / 5,
+              onStatusChange: onStatusChange,
+              onInterview: onInterview,
+              onAdvancedInterview: gateway is CampaignToolsProvider
+                  ? () => showDialog<void>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => InterviewPlanningDialog(
+                        application: application,
+                        tools: (gateway as CampaignToolsProvider).campaignTools,
+                        onSaved: (_) => onConversionCompleted(),
+                      ),
+                    )
+                  : null,
+              feedback: actionFeedback,
+            ),
+          ],
+        ),
+      if (!anonymized && gateway is CampaignToolsProvider)
+        PersonalityReviewCard(
+          application: application,
+          tools: (gateway as CampaignToolsProvider).campaignTools,
+        ),
+      if (application.interviewNeedsReassignment)
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'Un membre du jury n’est plus disponible. Modifie l’entretien pour réattribuer le jury.',
+            ),
           ),
-        ],
-      ),
+        ),
       if (!anonymized && application.status == 'accepted')
         CandidateIntegrationSection(
           application: application,

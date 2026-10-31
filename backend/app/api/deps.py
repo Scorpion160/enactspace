@@ -247,15 +247,11 @@ def require_finance_or_admin(
 
 
 def can_access_recruitment(db: Session, current_user: User) -> bool:
-    if current_user.status != "active" or not current_user.is_active:
+    from app.services.recruitment_access import eligible_juror, is_recruitment_staff, assigned_campaign_ids
+    if not eligible_juror(current_user):
         return False
-    if user_has_any_role(db, current_user.id, RECRUITMENT_ACCESS_ROLES):
-        return True
-    names = db.query(Pole.name).join(PoleMember, PoleMember.pole_id == Pole.id).filter(
-        PoleMember.user_id == current_user.id, PoleMember.is_active.is_(True),
-        PoleMember.left_at.is_(None),
-    ).all()
-    return any(is_veille_pole_name(name) for name, in names)
+    return is_recruitment_staff(db, current_user) or db.execute(
+        assigned_campaign_ids(db, current_user).limit(1)).first() is not None
 
 
 def require_recruitment_access(

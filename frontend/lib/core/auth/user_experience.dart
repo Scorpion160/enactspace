@@ -162,12 +162,9 @@ class UserExperience {
       (isActiveMember && (isAdmin || isTeamLeader || isFinance));
   bool get canManageFinance => isAdmin || isTeamLeader || isFinance;
   bool get canViewRecruitment =>
-      isActiveMember &&
-      (canAccessRecruitment ||
-          isAdmin ||
-          isTeamLeader ||
-          isSecretary ||
-          isRecruitmentLead);
+      ((status == 'alumni' || isActiveMember) && canAccessRecruitment) ||
+      (isActiveMember &&
+          (isAdmin || isTeamLeader || isSecretary || isRecruitmentLead));
   bool get canViewImpact => isEnacchef;
   bool get canCreateOperationalWork => isEnacchef;
   bool get canCreateTasks =>
@@ -224,7 +221,7 @@ class UserExperience {
     }
 
     if (user.isAlumni) {
-      return const [
+      return [
         '/dashboard',
         '/notifications',
         '/posts',
@@ -234,6 +231,7 @@ class UserExperience {
         '/academy',
         '/archives',
         '/alumni',
+        if (user.canViewRecruitment) '/recruitment',
       ];
     }
 

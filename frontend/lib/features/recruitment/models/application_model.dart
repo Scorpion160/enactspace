@@ -27,6 +27,15 @@ class ApplicationModel {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final bool? campusResident;
+  final List<String> interviewPreferences;
+  final String? interviewAvailability;
+  final DateTime? interviewEndAt;
+  final String? interviewMode;
+  final List<Map<String, dynamic>> interviewJurors;
+  final bool interviewNeedsReassignment;
+  final Map<String, dynamic> permissions;
+  final String? personalityStatus;
   final DateTime? interviewAt;
   final String? interviewLocation;
   final String? interviewLink;
@@ -75,6 +84,15 @@ class ApplicationModel {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.campusResident,
+    this.interviewPreferences = const [],
+    this.interviewAvailability,
+    this.interviewEndAt,
+    this.interviewMode,
+    this.interviewJurors = const [],
+    this.interviewNeedsReassignment = false,
+    this.permissions = const {},
+    this.personalityStatus,
     this.interviewAt,
     this.interviewLocation,
     this.interviewLink,
@@ -141,7 +159,23 @@ class ApplicationModel {
       associativeExperience: json['associative_experience']?.toString(),
       availability: json['availability']?.toString(),
       publicComment: json['public_comment']?.toString(),
-      interviewAt: DateTime.tryParse(json['interview_at']?.toString() ?? ''),
+      campusResident: json['campus_resident'] as bool?,
+      interviewPreferences: (json['interview_preferences'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
+      interviewAvailability: json['interview_availability']?.toString(),
+      interviewEndAt: _utcDate(json['interview_end_at']),
+      interviewMode: json['interview_mode']?.toString(),
+      interviewJurors: (json['interview_jurors'] as List? ?? const [])
+          .whereType<Map>()
+          .map((v) => Map<String, dynamic>.from(v))
+          .toList(),
+      interviewNeedsReassignment: json['interview_needs_reassignment'] == true,
+      permissions: Map<String, dynamic>.from(
+        json['permissions'] as Map? ?? const {},
+      ),
+      personalityStatus: json['personality_status']?.toString(),
+      interviewAt: _utcDate(json['interview_at']),
       interviewLocation: json['interview_location']?.toString(),
       interviewLink: json['interview_link']?.toString(),
       interviewJury: json['interview_jury']?.toString(),
@@ -220,11 +254,18 @@ class ApplicationModel {
 
   String get interviewLabel {
     if (interviewAt == null) return 'Entretien à programmer';
-    final local = interviewAt!.toLocal();
+    final local = interviewAt!.toUtc();
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
-    return '$day/$month/${local.year} $hour:$minute';
+    return '$day/$month/${local.year} $hour:$minute · Dakar';
   }
+}
+
+DateTime? _utcDate(Object? value) {
+  final raw = value?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  final explicit = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(raw);
+  return DateTime.tryParse(explicit ? raw : '${raw}Z')?.toUtc();
 }

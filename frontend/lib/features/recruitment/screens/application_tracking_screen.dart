@@ -1,3 +1,5 @@
+import '../services/recruitment_campaign_tools.dart';
+import 'public/personality_questionnaire_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,8 +11,13 @@ import '../widgets/public/public_recruitment_widgets.dart';
 
 class ApplicationTrackingScreen extends StatefulWidget {
   final PublicRecruitmentGateway? gateway;
+  final PublicPersonalityGateway? personalityGateway;
 
-  const ApplicationTrackingScreen({super.key, this.gateway});
+  const ApplicationTrackingScreen({
+    super.key,
+    this.gateway,
+    this.personalityGateway,
+  });
 
   @override
   State<ApplicationTrackingScreen> createState() =>
@@ -93,7 +100,72 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                 );
                 final result = _tracking == null
                     ? const _TrackingIntroduction()
-                    : TrackingResultView(tracking: _tracking!);
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TrackingResultView(tracking: _tracking!),
+                          if (_tracking!.personalityStatus != null &&
+                              (widget.personalityGateway != null ||
+                                  _gateway is RecruitmentPublicGateway))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        'Préparons notre échange',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _tracking!.personalityStatus ==
+                                                'submitted'
+                                            ? 'Tes réponses ont été partagées avec le jury. Tu peux retrouver ta synthèse.'
+                                            : _tracking!.personalityStatus ==
+                                                  'declined'
+                                            ? 'Tu as choisi d’en parler pendant l’entretien.'
+                                            : 'L’équipe te propose un questionnaire pour mieux préparer l’entretien.',
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton.icon(
+                                        icon: const Icon(Icons.forum_outlined),
+                                        label: Text(
+                                          _tracking!.personalityStatus ==
+                                                  'invited'
+                                              ? 'Ouvrir mon questionnaire'
+                                              : 'Consulter ma réponse',
+                                        ),
+                                        onPressed: () async {
+                                          final tracking = _tracking!;
+                                          await Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (context) =>
+                                                  PersonalityQuestionnaireScreen(
+                                                    code: tracking.trackingCode,
+                                                    email: tracking.email,
+                                                    gateway:
+                                                        widget
+                                                            .personalityGateway ??
+                                                        ApiPublicPersonalityGateway(),
+                                                  ),
+                                            ),
+                                          );
+                                          if (mounted) await _search();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                 if (constraints.maxWidth < 860) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

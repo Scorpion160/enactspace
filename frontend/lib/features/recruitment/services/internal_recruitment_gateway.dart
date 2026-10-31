@@ -1,3 +1,4 @@
+import 'recruitment_campaign_tools.dart';
 import '../models/application_model.dart';
 import '../models/application_review_model.dart';
 import '../models/candidate_conversion_model.dart';
@@ -67,16 +68,21 @@ abstract interface class InternalRecruitmentGateway {
   );
 }
 
-class RecruitmentServiceGateway implements InternalRecruitmentGateway {
+class RecruitmentServiceGateway
+    implements InternalRecruitmentGateway, CampaignToolsProvider {
+  @override
+  final RecruitmentCampaignTools campaignTools;
   final RecruitmentService service;
   final PolesService polesService;
   final ProjectsService projectsService;
 
   RecruitmentServiceGateway({
     RecruitmentService? service,
+    RecruitmentCampaignTools? campaignTools,
     PolesService? polesService,
     ProjectsService? projectsService,
-  }) : service = service ?? RecruitmentService(),
+  }) : campaignTools = campaignTools ?? ApiRecruitmentCampaignTools(),
+       service = service ?? RecruitmentService(),
        polesService = polesService ?? PolesService(),
        projectsService = projectsService ?? ProjectsService();
 

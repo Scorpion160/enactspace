@@ -21,6 +21,7 @@ class CandidateActionsSection extends StatelessWidget {
   final double? reviewAverage;
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
+  final VoidCallback? onAdvancedInterview;
   final String? feedback;
 
   const CandidateActionsSection({
@@ -31,6 +32,7 @@ class CandidateActionsSection extends StatelessWidget {
     required this.reviewAverage,
     required this.onStatusChange,
     required this.onInterview,
+    this.onAdvancedInterview,
     this.feedback,
   });
 
@@ -57,14 +59,16 @@ class CandidateActionsSection extends StatelessWidget {
           label: application.status == 'interview_scheduled'
               ? 'Modifier l’entretien'
               : 'Planifier un entretien',
-          onPressed: () => showDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => CandidateInterviewDialog(
-              application: application,
-              onConfirm: onInterview,
-            ),
-          ),
+          onPressed:
+              onAdvancedInterview ??
+              () => showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) => CandidateInterviewDialog(
+                  application: application,
+                  onConfirm: onInterview,
+                ),
+              ),
         ),
       if (allowed.contains('waiting_list'))
         _ActionButton(

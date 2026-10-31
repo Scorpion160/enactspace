@@ -19,6 +19,8 @@ class ApplicationTrackingModel {
   final String? interviewDetails;
   final String? finalResult;
   final bool accountCreated;
+  final String? personalityStatus;
+  final DateTime? personalityDueAt;
 
   const ApplicationTrackingModel({
     required this.applicationId,
@@ -39,6 +41,8 @@ class ApplicationTrackingModel {
     required this.interviewDetails,
     required this.finalResult,
     required this.accountCreated,
+    this.personalityStatus,
+    this.personalityDueAt,
   });
 
   factory ApplicationTrackingModel.fromJson(Map<String, dynamic> json) {
@@ -61,6 +65,10 @@ class ApplicationTrackingModel {
       interviewDetails: json['interview_details']?.toString(),
       finalResult: json['final_result']?.toString(),
       accountCreated: json['account_created'] == true,
+      personalityStatus: json['personality_status']?.toString(),
+      personalityDueAt: DateTime.tryParse(
+        json['personality_due_at']?.toString() ?? '',
+      ),
     );
   }
 

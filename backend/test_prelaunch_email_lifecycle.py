@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.models.email_delivery import EmailDelivery
 from app.models.recruitment import Application,RecruitmentCampaign
 from app.models.user import User
+from app.models.role import Role, UserRole
 from app.models.notification import Notification
 from app.services.email_provider import OutgoingEmail, SmtpEmailProvider, EmailProviderError, enforce_test_recipient
 from app.services.email_delivery_service import claim_email_deliveries,process_email_delivery
@@ -42,6 +43,9 @@ class PrelaunchEmailTests(unittest.TestCase):
         self.actor=User(first_name="Synthetic",last_name="Responsible",email="actor@example.test",
                         password_hash="unused",status="active",is_active=True,email_verified=True)
         self.db.add(self.actor);self.db.flush()
+        role = Role(name="administrateur")
+        self.db.add(role);self.db.flush()
+        self.db.add(UserRole(user_id=self.actor.id, role_id=role.id));self.db.flush()
         self.campaign=RecruitmentCampaign(title="ISOLATED QA",is_active=True)
         self.db.add(self.campaign);self.db.flush()
         self.request=Request({"type":"http","client":("127.0.0.1",1),"headers":[]})
@@ -126,7 +130,7 @@ class PrelaunchEmailTests(unittest.TestCase):
         schedule("Salle A","PRIVATE_REVIEW_SECRET")
         first=self.db.query(EmailDelivery).first()
         self.assertIn("Salle A",first.text_body)
-        self.assertIn("UTC",first.text_body)
+        self.assertIn("heure de Dakar",first.text_body)
         self.assertNotIn("PRIVATE_REVIEW_SECRET",first.text_body+first.html_body)
         self.assertNotIn("PRIVATE_JURY_SECRET",first.text_body+first.html_body)
         schedule("Salle A","UPDATED_PRIVATE_SECRET")

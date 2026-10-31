@@ -24,6 +24,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onToggleFilters;
   final VoidCallback onManageCampaigns;
+  final bool canManageCampaigns;
 
   const InternalRecruitmentHeader({
     super.key,
@@ -34,6 +35,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onToggleFilters,
     required this.onManageCampaigns,
+    this.canManageCampaigns = true,
   });
 
   @override
@@ -94,7 +96,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              manageCampaigns,
+              if (canManageCampaigns) manageCampaigns,
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -105,7 +107,14 @@ class InternalRecruitmentHeader extends StatelessWidget {
               ),
             ],
           )
-        : Wrap(spacing: 8, children: [manageCampaigns, filters, refresh]);
+        : Wrap(
+            spacing: 8,
+            children: [
+              if (canManageCampaigns) manageCampaigns,
+              filters,
+              refresh,
+            ],
+          );
     return Container(
       padding: EdgeInsets.all(compact ? 18 : 24),
       decoration: BoxDecoration(

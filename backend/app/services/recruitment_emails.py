@@ -36,7 +36,11 @@ def enqueue_candidate_update(db, application):
             if when.tzinfo is None:
                 when = when.replace(tzinfo=timezone.utc)
             when = when.astimezone(timezone.utc)
-            details.append("Date : " + when.strftime("%d/%m/%Y à %H:%M UTC"))
+            details.append("Date : " + when.strftime("%d/%m/%Y à %H:%M (heure de Dakar)"))
+        if application.interview_end_at:
+            details.append("Fin prévue à " + application.interview_end_at.strftime("%H:%M") + " (heure de Dakar)")
+        if application.interview_mode:
+            details.append("Format : " + {"in_person": "en présentiel", "online": "en ligne", "hybrid": "mixte"}.get(application.interview_mode, "entretien"))
         if application.interview_location:
             details.append("Lieu : " + application.interview_location.strip())
         if application.interview_link:

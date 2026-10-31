@@ -58,6 +58,8 @@ class _PublicApplicationFlowScreenState
   bool _confirmed = false;
   String? _submitError;
   PublicRecruitmentFailureKind? _submitFailureKind;
+  bool? _campusResident;
+  final Set<String> _interviewPreferences = {};
   String? _gender;
   String? _discoveryChannel;
   SelectedAttachment? _cvFile, _motivationLetterFile, _attachmentFile;
@@ -92,8 +94,10 @@ class _PublicApplicationFlowScreenState
       'department': 'Génie Électrique',
       'studyLevel': 'DIC2',
       'className': '2026-2027',
-      'motivation': 'Exemple fictif : apprendre en équipe et contribuer à des projets utiles aux communautés.',
-      'availability': 'Exemple fictif : deux soirées par semaine et des activités ponctuelles le week-end.',
+      'motivation':
+          'Exemple fictif : apprendre en équipe et contribuer à des projets utiles aux communautés.',
+      'availability':
+          'Exemple fictif : deux soirées par semaine et des activités ponctuelles le week-end.',
     };
     for (final entry in answers.entries) {
       _controller(entry.key).text = entry.value;
@@ -104,7 +108,8 @@ class _PublicApplicationFlowScreenState
     for (final question in _campaign!.applicationQuestions) {
       final input = _controller(_questionKey(question));
       if (input.text.isEmpty) {
-        input.text = 'Exemple fictif : écouter les personnes concernées, apprendre ensemble et tester une première action utile.';
+        input.text =
+            'Exemple fictif : écouter les personnes concernées, apprendre ensemble et tester une première action utile.';
       }
     }
   }
@@ -179,6 +184,9 @@ class _PublicApplicationFlowScreenState
     associativeExperience: _optional('associativeExperience'),
     availability: _optional('availability'),
     publicComment: _optional('publicComment'),
+    campusResident: _campusResident,
+    interviewPreferences: _interviewPreferences.toList(),
+    interviewAvailability: _optional('interviewAvailability'),
     cvFile: _cvFile,
     motivationLetterFile: _motivationLetterFile,
     attachmentFile: _attachmentFile,
@@ -228,7 +236,8 @@ class _PublicApplicationFlowScreenState
             }
             _step = 2;
             _confirmed = false;
-            _submitError = 'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.';
+            _submitError =
+                'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.';
           });
         }
       } else if (mounted) {
@@ -405,7 +414,8 @@ class _PublicApplicationFlowScreenState
       ),
       PublicApplicationField(
         label: 'Promotion — facultatif',
-        help: 'Indique l’année académique de ta promotion, par exemple 2025-2026.',
+        help:
+            'Indique l’année académique de ta promotion, par exemple 2025-2026.',
         child: TextFormField(
           key: const ValueKey('field-className'),
           controller: _controller('className'),
@@ -529,6 +539,79 @@ class _PublicApplicationFlowScreenState
                     required: questions[index].required,
                   ),
           ),
+        if (section == 'availability') ...[
+          PublicApplicationField(
+            label: 'Loges-tu au campus de l’ESP ?',
+            help:
+                'Facultatif. Cette information sert uniquement à organiser l’entretien.',
+            child: DropdownButtonFormField<String>(
+              key: const ValueKey('field-campus-resident'),
+              initialValue: _campusResident == null
+                  ? 'unspecified'
+                  : _campusResident!
+                  ? 'yes'
+                  : 'no',
+              isExpanded: true,
+              itemHeight: null,
+              selectedItemBuilder: (context) => const [
+                PublicApplicationChoiceText('Préfère ne pas préciser'),
+                PublicApplicationChoiceText('Oui, au campus de l’ESP'),
+                PublicApplicationChoiceText('Non, hors du campus'),
+              ],
+              items: const [
+                DropdownMenuItem(
+                  value: 'unspecified',
+                  child: Text('Préfère ne pas préciser'),
+                ),
+                DropdownMenuItem(
+                  value: 'yes',
+                  child: Text('Oui, au campus de l’ESP'),
+                ),
+                DropdownMenuItem(
+                  value: 'no',
+                  child: Text('Non, hors du campus'),
+                ),
+              ],
+              onChanged: (value) => setState(
+                () => _campusResident = value == 'yes'
+                    ? true
+                    : value == 'no'
+                    ? false
+                    : null,
+              ),
+            ),
+          ),
+          PublicApplicationField(
+            label: 'Quels formats d’entretien te conviennent ?',
+            help:
+                'Plusieurs choix possibles. Nous pourrons convenir d’un entretien pendant la pause de 12 h à 14 h 30 ou en soirée, selon les disponibilités.',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final entry in const {
+                  'in_person': 'En présentiel',
+                  'online': 'En ligne',
+                  'hybrid': 'Format mixte',
+                }.entries)
+                  FilterChip(
+                    label: Text(entry.value),
+                    selected: _interviewPreferences.contains(entry.key),
+                    onSelected: (selected) => setState(() {
+                      selected
+                          ? _interviewPreferences.add(entry.key)
+                          : _interviewPreferences.remove(entry.key);
+                    }),
+                  ),
+              ],
+            ),
+          ),
+          _longField(
+            'interviewAvailability',
+            'Tes disponibilités pour l’entretien — facultatif',
+            'Précise les pauses ou soirées qui te conviennent et les contraintes à prendre en compte. L’heure exacte sera confirmée avec toi.',
+          ),
+        ],
         if (section == 'availability')
           const Text(
             'Décris un engagement réaliste. Tes études et tes contraintes personnelles comptent aussi.',
@@ -584,7 +667,8 @@ class _PublicApplicationFlowScreenState
   );
 
   Widget _reviewStep() => _StepBody(
-    introduction: 'Relis tes informations avant l’envoi. Rien ne sera envoyé automatiquement.',
+    introduction:
+        'Relis tes informations avant l’envoi. Rien ne sera envoyé automatiquement.',
     children: [
       ApplicationReviewSection(
         title: 'Campagne',
@@ -626,6 +710,14 @@ class _PublicApplicationFlowScreenState
       ApplicationReviewSection(
         title: 'Disponibilités',
         lines: [
+          'Résidence au campus : ${_campusResident == null
+              ? 'Non renseignée'
+              : _campusResident!
+              ? 'Oui'
+              : 'Non'}',
+          'Formats d’entretien : ${_interviewPreferences.map((v) => const {'in_person': 'Présentiel', 'online': 'En ligne', 'hybrid': 'Mixte'}[v]).join(', ')}',
+          if (_text('interviewAvailability').isNotEmpty)
+            _text('interviewAvailability'),
           for (final q in _campaign!.applicationQuestions.where(
             (q) => q.section == 'availability',
           ))
@@ -676,9 +768,9 @@ class _PublicApplicationFlowScreenState
                   key: const ValueKey('duplicate-application-tracking'),
                   onPressed: () => context.push('/recruitment/track'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context)
-                        .colorScheme
-                        .onErrorContainer,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onErrorContainer,
                   ),
                   icon: const Icon(Icons.track_changes_rounded),
                   label: const Text('Suivre ma candidature'),

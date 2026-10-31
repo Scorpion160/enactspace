@@ -8,6 +8,10 @@ from app.services.request_rate_limit import POLICIES,counter_key,_consume_on_bin
 
 DEFAULT_BODY_LIMIT=501*1024*1024
 BODY_LIMITS={
+ "/api/recruitment/personality/decline":65536,
+ "/api/recruitment/personality/submit":65536,
+ "/api/recruitment/personality/save":65536,
+ "/api/recruitment/personality/load":65536,
  "/api/payments/paydunya/ipn":65536,
  "/api/auth/login":16384,
  "/api/auth/token":16384,

@@ -56,7 +56,7 @@ class ReadinessAuditTests(unittest.TestCase):
             'status': 'READ_ONLY_DATABASE_INVENTORY_COMPLETE',
             'source_sha256': audit.EXPECTED_HARDENING,
             'database_read_only_verified': read_only, 'configuration': {'safe': True},
-            'schema': ['20261007_0031'],
+            'schema': ['20261031_0032'],
             'campaigns': [{'matches_november_dates': matching, 'active': True, 'questions': 12,
                            'required_questions': 7, 'target_headcount': 30}],
             'document_sample': {'missing': 0},
