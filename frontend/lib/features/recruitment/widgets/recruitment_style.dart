@@ -106,15 +106,16 @@ class RecruitmentStyle extends StatelessWidget {
       chipTheme: inherited.chipTheme.copyWith(
         backgroundColor: colors.surface,
         selectedColor: recruitmentYellow,
-        labelStyle: WidgetStateTextStyle.resolveWith(
-          (states) =>
-              (inherited.textTheme.labelLarge ?? const TextStyle()).copyWith(
-                color: states.contains(WidgetState.selected)
+        // RawChip resolves stateful colors, not a stateful TextStyle.
+        labelStyle: (inherited.textTheme.labelLarge ?? const TextStyle())
+            .copyWith(
+              color: WidgetStateColor.resolveWith(
+                (states) => states.contains(WidgetState.selected)
                     ? recruitmentInk
                     : colors.onSurface,
-                fontWeight: FontWeight.w700,
               ),
-        ),
+              fontWeight: FontWeight.w700,
+            ),
         secondaryLabelStyle:
             (inherited.textTheme.labelLarge ?? const TextStyle()).copyWith(
               color: recruitmentInk,

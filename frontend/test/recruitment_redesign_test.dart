@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:frontend/core/theme/app_theme.dart';
@@ -41,6 +42,27 @@ Future<void> tapRedesign(WidgetTester tester, Finder target) async {
   await tester.pumpAndSettle();
 }
 
+void expectCampaignTabTypography(WidgetTester tester) {
+  for (final label in ['Informations', 'Questionnaire', 'Aperçu candidat']) {
+    final text = find.descendant(
+      of: find.widgetWithText(ChoiceChip, label),
+      matching: find.text(label),
+    );
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: text, matching: find.byType(RichText)),
+    );
+    final actual = (paragraph.text as TextSpan).style;
+    final expected = Theme.of(tester.element(text)).textTheme.labelLarge!;
+    expect(expected.fontFamily, contains('Poppins'));
+    expect(
+      actual?.fontFamily,
+      expected.fontFamily,
+      reason: 'Le libellé rendu « $label » doit conserver la police Poppins.',
+    );
+    expect(actual?.fontSize, expected.fontSize);
+  }
+}
+
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
   for (final dark in [false, true]) {
@@ -68,6 +90,19 @@ void main() {
             scale: size.$2,
           );
           expect(tester.takeException(), isNull);
+          if (page is CampaignManagementScreen) {
+            await tapRedesign(tester, find.byKey(const Key('create-campaign')));
+            expectCampaignTabTypography(tester);
+            for (final label in [
+              'Questionnaire',
+              'Aperçu candidat',
+              'Informations',
+            ]) {
+              await tapRedesign(tester, find.widgetWithText(ChoiceChip, label));
+              expectCampaignTabTypography(tester);
+              expect(tester.takeException(), isNull);
+            }
+          }
           expect(gateway.writes, 0);
           await tester.pumpWidget(const SizedBox());
         }
