@@ -1,4 +1,5 @@
 import '../../services/recruitment_message.dart';
+import 'package:frontend/core/api/api_client.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/application_model.dart';
@@ -149,16 +150,29 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   Future<void> _delete(RecruitmentCampaignModel campaign) async {
-    final deleted = await showDialog<bool>(
+    final result = await showDialog<_CampaignDeleteResult>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CampaignDeleteDialog(
         campaign: campaign,
         applicationCount: _counts[campaign.id] ?? 0,
         onConfirm: () => widget.gateway.deleteCampaign(campaign.id),
+        onClose: campaign.isActive
+            ? () async {
+                final updated = await widget.gateway.updateCampaign(
+                  campaignId: campaign.id,
+                  isActive: false,
+                );
+                if (mounted) _replace(updated);
+              }
+            : null,
       ),
     );
-    if (deleted != true || !mounted) return;
+    if (result == null || !mounted) return;
+    if (result == _CampaignDeleteResult.closed) {
+      _showFeedback('Campagne fermée. Les candidatures restent consultables.');
+      return;
+    }
     setState(() {
       _campaigns = _campaigns.where((item) => item.id != campaign.id).toList();
       _counts = Map.of(_counts)..remove(campaign.id);
@@ -649,15 +663,19 @@ class _CampaignToggleDialogState extends State<_CampaignToggleDialog> {
   }
 }
 
+enum _CampaignDeleteResult { deleted, closed }
+
 class _CampaignDeleteDialog extends StatefulWidget {
   final RecruitmentCampaignModel campaign;
   final int applicationCount;
   final Future<void> Function() onConfirm;
+  final Future<void> Function()? onClose;
 
   const _CampaignDeleteDialog({
     required this.campaign,
     required this.applicationCount,
     required this.onConfirm,
+    this.onClose,
   });
 
   @override
@@ -667,21 +685,27 @@ class _CampaignDeleteDialog extends StatefulWidget {
 class _CampaignDeleteDialogState extends State<_CampaignDeleteDialog> {
   bool _confirmed = false;
   bool _submitting = false;
+  bool _blockedByServer = false;
   String? _error;
+  bool get _hasApplications => widget.applicationCount > 0 || _blockedByServer;
 
   Future<void> _submit() async {
-    if (!_confirmed || _submitting) return;
+    if (!_confirmed || _submitting || _hasApplications) return;
     setState(() {
       _submitting = true;
       _error = null;
     });
     try {
       await widget.onConfirm();
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) Navigator.of(context).pop(_CampaignDeleteResult.deleted);
     } catch (error) {
       if (mounted) {
         setState(() {
           _submitting = false;
+          if (error is ApiException && error.statusCode == 409) {
+            _blockedByServer = true;
+            _confirmed = false;
+          }
           _error = recruitmentMessage(
             error,
             fallback:
@@ -692,35 +716,82 @@ class _CampaignDeleteDialogState extends State<_CampaignDeleteDialog> {
     }
   }
 
+  Future<void> _close() async {
+    if (_submitting || widget.onClose == null) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.onClose!();
+      if (mounted) Navigator.of(context).pop(_CampaignDeleteResult.closed);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _error = recruitmentMessage(
+            error,
+            fallback: 'La campagne n’a pas pu être fermée. Réessaie.',
+          );
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Supprimer définitivement cette campagne ?'),
+    title: Text(
+      _hasApplications
+          ? 'Cette campagne contient des candidatures'
+          : 'Supprimer définitivement cette campagne ?',
+    ),
     content: SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('Campagne : ${widget.campaign.title}'),
-          Text('${widget.applicationCount} candidatures concernées'),
+          if (widget.applicationCount > 0)
+            Text(
+              widget.applicationCount == 1
+                  ? '1 candidature à conserver'
+                  : '${widget.applicationCount} candidatures à conserver',
+            )
+          else if (_blockedByServer)
+            const Text(
+              'Des candidatures ont été déposées depuis l’ouverture de cette page.',
+            )
+          else
+            const Text('Aucune candidature associée'),
           const SizedBox(height: 12),
           Text(
-            'Cette suppression est définitive : la campagne et toutes ses candidatures seront supprimées. Vérifie les dossiers à conserver avant de confirmer.',
+            _hasApplications
+                ? 'Les dossiers, leur suivi et les évaluations doivent être conservés. Fermer la campagne arrête les inscriptions sans effacer ces informations.'
+                : 'Seule cette campagne vide sera supprimée. Cette action est définitive.',
             style: TextStyle(
-              color: Colors.red.shade800,
+              color: Theme.of(context).colorScheme.error,
               fontWeight: FontWeight.w700,
             ),
           ),
-          CheckboxListTile(
-            key: const Key('campaign-delete-confirmation'),
-            contentPadding: EdgeInsets.zero,
-            value: _confirmed,
-            onChanged: _submitting
-                ? null
-                : (value) => setState(() => _confirmed = value == true),
-            title: Text(
-              'Je confirme la suppression irréversible de « ${widget.campaign.title} » et de ses candidatures.',
+          if (_hasApplications && widget.onClose == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'Cette campagne est déjà fermée. Les dossiers restent consultables.',
+              ),
             ),
-          ),
+          if (!_hasApplications)
+            CheckboxListTile(
+              key: const Key('campaign-delete-confirmation'),
+              contentPadding: EdgeInsets.zero,
+              value: _confirmed,
+              onChanged: _submitting
+                  ? null
+                  : (value) => setState(() => _confirmed = value == true),
+              title: Text(
+                'Je confirme la suppression irréversible de « ${widget.campaign.title} ».',
+              ),
+            ),
           if (_error != null)
             Text(
               _error!,
@@ -734,17 +805,24 @@ class _CampaignDeleteDialogState extends State<_CampaignDeleteDialog> {
         onPressed: _submitting ? null : () => Navigator.of(context).pop(),
         child: const Text('Retour'),
       ),
-      FilledButton(
-        key: const Key('campaign-delete-submit'),
-        style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
-        onPressed: !_confirmed || _submitting ? null : _submit,
-        child: _submitting
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Text('Supprimer définitivement'),
-      ),
+      if (_hasApplications && widget.onClose != null)
+        FilledButton(
+          key: const Key('campaign-delete-close'),
+          onPressed: _submitting ? null : _close,
+          child: Text(_submitting ? 'Fermeture…' : 'Fermer la campagne'),
+        ),
+      if (!_hasApplications)
+        FilledButton(
+          key: const Key('campaign-delete-submit'),
+          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
+          onPressed: !_confirmed || _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Supprimer définitivement'),
+        ),
     ],
   );
 }

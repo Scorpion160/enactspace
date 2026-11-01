@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/api/api_client.dart';
 import 'package:frontend/features/recruitment/models/application_model.dart';
 import 'package:frontend/features/recruitment/models/application_review_model.dart';
 import 'package:frontend/features/recruitment/models/campaign_state_presentation.dart';
@@ -63,6 +64,7 @@ class _CampaignGateway implements InternalRecruitmentGateway {
   })?
   updateMutation;
   final Future<void> Function(String campaignId)? deleteMutation;
+  final List<ApplicationModel> applications;
   List<RecruitmentCampaignModel> items;
   int createCount = 0;
   int updateCount = 0;
@@ -74,6 +76,7 @@ class _CampaignGateway implements InternalRecruitmentGateway {
     this.createMutation,
     this.updateMutation,
     this.deleteMutation,
+    this.applications = const [],
   }) : items = List.of(campaigns);
 
   @override
@@ -81,7 +84,8 @@ class _CampaignGateway implements InternalRecruitmentGateway {
       campaignsLoader?.call() ?? Future.value(List.of(items));
 
   @override
-  Future<List<ApplicationModel>> loadApplications() async => const [];
+  Future<List<ApplicationModel>> loadApplications() async =>
+      List.of(applications);
 
   @override
   Future<RecruitmentCampaignModel> createCampaign({
@@ -501,24 +505,134 @@ void main() {
     expect(gateway.updateCount, 0);
   });
 
-  testWidgets('suppression avertit explicitement de la cascade', (
+  testWidgets(
+    'suppression explique que seule une campagne vide peut être effacée',
+    (tester) async {
+      final gateway = _CampaignGateway();
+      await _pump(tester, gateway);
+      await tester.tap(find.byKey(const Key('delete-campaign-open')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Supprimer définitivement cette campagne ?'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Seule cette campagne vide sera supprimée'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('irréversible'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'une campagne contenant un dossier propose sa fermeture et conserve le dossier',
+    (tester) async {
+      final gateway = _CampaignGateway(
+        applications: const [
+          ApplicationModel(
+            id: 'candidate',
+            campaignId: 'open',
+            firstName: 'Awa',
+            lastName: 'Test',
+            email: 'fixture@example.org',
+            status: 'submitted',
+            isAnonymized: false,
+            canConvert: false,
+          ),
+        ],
+      );
+      await _pump(tester, gateway);
+      await tester.tap(find.byKey(const Key('delete-campaign-open')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Cette campagne contient des candidatures'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('campaign-delete-submit')), findsNothing);
+      expect(
+        find.byKey(const Key('campaign-delete-confirmation')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('campaign-delete-close')));
+      await tester.pumpAndSettle();
+      expect(gateway.deleteCount, 0);
+      expect(gateway.updateCount, 1);
+      expect(gateway.items.single.isActive, isFalse);
+      expect(gateway.applications, hasLength(1));
+      expect(find.text('Campagne ouverte'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'une candidature arrivée entre temps bloque la suppression et propose la fermeture',
+    (tester) async {
+      final gateway = _CampaignGateway(
+        deleteMutation: (_) async => throw ApiException(
+          statusCode: 409,
+          message:
+              'Une campagne contenant des candidatures doit être clôturée, pas supprimée',
+        ),
+      );
+      await _pump(tester, gateway);
+      await tester.tap(find.byKey(const Key('delete-campaign-open')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('campaign-delete-confirmation')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('campaign-delete-submit')));
+      await tester.pumpAndSettle();
+      expect(gateway.deleteCount, 1);
+      expect(gateway.items, hasLength(1));
+      expect(find.byKey(const Key('campaign-delete-submit')), findsNothing);
+      expect(
+        find.textContaining('depuis l’ouverture de cette page'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('campaign-delete-close')));
+      await tester.pumpAndSettle();
+      expect(gateway.items.single.isActive, isFalse);
+    },
+  );
+
+  testWidgets(
+    'une campagne déjà fermée avec un dossier ne propose aucune suppression',
+    (tester) async {
+      final gateway = _CampaignGateway(
+        campaigns: const [_inactive],
+        applications: const [
+          ApplicationModel(
+            id: 'candidate',
+            campaignId: 'inactive',
+            firstName: 'Awa',
+            lastName: 'Test',
+            email: 'fixture@example.org',
+            status: 'submitted',
+            isAnonymized: false,
+            canConvert: false,
+          ),
+        ],
+      );
+      await _pump(tester, gateway);
+      await tester.tap(find.byKey(const Key('delete-campaign-inactive')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('déjà fermée'), findsOneWidget);
+      expect(find.byKey(const Key('campaign-delete-submit')), findsNothing);
+      expect(find.byKey(const Key('campaign-delete-close')), findsNothing);
+      expect(gateway.deleteCount, 0);
+    },
+  );
+
+  testWidgets('une campagne terminée encore active peut être fermée', (
     tester,
   ) async {
-    final gateway = _CampaignGateway();
+    final gateway = _CampaignGateway(campaigns: const [_ended]);
     await _pump(tester, gateway);
-    await tester.tap(find.byKey(const Key('delete-campaign-open')));
+    expect(find.text('Fermer'), findsOneWidget);
+    await tester.tap(find.text('Fermer'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Supprimer définitivement cette campagne ?'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'la campagne et toutes ses candidatures seront supprimées',
-      ),
-      findsOneWidget,
-    );
-    expect(find.textContaining('irréversible'), findsWidgets);
+    await tester.tap(find.byKey(const Key('campaign-toggle-submit')));
+    await tester.pumpAndSettle();
+    expect(gateway.items.single.isActive, isFalse);
+    expect(gateway.deleteCount, 0);
   });
 
   testWidgets('suppression exige confirmation et ne mute pas avant', (

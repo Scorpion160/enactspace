@@ -135,7 +135,7 @@ class CampaignManagementCard extends StatelessWidget {
                       child: const Text('Modifier'),
                     ),
                   ),
-                  if (!ended)
+                  if (active || !ended)
                     Semantics(
                       button: true,
                       label: active
