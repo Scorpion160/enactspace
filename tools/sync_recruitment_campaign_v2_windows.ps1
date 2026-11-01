@@ -13,6 +13,7 @@ $baseline = Join-Path $local 'baseline'
 $previous = Join-Path $local 'previous'
 $canonical = Join-Path $local 'current'
 $before = @{}
+$differences = @()
 $Frontend = [IO.Path]::GetFullPath($Frontend)
 if (!(Test-Path -LiteralPath (Join-Path $Frontend 'pubspec.yaml'))) { throw 'Frontend introuvable.' }
 New-Item -ItemType Directory -Path $local -Force | Out-Null
@@ -24,9 +25,17 @@ function DownloadChecked([string]$Ref, [string]$Relative, [string]$Destination, 
         -OutFile $Destination -UseBasicParsing
     if ((Hash $Destination) -ne $Expected) { throw "Integrite incorrecte : $Relative" }
 }
+function NormalizeSourceCopy([string]$Path) {
+    # Call only on candidate/baseline/comparison copies, never on originals.
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    [IO.File]::WriteAllText($Path, $text, [Text.UTF8Encoding]::new($false))
+}
 function FormatChecked([string]$Path) {
+    NormalizeSourceCopy $Path
     & dart format $Path | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Formatage de la copie de verification echoue.' }
+    NormalizeSourceCopy $Path
 }
 
 $manifest = Join-Path $local 'manifest.json'
@@ -54,15 +63,46 @@ foreach ($entry in $data.frontend) {
             FormatChecked $previousFile
             if ((Hash $currentCopy) -eq (Hash $previousFile)) { continue }
         }
-        if (!$entry.baseline_sha256) { throw "Un fichier local different existe deja : $relative" }
+        if (!$entry.baseline_sha256) {
+            $differences += [pscustomobject]@{
+                path = $relative; reason = 'unexpected_existing_source'
+                original_sha256 = $before[$relative]
+            }
+            continue
+        }
         $baselineFile = Join-Path $baseline $relative
         DownloadChecked $data.frontend_base_revision $entry.path $baselineFile $entry.baseline_sha256
         FormatChecked $baselineFile
         if ((Hash $currentCopy) -ne (Hash $baselineFile)) {
-            throw "Source locale differente : $relative. Aucun remplacement."
+            $differences += [pscustomobject]@{
+                path = $relative; reason = 'local_source_differs'
+                original_sha256 = $before[$relative]
+            }
         }
     }
-    elseif ($entry.baseline_sha256) { throw "Source locale manquante : $relative. Aucun remplacement." }
+    elseif ($entry.baseline_sha256) {
+        $differences += [pscustomobject]@{
+            path = $relative; reason = 'local_source_missing'; original_sha256 = $null
+        }
+    }
+}
+
+if ($differences.Count -gt 0) {
+    # Export only the scoped Dart copies and public manifest, never the complete
+    # frontend, signing files, client defines or generated deployment files.
+    $review = Join-Path $local 'source-differences.json'
+    [IO.File]::WriteAllText(
+        $review,
+        (ConvertTo-Json -InputObject @($differences) -Depth 4),
+        [Text.UTF8Encoding]::new($false)
+    )
+    $archive = Join-Path $local 'recruitment-source-review.zip'
+    $reviewFiles = @($canonical, $payload, $baseline, $previous, $manifest, $review) |
+        Where-Object { Test-Path -LiteralPath $_ }
+    Compress-Archive -LiteralPath $reviewFiles -DestinationPath $archive
+    foreach ($difference in $differences) { "SOURCE_A_EXAMINER=$($difference.path)" }
+    "ARCHIVE_SOURCES_A_EXAMINER=$archive"
+    throw 'Des differences de code restent a examiner. Sources originales conservees.'
 }
 
 # Work on a complete source copy. No original file is replaced before checks pass.
