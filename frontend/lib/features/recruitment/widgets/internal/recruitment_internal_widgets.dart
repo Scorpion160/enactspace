@@ -1,7 +1,7 @@
+import '../recruitment_workspace.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../models/application_model.dart';
 import '../../models/application_status_presentation.dart';
 import '../../models/recruitment_campaign_model.dart';
@@ -39,117 +39,25 @@ class InternalRecruitmentHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 720;
-    final heading = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recrutement',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(campaignLabel, style: TextStyle(color: Colors.white70)),
-      ],
-    );
-    final manageCampaigns = Semantics(
-      button: true,
-      label: 'Gérer les campagnes de recrutement',
-      child: OutlinedButton.icon(
-        key: const Key('manage-campaigns'),
-        onPressed: onManageCampaigns,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: Colors.white38),
-          minimumSize: const Size(44, 44),
-        ),
-        icon: const Icon(Icons.campaign_outlined),
-        label: const Text('Gérer les campagnes'),
+  Widget build(BuildContext context) => RecruitmentPageHeading(
+    title: 'Les candidatures',
+    subtitle:
+        '$campaignLabel · $visibleCount dossier(s) affiché(s) sur $totalCount',
+    actions: [
+      IconButton(
+        onPressed: onRefresh,
+        tooltip: 'Actualiser la liste',
+        icon: const Icon(Icons.refresh_rounded),
       ),
-    );
-    final filters = Semantics(
-      button: true,
-      label: 'Filtres, $activeFilterCount actifs',
-      child: OutlinedButton.icon(
-        onPressed: onToggleFilters,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: Colors.white38),
-          minimumSize: const Size(44, 44),
+      if (canManageCampaigns)
+        OutlinedButton.icon(
+          key: const Key('manage-campaigns'),
+          onPressed: onManageCampaigns,
+          icon: const Icon(Icons.campaign_outlined),
+          label: const Text('Gérer les campagnes'),
         ),
-        icon: const Icon(Icons.tune_rounded),
-        label: Text(
-          activeFilterCount == 0 ? 'Filtres' : 'Filtres ($activeFilterCount)',
-        ),
-      ),
-    );
-    final refresh = IconButton(
-      onPressed: onRefresh,
-      tooltip: 'Actualiser la liste',
-      color: Colors.white,
-      icon: const Icon(Icons.refresh_rounded),
-    );
-    final actions = compact
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (canManageCampaigns) manageCampaigns,
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: filters),
-                  const SizedBox(width: 8),
-                  refresh,
-                ],
-              ),
-            ],
-          )
-        : Wrap(
-            spacing: 8,
-            children: [
-              if (canManageCampaigns) manageCampaigns,
-              filters,
-              refresh,
-            ],
-          );
-    return Container(
-      padding: EdgeInsets.all(compact ? 18 : 24),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (compact) ...[
-            heading,
-            const SizedBox(height: 16),
-            SizedBox(width: double.infinity, child: actions),
-          ] else
-            Row(
-              children: [
-                Expanded(child: heading),
-                actions,
-              ],
-            ),
-          const SizedBox(height: 16),
-          Semantics(
-            label: '$visibleCount candidatures visibles sur $totalCount',
-            child: Text(
-              '$visibleCount candidatures · $totalCount dossiers chargés',
-              style: TextStyle(
-                color: AppTheme.enactusYellow,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class InternalFilterBar extends StatelessWidget {
@@ -211,9 +119,11 @@ class InternalFilterBar extends StatelessWidget {
         key: const Key('internal-search'),
         controller: searchController,
         onChanged: onSearchChanged,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Rechercher',
-          hintText: 'Nom, e-mail ou référence',
+          hintText: anonymized
+              ? 'Référence du dossier'
+              : 'Nom, e-mail ou référence',
           prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
@@ -221,14 +131,12 @@ class InternalFilterBar extends StatelessWidget {
         key: const Key('internal-campaign-filter'),
         isExpanded: true,
         initialValue: campaignId,
+        itemHeight: null,
         decoration: const InputDecoration(labelText: 'Campagne'),
         items: [
           const DropdownMenuItem(value: 'all', child: Text('Toutes')),
           ...campaigns.map(
-            (item) => DropdownMenuItem(
-              value: item.id,
-              child: Text(item.title, overflow: TextOverflow.ellipsis),
-            ),
+            (item) => DropdownMenuItem(value: item.id, child: Text(item.title)),
           ),
         ],
         onChanged: onCampaignChanged,
@@ -256,7 +164,20 @@ class InternalFilterBar extends StatelessWidget {
       search: primary.first,
       quickFilters: const [],
       filters: [...primary.skip(1)],
-      actions: const [],
+      actions: [
+        FilterChip(
+          key: const Key('internal-anonymized'),
+          selected: anonymized,
+          label: const Text('Mode anonymisé'),
+          avatar: Icon(
+            anonymized
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            size: 18,
+          ),
+          onSelected: onAnonymizedChanged,
+        ),
+      ],
       activeFilterCount:
           [campaignId, status, gender].where((v) => v != 'all').length +
           [
@@ -301,21 +222,16 @@ class InternalFilterBar extends StatelessWidget {
                     DropdownMenuItem(value: 'female', child: Text('Femme')),
                     DropdownMenuItem(value: 'male', child: Text('Homme')),
                     DropdownMenuItem(value: 'other', child: Text('Autre')),
+                    DropdownMenuItem(
+                      value: 'non_precise',
+                      child: Text('Non précisé'),
+                    ),
                   ],
                   onChanged: onGenderChanged,
                 ),
               ],
               expanded: true,
               collapsible: false,
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              value: anonymized,
-              onChanged: onAnonymizedChanged,
-              title: const Text('Mode anonymisé'),
-              subtitle: const Text(
-                'Masque l’identité dans la liste et la fiche.',
-              ),
             ),
             Wrap(
               alignment: WrapAlignment.end,
@@ -378,7 +294,6 @@ class _DateFilter extends StatelessWidget {
         value == null
             ? label
             : '${value!.day.toString().padLeft(2, '0')}/${value!.month.toString().padLeft(2, '0')}/${value!.year}',
-        overflow: TextOverflow.ellipsis,
       ),
     ),
   );
@@ -417,7 +332,7 @@ class ApplicationWorkbench extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final mobile =
-            constraints.maxWidth < 1300 ||
+            constraints.maxWidth < 1080 ||
             MediaQuery.textScalerOf(context).scale(16) > 21;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -459,7 +374,7 @@ class ApplicationWorkbench extends StatelessWidget {
                 (item) => _ApplicationRow(
                   application: item,
                   campaign: campaignTitle(item.campaignId),
-                  anonymized: anonymized,
+                  anonymized: anonymized || item.isAnonymized,
                   mobile: true,
                   onOpen: () => onOpen(item),
                 ),
@@ -474,7 +389,7 @@ class ApplicationWorkbench extends StatelessWidget {
                       (item) => _ApplicationRow(
                         application: item,
                         campaign: campaignTitle(item.campaignId),
-                        anonymized: anonymized,
+                        anonymized: anonymized || item.isAnonymized,
                         mobile: false,
                         onOpen: () => onOpen(item),
                       ),
@@ -579,7 +494,7 @@ class _ApplicationRow extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(campaign, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(campaign),
               const SizedBox(height: 6),
               Text(
                 '${application.department ?? 'Département non renseigné'} · ${application.studyLevel ?? 'Niveau non renseigné'}',
@@ -603,11 +518,7 @@ class _ApplicationRow extends StatelessWidget {
                   ? 'Identité masquée'
                   : (application.trackingCode ?? application.id),
             ),
-            campaign: Text(
-              campaign,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            campaign: Text(campaign),
             path: _TwoLines(
               first: application.department ?? 'Non renseigné',
               second: [application.studyLevel, application.className]

@@ -1,3 +1,4 @@
+import '../recruitment_workspace.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/campaign_state_presentation.dart';
@@ -10,11 +11,12 @@ class CampaignStateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (state.key) {
-      'open' => Colors.green.shade700,
-      'planned' => Colors.blue.shade700,
-      'ended' => Colors.grey.shade700,
-      _ => Colors.orange.shade800,
+      'open' => dark ? Colors.green.shade200 : Colors.green.shade800,
+      'planned' => dark ? Colors.lightBlue.shade200 : Colors.blue.shade800,
+      'ended' => Theme.of(context).colorScheme.onSurfaceVariant,
+      _ => dark ? Colors.orange.shade200 : Colors.deepOrange.shade800,
     };
     return Semantics(
       label: 'État de la campagne : ${state.label}',
@@ -69,29 +71,26 @@ class CampaignManagementCard extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      campaign.title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  CampaignStateBadge(state: state),
+                  const SizedBox(height: 12),
+                  Text(
+                    campaign.title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  CampaignStateBadge(state: state),
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
+              RecruitmentDescription(
                 campaign.description?.trim().isNotEmpty == true
                     ? campaign.description!.trim()
                     : 'Aucune description renseignée.',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 14),
               _InfoLine(
@@ -113,7 +112,6 @@ class CampaignManagementCard extends StatelessWidget {
                     : 'Non proposée aux nouveaux candidats',
                 semantics: active ? 'Activation active' : 'Activation inactive',
               ),
-              const Spacer(),
               const Divider(height: 24),
               Wrap(
                 spacing: 8,
@@ -148,13 +146,23 @@ class CampaignManagementCard extends StatelessWidget {
                     ),
                   Semantics(
                     button: true,
-                    label: 'Supprimer la campagne ${campaign.title}',
+                    label: applicationCount > 0
+                        ? 'Fermer la campagne ${campaign.title} en conservant ses dossiers'
+                        : 'Supprimer la campagne ${campaign.title}',
                     child: IconButton(
                       key: Key('delete-campaign-${campaign.id}'),
                       onPressed: onDelete,
-                      tooltip: 'Supprimer définitivement',
-                      color: Colors.red.shade700,
-                      icon: const Icon(Icons.delete_outline_rounded),
+                      tooltip: applicationCount > 0
+                          ? 'Fermer et conserver les dossiers'
+                          : 'Supprimer définitivement',
+                      color: applicationCount > 0
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                          : Theme.of(context).colorScheme.error,
+                      icon: Icon(
+                        applicationCount > 0
+                            ? Icons.archive_outlined
+                            : Icons.delete_outline_rounded,
+                      ),
                     ),
                   ),
                 ],

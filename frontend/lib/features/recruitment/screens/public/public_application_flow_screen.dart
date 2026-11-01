@@ -1,3 +1,4 @@
+import '../../widgets/recruitment_style.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 
@@ -260,7 +261,10 @@ class _PublicApplicationFlowScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     if (_campaignLoading) {
       return const PublicRecruitmentShell(
         child: Center(child: CircularProgressIndicator()),

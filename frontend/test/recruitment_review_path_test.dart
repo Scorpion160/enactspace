@@ -122,7 +122,13 @@ Future<void> _open(
   await tester.scrollUntilVisible(
     button,
     300,
-    scrollable: find.byType(Scrollable).first,
+    scrollable: find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        )
+        .first,
   );
   await tester.ensureVisible(button);
   await tester.pumpAndSettle();

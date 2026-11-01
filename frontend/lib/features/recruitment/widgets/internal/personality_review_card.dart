@@ -1,3 +1,4 @@
+import '../recruitment_style.dart';
 import 'package:flutter/material.dart';
 import '../../models/application_model.dart';
 import '../../services/recruitment_campaign_tools.dart';
@@ -56,7 +57,7 @@ class _PersonalityReviewCardState extends State<PersonalityReviewCard> {
     }
     DateTime? due;
     final form = GlobalKey<FormState>();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showRecruitmentDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Préparer l’entretien'),

@@ -1,3 +1,4 @@
+import '../recruitment_style.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -17,7 +18,10 @@ class PublicRecruitmentShell extends StatelessWidget {
   const PublicRecruitmentShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: const AppBackButton(fallbackPath: '/login'),

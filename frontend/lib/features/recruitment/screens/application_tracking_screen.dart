@@ -1,3 +1,4 @@
+import '../widgets/recruitment_style.dart';
 import '../services/recruitment_campaign_tools.dart';
 import 'public/personality_questionnaire_screen.dart';
 import 'package:flutter/material.dart';
@@ -79,7 +80,10 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     return PublicRecruitmentShell(
       child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(

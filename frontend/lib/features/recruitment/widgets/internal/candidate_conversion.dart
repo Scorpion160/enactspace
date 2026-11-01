@@ -1,3 +1,4 @@
+import '../recruitment_style.dart';
 import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
@@ -112,7 +113,7 @@ class _CandidateIntegrationSectionState
   }
 
   Future<void> _open() async {
-    final result = await showDialog<CandidateConversionResult>(
+    final result = await showRecruitmentDialog<CandidateConversionResult>(
       context: context,
       barrierDismissible: false,
       builder: (context) => CandidateConversionDialog(

@@ -1,3 +1,5 @@
+import '../../widgets/recruitment_style.dart';
+import '../../widgets/recruitment_workspace.dart';
 import '../../services/recruitment_message.dart';
 import 'package:frontend/core/api/api_client.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +15,14 @@ import '../../widgets/internal/campaign_management_widgets.dart';
 class CampaignManagementScreen extends StatefulWidget {
   final InternalRecruitmentGateway gateway;
   final DateTime? now;
+  final ValueChanged<RecruitmentSection>? onSectionSelected;
 
-  const CampaignManagementScreen({super.key, required this.gateway, this.now});
+  const CampaignManagementScreen({
+    super.key,
+    required this.gateway,
+    this.now,
+    this.onSectionSelected,
+  });
 
   @override
   State<CampaignManagementScreen> createState() =>
@@ -26,6 +34,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   Map<String, int> _counts = const {};
   bool _loading = true;
   bool _refreshing = false;
+  int _generation = 0;
   Object? _error;
 
   @override
@@ -35,6 +44,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   Future<void> _load({required bool initial}) async {
+    final generation = ++_generation;
     setState(() {
       initial ? _loading = true : _refreshing = true;
       _error = null;
@@ -54,15 +64,15 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
           ifAbsent: () => 1,
         );
       }
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _campaigns = campaigns;
         _counts = counts;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted && generation == _generation) setState(() => _error = error);
     } finally {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _loading = false;
           _refreshing = false;
@@ -72,6 +82,9 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   void _replace(RecruitmentCampaignModel campaign) => setState(() {
+    _generation++;
+    _loading = false;
+    _refreshing = false;
     final found = _campaigns.any((item) => item.id == campaign.id);
     _campaigns = found
         ? _campaigns
@@ -81,19 +94,19 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   });
 
   Future<void> _create() async {
-    final created = await showDialog<RecruitmentCampaignModel>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _CampaignFormDialog(
-        title: 'Créer une campagne',
-        submitLabel: 'Créer la campagne',
-        onSubmit: (value) => widget.gateway.createCampaign(
-          applicationQuestions: value.applicationQuestions,
-          title: value.title,
-          description: value.description,
-          startDate: value.startDate,
-          endDate: value.endDate,
-          isActive: value.isActive,
+    final created = await Navigator.of(context).push<RecruitmentCampaignModel>(
+      MaterialPageRoute(
+        builder: (context) => _CampaignFormScreen(
+          title: 'Créer une campagne',
+          submitLabel: 'Créer la campagne',
+          onSubmit: (value) => widget.gateway.createCampaign(
+            applicationQuestions: value.applicationQuestions,
+            title: value.title,
+            description: value.description,
+            startDate: value.startDate,
+            endDate: value.endDate,
+            isActive: value.isActive,
+          ),
         ),
       ),
     );
@@ -103,20 +116,20 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   Future<void> _edit(RecruitmentCampaignModel campaign) async {
-    final updated = await showDialog<RecruitmentCampaignModel>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _CampaignFormDialog(
-        title: 'Modifier la campagne',
-        submitLabel: 'Enregistrer les modifications',
-        campaign: campaign,
-        onSubmit: (value) => widget.gateway.updateCampaign(
-          campaignId: campaign.id,
-          applicationQuestions: value.applicationQuestions,
-          title: value.title,
-          description: value.description,
-          startDate: value.startDate,
-          endDate: value.endDate,
+    final updated = await Navigator.of(context).push<RecruitmentCampaignModel>(
+      MaterialPageRoute(
+        builder: (context) => _CampaignFormScreen(
+          title: 'Modifier la campagne',
+          submitLabel: 'Enregistrer les modifications',
+          campaign: campaign,
+          onSubmit: (value) => widget.gateway.updateCampaign(
+            campaignId: campaign.id,
+            applicationQuestions: value.applicationQuestions,
+            title: value.title,
+            description: value.description,
+            startDate: value.startDate,
+            endDate: value.endDate,
+          ),
         ),
       ),
     );
@@ -127,7 +140,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
 
   Future<void> _toggle(RecruitmentCampaignModel campaign) async {
     final opening = !campaign.isActive;
-    final updated = await showDialog<RecruitmentCampaignModel>(
+    final updated = await showRecruitmentDialog<RecruitmentCampaignModel>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CampaignToggleDialog(
@@ -150,7 +163,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   Future<void> _delete(RecruitmentCampaignModel campaign) async {
-    final result = await showDialog<_CampaignDeleteResult>(
+    final result = await showRecruitmentDialog<_CampaignDeleteResult>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _CampaignDeleteDialog(
@@ -185,7 +198,7 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
       campaign,
       now: widget.now,
     );
-    showDialog<void>(
+    showRecruitmentDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(campaign.title),
@@ -225,37 +238,117 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestion des campagnes'),
-        actions: [
-          IconButton(
-            onPressed: _refreshing ? null : () => _load(initial: false),
-            tooltip: 'Actualiser les campagnes',
-            icon: const Icon(Icons.refresh_rounded),
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) => Scaffold(
+    appBar: widget.onSectionSelected == null
+        ? AppBar(title: const Text('Recrutement'))
+        : null,
+    body: RefreshIndicator(
+      onRefresh: () => _load(initial: false),
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1440),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.onSectionSelected != null) ...[
+                        RecruitmentWorkspaceNav(
+                          selected: RecruitmentSection.campaigns,
+                          onSelected: widget.onSectionSelected!,
+                        ),
+                        const SizedBox(height: 22),
+                      ],
+                      RecruitmentPageHeading(
+                        title: 'Gestion des campagnes',
+                        subtitle:
+                            'Prépare les inscriptions, adapte le questionnaire et garde le suivi de chaque promotion.',
+                        actions: [
+                          IconButton(
+                            onPressed: _refreshing
+                                ? null
+                                : () => _load(initial: false),
+                            tooltip: 'Actualiser les campagnes',
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                          FilledButton.icon(
+                            key: const Key('create-campaign'),
+                            onPressed: _create,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Créer une campagne'),
+                          ),
+                        ],
+                      ),
+                      if (!_loading && _error == null) ...[
+                        const SizedBox(height: 20),
+                        RecruitmentStats(
+                          values: [
+                            (
+                              label: 'Campagnes',
+                              count: _campaigns.length,
+                              icon: Icons.campaign_outlined,
+                            ),
+                            (
+                              label: 'Planifiées',
+                              count: _campaigns
+                                  .where(
+                                    (c) =>
+                                        CampaignStatePresentation.fromCampaign(
+                                          c,
+                                          now: widget.now,
+                                        ).key ==
+                                        'planned',
+                                  )
+                                  .length,
+                              icon: Icons.schedule_outlined,
+                            ),
+                            (
+                              label: 'Ouvertes',
+                              count: _campaigns
+                                  .where(
+                                    (c) =>
+                                        CampaignStatePresentation.fromCampaign(
+                                          c,
+                                          now: widget.now,
+                                        ).key ==
+                                        'open',
+                                  )
+                                  .length,
+                              icon: Icons.lock_open_outlined,
+                            ),
+                            (
+                              label: 'Candidatures',
+                              count: _counts.values.fold<int>(
+                                0,
+                                (a, b) => a + b,
+                              ),
+                              icon: Icons.people_outline,
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      if (_refreshing) const LinearProgressIndicator(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            sliver: _body(),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('create-campaign'),
-        onPressed: _create,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Créer une campagne'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => _load(initial: false),
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-              sliver: _body(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
 
   Widget _body() {
     if (_loading) {
@@ -290,38 +383,42 @@ class _CampaignManagementScreenState extends State<CampaignManagementScreen> {
         ),
       );
     }
-    return SliverLayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.crossAxisExtent >= 1180
-            ? 3
-            : constraints.crossAxisExtent >= 720
-            ? 2
-            : 1;
-        return SliverGrid(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            mainAxisExtent: 450,
+    return SliverToBoxAdapter(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scaled = MediaQuery.textScalerOf(context).scale(14) > 21;
+              final columns = !scaled && constraints.maxWidth >= 1050 ? 2 : 1;
+              final width =
+                  (constraints.maxWidth - 16 * (columns - 1)) / columns;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  for (final campaign in _campaigns)
+                    SizedBox(
+                      width: width,
+                      child: CampaignManagementCard(
+                        campaign: campaign,
+                        state: CampaignStatePresentation.fromCampaign(
+                          campaign,
+                          now: widget.now,
+                        ),
+                        applicationCount: _counts[campaign.id] ?? 0,
+                        onView: () => _view(campaign),
+                        onEdit: () => _edit(campaign),
+                        onToggle: () => _toggle(campaign),
+                        onDelete: () => _delete(campaign),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
-          delegate: SliverChildBuilderDelegate((context, index) {
-            final campaign = _campaigns[index];
-            final state = CampaignStatePresentation.fromCampaign(
-              campaign,
-              now: widget.now,
-            );
-            return CampaignManagementCard(
-              campaign: campaign,
-              state: state,
-              applicationCount: _counts[campaign.id] ?? 0,
-              onView: () => _view(campaign),
-              onEdit: () => _edit(campaign),
-              onToggle: () => _toggle(campaign),
-              onDelete: () => _delete(campaign),
-            );
-          }, childCount: _campaigns.length),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -344,14 +441,14 @@ class _CampaignFormValue {
   });
 }
 
-class _CampaignFormDialog extends StatefulWidget {
+class _CampaignFormScreen extends StatefulWidget {
   final String title;
   final String submitLabel;
   final RecruitmentCampaignModel? campaign;
   final Future<RecruitmentCampaignModel> Function(_CampaignFormValue value)
   onSubmit;
 
-  const _CampaignFormDialog({
+  const _CampaignFormScreen({
     required this.title,
     required this.submitLabel,
     this.campaign,
@@ -359,10 +456,10 @@ class _CampaignFormDialog extends StatefulWidget {
   });
 
   @override
-  State<_CampaignFormDialog> createState() => _CampaignFormDialogState();
+  State<_CampaignFormScreen> createState() => _CampaignFormScreenState();
 }
 
-class _CampaignFormDialogState extends State<_CampaignFormDialog> {
+class _CampaignFormScreenState extends State<_CampaignFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _description;
@@ -371,6 +468,7 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
   late bool _active;
   late List<RecruitmentApplicationQuestion> _questions;
   bool _submitting = false;
+  int _tab = 0;
   String? _error;
 
   @override
@@ -397,11 +495,25 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
   }
 
   Future<void> _submit() async {
-    if (_submitting || !_formKey.currentState!.validate()) return;
+    if (_submitting) return;
+    if (_questions.any((q) => q.label.trim().isEmpty)) {
+      setState(() {
+        _tab = 1;
+        _error = 'Écris un libellé pour chaque question.';
+      });
+      return;
+    }
+    if (!_formKey.currentState!.validate()) {
+      setState(() => _tab = 0);
+      return;
+    }
     final start = _parseDate(_start.text);
     final end = _parseDate(_end.text);
     if (start != null && end != null && end.isBefore(start)) {
-      setState(() => _error = 'La date de fin doit suivre la date de début.');
+      setState(() {
+        _tab = 0;
+        _error = 'La date de fin doit suivre la date de début.';
+      });
       return;
     }
     setState(() {
@@ -437,104 +549,312 @@ class _CampaignFormDialogState extends State<_CampaignFormDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.title),
-    content: SizedBox(
-      width: 560,
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Semantics(
-                textField: true,
-                label: 'Titre de la campagne',
-                child: TextFormField(
-                  key: const Key('campaign-title'),
-                  controller: _title,
-                  decoration: const InputDecoration(labelText: 'Titre *'),
-                  validator: (value) => value?.trim().isEmpty == true
-                      ? 'Le titre est requis.'
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('campaign-description'),
-                controller: _description,
-                minLines: 3,
-                maxLines: 5,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('campaign-start-date'),
-                controller: _start,
-                keyboardType: TextInputType.datetime,
-                decoration: const InputDecoration(
-                  labelText: 'Date de début',
-                  hintText: 'JJ/MM/AAAA',
-                ),
-                validator: _dateValidator,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('campaign-end-date'),
-                controller: _end,
-                keyboardType: TextInputType.datetime,
-                decoration: const InputDecoration(
-                  labelText: 'Date de fin',
-                  hintText: 'JJ/MM/AAAA',
-                ),
-                validator: _dateValidator,
-              ),
-              if (widget.campaign == null)
-                SwitchListTile.adaptive(
-                  key: const Key('campaign-active'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _active,
-                  onChanged: (value) => setState(() => _active = value),
-                  title: const Text('Activer après création'),
-                  subtitle: const Text(
-                    'Une date future gardera la campagne planifiée.',
-                  ),
-                ),
-              RecruitmentQuestionnaireEditor(
-                questions: _questions,
-                onChanged: (value) => setState(() => _questions = value),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+  Widget build(BuildContext context) => RecruitmentStyle(
+    child: Builder(
+      builder: (context) => PopScope(
+        canPop: !_submitting,
+        child: Scaffold(
+          appBar: AppBar(title: Text(widget.title)),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1360),
+                        child: Padding(
+                          padding: EdgeInsets.all(
+                            MediaQuery.sizeOf(context).width < 600 ? 14 : 24,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              RecruitmentPageHeading(
+                                title: widget.campaign == null
+                                    ? 'Prépare la prochaine génération.'
+                                    : widget.campaign!.title,
+                                subtitle:
+                                    'Informations, questions et aperçu : tout le parcours de la campagne au même endroit.',
+                              ),
+                              const SizedBox(height: 18),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    for (final tab in [
+                                      (0, 'Informations'),
+                                      (1, 'Questionnaire'),
+                                      (2, 'Aperçu candidat'),
+                                    ])
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8,
+                                        ),
+                                        child: ChoiceChip(
+                                          label: Text(tab.$2),
+                                          selected: _tab == tab.$1,
+                                          onSelected: _submitting
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _tab = tab.$1,
+                                                ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              if (_error != null) ...[
+                                Text(
+                                  _error!,
+                                  key: const Key('campaign-form-error'),
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                              Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Visibility(
+                                      visible: _tab == 0,
+                                      maintainState: true,
+                                      child: Align(
+                                        alignment: Alignment.topLeft,
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 820,
+                                          ),
+                                          child: Card(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(20),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Semantics(
+                                                    textField: true,
+                                                    label:
+                                                        'Titre de la campagne',
+                                                    child: TextFormField(
+                                                      key: const Key(
+                                                        'campaign-title',
+                                                      ),
+                                                      controller: _title,
+                                                      enabled: !_submitting,
+                                                      decoration:
+                                                          const InputDecoration(
+                                                            labelText:
+                                                                'Titre *',
+                                                          ),
+                                                      validator: (value) =>
+                                                          value
+                                                                  ?.trim()
+                                                                  .isEmpty ==
+                                                              true
+                                                          ? 'Le titre est requis.'
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  TextFormField(
+                                                    key: const Key(
+                                                      'campaign-description',
+                                                    ),
+                                                    controller: _description,
+                                                    enabled: !_submitting,
+                                                    minLines: 3,
+                                                    maxLines: 5,
+                                                    decoration:
+                                                        const InputDecoration(
+                                                          labelText:
+                                                              'Description',
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  TextFormField(
+                                                    key: const Key(
+                                                      'campaign-start-date',
+                                                    ),
+                                                    controller: _start,
+                                                    enabled: !_submitting,
+                                                    keyboardType:
+                                                        TextInputType.datetime,
+                                                    decoration:
+                                                        const InputDecoration(
+                                                          labelText:
+                                                              'Date de début',
+                                                          hintText:
+                                                              'JJ/MM/AAAA',
+                                                        ),
+                                                    validator: _dateValidator,
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  TextFormField(
+                                                    key: const Key(
+                                                      'campaign-end-date',
+                                                    ),
+                                                    controller: _end,
+                                                    enabled: !_submitting,
+                                                    keyboardType:
+                                                        TextInputType.datetime,
+                                                    decoration:
+                                                        const InputDecoration(
+                                                          labelText:
+                                                              'Date de fin',
+                                                          hintText:
+                                                              'JJ/MM/AAAA',
+                                                        ),
+                                                    validator: _dateValidator,
+                                                  ),
+                                                  if (widget.campaign == null)
+                                                    SwitchListTile.adaptive(
+                                                      key: const Key(
+                                                        'campaign-active',
+                                                      ),
+                                                      contentPadding:
+                                                          EdgeInsets.zero,
+                                                      value: _active,
+                                                      onChanged: (value) =>
+                                                          setState(
+                                                            () =>
+                                                                _active = value,
+                                                          ),
+                                                      title: const Text(
+                                                        'Activer après création',
+                                                      ),
+                                                      subtitle: const Text(
+                                                        'Une date future gardera la campagne planifiée.',
+                                                      ),
+                                                    ),
+                                                  const SizedBox(height: 14),
+                                                  const RecruitmentNotice(
+                                                    'Les dates sont interprétées à Dakar. La date de fin inclut toute la journée. Fermer une campagne conserve ses candidatures.',
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Visibility(
+                                      visible: _tab == 1,
+                                      maintainState: true,
+                                      child: RecruitmentQuestionnaireEditor(
+                                        questions: _questions,
+                                        onChanged: _submitting
+                                            ? (_) {}
+                                            : (value) => setState(
+                                                () => _questions = value,
+                                              ),
+                                      ),
+                                    ),
+                                    if (_tab == 2)
+                                      Card(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(24),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              const RecruitmentNotice(
+                                                'Aperçu de cette campagne. Aucune candidature ne sera envoyée depuis cet écran.',
+                                              ),
+                                              const SizedBox(height: 20),
+                                              Text(
+                                                _title.text.trim().isEmpty
+                                                    ? 'Titre de la campagne'
+                                                    : _title.text.trim(),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .headlineSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              SelectableText(
+                                                _description.text.trim().isEmpty
+                                                    ? 'La description apparaîtra ici.'
+                                                    : _description.text.trim(),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                'Inscriptions : ${_start.text.isEmpty ? 'À définir' : _start.text} → ${_end.text.isEmpty ? 'À définir' : _end.text} · Dakar',
+                                              ),
+                                              const Divider(height: 32),
+                                              const Text(
+                                                'Identité · Parcours · Motivations · Disponibilités · Documents · Vérification',
+                                              ),
+                                              const SizedBox(height: 12),
+                                              RecruitmentQuestionnairePreview(
+                                                questions: _questions,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-            ],
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: _submitting
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text('Retour'),
+                        ),
+                        FilledButton(
+                          key: const Key('campaign-form-submit'),
+                          onPressed: _submitting ? null : _submit,
+                          child: _submitting
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(widget.submitLabel),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     ),
-    actions: [
-      TextButton(
-        onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-        child: const Text('Retour'),
-      ),
-      FilledButton(
-        key: const Key('campaign-form-submit'),
-        onPressed: _submitting ? null : _submit,
-        child: _submitting
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(widget.submitLabel),
-      ),
-    ],
   );
 
   static String? _dateValidator(String? value) {

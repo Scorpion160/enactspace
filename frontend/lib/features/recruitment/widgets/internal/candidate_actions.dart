@@ -1,3 +1,4 @@
+import '../recruitment_style.dart';
 import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
@@ -61,7 +62,7 @@ class CandidateActionsSection extends StatelessWidget {
               : 'Planifier un entretien',
           onPressed:
               onAdvancedInterview ??
-              () => showDialog<void>(
+              () => showRecruitmentDialog<void>(
                 context: context,
                 barrierDismissible: false,
                 builder: (dialogContext) => CandidateInterviewDialog(
@@ -170,7 +171,7 @@ class CandidateActionsSection extends StatelessWidget {
     BuildContext context, {
     required String targetStatus,
     required CandidateDecisionKind kind,
-  }) => showDialog<void>(
+  }) => showRecruitmentDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) => CandidateDecisionDialog(

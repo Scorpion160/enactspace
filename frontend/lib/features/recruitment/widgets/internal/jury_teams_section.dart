@@ -1,3 +1,4 @@
+import '../recruitment_style.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/recruitment_campaign_tools.dart';
@@ -47,7 +48,7 @@ class _JuryTeamsSectionState extends State<JuryTeamsSection> {
     var active = team?['active'] != false;
     var saving = false;
     String? error;
-    await showDialog<void>(
+    await showRecruitmentDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(

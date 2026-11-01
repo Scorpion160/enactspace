@@ -1,3 +1,5 @@
+import '../../widgets/recruitment_style.dart';
+import '../../widgets/recruitment_workspace.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/recruitment_campaign_model.dart';
@@ -6,6 +8,8 @@ import '../../services/recruitment_message.dart';
 import '../../widgets/internal/jury_teams_section.dart';
 
 class RecruitmentJuryScreen extends StatefulWidget {
+  final ValueChanged<RecruitmentSection>? onSectionSelected;
+  final bool canManageCampaigns;
   final RecruitmentCampaignTools tools;
   final List<RecruitmentCampaignModel> campaigns;
   final String? initialCampaignId;
@@ -16,6 +20,8 @@ class RecruitmentJuryScreen extends StatefulWidget {
     required this.campaigns,
     this.initialCampaignId,
     this.onOpenApplication,
+    this.onSectionSelected,
+    this.canManageCampaigns = true,
   });
   @override
   State<RecruitmentJuryScreen> createState() => _RecruitmentJuryScreenState();
@@ -111,7 +117,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
   Future<void> _revoke(Map<String, dynamic> person) async {
     final campaign = _campaign;
     if (_busy || campaign == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showRecruitmentDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Retirer ce membre du jury ?'),
@@ -165,7 +171,10 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     final members = (_roster?['members'] as List? ?? const [])
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
@@ -176,22 +185,29 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
         .map((row) => row['user_id'].toString())
         .toSet();
     return Scaffold(
-      appBar: AppBar(title: const Text('Le jury de la campagne')),
+      appBar: widget.onSectionSelected == null
+          ? AppBar(title: const Text('Recrutement'))
+          : null,
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
+          constraints: const BoxConstraints(maxWidth: 1440),
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text(
-                'Des générations qui se rencontrent',
-                style: Theme.of(context).textTheme.headlineSmall,
+              if (widget.onSectionSelected != null) ...[
+                RecruitmentWorkspaceNav(
+                  selected: RecruitmentSection.jury,
+                  onSelected: widget.onSectionSelected!,
+                  canManageCampaigns: widget.canManageCampaigns,
+                ),
+                const SizedBox(height: 22),
+              ],
+              const RecruitmentPageHeading(
+                title: 'Le jury de la campagne',
+                subtitle:
+                    'Des générations qui se rencontrent : enacteurs et alumni sélectionnés évaluent les dossiers. Les responsables organisent les équipes et les décisions.',
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Enacteurs et alumni sélectionnés peuvent consulter et évaluer les dossiers de leur campagne. Les responsables gardent la gestion du planning et des décisions.',
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 key: ValueKey('jury-campaign-$_campaign'),
                 initialValue: _campaign,
@@ -241,129 +257,189 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                   child: Text(_feedback!, semanticsLabel: _feedback),
                 ),
               const SizedBox(height: 18),
-              if (_campaign != null && _roster != null)
-                JuryTeamsSection(
-                  campaignId: _campaign!,
-                  teams: (_roster?['teams'] as List? ?? const [])
-                      .whereType<Map>()
-                      .map((row) => Map<String, dynamic>.from(row))
-                      .toList(),
-                  members: members,
-                  canManage: canManage,
-                  tools: widget.tools,
-                  busy: _busy,
-                  onChanged: _load,
-                  onOpenApplication: widget.onOpenApplication,
-                ),
-              if ((_roster?['interviews_needing_reassignment'] as List? ??
-                      const [])
-                  .isNotEmpty) ...[
-                Text(
-                  'Entretiens à réattribuer',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                for (final row
-                    in (_roster!['interviews_needing_reassignment'] as List)
-                        .whereType<Map>())
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.event_busy_outlined),
-                      title: Text(row['name'].toString()),
-                      subtitle: Text(
-                        '${row['interview_at'].toString().replaceAll('T', ' ').replaceAll('Z', '')} · Dakar',
-                      ),
-                      trailing: widget.onOpenApplication == null
-                          ? null
-                          : IconButton(
-                              tooltip: 'Ouvrir le dossier',
-                              icon: const Icon(Icons.arrow_forward),
-                              onPressed: _busy
-                                  ? null
-                                  : () async {
-                                      await widget.onOpenApplication!(
-                                        row['application_id'].toString(),
-                                      );
-                                      if (mounted) await _load();
-                                    },
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final roster = Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Membres sélectionnés',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          if (!_busy && members.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Text(
+                                'Le jury n’a pas encore été constitué.',
+                              ),
                             ),
+                          for (final member in members)
+                            Card(
+                              child: ListTile(
+                                leading: Icon(
+                                  member['status'] == 'alumni'
+                                      ? Icons.school_outlined
+                                      : Icons.person_outline,
+                                ),
+                                title: Text(member['name'].toString()),
+                                subtitle: Text(
+                                  '${member['status'] == 'alumni' ? 'Alumni' : 'Enacteur'} · ${member['active'] == true
+                                      ? 'Sélectionné'
+                                      : member['appointed'] == true
+                                      ? 'Compte indisponible'
+                                      : 'Retiré du jury'}',
+                                ),
+                                trailing:
+                                    canManage && member['appointed'] == true
+                                    ? IconButton(
+                                        tooltip: 'Retirer du jury',
+                                        onPressed: _busy
+                                            ? null
+                                            : () => _revoke(member),
+                                        icon: const Icon(
+                                          Icons.person_remove_outlined,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          if (canManage) ...[
+                            const SizedBox(height: 22),
+                            Text(
+                              'Ajouter un membre',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _search,
+                              enabled: !_busy,
+                              onSubmitted: (_) => _load(),
+                              decoration: InputDecoration(
+                                labelText: 'Rechercher un membre',
+                                hintText: 'Nom d’un enacteur ou d’un alumni…',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: IconButton(
+                                  tooltip: 'Chercher',
+                                  onPressed: _busy ? null : _load,
+                                  icon: const Icon(Icons.arrow_forward),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Les comptes proposés sont actifs et leur adresse e-mail est vérifiée. Recherche par nom pour affiner la liste.',
+                            ),
+                            for (final person in _eligible.where(
+                              (row) =>
+                                  !appointed.contains(row['id'].toString()),
+                            ))
+                              ListTile(
+                                title: Text(person['name'].toString()),
+                                subtitle: Text(
+                                  person['status'] == 'alumni'
+                                      ? 'Alumni'
+                                      : 'Enacteur',
+                                ),
+                                trailing: IconButton(
+                                  tooltip: 'Ajouter au jury',
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _appoint(person),
+                                  icon: const Icon(
+                                    Icons.person_add_alt_1_outlined,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                const SizedBox(height: 16),
-              ],
-              Text(
-                'Membres sélectionnés',
-                style: Theme.of(context).textTheme.titleLarge,
+                  );
+                  final teams = Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_campaign != null && _roster != null)
+                            JuryTeamsSection(
+                              campaignId: _campaign!,
+                              teams: (_roster?['teams'] as List? ?? const [])
+                                  .whereType<Map>()
+                                  .map((row) => Map<String, dynamic>.from(row))
+                                  .toList(),
+                              members: members,
+                              canManage: canManage,
+                              tools: widget.tools,
+                              busy: _busy,
+                              onChanged: _load,
+                              onOpenApplication: widget.onOpenApplication,
+                            ),
+                          if ((_roster?['interviews_needing_reassignment']
+                                      as List? ??
+                                  const [])
+                              .isNotEmpty) ...[
+                            Text(
+                              'Entretiens à réattribuer',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            for (final row
+                                in (_roster!['interviews_needing_reassignment']
+                                        as List)
+                                    .whereType<Map>())
+                              Card(
+                                child: ListTile(
+                                  leading: const Icon(
+                                    Icons.event_busy_outlined,
+                                  ),
+                                  title: Text(row['name'].toString()),
+                                  subtitle: Text(
+                                    '${row['interview_at'].toString().replaceAll('T', ' ').replaceAll('Z', '')} · Dakar',
+                                  ),
+                                  trailing: widget.onOpenApplication == null
+                                      ? null
+                                      : IconButton(
+                                          tooltip: 'Ouvrir le dossier',
+                                          icon: const Icon(Icons.arrow_forward),
+                                          onPressed: _busy
+                                              ? null
+                                              : () async {
+                                                  await widget
+                                                      .onOpenApplication!(
+                                                    row['application_id']
+                                                        .toString(),
+                                                  );
+                                                  if (mounted) await _load();
+                                                },
+                                        ),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                  if (constraints.maxWidth < 1000 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 21) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [roster, const SizedBox(height: 18), teams],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: roster),
+                      const SizedBox(width: 20),
+                      Expanded(child: teams),
+                    ],
+                  );
+                },
               ),
-              if (!_busy && members.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text('Le jury n’a pas encore été constitué.'),
-                ),
-              for (final member in members)
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      member['status'] == 'alumni'
-                          ? Icons.school_outlined
-                          : Icons.person_outline,
-                    ),
-                    title: Text(member['name'].toString()),
-                    subtitle: Text(
-                      '${member['status'] == 'alumni' ? 'Alumni' : 'Enacteur'} · ${member['active'] == true
-                          ? 'Sélectionné'
-                          : member['appointed'] == true
-                          ? 'Compte indisponible'
-                          : 'Retiré du jury'}',
-                    ),
-                    trailing: canManage && member['appointed'] == true
-                        ? IconButton(
-                            tooltip: 'Retirer du jury',
-                            onPressed: _busy ? null : () => _revoke(member),
-                            icon: const Icon(Icons.person_remove_outlined),
-                          )
-                        : null,
-                  ),
-                ),
-              if (canManage) ...[
-                const SizedBox(height: 22),
-                Text(
-                  'Ajouter un membre',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _search,
-                  enabled: !_busy,
-                  onSubmitted: (_) => _load(),
-                  decoration: InputDecoration(
-                    hintText: 'Chercher un enacteur ou un alumni…',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      tooltip: 'Chercher',
-                      onPressed: _busy ? null : _load,
-                      icon: const Icon(Icons.arrow_forward),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Les comptes proposés sont actifs et leur adresse e-mail est vérifiée. Recherche par nom pour affiner la liste.',
-                ),
-                for (final person in _eligible.where(
-                  (row) => !appointed.contains(row['id'].toString()),
-                ))
-                  ListTile(
-                    title: Text(person['name'].toString()),
-                    subtitle: Text(
-                      person['status'] == 'alumni' ? 'Alumni' : 'Enacteur',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Ajouter au jury',
-                      onPressed: _busy ? null : () => _appoint(person),
-                      icon: const Icon(Icons.person_add_alt_1_outlined),
-                    ),
-                  ),
-              ],
             ],
           ),
         ),

@@ -402,7 +402,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Statut mis à jour'),
       400,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
     );
     expect(find.text('Reçue → En cours d’étude'), findsOneWidget);
     expect(find.textContaining('Aïta DIA'), findsOneWidget);
@@ -415,7 +421,7 @@ void main() {
 
   testWidgets('écran interne autorisé avec liste dense', (tester) async {
     await _pump(tester, _FakeGateway());
-    expect(find.text('Recrutement'), findsOneWidget);
+    expect(find.text('Les candidatures'), findsOneWidget);
     expect(find.text('Candidat / référence'), findsOneWidget);
     expect(find.text('Ouvrir le dossier'), findsOneWidget);
     expect(find.text('1–1 sur 1 candidatures'), findsOneWidget);
@@ -572,7 +578,13 @@ void main() {
     await tester.scrollUntilVisible(
       openButton,
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
     );
     await tester.pumpAndSettle();
     await tester.tap(openButton);

@@ -1,3 +1,5 @@
+import '../../widgets/recruitment_workspace.dart';
+import '../../widgets/recruitment_style.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../widgets/internal/interview_planning_dialog.dart';
 import '../../widgets/internal/personality_review_card.dart';
@@ -70,7 +72,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     final application = _application;
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -78,7 +83,9 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
         child: Column(
           children: [
             _PanelHeader(
-              title: widget.anonymized
+              title:
+                  (widget.anonymized ||
+                      (_application ?? widget.summary).isAnonymized)
                   ? (_application ?? widget.summary).anonymousCode
                   : (_application ?? widget.summary).fullName,
               status: (_application ?? widget.summary).status,
@@ -108,7 +115,7 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       application: application,
                       reviews: _reviews,
                       campaignTitle: widget.campaignTitle,
-                      anonymized: widget.anonymized,
+                      anonymized: widget.anonymized || application.isAnonymized,
                       actionFeedback: _actionFeedback,
                       gateway: widget.gateway,
                       onReview: _openReview,
@@ -126,7 +133,7 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   Future<void> _openReview() async {
     final application = _application;
     if (application == null || application.screeningRubric == null) return;
-    final saved = await showDialog<bool>(
+    final saved = await showRecruitmentDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => CandidateReviewDialog(
@@ -266,7 +273,7 @@ class _PanelHeader extends StatelessWidget {
   );
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends StatefulWidget {
   final ApplicationModel application;
   final List<ApplicationReviewModel> reviews;
   final String campaignTitle;
@@ -292,239 +299,353 @@ class _DetailBody extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => ListView(
-    key: const Key('application-detail-scroll'),
-    padding: const EdgeInsets.all(18),
+  State<_DetailBody> createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends State<_DetailBody> {
+  late final Map<String, GlobalKey> _anchors = {
+    for (final label in [
+      'Réponses',
+      'Évaluation',
+      'Entretien',
+      'Décision',
+      'Historique',
+    ])
+      label: GlobalKey(),
+  };
+  @override
+  Widget build(BuildContext context) => Column(
     children: [
-      _Section(
-        title: 'Résumé',
-        icon: Icons.badge_outlined,
-        children: [
-          _InfoGrid(
-            values: {
-              'Identité': anonymized
-                  ? application.anonymousCode
-                  : application.fullName,
-              'E-mail': anonymized ? 'Identité masquée' : application.email,
-              'Téléphone': anonymized
-                  ? 'Identité masquée'
-                  : _value(application.phone),
-              'Campagne': campaignTitle,
-              'Statut': application.statusLabel,
-              'Soumise le': _dateTime(application.createdAt),
-              'Département': _value(application.department),
-              'Promotion': _value(application.className),
-              'Niveau': _value(application.studyLevel),
-              if (!anonymized &&
-                  application.knownEnactusFrom?.trim().isNotEmpty == true)
-                'Découverte d’Enactus ESP': application.knownEnactusFrom!,
-              if (application.preferredPole?.trim().isNotEmpty == true)
-                'Préférence de pôle indiquée auparavant':
-                    application.preferredPole!,
-              if (application.projectInterest?.trim().isNotEmpty == true)
-                'Projet évoqué auparavant': application.projectInterest!,
-              'Disponibilité': _value(application.availability),
-              if (!anonymized)
-                'Résidence au campus': application.campusResident == null
-                    ? 'Non renseignée'
-                    : application.campusResident!
-                    ? 'Oui'
-                    : 'Non',
-              if (!anonymized &&
-                  application.interviewAvailability?.isNotEmpty == true)
-                'Disponibilités pour l’entretien':
-                    application.interviewAvailability!,
-              if (!anonymized && application.interviewPreferences.isNotEmpty)
-                'Formats souhaités': application.interviewPreferences
-                    .map(
-                      (v) =>
-                          const {
-                            'in_person': 'Présentiel',
-                            'online': 'En ligne',
-                            'hybrid': 'Mixte',
-                          }[v] ??
-                          v,
-                    )
-                    .join(', '),
-              'Évaluation selon la grille': application.screeningScore == null
-                  ? 'À réaliser'
-                  : '${application.screeningScore!.toStringAsFixed(1)}/100',
-              'Avis enregistrés': '${application.screeningReviewCount}',
-            },
+      if (widget.anonymized)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: RecruitmentNotice(
+            'Lecture anonymisée : identité, documents et éléments personnels masqués.',
+            icon: Icons.visibility_off_outlined,
           ),
-        ],
-      ),
-      _Section(
-        title: 'Réponses',
-        icon: Icons.forum_outlined,
-        children: [
-          if (application.questionnaireAnswers.isNotEmpty) ...[
-            const Text(
-              'Questionnaire de candidature',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            for (final q in application.questionnaireAnswers)
-              _Answer(q['question']?.toString() ?? '', q['answer']?.toString()),
-          ] else ...[
-            _Answer('Motivations', application.motivation),
-            _Answer(
-              'Votre connaissance d’Enactus',
-              application.enactusKnowledge,
-            ),
-            _Answer('Autres clubs ou associations', application.otherClubs),
-            _Answer('Contribution envisagée', application.contribution),
-            _Answer('Idées de projets', application.projectIdeas),
-            _Answer('Profil de leadership', application.leadershipProfile),
-            _Answer(
-              'Expérience associative',
-              application.associativeExperience,
-            ),
-            _Answer('Commentaire candidat', application.publicComment),
-          ],
-        ],
-      ),
-      _Section(
-        title: 'Documents',
-        icon: Icons.folder_open_outlined,
-        children: [
-          if (anonymized)
-            const Text(
-              'Les pièces jointes sont masquées pendant la lecture anonymisée.',
-            )
-          else ...[
-            _DocumentRow(label: 'CV', url: application.cvUrl),
-            _DocumentRow(
-              label: 'Lettre de motivation',
-              url: application.motivationLetterUrl,
-            ),
-            _DocumentRow(
-              label: 'Document complémentaire',
-              url: application.attachmentUrl,
-            ),
-          ],
-        ],
-      ),
-      _Section(
-        title: 'Évaluations',
-        icon: Icons.rate_review_outlined,
-        children: [
-          FilledButton.icon(
-            key: const Key('candidate-review-action'),
-            onPressed: application.screeningRubric == null ? null : onReview,
-            icon: const Icon(Icons.rate_review_outlined),
-            label: Text(
-              application.myReview == null ? 'Évaluer' : 'Modifier mon avis',
-            ),
-          ),
-          if (application.screeningRubric == null)
-            const Text(
-              'Actualisez le dossier pour charger la grille d’évaluation.',
-            ),
-          const SizedBox(height: 12),
-          if (reviews.isEmpty)
-            Text('Aucune évaluation officielle enregistrée.')
-          else ...[
-            Text(
-              application.screeningScore == null
-                  ? 'La grille reste à renseigner. Les notes antérieures sont conservées ci-dessous.'
-                  : 'Indice du jury : ${application.screeningScore!.toStringAsFixed(1)}/100 · ${application.screeningReviewCount} avis',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            if (application.screeningSpread != null &&
-                application.screeningReviewCount > 1)
-              Text(
-                'Écart entre les avis : ${application.screeningSpread!.toStringAsFixed(1)} points. Discutez les observations avant de décider.',
+        ),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            for (final entry in _anchors.entries.where(
+              (e) =>
+                  e.key != 'Décision' ||
+                  widget.application.permissions['can_decide'] != false,
+            ))
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: TextButton(
+                  onPressed: () {
+                    final target = entry.value.currentContext;
+                    if (target != null) {
+                      Scrollable.ensureVisible(
+                        target,
+                        duration: const Duration(milliseconds: 240),
+                        alignment: 0,
+                      );
+                    }
+                  },
+                  child: Text(entry.key),
+                ),
               ),
-            const SizedBox(height: 10),
-            ...reviews.map(
-              (review) => _ReviewCard(review, application.screeningRubric),
-            ),
           ],
-        ],
+        ),
       ),
-      if (application.interviewAt != null ||
-          application.interviewLocation?.trim().isNotEmpty == true ||
-          application.interviewNote?.trim().isNotEmpty == true)
-        _Section(
-          title: 'Entretien',
-          icon: Icons.record_voice_over_outlined,
-          children: [
-            _InfoGrid(
-              values: {
-                'Date': application.interviewLabel,
-                'Lieu': _value(application.interviewLocation),
-                'Jury': _value(application.interviewJury),
-                if (application.interviewTeam != null)
-                  'Équipe': _value(
-                    application.interviewTeam!['name']?.toString(),
+      Expanded(
+        child: SingleChildScrollView(
+          key: const Key('application-detail-scroll'),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Section(
+                key: _anchors['Réponses'],
+                title: 'Résumé',
+                icon: Icons.badge_outlined,
+                children: [
+                  _InfoGrid(
+                    values: {
+                      'Identité': widget.anonymized
+                          ? widget.application.anonymousCode
+                          : widget.application.fullName,
+                      'E-mail': widget.anonymized
+                          ? 'Identité masquée'
+                          : widget.application.email,
+                      'Téléphone': widget.anonymized
+                          ? 'Identité masquée'
+                          : _value(widget.application.phone),
+                      'Campagne': widget.campaignTitle,
+                      'Statut': widget.application.statusLabel,
+                      'Soumise le': _dateTime(widget.application.createdAt),
+                      'Département': _value(widget.application.department),
+                      'Promotion': _value(widget.application.className),
+                      'Niveau': _value(widget.application.studyLevel),
+                      if (!widget.anonymized &&
+                          widget.application.knownEnactusFrom
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true)
+                        'Découverte d’Enactus ESP':
+                            widget.application.knownEnactusFrom!,
+                      if (widget.application.preferredPole?.trim().isNotEmpty ==
+                          true)
+                        'Préférence de pôle indiquée auparavant':
+                            widget.application.preferredPole!,
+                      if (widget.application.projectInterest
+                              ?.trim()
+                              .isNotEmpty ==
+                          true)
+                        'Projet évoqué auparavant':
+                            widget.application.projectInterest!,
+                      'Disponibilité': _value(widget.application.availability),
+                      if (!widget.anonymized)
+                        'Résidence au campus':
+                            widget.application.campusResident == null
+                            ? 'Non renseignée'
+                            : widget.application.campusResident!
+                            ? 'Oui'
+                            : 'Non',
+                      if (!widget.anonymized &&
+                          widget
+                                  .application
+                                  .interviewAvailability
+                                  ?.isNotEmpty ==
+                              true)
+                        'Disponibilités pour l’entretien':
+                            widget.application.interviewAvailability!,
+                      if (!widget.anonymized &&
+                          widget.application.interviewPreferences.isNotEmpty)
+                        'Formats souhaités': widget
+                            .application
+                            .interviewPreferences
+                            .map(
+                              (v) =>
+                                  const {
+                                    'in_person': 'Présentiel',
+                                    'online': 'En ligne',
+                                    'hybrid': 'Mixte',
+                                  }[v] ??
+                                  v,
+                            )
+                            .join(', '),
+                      'Évaluation selon la grille':
+                          widget.application.screeningScore == null
+                          ? 'À réaliser'
+                          : '${widget.application.screeningScore!.toStringAsFixed(1)}/100',
+                      'Avis enregistrés':
+                          '${widget.application.screeningReviewCount}',
+                    },
                   ),
-                'Détails': _value(application.interviewNote),
-              },
-            ),
-          ],
-        ),
-      _Section(
-        title: 'Historique',
-        icon: Icons.history_rounded,
-        children: [
-          if (application.history.isEmpty)
-            Text('Candidature reçue · ${_dateTime(application.createdAt)}')
-          else
-            ...application.history.map(_HistoryEntry.new),
-        ],
-      ),
-      if (application.permissions['can_decide'] != false)
-        _Section(
-          title: 'Actions sur la candidature',
-          icon: Icons.admin_panel_settings_outlined,
-          children: [
-            CandidateActionsSection(
-              application: application,
-              campaignTitle: campaignTitle,
-              reviewCount: application.screeningReviewCount,
-              reviewAverage: application.screeningScore == null
-                  ? null
-                  : application.screeningScore! / 5,
-              onStatusChange: onStatusChange,
-              onInterview: onInterview,
-              onAdvancedInterview: gateway is CampaignToolsProvider
-                  ? () => showDialog<void>(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => InterviewPlanningDialog(
-                        application: application,
-                        tools: (gateway as CampaignToolsProvider).campaignTools,
-                        onSaved: (_) => onConversionCompleted(),
+                ],
+              ),
+              _Section(
+                title: 'Réponses',
+                icon: Icons.forum_outlined,
+                children: [
+                  if (widget.application.questionnaireAnswers.isNotEmpty) ...[
+                    const Text(
+                      'Questionnaire de candidature',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    for (final q in widget.application.questionnaireAnswers)
+                      _Answer(
+                        q['question']?.toString() ?? '',
+                        q['answer']?.toString(),
                       ),
+                  ] else ...[
+                    _Answer('Motivations', widget.application.motivation),
+                    _Answer(
+                      'Votre connaissance d’Enactus',
+                      widget.application.enactusKnowledge,
+                    ),
+                    _Answer(
+                      'Autres clubs ou associations',
+                      widget.application.otherClubs,
+                    ),
+                    _Answer(
+                      'Contribution envisagée',
+                      widget.application.contribution,
+                    ),
+                    _Answer(
+                      'Idées de projets',
+                      widget.application.projectIdeas,
+                    ),
+                    _Answer(
+                      'Profil de leadership',
+                      widget.application.leadershipProfile,
+                    ),
+                    _Answer(
+                      'Expérience associative',
+                      widget.application.associativeExperience,
+                    ),
+                    _Answer(
+                      'Commentaire candidat',
+                      widget.application.publicComment,
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                title: 'Documents',
+                icon: Icons.folder_open_outlined,
+                children: [
+                  if (widget.anonymized)
+                    const Text(
+                      'Les pièces jointes sont masquées pendant la lecture anonymisée.',
                     )
-                  : null,
-              feedback: actionFeedback,
-            ),
-          ],
-        ),
-      if (!anonymized && gateway is CampaignToolsProvider)
-        PersonalityReviewCard(
-          application: application,
-          tools: (gateway as CampaignToolsProvider).campaignTools,
-        ),
-      if (application.interviewNeedsReassignment)
-        const Card(
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'La composition du jury a changé. Modifie l’entretien pour confirmer une équipe disponible.',
-            ),
+                  else ...[
+                    _DocumentRow(label: 'CV', url: widget.application.cvUrl),
+                    _DocumentRow(
+                      label: 'Lettre de motivation',
+                      url: widget.application.motivationLetterUrl,
+                    ),
+                    _DocumentRow(
+                      label: 'Document complémentaire',
+                      url: widget.application.attachmentUrl,
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                key: _anchors['Évaluation'],
+                title: 'Évaluations',
+                icon: Icons.rate_review_outlined,
+                children: [
+                  FilledButton.icon(
+                    key: const Key('candidate-review-action'),
+                    onPressed: widget.application.screeningRubric == null
+                        ? null
+                        : widget.onReview,
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: Text(
+                      widget.application.myReview == null
+                          ? 'Évaluer'
+                          : 'Modifier mon avis',
+                    ),
+                  ),
+                  if (widget.application.screeningRubric == null)
+                    const Text(
+                      'Actualisez le dossier pour charger la grille d’évaluation.',
+                    ),
+                  const SizedBox(height: 12),
+                  if (widget.reviews.isEmpty)
+                    Text('Aucune évaluation officielle enregistrée.')
+                  else ...[
+                    Text(
+                      widget.application.screeningScore == null
+                          ? 'La grille reste à renseigner. Les notes antérieures sont conservées ci-dessous.'
+                          : 'Indice du jury : ${widget.application.screeningScore!.toStringAsFixed(1)}/100 · ${widget.application.screeningReviewCount} avis',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (widget.application.screeningSpread != null &&
+                        widget.application.screeningReviewCount > 1)
+                      Text(
+                        'Écart entre les avis : ${widget.application.screeningSpread!.toStringAsFixed(1)} points. Discutez les observations avant de décider.',
+                      ),
+                    const SizedBox(height: 10),
+                    ...widget.reviews.map(
+                      (review) => _ReviewCard(
+                        review,
+                        widget.application.screeningRubric,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                key: _anchors['Entretien'],
+                title: 'Entretien',
+                icon: Icons.record_voice_over_outlined,
+                children: [
+                  _InfoGrid(
+                    values: {
+                      'Date': widget.application.interviewLabel,
+                      'Lieu': _value(widget.application.interviewLocation),
+                      'Jury': _value(widget.application.interviewJury),
+                      if (widget.application.interviewTeam != null)
+                        'Équipe': _value(
+                          widget.application.interviewTeam!['name']?.toString(),
+                        ),
+                      'Détails': _value(widget.application.interviewNote),
+                    },
+                  ),
+                ],
+              ),
+              _Section(
+                key: _anchors['Historique'],
+                title: 'Historique',
+                icon: Icons.history_rounded,
+                children: [
+                  if (widget.application.history.isEmpty)
+                    Text(
+                      'Candidature reçue · ${_dateTime(widget.application.createdAt)}',
+                    )
+                  else
+                    ...widget.application.history.map(_HistoryEntry.new),
+                ],
+              ),
+              if (widget.application.permissions['can_decide'] != false)
+                _Section(
+                  key: _anchors['Décision'],
+                  title: 'Actions sur la candidature',
+                  icon: Icons.admin_panel_settings_outlined,
+                  children: [
+                    CandidateActionsSection(
+                      application: widget.application,
+                      campaignTitle: widget.campaignTitle,
+                      reviewCount: widget.application.screeningReviewCount,
+                      reviewAverage: widget.application.screeningScore == null
+                          ? null
+                          : widget.application.screeningScore! / 5,
+                      onStatusChange: widget.onStatusChange,
+                      onInterview: widget.onInterview,
+                      onAdvancedInterview:
+                          widget.gateway is CampaignToolsProvider
+                          ? () => showRecruitmentDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => InterviewPlanningDialog(
+                                application: widget.application,
+                                tools: (widget.gateway as CampaignToolsProvider)
+                                    .campaignTools,
+                                onSaved: (_) => widget.onConversionCompleted(),
+                              ),
+                            )
+                          : null,
+                      feedback: widget.actionFeedback,
+                    ),
+                  ],
+                ),
+              if (!widget.anonymized && widget.gateway is CampaignToolsProvider)
+                PersonalityReviewCard(
+                  application: widget.application,
+                  tools:
+                      (widget.gateway as CampaignToolsProvider).campaignTools,
+                ),
+              if (widget.application.interviewNeedsReassignment)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'La composition du jury a changé. Modifie l’entretien pour confirmer une équipe disponible.',
+                    ),
+                  ),
+                ),
+              if (!widget.anonymized && widget.application.status == 'accepted')
+                CandidateIntegrationSection(
+                  application: widget.application,
+                  campaignTitle: widget.campaignTitle,
+                  gateway: widget.gateway,
+                  onCompleted: widget.onConversionCompleted,
+                ),
+            ],
           ),
         ),
-      if (!anonymized && application.status == 'accepted')
-        CandidateIntegrationSection(
-          application: application,
-          campaignTitle: campaignTitle,
-          gateway: gateway,
-          onCompleted: onConversionCompleted,
-        ),
+      ),
     ],
   );
 }
@@ -535,6 +656,7 @@ class _Section extends StatelessWidget {
   final List<Widget> children;
 
   const _Section({
+    super.key,
     required this.title,
     required this.icon,
     required this.children,

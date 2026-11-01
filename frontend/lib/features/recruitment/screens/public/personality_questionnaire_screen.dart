@@ -1,3 +1,4 @@
+import '../../widgets/recruitment_style.dart';
 import 'package:flutter/material.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
@@ -168,7 +169,7 @@ class _PersonalityQuestionnaireScreenState
   }
 
   Future<void> _finish() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showRecruitmentDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Partager tes réponses avec le jury ?'),
@@ -191,7 +192,7 @@ class _PersonalityQuestionnaireScreenState
   }
 
   Future<void> _decline() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showRecruitmentDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('En parler pendant l’entretien ?'),
@@ -214,7 +215,10 @@ class _PersonalityQuestionnaireScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 600;
     final currentItems = _page < 5
         ? _items.skip(_page * 4).take(4).toList()
@@ -226,7 +230,7 @@ class _PersonalityQuestionnaireScreenState
       canPop: !_dirty && !_busy,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop || _busy) return;
-        final leave = await showDialog<bool>(
+        final leave = await showRecruitmentDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Enregistrer avant de partir ?'),
