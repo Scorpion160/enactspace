@@ -26,7 +26,7 @@ $files = @(
     @{ source = 'backend/app/scripts/prelaunch_scheduled_backup.py'; target = 'prelaunch_scheduled_backup.py'; sha256 = 'bf18b1b978bddad5e3773a33060effd8617a184bdcdb29a51d8b3206113c0a80' },
     @{ source = 'backend/test_recruitment_campaign_lifecycle.py'; target = 'test_recruitment_campaign_lifecycle.py'; sha256 = '401ef6cc965abcb7c1d63611d0e20e55d24f8a9616525302ea976021b41c1f64' },
     @{ source = 'backend/test_recruitment_test_campaign_cleanup.py'; target = 'test_recruitment_test_campaign_cleanup.py'; sha256 = '91efc46e548027b1c32dc73a9f617d04750df1f3e1aaef04d9e39e898d318d9d' },
-    @{ source = 'tools/sync_recruitment_lifecycle_windows.ps1'; target = 'sync_recruitment_lifecycle_windows.ps1'; sha256 = '830ccf7b304d9d2a767f6bb44e314f81434fc7eddd80248e09474c619d5b2048' }
+    @{ source = 'tools/sync_recruitment_lifecycle_windows.ps1'; target = 'sync_recruitment_lifecycle_windows.ps1'; sha256 = 'a60fa706c10fe62f1d7659e48f62255cb040ee0d2030cf4e6f29d8a4c260053b' }
 )
 New-Item -ItemType Directory -Path $local | Out-Null
 $sshOptions = @('-T', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8')

@@ -104,8 +104,9 @@ l'interface sur Windows n'a donc pas encore été exécutée.
 Le code du planificateur de sauvegarde n'autorisait que les révisions
 0025 et 0031. La révision 0033, déjà déployée, est désormais ajoutée à cette
 liste explicite, et ses tests refusent toujours les révisions inconnues.
-La copie du VPS doit encore être vérifiée : le statut seul de l'opération
-précédente ne permettait pas d'affirmer la cause exacte de la panne.
+La reprise ci-dessous a confirmé cette ancienne liste sur le VPS. Les
+sources reconnues utilisaient des fins de ligne Windows ; leurs empreintes
+normalisées correspondaient aux programmes vérifiés.
 
 La reprise ajoute `-ApproveBackupSchema` : avant de mettre les services en
 pause, elle vérifie le programme systemd, le répertoire de travail et les
@@ -122,9 +123,57 @@ maintenant leur code fixe et un diagnostic limité à l'état systemd et aux
 indicateurs de la dernière sauvegarde, sans journaux bruts ni secrets.
 La reprise vérifie aussi l'identifiant exact de la campagne déjà identifiée.
 
-Le nouveau nettoyeur doit encore être exécuté sur le VPS ; aucune campagne
-n'a été supprimée depuis l'environnement de développement. La commande ne
-crée pas la campagne réelle du 4 au 8 novembre. Après son succès, créer et
-contrôler cette campagne depuis un compte habilité, puis poursuivre les
-vérifications de délivrabilité, de proxy et d'organisation du jury encore
-énumérées dans l'audit de préparation.
+### Nettoyage terminé sur le VPS
+
+Le compte rendu du 1 novembre, fourni à 12:56 UTC, confirme le succès de
+`cleanup-recruitment-test-86cfb8feebf042c9b1359b6f446b755d` :
+
+- 27 tests du lanceur et du contrôle de sauvegarde, puis 15 tests isolés,
+  sans échec ni test ignoré.
+- Nouvelle sauvegarde `20261101T125122Z_bd40f1`, avec restauration du schéma
+  0033 explicitement vérifiée.
+- Une campagne et un dossier supprimés, ainsi que quatre notifications,
+  six lignes de livraison d'e-mails, une livraison push et un événement
+  d'audit appartenant à ce test.
+- Aucune pièce jointe à retirer ; comptes et lignes non ciblées conservés.
+- Inventaire final : zéro campagne, zéro candidature.
+- Quatre services remis en marche et contrôle HTTPS public de l'API réussi.
+
+Le champ `backup_guard.unit` contient l'état initial de l'unité, avant
+correction ; son ancien état `failed` ne contredit pas la restauration
+0033 réussie ensuite. L'actualisation du planificateur a été appliquée, sans
+changer le schéma, l'image applicative ou le routage des messages.
+
+### Installation de l'interface à terminer
+
+La suppression est acquise. L'étape suivante, `SyncFrontend`, a refusé le
+premier fichier local avant tout remplacement. Le premier installateur
+n'acceptait que l'empreinte d'un code déjà reformatté, pas celle du fichier
+d'origine pourtant présent dans le dépôt. Les contenus locaux exacts n'ont
+pas été lus depuis le poste, actuellement hors ligne dans Desktop Commander.
+
+La version 2 du synchroniseur reconnaît à la fois les sources d'origine
+épinglées et leur version reformattée. En cas de différence d'empreinte,
+elle compare la sortie du même formateur Dart, avec des options explicites
+et `--output=show`, sur le fichier local et les deux références. Elle
+n'écrit pas dans le fichier local pour effectuer cette comparaison.
+
+Une différence réelle de contenu prépare une archive limitée aux trois
+sources concernées et aux empreintes de comparaison, dans Téléchargements,
+avant tout remplacement. Cette archive peut être jointe pour réaliser une
+fusion adaptée. Aucune différence de code inconnue n'est acceptée de force.
+Les trois références téléchargées et les trois fichiers cibles sont
+vérifiés avant comparaison. Des contrôles supplémentaires détectent une
+modification pendant la préparation, et les sources précédentes sont
+sauvegardées avant copie.
+
+Treize vérifications avec le SDK officiel Dart 3.13.7 confirment les
+empreintes épinglées, la reconnaissance du formatage et des fins de ligne
+Windows, et le refus d'un changement de texte dans le code. Les tests de
+widgets doivent encore être lancés sur Windows par ce synchroniseur.
+
+La prochaine commande exécute uniquement ce synchroniseur local. Elle ne
+relance pas le nettoyage terminé et ne publie pas le web. Après ses tests,
+publier le correctif d'interface, créer et contrôler la campagne réelle
+du 4 au 8 novembre depuis un compte habilité, puis poursuivre les vérifications
+de délivrabilité, de proxy et d'organisation du jury restantes.
