@@ -1,0 +1,45 @@
+{
+  "date_utc": "2026-11-01",
+  "source_commit": "f0e88fc345561b5ff6e6d04d34b3eb4affbb11b1",
+  "windows_operation_id": "f51504dd195f4ad8afe8af067db1fb8e",
+  "evidence": "User-supplied Windows validation and build log, received at 19:56 UTC",
+  "flutter_analysis": {
+    "passed": true,
+    "duration_seconds": 14.7
+  },
+  "recruitment_tests": {
+    "passed": 237,
+    "failed": 0,
+    "duration_seconds": 82,
+    "includes_rendered_tab_font_checks": true
+  },
+  "captures": {
+    "capture_tests_passed": 4,
+    "expected_image_count": 52,
+    "generation_confirmed_by_installer": true,
+    "archive_name": "enactspace-recruitment-rendu-f51504dd195f4ad8afe8af067db1fb8e.zip",
+    "archive_received": false,
+    "visual_review_completed": false
+  },
+  "web_build": {
+    "version": "1.0.23",
+    "build_number": 26,
+    "passed": true,
+    "duration_seconds": 196,
+    "main_dart_js_sha256": "2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad",
+    "firebase_worker_generation_confirmed": true,
+    "deployed": false
+  },
+  "publication_preparation": {
+    "publisher_template_commit": "614fdb493b03693b816eba62e9997906cddb1b92",
+    "publisher_archive_tests_passed": 5,
+    "publisher_executed": false,
+    "reuse_existing_build": true
+  },
+  "next_steps": [
+    "Review the f515 capture archive",
+    "Recheck the current public release before publication",
+    "Package and publish the already built version 1.0.23 build 26",
+    "Verify public HTTPS version and JavaScript bytes"
+  ]
+}

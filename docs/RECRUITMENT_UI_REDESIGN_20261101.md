@@ -91,3 +91,22 @@ La lecture de `RawChip.build` dans les sources officielles de Flutter 3.47.5 pr�
 Les six cas responsive de `recruitment_redesign_test.dart` ouvrent désormais l’éditeur de campagne et contrôlent le `RenderParagraph` des trois libellés, à l’ouverture et après changement d’onglet. Le contrôle porte sur la famille de police et sa taille, en clair et en sombre, à 320 et 1440 pixels ainsi qu’à 390 pixels avec texte à 200 %. Ces vérifications complètent les tests fonctionnels qui ne détectaient pas la perte de police.
 
 La reprise remplace seulement **deux fichiers**, le thème du recrutement et le test de refonte, sur la base `15ddd559…`. Les **59 autres sources** sont vérifiées et conservées. Le formateur Dart 3.13.7 avec langage 3.12, les contrôles PowerShell 7.5.4 et les empreintes du manifeste ont été vérifiés. **L’analyse Flutter, les tests renforcés et les nouvelles captures de ce dernier ajustement restent à exécuter sur Windows avant le build web.**
+
+## Journal f515 reçu : tests renforcés et build web réussis
+
+Le journal Windows transmis à 19 h 56 le 1er novembre concerne le commit `f0e88fc345561b5ff6e6d04d34b3eb4affbb11b1` et l’opération `f51504dd195f4ad8afe8af067db1fb8e`. Il confirme :
+
+- Deux fichiers formatés, sans changement restant ; analyse Flutter sans problème en 14,7 secondes.
+- **237 tests réussis** en 1 minute 22 secondes, comprenant les six cas responsive renforcés qui vérifient la police des onglets sélectionnés et non sélectionnés.
+- Quatre exécutions de capture réussies en 28 secondes, avec génération des 52 PNG et de `enactspace-recruitment-rendu-f51504dd195f4ad8afe8af067db1fb8e.zip` dans Téléchargements.
+- Génération du worker Firebase, puis compilation web réussie en **196 secondes**.
+- Marqueur `BUILD_WEB_1.0.23_26_OK` et empreinte de `main.dart.js` : `2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad`.
+- Marqueur final `DEPLOIEMENT_NON_EFFECTUE` : ce build n’est pas encore publié.
+
+Les messages sur les versions plus récentes des dépendances et le dry run Wasm n’ont pas empêché la compilation. Aucune mise à niveau des dépendances n’est demandée pour poursuivre cette publication.
+
+**Étape restante avant publication :** examiner le ZIP des captures de l’opération f515, qui n’accompagne pas le journal reçu. Les vérifications de police ont réussi, mais aucune nouvelle revue visuelle de ces 52 images n’est encore revendiquée. Le PC reste hors ligne pour l’accès distant.
+
+Le programme `tools/publish_web_release.py` et ses cinq tests sont repris de la version déjà utilisée pour les publications précédentes, commit `614fdb493b03693b816eba62e9997906cddb1b92`. Seules les trois constantes de contrôle du build ont été adaptées : empreinte JavaScript ci-dessus, version 1.0.23 et build 26. Les cinq tests d’archives et la compilation syntaxique Python passent. Aucun appel de publication n’a été exécuté. Après revue des captures, ce programme permettra de publier les fichiers déjà compilés, avec le mécanisme de contrôle et de retour arrière existant, puis de vérifier la version et l’empreinte servies en HTTPS. Il n’est pas nécessaire de relancer Flutter pour cette étape.
+
+Les résultats de cette exécution sont aussi consignés dans [le reçu du build 1.0.23 (26)](releases/20261101-recruitment-ui-1.0.23-build26.json).
