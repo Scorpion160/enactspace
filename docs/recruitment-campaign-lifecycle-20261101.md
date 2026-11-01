@@ -169,11 +169,40 @@ sauvegardées avant copie.
 
 Treize vérifications avec le SDK officiel Dart 3.13.7 confirment les
 empreintes épinglées, la reconnaissance du formatage et des fins de ligne
-Windows, et le refus d'un changement de texte dans le code. Les tests de
-widgets doivent encore être lancés sur Windows par ce synchroniseur.
+Windows, et le refus d'un changement de texte dans le code.
 
-La prochaine commande exécute uniquement ce synchroniseur local. Elle ne
-relance pas le nettoyage terminé et ne publie pas le web. Après ses tests,
-publier le correctif d'interface, créer et contrôler la campagne réelle
-du 4 au 8 novembre depuis un compte habilité, puis poursuivre les vérifications
-de délivrabilité, de proxy et d'organisation du jury restantes.
+### Interface installée et validée sur Windows
+
+Le synchroniseur du commit `917405168450da023d0a86e5fd4c832f01350a8e`
+a ensuite terminé son exécution sur le poste de développement :
+
+- Sauvegarde des trois fichiers dans
+  `C:\Users\DIOP\AppData\Local\EnactSpace\CodeRollback\recruitment-lifecycle-60feba67731e44cb909891bcccaf3c2a`.
+- Formatage des trois fichiers : aucun changement restant.
+- Analyse ciblée : aucune anomalie.
+- 29 tests de gestion des campagnes réussis, dont fermeture d'une campagne
+  avec dossier, arrivée d'une candidature avant suppression, fermeture
+  d'une campagne expirée, confirmation avant suppression d'une campagne vide,
+  conservation des données après erreur et affichage mobile à 390 pixels.
+
+L'installation locale est donc terminée. Le marqueur
+`CORRECTIF_INTERFACE_NON_ENCORE_DEPLOYE_SUR_LE_WEB` confirme que ce test
+n'a pas effectué de build ou de publication web.
+
+### Publication web suivante
+
+La publication prévue est le web **1.0.22, build 25**, à partir des sources
+locales qui viennent d'être analysées et testées. Le lanceur inchangé est
+`tools/build_publish_web_windows.ps1` du commit
+`5dc33c30398db9a040debb68a32778cc255f5e66`, SHA-256
+`2535e443cc5de435cd4d9953c6ac563a1583d05aa53879d4a96aae33eb9c7656`.
+Il a déjà servi aux publications précédentes et vérifie la version et
+l'empreinte du JavaScript servi publiquement après la publication.
+
+La commande préalable doit vérifier le web 1.0.21 build 24 et l'API 1.0.21.
+Le build et la publication 1.0.22 build 25 ne sont pas encore confirmés par
+un compte rendu d'exécution. Le nettoyage terminé n'est pas relancé.
+
+Après publication, créer et contrôler la campagne réelle du 4 au 8 novembre
+depuis un compte habilité, puis poursuivre les vérifications de délivrabilité,
+de proxy et d'organisation du jury restantes.
