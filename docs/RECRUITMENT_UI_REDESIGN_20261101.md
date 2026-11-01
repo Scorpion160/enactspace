@@ -62,3 +62,20 @@ L’échec ne signale pas une donnée manquante : le test cherchait un seul text
 La reprise cible uniquement les **deux fichiers de test** sur la base `49b446aa64428749f1bc1fe65922c1baeb501db0`. Le reste des 61 sources du manifeste est vérifié et laissé intact. Le script de reprise conserve les contrôles, la sauvegarde, l’analyse, la suite de tests et les 52 captures, sans accès au serveur. Les nouveaux résultats et captures restent à obtenir sous Windows ; les 237 tests ne sont pas encore déclarés tous réussis.
 
 Le correctif ciblé a été formaté et analysé avec Dart 3.13.7 : aucun problème signalé. La logique PowerShell de reprise est inchangée ; seule son empreinte de manifeste est actualisée. Les empreintes des deux remplacements et des 59 dépendances ont été vérifiées.
+
+## Validation Windows reçue et revue des 52 captures
+
+Le second journal transmis le 1er novembre, opération `2aa4d02235214f8e93287704154b6cac`, confirme **237 tests réussis sur 237**, une analyse Flutter sans problème, puis les quatre exécutions de capture réussies. L’archive jointe contient bien **52 PNG**, soit les 13 vues à 390 et 1440 pixels, en clair et en sombre. Le build web et le déploiement restent non effectués. Ces résultats concernent les sources `7ce4ccb6e83f198bc9c1bfb1739c95a53d07167d`, avant les retouches décrites ci-dessous.
+
+La lecture des 52 images a permis de relever des défauts que la réussite des tests fonctionnels ne suffit pas à écarter :
+
+- Les libellés des onglets Informations, Questionnaire et Aperçu candidat sont rendus en rectangles ou disparaissent. Le thème local des chips remplaçait le style Poppins par un `TextStyle` sans police. Les styles des libellés sélectionnés et non sélectionnés conservent désormais la typographie du thème de l’application.
+- Les rubriques du recrutement et les onglets de campagne dépassent horizontalement sur mobile. Ils passent désormais à la ligne selon l’espace disponible et la taille du texte, tout en conservant leurs actions et restrictions d’accès.
+- L’icône du statut dans le suivi reste presque noire sur une carte sombre. Elle utilise désormais la couleur principale du thème du recrutement.
+- Le symbole flèche entre les dates de l’aperçu candidat est absent de la police utilisée pour les captures. La période est écrite « du … au … » ; les dates manquantes ont un libellé dédié.
+
+La bannière de debug est également retirée de l’hôte de capture, sans changement de l’application. La reprise cible **cinq fichiers** sur la base `7ce4ccb6…` et vérifie les **56 autres sources** du manifeste sans les remplacer. Elle conserve la sauvegarde, les vérifications de contenu local, l’analyse, la suite complète du recrutement et les 52 captures.
+
+**Vérifications du correctif :** les cinq fichiers Dart ont été analysés syntaxiquement par le formateur Dart 3.13.7 avec le langage 3.12 du projet ; les contrôles PowerShell 7.5.4 de syntaxe, de périmètre, d’empreintes et de comparaison Dart non mutante ont réussi. Les 61 empreintes de référence ont été comparées aux blobs du commit de base ; les cinq remplacements et les 56 dépendances du nouveau manifeste concordent avec les fichiers préparés.
+
+**Validation Flutter du correctif encore attendue :** une tentative de préparation de Flutter 3.47.5 dans l’environnement de travail a été interrompue par le contrôle automatique, qui a bloqué l’accès du détecteur d’environnement de Flutter au service de métadonnées cloud. Aucun résultat d’analyse Flutter, de test Flutter ou de nouvelle capture ne peut donc être revendiqué pour ces retouches. L’installateur permet de les valider sur le PC Windows déjà utilisé pour la première série. Aucun accès au VPS, changement de campagne, build web ou déploiement n’a été effectué pendant cette revue.

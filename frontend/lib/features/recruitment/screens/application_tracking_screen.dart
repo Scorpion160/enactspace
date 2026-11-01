@@ -1,6 +1,7 @@
 import '../widgets/recruitment_style.dart';
 import '../services/recruitment_campaign_tools.dart';
 import 'public/personality_questionnaire_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -404,7 +405,11 @@ class TrackingResultView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(presentation.icon, size: 38, color: AppTheme.softBlack),
+              Icon(
+                presentation.icon,
+                size: 38,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 presentation.title,

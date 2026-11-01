@@ -1,6 +1,7 @@
 import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import '../../services/recruitment_message.dart';
+
 import 'package:frontend/core/api/api_client.dart';
 import 'package:flutter/material.dart';
 
@@ -578,31 +579,24 @@ class _CampaignFormScreenState extends State<_CampaignFormScreen> {
                                     'Informations, questions et aperçu : tout le parcours de la campagne au même endroit.',
                               ),
                               const SizedBox(height: 18),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    for (final tab in [
-                                      (0, 'Informations'),
-                                      (1, 'Questionnaire'),
-                                      (2, 'Aperçu candidat'),
-                                    ])
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 8,
-                                        ),
-                                        child: ChoiceChip(
-                                          label: Text(tab.$2),
-                                          selected: _tab == tab.$1,
-                                          onSelected: _submitting
-                                              ? null
-                                              : (_) => setState(
-                                                  () => _tab = tab.$1,
-                                                ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final tab in [
+                                    (0, 'Informations'),
+                                    (1, 'Questionnaire'),
+                                    (2, 'Aperçu candidat'),
+                                  ])
+                                    ChoiceChip(
+                                      label: Text(tab.$2),
+                                      selected: _tab == tab.$1,
+                                      onSelected: _submitting
+                                          ? null
+                                          : (_) =>
+                                                setState(() => _tab = tab.$1),
+                                    ),
+                                ],
                               ),
                               const SizedBox(height: 18),
                               if (_error != null) ...[
@@ -787,7 +781,10 @@ class _CampaignFormScreenState extends State<_CampaignFormScreen> {
                                               ),
                                               const SizedBox(height: 12),
                                               Text(
-                                                'Inscriptions : ${_start.text.isEmpty ? 'À définir' : _start.text} → ${_end.text.isEmpty ? 'À définir' : _end.text} · Dakar',
+                                                _start.text.isEmpty ||
+                                                        _end.text.isEmpty
+                                                    ? 'Dates d’inscription à définir · Dakar'
+                                                    : 'Inscriptions : du ${_start.text} au ${_end.text} · Dakar',
                                               ),
                                               const Divider(height: 32),
                                               const Text(

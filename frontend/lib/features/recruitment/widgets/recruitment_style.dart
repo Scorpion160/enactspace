@@ -107,13 +107,19 @@ class RecruitmentStyle extends StatelessWidget {
         backgroundColor: colors.surface,
         selectedColor: recruitmentYellow,
         labelStyle: WidgetStateTextStyle.resolveWith(
-          (states) => TextStyle(
-            color: states.contains(WidgetState.selected)
-                ? recruitmentInk
-                : colors.onSurface,
-          ),
+          (states) =>
+              (inherited.textTheme.labelLarge ?? const TextStyle()).copyWith(
+                color: states.contains(WidgetState.selected)
+                    ? recruitmentInk
+                    : colors.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
         ),
-        secondaryLabelStyle: const TextStyle(color: recruitmentInk),
+        secondaryLabelStyle:
+            (inherited.textTheme.labelLarge ?? const TextStyle()).copyWith(
+              color: recruitmentInk,
+              fontWeight: FontWeight.w800,
+            ),
         checkmarkColor: recruitmentInk,
         side: BorderSide(color: colors.outlineVariant),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

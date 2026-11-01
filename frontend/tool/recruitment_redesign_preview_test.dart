@@ -1,6 +1,7 @@
 // Actual Flutter widget captures, using local fonts and fictitious gateways.
 import 'dart:io';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import 'package:frontend/features/recruitment/screens/public/public_application_
 import 'package:frontend/features/recruitment/widgets/internal/candidate_review_dialog.dart';
 import 'package:frontend/features/recruitment/widgets/internal/interview_planning_dialog.dart';
 import 'package:frontend/features/recruitment/widgets/recruitment_style.dart';
+
 import '../test/support/recruitment_redesign_fixture.dart';
 
 final _capture = GlobalKey();
@@ -25,6 +27,7 @@ Future<void> _pump(WidgetTester tester, Widget page, bool dark) async {
       key: _capture,
       child: MaterialApp(
         key: UniqueKey(),
+        debugShowCheckedModeBanner: false,
         theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
         home: Scaffold(body: page),
       ),

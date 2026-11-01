@@ -30,48 +30,45 @@ class RecruitmentWorkspaceNav extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: colors.outlineVariant)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final section in RecruitmentSection.values)
-              if ((section != RecruitmentSection.campaigns ||
-                      canManageCampaigns) &&
-                  (section != RecruitmentSection.jury || hasJury))
-                Semantics(
-                  selected: selected == section,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: selected == section
-                              ? colors.primary
-                              : Colors.transparent,
-                          width: 3,
-                        ),
+      child: Wrap(
+        children: [
+          for (final section in RecruitmentSection.values)
+            if ((section != RecruitmentSection.campaigns ||
+                    canManageCampaigns) &&
+                (section != RecruitmentSection.jury || hasJury))
+              Semantics(
+                selected: selected == section,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: selected == section
+                            ? colors.primary
+                            : Colors.transparent,
+                        width: 3,
                       ),
-                    ),
-                    child: TextButton.icon(
-                      key: ValueKey('recruitment-nav-${section.name}'),
-                      onPressed: selected == section
-                          ? null
-                          : () => onSelected(section),
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.onSurfaceVariant,
-                        disabledForegroundColor: colors.primary,
-                        minimumSize: const Size(44, 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      icon: Icon(section.icon, size: 19),
-                      label: Text(section.label),
                     ),
                   ),
+                  child: TextButton.icon(
+                    key: ValueKey('recruitment-nav-${section.name}'),
+                    onPressed: selected == section
+                        ? null
+                        : () => onSelected(section),
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.onSurfaceVariant,
+                      disabledForegroundColor: colors.primary,
+                      minimumSize: const Size(44, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    icon: Icon(section.icon, size: 19),
+                    label: Text(section.label),
+                  ),
                 ),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }

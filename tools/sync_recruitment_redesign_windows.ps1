@@ -5,7 +5,7 @@ param(
     [switch]$SkipPreviews
 )
 $ErrorActionPreference = 'Stop'
-$manifestHash = 'cc424a834c008ba1fcdbfc1413ae7e7bf80d048f049066c90338930f5c20c2ee'
+$manifestHash = 'a9c458332047c4b8f6b15614b99f0bdb857731ae651b8248dacdee7965657b82'
 $id = [guid]::NewGuid().ToString('N')
 $operation = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentRedesign\$id"
 $backup = Join-Path $env:LOCALAPPDATA "EnactSpace\CodeRollback\recruitment-redesign-$id"
