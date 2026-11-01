@@ -37,6 +37,13 @@ NAMES = ('enactspace_backend', 'enactspace_email_worker',
          'enactspace_push_worker', 'enactspace_veille_worker')
 BACKUP_UNIT = 'enactspace-verified-backup.service'
 BACKUPS = Path('/var/backups/enactspace')
+PUSH_TEST_RESTRICTION = 'PUSH_RESTRICT_TO_TEST_USER_EMAIL'
+CONFIGURATION_CHECKS = frozenset({
+    'production', 'debug_disabled', 'auto_create_disabled', 'seed_disabled',
+    'email_enabled', 'push_enabled', 'email_redirection_disabled',
+    'push_redirection_disabled', 'institutional_sender', 'smtp_password_present',
+    'payments_remain_disabled',
+})
 
 
 class ReleaseError(RuntimeError):
@@ -73,14 +80,74 @@ def validate_rehearsal(report):
                     for item in measures), 'Rehearsal_volume_not_passed')
 
 
-def updated_compose(original):
+def production_push_compose(content):
+    """Set only the explicit production push flag in each application service."""
+    seen = []
+    pattern = re.compile(r'^  (?P<name>backend|email-worker|push-worker|veille-worker):[ \t]*\n'
+                         r'(?P<body>.*?)(?=^  [^\s#][^\n:]*:[ \t]*\n|^[^\s#]|\Z)', re.M | re.S)
+    def update(match):
+        name, body = match['name'], match['body']
+        require(name not in seen, 'Duplicate_application_service')
+        seen.append(name)
+        require(len(re.findall(r'^    environment:', body, re.M)) <= 1,
+                'Duplicate_service_environment')
+        header = re.search(r'^    environment:[ \t]*\n', body, re.M)
+        flag = '      ' + PUSH_TEST_RESTRICTION + ': "false"\n'
+        if header is None:
+            require(not re.search(r'^    environment:', body, re.M), 'Unsupported_service_environment')
+            body = '    environment:\n' + flag + body
+        else:
+            rest = body[header.end():]
+            end = re.search(r'^    [^\s#]', rest, re.M)
+            boundary = end.start() if end else len(rest)
+            env, suffix = rest[:boundary], rest[boundary:]
+            require(not re.search(r'^      -', env, re.M), 'Unsupported_service_environment_list')
+            entries = re.findall(r'^      ' + PUSH_TEST_RESTRICTION + r'[ \t]*:.*$', env, re.M)
+            require(len(entries) <= 1, 'Duplicate_push_restriction_setting')
+            if entries:
+                env = re.sub(r'^      ' + PUSH_TEST_RESTRICTION + r'[ \t]*:[^\n]*(?:\n|\Z)', flag, env, count=1, flags=re.M)
+            else:
+                env = flag + env
+            body = body[:header.end()] + env + suffix
+        return '  ' + name + ':\n' + body
+    updated = pattern.sub(update, content)
+    require(set(seen) == set(SERVICES) and len(seen) == 4, 'Application_service_scope_incorrect')
+    return updated
+
+
+def validate_compose_plan(before, after, restore_normal_push):
+    """Compare fully resolved Compose maps without returning any secret values."""
+    expected = json.loads(json.dumps(before))
+    for name in SERVICES:
+        service = expected['services'][name]
+        require(service.get('image') == OLD_IMAGE, 'Unexpected_resolved_service_image')
+        service['image'] = IMAGE_ID
+        environment = service.setdefault('environment', {})
+        if name == 'backend':
+            require(environment.get('APP_VERSION') == OLD_VERSION, 'Unexpected_resolved_version')
+            environment['APP_VERSION'] = VERSION
+        if restore_normal_push:
+            environment[PUSH_TEST_RESTRICTION] = 'false'
+    require(expected == after, 'Unexpected_resolved_configuration_change')
+
+
+def configuration_failures(value, allow_test_push=False):
+    require(isinstance(value, dict) and set(value) == CONFIGURATION_CHECKS
+            and all(type(item) is bool for item in value.values()),
+            'Configuration_probe_format_incorrect')
+    return sorted(key for key in CONFIGURATION_CHECKS if value[key] is False
+                  and not (allow_test_push and key == 'push_redirection_disabled'))
+
+
+def updated_compose(original, restore_normal_push=False):
     require(original.count('image: ' + OLD_IMAGE) == 4,
             'Unexpected_current_images')
     require(original.count('APP_VERSION: "' + OLD_VERSION + '"') == 1,
             'Unexpected_current_version')
     # The image ID is immutable; do not deploy a mutable candidate tag.
-    return original.replace('image: ' + OLD_IMAGE, 'image: ' + IMAGE_ID).replace(
+    updated = original.replace('image: ' + OLD_IMAGE, 'image: ' + IMAGE_ID).replace(
         'APP_VERSION: "' + OLD_VERSION + '"', 'APP_VERSION: "' + VERSION + '"')
+    return production_push_compose(updated) if restore_normal_push else updated
 
 
 def validate_backup(receipt, started):
@@ -152,12 +219,27 @@ print(json.dumps({"migration_command_completed": True}))
 
 
 class Host:
-    def __init__(self, directory):
+    def __init__(self, directory, restore_normal_push=False):
         self.directory = directory
         self.owner = directory.name.removeprefix('publish-recruitment-')
         self.override = directory / 'candidate.json'
         self.calls = 0
         self.probes_stopped = True
+        self.restore_normal_push = restore_normal_push
+        self.failed_configuration_checks = []
+
+    def validate_plan(self, updated):
+        plan = self.directory / 'compose.candidate.yml'
+        plan.write_text(updated)
+        plan.chmod(0o600)
+        before = json.loads(self.compose('config', '--format', 'json'))
+        after = json.loads(self.run(['docker', 'compose', '-p', 'enactspace',
+            '--project-directory', str(BASE.parent), '-f', str(plan), 'config', '--format', 'json']))
+        validate_compose_plan(before, after, self.restore_normal_push)
+
+    def check_settings(self, value, *, allow_test_push=False):
+        self.failed_configuration_checks = configuration_failures(value, allow_test_push)
+        require(not self.failed_configuration_checks, 'Production_configuration_incorrect')
 
     def run(self, args, *, input=None, timeout=180):
         try:
@@ -243,8 +325,7 @@ class Host:
         lines = self.candidate(DATABASE_PROBE).splitlines()
         require(len(lines) == 2, 'Database_probe_report_incorrect')
         settings, data = map(json.loads, lines)
-        require(settings and all(value is True for value in settings.values()),
-                'Production_configuration_incorrect')
+        self.check_settings(settings)
         require(data.get('database_read_only_verified') is True and
                 data.get('schema') in [['20261007_0031'], ['20261031_0032'], [SCHEMA]],
                 'Unexpected_database_revision')
@@ -294,11 +375,10 @@ class Host:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def configuration(self):
+    def configuration(self, *, allow_test_push=False):
         for name in NAMES:
             value = json.loads(self.run(['docker', 'exec', '-i', name, 'python', '-'], input=CONFIG_PROBE))
-            require(value and all(item is True for item in value.values()),
-                    'Messaging_or_production_configuration_changed')
+            self.check_settings(value, allow_test_push=allow_test_push)
 
     def timeline(self):
         with urllib.request.urlopen('http://127.0.0.1:18002/api/recruitment/campaigns/timeline', timeout=15) as response:
@@ -308,14 +388,21 @@ class Host:
 
 
 def perform_release(host, original, execute):
-    updated = updated_compose(original)
+    restore_normal_push = getattr(host, 'restore_normal_push', False)
+    updated = updated_compose(original, restore_normal_push)
     report = {'deployment_performed': False, 'migration_attempted': False,
               'migration_performed': False, 'web_changed': False, 'campaign_created': False,
-              'mail_routing_changed': False, 'payments_enabled': False}
+              'mail_routing_changed': False, 'payments_enabled': False,
+              'production_push_restoration_requested': restore_normal_push}
     paused = switched = False
     stage = 'preflight'
     try:
         host.healthy(OLD_VERSION, OLD_IMAGE_ID)
+        host.validate_plan(updated)
+        if restore_normal_push:
+            # The old process may retain its test restriction until recreation.
+            # Every other safety check still has to pass before stopping it.
+            host.configuration(allow_test_push=True)
         before = host.database()
         catalog = json.loads(host.candidate(CATALOG_PROBE))
         require(catalog.get('catalog_and_routes_verified') is True, 'Candidate_catalog_incorrect')
@@ -357,12 +444,15 @@ def perform_release(host, original, execute):
         report.update(status='RECRUITMENT_BACKEND_DEPLOYED', deployment_performed=True,
                       version=VERSION, schema=SCHEMA, image_id=IMAGE_ID, patch_revision=PATCH,
                       all_four_services_verified=True, timeline_verified=True,
+                      push_test_restriction_removed=restore_normal_push,
                       rollback_configuration=str(backup), ready_for_campaign=False)
     except BaseException as error:
         report.update(status='RECRUITMENT_BACKEND_DEPLOYMENT_BLOCKED', stage=stage,
                       error_type=type(error).__name__)
         if isinstance(error, ReleaseError):
             report['reason'] = str(error)
+        if getattr(host, 'failed_configuration_checks', None):
+            report['failed_configuration_checks'] = host.failed_configuration_checks
         if paused:
             try:
                 require(host.probes_stopped, 'Candidate_probe_cleanup_not_verified')
@@ -384,6 +474,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', required=True, type=Path)
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--restore-normal-push', action='store_true')
     args = parser.parse_args(argv)
     directory = args.directory.resolve()
     require(directory.parent == OPERATIONS and re.fullmatch(r'publish-recruitment-[a-f0-9]{32}', directory.name)
@@ -404,10 +495,13 @@ def main(argv=None):
         require(len(receipts) == 1, 'Verified_rehearsal_receipt_missing_or_ambiguous')
         validate_rehearsal(receipts[0])
         require(not (directory / 'deployment.json').exists(), 'Operation_already_finished')
-        host = Host(directory)
+        host = Host(directory, restore_normal_push=args.restore_normal_push)
         host.source_check(manifest)
+        candidate_environment = {'APP_VERSION': VERSION}
+        if args.restore_normal_push:
+            candidate_environment[PUSH_TEST_RESTRICTION] = 'false'
         host.override.write_text(json.dumps({'services': {'backend': {
-            'image': IMAGE_ID, 'environment': {'APP_VERSION': VERSION}}}}))
+            'image': IMAGE_ID, 'environment': candidate_environment}}}))
         with (OPERATIONS / 'backend-publication.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             require(not BASE.is_symlink(), 'Unexpected_compose_symlink')

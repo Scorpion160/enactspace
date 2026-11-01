@@ -13,7 +13,10 @@ spec = importlib.util.spec_from_file_location('recruitment_publish', Path(__file
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
-ORIGINAL = '\n'.join('  image: ' + release.OLD_IMAGE for _ in range(4)) + '\n APP_VERSION: "1.0.17"\n# keep this\n'
+ORIGINAL = 'name: enactspace\nservices:\n' + ''.join(
+    '  ' + name + ':\n    image: ' + release.OLD_IMAGE + '\n' +
+    ('    environment:\n      APP_VERSION: "1.0.17"\n      KEEP_SETTING: "unchanged"\n' if name == 'backend' else '')
+    for name in release.SERVICES) + '# keep this\n'
 
 
 def rehearsal():
@@ -37,6 +40,10 @@ class FakeHost:
         self.migrated = False
         self.content = ORIGINAL
         self.probes_stopped = True
+        self.restore_normal_push = False
+
+    def validate_plan(self, updated):
+        self.event('plan')
 
     def event(self, name):
         self.events.append(name)
@@ -77,8 +84,8 @@ class FakeHost:
             raise release.ReleaseError('Compose_changed_during_release')
         self.content = new
 
-    def configuration(self):
-        self.event('configuration')
+    def configuration(self, *, allow_test_push=False):
+        self.event('baseline_configuration' if allow_test_push else 'configuration')
 
     def timeline(self):
         self.event('timeline')
@@ -270,10 +277,10 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             host = release.Host(Path(directory))
             valid = {'schema': ['20261007_0031'], 'counts': {}, 'database_read_only_verified': True}
-            settings = {'production': True, 'payments_remain_disabled': True}
+            settings = dict.fromkeys(release.CONFIGURATION_CHECKS, True)
             with patch.object(host, 'candidate', return_value=json.dumps(settings) + '\n' + json.dumps(valid)):
                 self.assertEqual(host.database(), valid)
-            for unsafe, data in [({'production': False}, valid), (settings, {**valid, 'schema': ['unknown']}),
+            for unsafe, data in [({**settings, 'production': False}, valid), (settings, {**valid, 'schema': ['unknown']}),
                                  (settings, {**valid, 'database_read_only_verified': False})]:
                 with patch.object(host, 'candidate', return_value=json.dumps(unsafe) + '\n' + json.dumps(data)), \
                      self.assertRaises(release.ReleaseError):
@@ -285,6 +292,102 @@ class ReleaseTests(unittest.TestCase):
             with patch.object(release.urllib.request, 'urlopen', side_effect=KeyboardInterrupt), \
                  self.assertRaises(KeyboardInterrupt):
                 host.healthy('fixture', 'fixture')
+
+    def test_push_change_is_explicit_and_preserves_other_service_settings(self):
+        plain = release.updated_compose(ORIGINAL)
+        changed = release.updated_compose(ORIGINAL, True)
+        self.assertNotIn(release.PUSH_TEST_RESTRICTION, plain)
+        self.assertEqual(changed.count(release.PUSH_TEST_RESTRICTION + ': "false"'), 4)
+        self.assertIn('KEEP_SETTING: "unchanged"', changed)
+        self.assertIn('# keep this', changed)
+        self.assertEqual(release.production_push_compose(changed), changed)
+
+    def test_missing_duplicate_and_inline_service_environments_fail_closed(self):
+        fixtures = [ORIGINAL.replace('  push-worker:', '  missing:'),
+                    ORIGINAL + '  backend:\n    image: anything\n',
+                    ORIGINAL.replace('    environment:\n', '    environment: {FLAG: value}\n'),
+                    ORIGINAL.replace('      KEEP_SETTING: "unchanged"', '      - KEEP_SETTING=value')]
+        for value in fixtures:
+            with self.subTest(value=value), self.assertRaises(release.ReleaseError):
+                release.production_push_compose(value)
+
+    def test_existing_push_flag_is_replaced_once_and_neighbouring_settings_survive(self):
+        source = ORIGINAL.replace('      KEEP_SETTING:',
+            '      PUSH_RESTRICT_TO_TEST_USER_EMAIL: "true"\n      KEEP_SETTING:')
+        result = release.production_push_compose(source)
+        self.assertEqual(result.count(release.PUSH_TEST_RESTRICTION), 4)
+        self.assertIn('KEEP_SETTING: "unchanged"', result)
+        duplicate = source.replace('      KEEP_SETTING:',
+            '      PUSH_RESTRICT_TO_TEST_USER_EMAIL: "true"\n      KEEP_SETTING:')
+        with self.assertRaises(release.ReleaseError): release.production_push_compose(duplicate)
+
+    def test_planned_resolved_config_may_change_only_images_version_and_push_flag(self):
+        before = {'name': 'enactspace', 'services': {
+            name: {'image': release.OLD_IMAGE, 'environment': {
+                'SMTP_PASSWORD': 'private-fixture', 'MOBILE_MONEY_ENABLED': 'false',
+                release.PUSH_TEST_RESTRICTION: 'true',
+                **({'APP_VERSION': release.OLD_VERSION} if name == 'backend' else {})}}
+            for name in release.SERVICES}, 'networks': {'keep': {'name': 'same-network'}}}
+        before['services']['postgres'] = {'image': 'postgres:16', 'environment': {'PASSWORD': 'private-fixture'}}
+        after = copy.deepcopy(before)
+        for name in release.SERVICES:
+            after['services'][name]['image'] = release.IMAGE_ID
+            after['services'][name]['environment'][release.PUSH_TEST_RESTRICTION] = 'false'
+        after['services']['backend']['environment']['APP_VERSION'] = release.VERSION
+        release.validate_compose_plan(before, after, True)
+        for key in ('SMTP_PASSWORD', 'MOBILE_MONEY_ENABLED'):
+            altered = copy.deepcopy(after); altered['services']['backend']['environment'][key] = 'changed'
+            with self.subTest(field=key), self.assertRaises(release.ReleaseError):
+                release.validate_compose_plan(before, altered, True)
+        with self.assertRaises(release.ReleaseError): release.validate_compose_plan(before, after, False)
+
+    def test_only_known_test_push_restriction_can_be_allowed_on_the_old_process(self):
+        checks = dict.fromkeys(release.CONFIGURATION_CHECKS, True)
+        checks['push_redirection_disabled'] = False
+        self.assertEqual(release.configuration_failures(checks), ['push_redirection_disabled'])
+        self.assertEqual(release.configuration_failures(checks, True), [])
+        checks['payments_remain_disabled'] = False
+        self.assertEqual(release.configuration_failures(checks, True), ['payments_remain_disabled'])
+        for value in [{}, {**checks, 'SMTP_PASSWORD': 'secret-fixture'}, {**checks, 'push_enabled': 1}]:
+            with self.subTest(value=value), self.assertRaises(release.ReleaseError):
+                release.configuration_failures(value, True)
+
+    def test_read_only_push_preflight_never_applies_the_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            host = FakeHost(Path(directory)); host.restore_normal_push = True
+            with patch('builtins.print'):
+                report = release.perform_release(host, ORIGINAL, False)
+            self.assertEqual(report['status'], 'RECRUITMENT_BACKEND_PREFLIGHT_PASSED')
+            self.assertIn('baseline_configuration', host.events)
+            self.assertNotIn('compose:stop', host.events)
+            self.assertEqual(host.content, ORIGINAL)
+
+    def test_push_switch_happens_only_after_backup_and_failed_checks_restore_old_config(self):
+        for failure in [None, 'backup', 'migration', 'configuration']:
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                host = FakeHost(Path(directory), failure); host.restore_normal_push = True
+                with patch('builtins.print'):
+                    report = release.perform_release(host, ORIGINAL, True)
+                if failure is None:
+                    self.assertTrue(report['push_test_restriction_removed'])
+                    self.assertEqual(host.content.count(release.PUSH_TEST_RESTRICTION + ': "false"'), 4)
+                    self.assertLess(host.events.index('backup'), host.events.index('replace'))
+                else:
+                    self.assertEqual(host.content, ORIGINAL)
+                    self.assertTrue(report['previous_services_restored'])
+
+    def test_unsafe_resolved_plan_blocks_before_any_service_stop(self):
+        host, report = self.run_release('plan')
+        self.assertEqual(report['stage'], 'preflight')
+        self.assertNotIn('compose:stop', host.events)
+
+    def test_failed_configuration_names_are_reported_without_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            host = FakeHost(Path(directory), 'catalog')
+            host.failed_configuration_checks = ['push_redirection_disabled']
+            with patch('builtins.print'):
+                report = release.perform_release(host, ORIGINAL, True)
+            self.assertEqual(report['failed_configuration_checks'], ['push_redirection_disabled'])
 
 
 if __name__ == '__main__':

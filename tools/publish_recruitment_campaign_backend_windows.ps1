@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)] [ValidatePattern('^[a-f0-9]{40}$')] [string]$Commit,
-    [switch]$Execute
+    [switch]$Execute,
+    [switch]$RestoreNormalPush
 )
 $ErrorActionPreference = 'Stop'
 $id = [guid]::NewGuid().ToString('N')
@@ -10,9 +11,10 @@ $remote = "/opt/enactspace/operations/publish-recruitment-$id"
 $unit = "enactspace-recruitment-release-$id"
 $runner = 'publish_recruitment_campaign_backend.py'
 $tests = 'test_publish_recruitment_campaign_backend.py'
+$pushArgument = if ($RestoreNormalPush) { ' --restore-normal-push' } else { '' }
 $files = @(
-    @{ source = "tools/$runner"; target = $runner; sha256 = '50e8d990c6651a8ef4bf101a543118044f6b096ebb47194cb2eaa8daef963353' },
-    @{ source = "tools/$tests"; target = $tests; sha256 = 'c3347dad89d422e29fa7d4554177085e2299435a2b4d3a32cd7b11c4e1b96bee' },
+    @{ source = "tools/$runner"; target = $runner; sha256 = '2ad80ede7b3c51eb4b349f0d35c6b595f28fc2fa58e2c3fed59a25495efb5a15' },
+    @{ source = "tools/$tests"; target = $tests; sha256 = 'c9b95f44166032aa70457436e512c7b248a8c85a960270ab98568b0c747be9ab' },
     @{ source = 'tools/recruitment_campaign_v2_manifest.json'; target = 'manifest.json'; sha256 = '4862607c0be62f6138543354423ab0b569efc429c0cb6432e5e2b2265edf92b2' }
 )
 New-Item -ItemType Directory -Path $local | Out-Null
@@ -41,7 +43,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Tests du lanceur echoues : aucun deploiement l
 
 "DOSSIER_OPERATION=$remote"
 if (!$Execute) {
-    & ssh @sshOptions vps "python3 $remote/$runner --directory $remote"
+    & ssh @sshOptions vps "python3 $remote/$runner --directory $remote$pushArgument"
     if ($LASTEXITCODE -ne 0) { throw 'Controle prealable bloque : transmettre le compte rendu.' }
     'CONTROLE_SEUL_SANS_MIGRATION_NI_DEPLOIEMENT'
     return
@@ -52,7 +54,7 @@ if (!$Execute) {
 & ssh @sshOptions vps (
     "systemd-run --unit=$unit --collect --service-type=exec " +
     "--property=RuntimeMaxSec=25min --property=TimeoutStopSec=3min " +
-    "/usr/bin/python3 $remote/$runner --directory $remote --execute"
+    "/usr/bin/python3 $remote/$runner --directory $remote --execute$pushArgument"
 )
 if ($LASTEXITCODE -ne 0) { throw "Lancement non confirme. Consulter l'unite $unit et $remote/deployment.json avant toute relance." }
 $deadline = [DateTime]::UtcNow.AddMinutes(29)
