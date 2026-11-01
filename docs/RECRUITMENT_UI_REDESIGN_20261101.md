@@ -52,3 +52,13 @@ Tests supplémentaires : descriptions dépliables, navigation réelle entre écr
 Une validation locale réussie affiche `REFONTE_RECRUTEMENT_ANALYSE_ET_TESTS_OK` et le chemin de l’archive de captures. Le journal et le reçu de validation indiquent séparément les étapes réussies. Une erreur de test conserve les sources installées et leur sauvegarde pour correction ; elle ne déclenche aucune publication.
 
 La publication web se fera après contrôle de ces résultats et des captures, avec vérification préalable de la version publique et du rollback. La nouvelle interface ne doit jamais être déclarée validée en production sur la seule base de l’analyse statique.
+
+## Première exécution Windows et reprise ciblée
+
+Le journal transmis le 1er novembre confirme : 24 sources installées et sauvegardées, formatage sans changement, analyse Flutter sans problème, **236 tests réussis et un échec sur 237**. Aucun build ni déploiement effectué. Les captures n’ont pas été lancées puisque la suite comportait un échec.
+
+L’échec ne signale pas une donnée manquante : le test cherchait un seul texte « Réponses » dans toute la fiche, alors que ce libellé existe dans le raccourci de navigation et le titre de section. Le correctif vérifie séparément le raccourci, le titre du résumé, le titre et le contenu de la section Réponses, ainsi que les trois liens dans la section Documents. Les assertions restent précises ; elles ne deviennent pas une simple recherche acceptant plusieurs résultats. Le jeu de données fictif des captures utilise également la clé `question` attendue pour le libellé des réponses reçues.
+
+La reprise cible uniquement les **deux fichiers de test** sur la base `49b446aa64428749f1bc1fe65922c1baeb501db0`. Le reste des 61 sources du manifeste est vérifié et laissé intact. Le script de reprise conserve les contrôles, la sauvegarde, l’analyse, la suite de tests et les 52 captures, sans accès au serveur. Les nouveaux résultats et captures restent à obtenir sous Windows ; les 237 tests ne sont pas encore déclarés tous réussis.
+
+Le correctif ciblé a été formaté et analysé avec Dart 3.13.7 : aucun problème signalé. La logique PowerShell de reprise est inchangée ; seule son empreinte de manifeste est actualisée. Les empreintes des deux remplacements et des 59 dépendances ont été vérifiées.

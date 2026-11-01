@@ -499,16 +499,49 @@ void main() {
     await tester.tap(find.text('Ouvrir le dossier'));
     await tester.pumpAndSettle();
     expect(find.text('Fiche candidat'), findsOneWidget);
-    expect(find.text('Résumé'), findsOneWidget);
-    expect(find.text('Réponses'), findsOneWidget);
+    final summarySection = find.byKey(const Key('detail-section-Résumé'));
+    final answersSection = find.byKey(const Key('detail-section-Réponses'));
+    expect(summarySection, findsOneWidget);
+    expect(answersSection, findsOneWidget);
+    expect(
+      find.descendant(of: summarySection, matching: find.text('Résumé')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: answersSection, matching: find.text('Réponses')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: answersSection,
+        matching: find.text(
+          'Je souhaite contribuer durablement aux projets Enactus.',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextButton, 'Réponses'), findsOneWidget);
     await tester.drag(
       find.byKey(const Key('application-detail-scroll')),
       const Offset(0, -700),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Documents'), findsWidgets);
-    expect(find.text('Lettre de motivation'), findsOneWidget);
-    expect(find.text('Consulter la pièce jointe'), findsNWidgets(3));
+    final documentsSection = find.byKey(const Key('detail-section-Documents'));
+    expect(documentsSection, findsOneWidget);
+    expect(
+      find.descendant(
+        of: documentsSection,
+        matching: find.text('Lettre de motivation'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: documentsSection,
+        matching: find.text('Consulter la pièce jointe'),
+      ),
+      findsNWidgets(3),
+    );
   });
 
   testWidgets(

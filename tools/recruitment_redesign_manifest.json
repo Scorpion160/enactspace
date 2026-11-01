@@ -1,126 +1,16 @@
 {
   "schema_version": 1,
-  "baseline_commit": "220bfa4fe6e0f2f1c6a506a0e6885247d8516360",
+  "baseline_commit": "49b446aa64428749f1bc1fe65922c1baeb501db0",
   "files": [
     {
-      "path": "lib/features/recruitment/screens/application_tracking_screen.dart",
-      "sha256": "812f8c341cd4682c8a94cef997f1a3f3e2c37a6727e18700e978153860d78668",
-      "baseline_sha256": "249aab7382dd8066bdb2f1a4b2ad1119ec55c8cebbdca3d5af23c48d091b9ae8"
-    },
-    {
-      "path": "lib/features/recruitment/screens/internal/application_detail_panel.dart",
-      "sha256": "8622a1013e4085f9f935bb38e92b950512cb024d4a6bb4aae7cde2a6a126f6d7",
-      "baseline_sha256": "cb95bd8092a75ec382267ca996db270654170a24cc87481533b48efd9675726e"
-    },
-    {
-      "path": "lib/features/recruitment/screens/internal/campaign_management_screen.dart",
-      "sha256": "9eb47ead1bee205ec0fbdcb3887397d50d9e9928974fb5f1b62d29e7e970023d",
-      "baseline_sha256": "60677ae2b61d939d8b16c4274a0da0375e372240da1dc109185856b81a89e191"
-    },
-    {
-      "path": "lib/features/recruitment/screens/internal/internal_recruitment_screen.dart",
-      "sha256": "12bac25cb67ff3d9d899db10cedb83eb9dca8ad0720a7dbf6d0b490df0aa7a13",
-      "baseline_sha256": "fdd0424f3b605c1a4d0fae3384658344591566850aa9f6ec5c51f091cb29812d"
-    },
-    {
-      "path": "lib/features/recruitment/screens/internal/recruitment_jury_screen.dart",
-      "sha256": "00ac03157b0f4b24d9097342a6de5b8c6b1078b032e5a7a596b6e39e5c220946",
-      "baseline_sha256": "19fbe241ec769ee2e904b6e2970e6b720ef1a106400ea1a634f1171e2b77cd5a"
-    },
-    {
-      "path": "lib/features/recruitment/screens/public/personality_questionnaire_screen.dart",
-      "sha256": "5353bd259e591f0ec8d6c3eec91ea6534cbd66a33ebe3871ce83cf2de1b240d2",
-      "baseline_sha256": "dc4caa1571b3e20c6e4b7a54e193e9b682fea8462e04fab029a370df01aada8f"
-    },
-    {
-      "path": "lib/features/recruitment/screens/public/public_application_flow_screen.dart",
-      "sha256": "25847d8812f1d3bb7ce0ac2b3b53ac17ba6a18295b9329d234806d736f7b3995",
-      "baseline_sha256": "36d23cdca217aea583cb80bddcd9200bbd943fac55b99079f9551ba9b02862eb"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/campaign_management_widgets.dart",
-      "sha256": "884ad102f6dd8a71513f9d422a0d927366545a03f881fc7472c98e3627060778",
-      "baseline_sha256": "5eba2204aa590f30ab40f9b129a8e868b52a91a8c8666904c4cb838d1dd44c7d"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/candidate_actions.dart",
-      "sha256": "3f9f27f3eb51f64bd4a5b9cbf26c40b7af01d607fac52e739afc01ccbe3b4942",
-      "baseline_sha256": "929c47f7a4b43ee3463732417453ae65f6f67c7339472b15fc4548d4564e81f7"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/candidate_conversion.dart",
-      "sha256": "8cb9fac0e48973b28dd698e16bd8350f9f853c47e6111ed1b318d8d68b4498db",
-      "baseline_sha256": "7f535751a5cc793d10c432b8c134018b9ebbbbd1554c9e14ce8895e5f0a40769"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/jury_teams_section.dart",
-      "sha256": "4e3883a172b9698d04f57dea6e93b9a6fabbe7c39fcc65b753aafdc9a42c3b2c",
-      "baseline_sha256": "72ae6c4b60d3f14064e5246d8d8a2e8db4c2a94661ce52441c3119e240c2a846"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/personality_review_card.dart",
-      "sha256": "a6f7cc7fb3905afe49d006938aaff38f6aa4eb2ee21b9c1a6abae80df539bab9",
-      "baseline_sha256": "120930811de1f6f683767f06bad620b3b21615d7325a86d1d05aeafe3fecd193"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/questionnaire_editor.dart",
-      "sha256": "b43f0799c0b967bca52a7a0a728bef7191ba946e135d935e3d9467641e89bbf6",
-      "baseline_sha256": "647ef8e5d867299578e73950dd18dcae7cfe683d5e91e36556b6c849bc10fcf9"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/recruitment_internal_widgets.dart",
-      "sha256": "3e431c6d20e0322929127967ed370905cf38c3e6bf0b267fd08006bf25fc1850",
-      "baseline_sha256": "8e933b1aa74e0353105cb2c6ca5b484f68c5a2c079a5688d405e8d2dc0977c56"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/internal/recruitment_interview_board.dart",
-      "sha256": "0fd241ccd75cabb14ad6ab507d87982df06c93f813dd7bdc59229d6b96e28d49",
-      "baseline_sha256": null
-    },
-    {
-      "path": "lib/features/recruitment/widgets/public/public_recruitment_widgets.dart",
-      "sha256": "f437430fa719f74a5d67be5e0cb8d8f57e8292cf06348c6a77dfe6ff57fdf1ba",
-      "baseline_sha256": "c39d1d70b7f0b57628a1375d6019e183dd5eedf0d58da332d64c606895656770"
-    },
-    {
-      "path": "lib/features/recruitment/widgets/recruitment_style.dart",
-      "sha256": "23b8ec927cacba099764670cf81225cabb6465bd5a3a674d2cb8c45e2b3fd589",
-      "baseline_sha256": null
-    },
-    {
-      "path": "lib/features/recruitment/widgets/recruitment_workspace.dart",
-      "sha256": "86e600320faff8604bde11dc8d954ffca002d07e517eb0263e8f9d6b17407e71",
-      "baseline_sha256": null
-    },
-    {
       "path": "test/recruitment_internal_test.dart",
-      "sha256": "dcd0bdf9addc3853d39b9751cc53a5dd833cf8871e32a785ce05214f3f7e5bf5",
-      "baseline_sha256": "f0bdff6003bc9bcb79f8000c25b22a50d8e2c975d90b3f5fbb2b52861534fa1b"
-    },
-    {
-      "path": "test/recruitment_jury_personality_test.dart",
-      "sha256": "5e4bb53a9bac90e7d907a674a35c83bdf73371b008b14f3bcac93675b13f7e72",
-      "baseline_sha256": "c5aff72be40acecfb242c5c4f7d014f7a6ad4f38390d7ec0e89dccfacbd3d8fe"
-    },
-    {
-      "path": "test/recruitment_redesign_test.dart",
-      "sha256": "7abafe2d67b5fa8056ce214d8fafe0f7d5fff851b0bc82d4dc93f29a52ce63a0",
-      "baseline_sha256": null
-    },
-    {
-      "path": "test/recruitment_review_path_test.dart",
-      "sha256": "ea0ba1c28ce32836fa28dd90738d23dc6e031ef0fd8e2c10f89c85fa7a7a22d9",
-      "baseline_sha256": "74971c99df8ba84255921771ae2be4e78673d9da89278473e181ea1a948702bb"
+      "sha256": "5e20933473d0ca1879f36a5426ca320c974f5927e6b340ac57502ac46981eff8",
+      "baseline_sha256": "dcd0bdf9addc3853d39b9751cc53a5dd833cf8871e32a785ce05214f3f7e5bf5"
     },
     {
       "path": "test/support/recruitment_redesign_fixture.dart",
-      "sha256": "5092e2b9d7026031127585f609220cefa9999a4b8c5500b7f1da882e46c2894b",
-      "baseline_sha256": null
-    },
-    {
-      "path": "tool/recruitment_redesign_preview_test.dart",
-      "sha256": "7b3ad56a8fcfd4c72598e29cee26d7d7f48336e9c3ba634971518ff1ef459d2e",
-      "baseline_sha256": null
+      "sha256": "f2b99c48b43c26057dbae00ce9708a5088313e88127fd17395171a00ff2cbe12",
+      "baseline_sha256": "5092e2b9d7026031127585f609220cefa9999a4b8c5500b7f1da882e46c2894b"
     }
   ],
   "requirements": [
@@ -180,6 +70,41 @@
       "baseline_sha256": "3a594be82e56057031f7defc830e1d67f788e5cc35005b373bbcaaf00221ba71"
     },
     {
+      "path": "lib/features/recruitment/screens/application_tracking_screen.dart",
+      "sha256": "812f8c341cd4682c8a94cef997f1a3f3e2c37a6727e18700e978153860d78668",
+      "baseline_sha256": "812f8c341cd4682c8a94cef997f1a3f3e2c37a6727e18700e978153860d78668"
+    },
+    {
+      "path": "lib/features/recruitment/screens/internal/application_detail_panel.dart",
+      "sha256": "8622a1013e4085f9f935bb38e92b950512cb024d4a6bb4aae7cde2a6a126f6d7",
+      "baseline_sha256": "8622a1013e4085f9f935bb38e92b950512cb024d4a6bb4aae7cde2a6a126f6d7"
+    },
+    {
+      "path": "lib/features/recruitment/screens/internal/campaign_management_screen.dart",
+      "sha256": "9eb47ead1bee205ec0fbdcb3887397d50d9e9928974fb5f1b62d29e7e970023d",
+      "baseline_sha256": "9eb47ead1bee205ec0fbdcb3887397d50d9e9928974fb5f1b62d29e7e970023d"
+    },
+    {
+      "path": "lib/features/recruitment/screens/internal/internal_recruitment_screen.dart",
+      "sha256": "12bac25cb67ff3d9d899db10cedb83eb9dca8ad0720a7dbf6d0b490df0aa7a13",
+      "baseline_sha256": "12bac25cb67ff3d9d899db10cedb83eb9dca8ad0720a7dbf6d0b490df0aa7a13"
+    },
+    {
+      "path": "lib/features/recruitment/screens/internal/recruitment_jury_screen.dart",
+      "sha256": "00ac03157b0f4b24d9097342a6de5b8c6b1078b032e5a7a596b6e39e5c220946",
+      "baseline_sha256": "00ac03157b0f4b24d9097342a6de5b8c6b1078b032e5a7a596b6e39e5c220946"
+    },
+    {
+      "path": "lib/features/recruitment/screens/public/personality_questionnaire_screen.dart",
+      "sha256": "5353bd259e591f0ec8d6c3eec91ea6534cbd66a33ebe3871ce83cf2de1b240d2",
+      "baseline_sha256": "5353bd259e591f0ec8d6c3eec91ea6534cbd66a33ebe3871ce83cf2de1b240d2"
+    },
+    {
+      "path": "lib/features/recruitment/screens/public/public_application_flow_screen.dart",
+      "sha256": "25847d8812f1d3bb7ce0ac2b3b53ac17ba6a18295b9329d234806d736f7b3995",
+      "baseline_sha256": "25847d8812f1d3bb7ce0ac2b3b53ac17ba6a18295b9329d234806d736f7b3995"
+    },
+    {
       "path": "lib/features/recruitment/screens/public/public_recruitment_campaigns_screen.dart",
       "sha256": "6970e104bd3c2a42a8b0559265638a7b380eaf51d2fbfa3502a61f07e09299b1",
       "baseline_sha256": "6970e104bd3c2a42a8b0559265638a7b380eaf51d2fbfa3502a61f07e09299b1"
@@ -215,6 +140,21 @@
       "baseline_sha256": "68a3b1f75e2f73d6ddcf1e582cfb74c73cc68ae125146e9e7ab708d8ad5944b8"
     },
     {
+      "path": "lib/features/recruitment/widgets/internal/campaign_management_widgets.dart",
+      "sha256": "884ad102f6dd8a71513f9d422a0d927366545a03f881fc7472c98e3627060778",
+      "baseline_sha256": "884ad102f6dd8a71513f9d422a0d927366545a03f881fc7472c98e3627060778"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/candidate_actions.dart",
+      "sha256": "3f9f27f3eb51f64bd4a5b9cbf26c40b7af01d607fac52e739afc01ccbe3b4942",
+      "baseline_sha256": "3f9f27f3eb51f64bd4a5b9cbf26c40b7af01d607fac52e739afc01ccbe3b4942"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/candidate_conversion.dart",
+      "sha256": "8cb9fac0e48973b28dd698e16bd8350f9f853c47e6111ed1b318d8d68b4498db",
+      "baseline_sha256": "8cb9fac0e48973b28dd698e16bd8350f9f853c47e6111ed1b318d8d68b4498db"
+    },
+    {
       "path": "lib/features/recruitment/widgets/internal/candidate_review_dialog.dart",
       "sha256": "39914cac31abf1087a84cd64efd82f97a90fea1004f00310cb9e9820b9a9fa52",
       "baseline_sha256": "39914cac31abf1087a84cd64efd82f97a90fea1004f00310cb9e9820b9a9fa52"
@@ -230,6 +170,31 @@
       "baseline_sha256": "84b6e0a89f65390addbcd00c787d011ef2ccad6004e5fbf52a1a65ddd0e5880b"
     },
     {
+      "path": "lib/features/recruitment/widgets/internal/jury_teams_section.dart",
+      "sha256": "4e3883a172b9698d04f57dea6e93b9a6fabbe7c39fcc65b753aafdc9a42c3b2c",
+      "baseline_sha256": "4e3883a172b9698d04f57dea6e93b9a6fabbe7c39fcc65b753aafdc9a42c3b2c"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/personality_review_card.dart",
+      "sha256": "a6f7cc7fb3905afe49d006938aaff38f6aa4eb2ee21b9c1a6abae80df539bab9",
+      "baseline_sha256": "a6f7cc7fb3905afe49d006938aaff38f6aa4eb2ee21b9c1a6abae80df539bab9"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/questionnaire_editor.dart",
+      "sha256": "b43f0799c0b967bca52a7a0a728bef7191ba946e135d935e3d9467641e89bbf6",
+      "baseline_sha256": "b43f0799c0b967bca52a7a0a728bef7191ba946e135d935e3d9467641e89bbf6"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/recruitment_internal_widgets.dart",
+      "sha256": "3e431c6d20e0322929127967ed370905cf38c3e6bf0b267fd08006bf25fc1850",
+      "baseline_sha256": "3e431c6d20e0322929127967ed370905cf38c3e6bf0b267fd08006bf25fc1850"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/internal/recruitment_interview_board.dart",
+      "sha256": "0fd241ccd75cabb14ad6ab507d87982df06c93f813dd7bdc59229d6b96e28d49",
+      "baseline_sha256": "0fd241ccd75cabb14ad6ab507d87982df06c93f813dd7bdc59229d6b96e28d49"
+    },
+    {
       "path": "lib/features/recruitment/widgets/public/public_application_field.dart",
       "sha256": "777e2169487fd2951b65c6f179d8e4c86556fdb28aa10f4c0843fd316f42f012",
       "baseline_sha256": "777e2169487fd2951b65c6f179d8e4c86556fdb28aa10f4c0843fd316f42f012"
@@ -240,6 +205,11 @@
       "baseline_sha256": "2043c436a119e2c58b15e0403d3a84453fd57739f47ca37f0061f6221703b78f"
     },
     {
+      "path": "lib/features/recruitment/widgets/public/public_recruitment_widgets.dart",
+      "sha256": "f437430fa719f74a5d67be5e0cb8d8f57e8292cf06348c6a77dfe6ff57fdf1ba",
+      "baseline_sha256": "f437430fa719f74a5d67be5e0cb8d8f57e8292cf06348c6a77dfe6ff57fdf1ba"
+    },
+    {
       "path": "lib/features/recruitment/widgets/public/recruitment_countdown.dart",
       "sha256": "574dc79a11155f52e483e70910e95ed300d92144618379968614c39136e751d0",
       "baseline_sha256": "574dc79a11155f52e483e70910e95ed300d92144618379968614c39136e751d0"
@@ -248,6 +218,16 @@
       "path": "lib/features/recruitment/widgets/public/recruitment_welcome.dart",
       "sha256": "e7a6319f7fadaad97cc2ab655c3d5edccae097d11b3705b0ebd250f0c91eb5d5",
       "baseline_sha256": "e7a6319f7fadaad97cc2ab655c3d5edccae097d11b3705b0ebd250f0c91eb5d5"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/recruitment_style.dart",
+      "sha256": "23b8ec927cacba099764670cf81225cabb6465bd5a3a674d2cb8c45e2b3fd589",
+      "baseline_sha256": "23b8ec927cacba099764670cf81225cabb6465bd5a3a674d2cb8c45e2b3fd589"
+    },
+    {
+      "path": "lib/features/recruitment/widgets/recruitment_workspace.dart",
+      "sha256": "86e600320faff8604bde11dc8d954ffca002d07e517eb0263e8f9d6b17407e71",
+      "baseline_sha256": "86e600320faff8604bde11dc8d954ffca002d07e517eb0263e8f9d6b17407e71"
     },
     {
       "path": "test/recruitment_application_metadata_test.dart",
@@ -280,6 +260,11 @@
       "baseline_sha256": "772832c8f22fdb52b12734d15d8919e8d9b9bf1f1fc9809f8904887f72a0b9f3"
     },
     {
+      "path": "test/recruitment_jury_personality_test.dart",
+      "sha256": "5e4bb53a9bac90e7d907a674a35c83bdf73371b008b14f3bcac93675b13f7e72",
+      "baseline_sha256": "5e4bb53a9bac90e7d907a674a35c83bdf73371b008b14f3bcac93675b13f7e72"
+    },
+    {
       "path": "test/recruitment_landing_test.dart",
       "sha256": "72637fd7c4eaafbf14bfb15356208f1418af7358060bffa9701d68fc9b5a3142",
       "baseline_sha256": "72637fd7c4eaafbf14bfb15356208f1418af7358060bffa9701d68fc9b5a3142"
@@ -305,9 +290,24 @@
       "baseline_sha256": "9ecfd0b6e2d95725bd4ce7dbb6590ed32044d1e3589c7e2ed252c81332d2ea92"
     },
     {
+      "path": "test/recruitment_redesign_test.dart",
+      "sha256": "7abafe2d67b5fa8056ce214d8fafe0f7d5fff851b0bc82d4dc93f29a52ce63a0",
+      "baseline_sha256": "7abafe2d67b5fa8056ce214d8fafe0f7d5fff851b0bc82d4dc93f29a52ce63a0"
+    },
+    {
+      "path": "test/recruitment_review_path_test.dart",
+      "sha256": "ea0ba1c28ce32836fa28dd90738d23dc6e031ef0fd8e2c10f89c85fa7a7a22d9",
+      "baseline_sha256": "ea0ba1c28ce32836fa28dd90738d23dc6e031ef0fd8e2c10f89c85fa7a7a22d9"
+    },
+    {
       "path": "test/recruitment_submission_contract_test.dart",
       "sha256": "40cae6e6f6c12dcb658cafec2504d0a8d630c1a69b235748bf7730793d10b626",
       "baseline_sha256": "40cae6e6f6c12dcb658cafec2504d0a8d630c1a69b235748bf7730793d10b626"
+    },
+    {
+      "path": "tool/recruitment_redesign_preview_test.dart",
+      "sha256": "7b3ad56a8fcfd4c72598e29cee26d7d7f48336e9c3ba634971518ff1ef459d2e",
+      "baseline_sha256": "7b3ad56a8fcfd4c72598e29cee26d7d7f48336e9c3ba634971518ff1ef459d2e"
     }
   ],
   "expected_runtime_captures": 52,

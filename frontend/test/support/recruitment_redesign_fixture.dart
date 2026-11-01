@@ -76,7 +76,7 @@ ApplicationModel redesignCandidate({
   questionnaireAnswers: const [
     {
       'id': 'motivation',
-      'label': 'Qu’est-ce qui te motive à rejoindre Enactus ESP ?',
+      'question': 'Qu’est-ce qui te motive à rejoindre Enactus ESP ?',
       'answer':
           'Écouter, apprendre ensemble et tester une première action utile.',
     },
