@@ -3,7 +3,7 @@ import argparse,fcntl,json,os
 from pathlib import Path
 from app.scripts import prelaunch_backup_restore as backup
 ROOT=Path("/opt/enactspace/operations/backup-lot26")
-APPROVED_REVISIONS={"20261006_0025","20261007_0031"}
+APPROVED_REVISIONS={"20261006_0025","20261007_0031","20261031_0033"}
 def approved_revision(revision):
     if revision not in APPROVED_REVISIONS:raise ValueError("Production revision is not approved for scheduled backup")
     return revision

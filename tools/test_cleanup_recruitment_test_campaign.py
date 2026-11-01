@@ -62,10 +62,20 @@ class CleanupHostTests(unittest.TestCase):
         self.patch_base.start()
         self.patch_test = patch.object(cleanup, 'isolated_tests', return_value={'passed': True, 'tests_run': 15})
         self.patch_test.start()
+        self.patch_guard = patch.object(cleanup.backup_guard, 'prepare', return_value={
+            'ready_for_schema_0033': True, 'source_modified': False})
+        self.patch_guard.start()
+        self.patch_revision = patch.object(cleanup.backup_guard, 'verify_backup_revision', return_value=True)
+        self.patch_revision.start()
+        self.patch_diagnostic = patch.object(cleanup.backup_guard, 'failure_diagnostic', return_value={'raw_logs_printed': False})
+        self.patch_diagnostic.start()
         self.host = FakeHost()
 
     def tearDown(self):
         self.patch_test.stop()
+        self.patch_guard.stop()
+        self.patch_revision.stop()
+        self.patch_diagnostic.stop()
         self.patch_base.stop()
         self.directory.cleanup()
 
@@ -112,6 +122,38 @@ class CleanupHostTests(unittest.TestCase):
         self.assertTrue(report['production_services_restored'])
         self.assertFalse(report['database_modified'])
         self.assertNotIn('erase', self.host.events)
+
+    def test_missing_schema_approval_blocks_before_services_are_stopped(self):
+        self.patch_guard.stop()
+        with patch.object(cleanup.backup_guard, 'prepare', return_value={'ready_for_schema_0033': False}):
+            report = self.perform()
+        self.assertEqual(report['stage'], 'backup_schema_preflight')
+        self.assertNotIn('stop', self.host.events)
+        self.assertNotIn('erase', self.host.events)
+
+    def test_backup_for_another_revision_never_allows_erasure(self):
+        self.patch_revision.stop()
+        with patch.object(cleanup.backup_guard, 'verify_backup_revision',
+                          side_effect=cleanup.backup_guard.BackupGuardError('Fresh_backup_for_schema_0033_not_verified')):
+            report = self.perform()
+        self.assertEqual(report['reason'], 'Fresh_backup_for_schema_0033_not_verified')
+        self.assertNotIn('erase', self.host.events)
+        self.assertTrue(report['production_services_restored'])
+
+    def test_known_release_error_code_is_reported_without_raw_command_output(self):
+        ReleaseError = type('ReleaseError', (RuntimeError,), {})
+        def failed_backup():
+            raise ReleaseError('Backup_service_failed_or_stale')
+        self.host.verified_backup = failed_backup
+        report = self.perform()
+        self.assertEqual(report['reason'], 'Backup_service_failed_or_stale')
+        self.assertIn('backup_failure_diagnostic', report)
+
+    def test_identified_campaign_id_is_checked_before_backup_or_service_stop(self):
+        report = cleanup.perform_cleanup(self.host, 'unchanged production compose', True,
+                                         expected_campaign_id='c430e401-34ca-4f4b-8713-aaab44faba6f')
+        self.assertEqual(report['reason'], 'Campaign_identifier_differs_from_identified_test')
+        self.assertNotIn('stop', self.host.events)
 
     def test_changed_fingerprint_prevents_delete_and_resumes_services(self):
         self.host.inventories[1]['campaigns'][0]['fingerprint'] = 'b' * 64

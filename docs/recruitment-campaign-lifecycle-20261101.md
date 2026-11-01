@@ -48,8 +48,8 @@ HTTP exécutés localement utilisent une base SQLite isolée.
 ## Nettoyage exceptionnel demandé par le propriétaire
 
 `tools/cleanup_recruitment_test_campaign_windows.ps1` télécharge des fichiers
-immuables et vérifie leur SHA-256 local et distant. Il lance neuf tests du
-lanceur, puis le programme distant rejoue les quinze tests HTTP et de
+immuables et vérifie leur SHA-256 local et distant. Il lance les tests du
+lanceur et du contrôle de sauvegarde, puis le programme distant rejoue les quinze tests HTTP et de
 nettoyage dans un conteneur sans réseau avec base SQLite et messagerie
 désactivée. Aucun test ne se connecte à la base de production.
 
@@ -88,6 +88,39 @@ aux boîtes des destinataires ne peuvent pas être rappelés par ce nettoyage.
 Le lancement distant via systemd continue si la session SSH se ferme.
 
 ## Limites et suite
+
+### Première exécution sur le VPS
+
+L'opération `cleanup-recruitment-test-75d0ed9b932948118efebfdafc093491`
+a réussi ses quinze tests isolés et identifié l'unique campagne
+`c430e401-34ca-4f4b-8713-aaab44faba6f`, intitulée
+« Campagne de recrutement Enactus ESP 2027-TEST », du 16 au 29 octobre.
+Elle contient un dossier, quatre notifications, six courriels, un push et
+un événement d'audit ; aucun fichier ni compte converti n'est lié.
+L'arrêt s'est produit à `fresh_verified_backup` avant toute suppression,
+et les quatre services ont été remis en marche. L'installation de
+l'interface sur Windows n'a donc pas encore été exécutée.
+
+Le code du planificateur de sauvegarde n'autorisait que les révisions
+0025 et 0031. La révision 0033, déjà déployée, est désormais ajoutée à cette
+liste explicite, et ses tests refusent toujours les révisions inconnues.
+La copie du VPS doit encore être vérifiée : le statut seul de l'opération
+précédente ne permettait pas d'affirmer la cause exacte de la panne.
+
+La reprise ajoute `-ApproveBackupSchema` : avant de mettre les services en
+pause, elle vérifie le programme systemd, le répertoire de travail et les
+empreintes connues du planificateur et du moteur de restauration. Si la
+copie correspond exactement à la version connue, seul le littéral
+`APPROVED_REVISIONS` reçoit `20261031_0033`. Le fichier précédent est conservé
+en privé, et propriétaire et permissions sont préservés. Une version
+inconnue ou une sauvegarde en cours bloque avant l'arrêt des services.
+
+La sauvegarde complète et la restauration isolée restent obligatoires.
+Le nouveau reçu doit prouver explicitement la restauration du schéma
+0033 ; un ancien reçu 0031 est refusé. Les erreurs du lanceur affichent
+maintenant leur code fixe et un diagnostic limité à l'état systemd et aux
+indicateurs de la dernière sauvegarde, sans journaux bruts ni secrets.
+La reprise vérifie aussi l'identifiant exact de la campagne déjà identifiée.
 
 Le nouveau nettoyeur doit encore être exécuté sur le VPS ; aucune campagne
 n'a été supprimée depuis l'environnement de développement. La commande ne

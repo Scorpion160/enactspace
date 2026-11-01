@@ -3,6 +3,7 @@
 Default is inventory. --execute is the user's explicit test-data erasure,
 with an isolated rehearsal, fresh verified backup and transaction. This never
 changes campaign API permissions, the image, schema, Compose or mail routing.
+An explicit opt-in can add schema 0033 to the exact known backup scheduler.
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ import re
 import signal
 import sys
 import uuid
+
+import recruitment_backup_schema_guard as backup_guard
 
 HELPER_HASH = '2ad80ede7b3c51eb4b349f0d35c6b595f28fc2fa58e2c3fed59a25495efb5a15'
 IMAGE_ID = 'sha256:415403e80c33ab717337d3e742bfea544dcc3651fc147da107450d76582bcc04'
@@ -158,7 +161,7 @@ def read_inventory(host):
     return result['inventory']
 
 
-def perform_cleanup(host, original, execute):
+def perform_cleanup(host, original, execute, *, approve_backup_schema=False, expected_campaign_id=None):
     report = dict(database_modified=False, schema_changed=False, configuration_modified=False,
                   image_changed=False, mail_routing_changed=False, emails_sent=False,
                   campaign_created=False, services_temporarily_paused=False)
@@ -177,7 +180,12 @@ def perform_cleanup(host, original, execute):
         require(data['campaign_count'] == 1 and len(eligible) == 1,
                 'Campaign_not_eligible_for_scoped_test_cleanup')
         target = eligible[0]
+        require(expected_campaign_id is None or target['id'] == expected_campaign_id,
+                'Campaign_identifier_differs_from_identified_test')
         report['campaign_id'] = target['id']
+        stage = 'backup_schema_preflight'
+        report['backup_guard'] = backup_guard.prepare(host, apply=approve_backup_schema)
+        require(report['backup_guard']['ready_for_schema_0033'], 'Backup_schema_0033_requires_known_guard_update')
         stage = 'pause_application_services'
         paused = True  # Also resume after a partially successful stop.
         host.compose('stop', *SERVICES)
@@ -185,6 +193,7 @@ def perform_cleanup(host, original, execute):
         print('SAUVEGARDE_AVANT_NETTOYAGE_DU_TEST', flush=True)
         stage = 'fresh_verified_backup'
         report['backup_id'] = host.verified_backup()
+        report['backup_schema_0033_restore_verified'] = backup_guard.verify_backup_revision(report['backup_id'])
         require(BASE.read_text() == original, 'Compose_changed_during_backup')
         stage = 'revalidate_plan'
         fresh = read_inventory(host)
@@ -206,9 +215,19 @@ def perform_cleanup(host, original, execute):
         report['status'] = 'TEST_CAMPAIGN_CLEANUP_PASSED'
     except Exception as error:
         report.update(status='TEST_CAMPAIGN_CLEANUP_BLOCKED', stage=stage, error_type=type(error).__name__)
-        if isinstance(error, CleanupError):
+        if isinstance(error, (CleanupError, backup_guard.BackupGuardError)) or type(error).__name__ == 'ReleaseError':
             report['reason'] = str(error)
+        if stage == 'fresh_verified_backup':
+            try:
+                report['backup_failure_diagnostic'] = backup_guard.failure_diagnostic(host)
+            except Exception as diagnostic_error:
+                report['backup_failure_diagnostic'] = {'status': 'unavailable', 'error_type': type(diagnostic_error).__name__}
     finally:
+        if hasattr(host, 'backup_guard_diagnostic'):
+            report['backup_guard'] = host.backup_guard_diagnostic
+        modified = report.get('backup_guard', {}).get('source_modified', False)
+        report['backup_scheduler_source_modified'] = modified
+        report['configuration_modified'] = modified
         if paused:
             try:
                 require(host.probes_stopped and BASE.read_text() == original,
@@ -234,6 +253,8 @@ def save_receipt(directory, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--approve-backup-schema', action='store_true')
+    parser.add_argument('--expected-campaign-id', type=uuid.UUID)
     parser.add_argument('--operation', type=Path, required=True)
     args = parser.parse_args()
     def interrupt(signum, frame):
@@ -252,7 +273,9 @@ def main():
     host.override.chmod(0o600)
     with (ROOT / 'backend-publication.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        report = perform_cleanup(host, BASE.read_text(), args.execute)
+        report = perform_cleanup(host, BASE.read_text(), args.execute,
+                                 approve_backup_schema=args.approve_backup_schema,
+                                 expected_campaign_id=str(args.expected_campaign_id) if args.expected_campaign_id else None)
         save_receipt(directory, report)
     print(json.dumps(report, indent=2))
     return 0 if report['status'] in {'TEST_CAMPAIGN_CLEANUP_PASSED', 'TEST_CAMPAIGN_INVENTORY_COMPLETE'} else 1

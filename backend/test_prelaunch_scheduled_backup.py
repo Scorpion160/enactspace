@@ -5,9 +5,9 @@ from unittest.mock import patch
 from app.scripts import prelaunch_scheduled_backup as scheduled
 class ScheduledBackupSafetyTests(unittest.TestCase):
     def test_only_approved_release_revisions_are_accepted(self):
-        for revision in ("20261006_0025","20261007_0031"):
+        for revision in ("20261006_0025","20261007_0031","20261031_0033"):
             self.assertEqual(scheduled.approved_revision(revision),revision)
-        for revision in ("20261007_9999",None,"unexpected"):
+        for revision in ("20261007_9999","20261031_0032","20261031_0034",None,"unexpected"):
             with self.assertRaises(ValueError):scheduled.approved_revision(revision)
     def test_existing_capture_lock_prevents_another_capture(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -25,6 +25,6 @@ class ScheduledBackupSafetyTests(unittest.TestCase):
     def test_capture_receives_the_verified_revision(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);os.chmod(root,0o700)
-            with patch.object(scheduled,"ROOT",root),patch.object(scheduled.backup,"sql",return_value="20261007_0031"),patch.object(scheduled.backup,"execute_rehearsal") as execute:
-                scheduled.execute();execute.assert_called_once_with(expected_revision="20261007_0031")
+            with patch.object(scheduled,"ROOT",root),patch.object(scheduled.backup,"sql",return_value="20261031_0033"),patch.object(scheduled.backup,"execute_rehearsal") as execute:
+                scheduled.execute();execute.assert_called_once_with(expected_revision="20261031_0033")
 if __name__=="__main__":unittest.main()

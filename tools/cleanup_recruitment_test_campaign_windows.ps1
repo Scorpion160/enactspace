@@ -2,7 +2,10 @@
 param(
     [Parameter(Mandatory = $true)] [ValidatePattern('^[a-f0-9]{40}$')] [string]$Commit,
     [switch]$Execute,
-    [switch]$SyncFrontend
+    [switch]$SyncFrontend,
+    [switch]$ApproveBackupSchema,
+    [ValidatePattern('^[a-f0-9-]{36}$')]
+    [string]$ExpectedCampaignId = 'c430e401-34ca-4f4b-8713-aaab44faba6f'
 )
 $ErrorActionPreference = 'Stop'
 $id = [guid]::NewGuid().ToString('N')
@@ -10,12 +13,17 @@ $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentTestCleanup\$id"
 $remote = "/opt/enactspace/operations/cleanup-recruitment-test-$id"
 $unit = "enactspace-recruitment-test-cleanup-$id"
 $runner = 'cleanup_recruitment_test_campaign.py'
-$tests = 'test_cleanup_recruitment_test_campaign.py'
+$tests = 'test_cleanup_recruitment_*.py'
+$backupArgument = if ($ApproveBackupSchema) { ' --approve-backup-schema' } else { '' }
+$campaignArgument = " --expected-campaign-id $ExpectedCampaignId"
 $files = @(
-    @{ source = 'tools/cleanup_recruitment_test_campaign.py'; target = 'cleanup_recruitment_test_campaign.py'; sha256 = 'c8a6400062c0468c5652fd520bf252c8ea421db5b2f99eb1521472aa7c9ff38a' },
+    @{ source = 'tools/cleanup_recruitment_test_campaign.py'; target = 'cleanup_recruitment_test_campaign.py'; sha256 = '554c9efa13f77154135465e387d99691e03ba967022284778845ff62c72d2aec' },
     @{ source = 'tools/recruitment_test_campaign_scope.py'; target = 'recruitment_test_campaign_scope.py'; sha256 = '3d877a78d7717c0733ad140b26589e73ab976d591e736df6b8bdd1264f51638a' },
-    @{ source = 'tools/test_cleanup_recruitment_test_campaign.py'; target = 'test_cleanup_recruitment_test_campaign.py'; sha256 = '8a89a39804b7f4b7175534c1804ff8bda465fdd0ba8a647eb5319377b79261e4' },
+    @{ source = 'tools/recruitment_backup_schema_guard.py'; target = 'recruitment_backup_schema_guard.py'; sha256 = 'c02cb1c9c1fcb8fdbf5ebb54a0417b89902e920ebdd43154994b0c92a3035823' },
+    @{ source = 'tools/test_cleanup_recruitment_test_campaign.py'; target = 'test_cleanup_recruitment_test_campaign.py'; sha256 = 'e61f802f77a63f74d94a0b63d8661673e4f456b8f53c8dfb35c0753b6554e457' },
+    @{ source = 'tools/test_cleanup_recruitment_backup_guard.py'; target = 'test_cleanup_recruitment_backup_guard.py'; sha256 = '89d7b90c69faca01e238850de1e782de7a853a311e8f43d941bbe273cef73675' },
     @{ source = 'tools/publish_recruitment_campaign_backend.py'; target = 'publish_recruitment_campaign_backend.py'; sha256 = '2ad80ede7b3c51eb4b349f0d35c6b595f28fc2fa58e2c3fed59a25495efb5a15' },
+    @{ source = 'backend/app/scripts/prelaunch_scheduled_backup.py'; target = 'prelaunch_scheduled_backup.py'; sha256 = 'bf18b1b978bddad5e3773a33060effd8617a184bdcdb29a51d8b3206113c0a80' },
     @{ source = 'backend/test_recruitment_campaign_lifecycle.py'; target = 'test_recruitment_campaign_lifecycle.py'; sha256 = '401ef6cc965abcb7c1d63611d0e20e55d24f8a9616525302ea976021b41c1f64' },
     @{ source = 'backend/test_recruitment_test_campaign_cleanup.py'; target = 'test_recruitment_test_campaign_cleanup.py'; sha256 = '91efc46e548027b1c32dc73a9f617d04750df1f3e1aaef04d9e39e898d318d9d' },
     @{ source = 'tools/sync_recruitment_lifecycle_windows.ps1'; target = 'sync_recruitment_lifecycle_windows.ps1'; sha256 = '830ccf7b304d9d2a767f6bb44e314f81434fc7eddd80248e09474c619d5b2048' }
@@ -41,7 +49,7 @@ foreach ($file in $files) {
         throw 'Integrite distante incorrecte : aucune operation lancee.'
     }
 }
-& ssh @sshOptions vps "python3 -m unittest discover -s $remote -p $tests -v"
+& ssh @sshOptions vps "python3 -m unittest discover -s $remote -p '$tests' -v"
 if ($LASTEXITCODE -ne 0) { throw 'Tests du lanceur echoues : aucun nettoyage lance.' }
 "DOSSIER_OPERATION=$remote"
 if (!$Execute) {
@@ -55,7 +63,7 @@ if (!$Execute) {
 & ssh @sshOptions vps (
     "systemd-run --unit=$unit --collect --service-type=exec " +
     "--property=RuntimeMaxSec=30min --property=TimeoutStopSec=3min " +
-    "/usr/bin/python3 $remote/$runner --operation $remote --execute"
+    "/usr/bin/python3 $remote/$runner --operation $remote --execute$backupArgument$campaignArgument"
 )
 if ($LASTEXITCODE -ne 0) {
     throw "Lancement non confirme. Consulter $remote/cleanup.json et l'unite $unit avant toute relance."
