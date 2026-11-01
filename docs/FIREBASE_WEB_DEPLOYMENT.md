@@ -2,11 +2,13 @@
 
 ## État et compilation actuels
 
-Le web public est en 1.0.13 build 16. La compilation doit passer par `tools/build_web_with_firebase.ps1` avec un fichier de defines privé complet : API HTTPS, projet Firebase, sender ID, clé/app ID web et clé publique VAPID. Le worker généré est exclu de la sauvegarde Git; ne pas le remplacer par un fichier obsolète après build.
+Le web public est en **1.0.23 build 26**, publié le 1er novembre 2026 avec la refonte du recrutement. Le journal Windows confirme les contrôles locaux du VPS puis la version et l’empreinte JavaScript en HTTPS. Voir [les preuves de publication](releases/20261101-recruitment-ui-1.0.23-build26.json) et [le compte rendu de la refonte](RECRUITMENT_UI_REDESIGN_20261101.md).
+
+Pour les compilations suivantes, utiliser `tools/build_web_with_firebase.ps1` avec un fichier de defines privé complet : API HTTPS, projet Firebase, sender ID, clé/app ID web et clé publique VAPID. Le worker généré est exclu de la sauvegarde Git; ne pas le remplacer par un fichier obsolète après build.
 
 Les restrictions de clé API ne sont pas encore attestées. La présence de `firebase-messaging-sw.js` et l’activation backend des push ne prouvent pas la réception sur navigateur : vérifier permission, enregistrement, réception et déconnexion.
 
-Le publieur historique contient des constantes de version et de SHA256. Une copie opérationnelle a été adaptée pour chaque release; ne pas publier un nouveau build avec les anciennes constantes. Vérifier les trois changements, l’intégrité du script transféré, l’archive et les tests avant exécution. Voir [la procédure actuelle](releases/20261010-release-1.0.13.md).
+La publication 1.0.23 utilise `tools/publish_prebuilt_recruitment_web_windows.ps1` pour réutiliser le build déjà compilé, contrôler l’archive transférée, conserver la publication précédente et vérifier les octets servis en HTTPS. Son publieur est épinglé à cette version, à ce numéro de build et à cette empreinte JavaScript. Chaque release suivante doit disposer de contrôles adaptés à ses propres valeurs. Le [compte rendu 1.0.13](releases/20261010-release-1.0.13.md) conserve la procédure historique.
 
 ## Procédures générales et contexte antérieur
 

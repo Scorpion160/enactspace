@@ -123,4 +123,19 @@ Sans option, le lanceur prépare uniquement l’archive locale. Avec `-Publish`,
 
 Les contrôles PowerShell 7.5.4 du lanceur passent : syntaxe, acceptation du build attendu, refus d’une autre version, d’un autre numéro, d’un fichier obligatoire absent ou d’un JavaScript modifié, stabilité de l’empreinte et détection des ajouts/modifications/retraits de ressources. Les cinq tests Python du publieur passent également. Ces contrôles utilisent des fichiers temporaires locaux et n’exécutent aucun transfert ni déploiement.
 
-**État actuel :** captures revues, build prêt et commande de publication préparée. Le PC est toujours hors ligne pour l’accès distant. La publication reste à lancer sous Windows ; le marqueur attendu après vérification est `WEB_PUBLIC_1.0.23_26_HTTPS_ET_EMPREINTE_OK`, accompagné du chemin de retour arrière et du dossier contenant le journal et le reçu de publication.
+**État avant lancement Windows :** captures revues, build prêt et commande de publication préparée. Le PC est toujours hors ligne pour l’accès distant. La publication reste à lancer sous Windows ; le marqueur attendu après vérification est `WEB_PUBLIC_1.0.23_26_HTTPS_ET_EMPREINTE_OK`, accompagné du chemin de retour arrière et du dossier contenant le journal et le reçu de publication.
+
+## Publication 1.0.23 (26) confirmée
+
+Le journal fourni après exécution du lanceur `b51bf35691d06e91ecceee29086b7a88765b562a` avec `-Publish` confirme la publication du build existant. Les trois fichiers ont été transférés et vérifiés ; les cinq tests Python du publieur ont réussi sur le VPS.
+
+Le résultat serveur est `WEB_DEPLOYED_LOCAL_CHECKS_PASSED`, avec `web_deployed: true`, version 1.0.23 et build 26. Les ressources `index.html`, `main.dart.js`, `flutter_bootstrap.js`, `firebase-messaging-sw.js`, `version.json` et les routes `/academy`, `/archives`, `/recruitment/apply`, `/application-tracking` ont passé les contrôles locaux.
+
+Le contrôle supplémentaire exécuté depuis Windows confirme ensuite **`WEB_PUBLIC_1.0.23_26_HTTPS_ET_EMPREINTE_OK`** : la version servie publiquement et l’empreinte JavaScript `2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad` concordent avec le build validé. Le champ `public_https_checked: false` du résultat serveur décrit uniquement la portée des contrôles locaux du VPS ; la vérification HTTPS a bien réussi dans l’étape suivante du lanceur Windows.
+
+- Retour arrière web conservé : `/opt/enactspace/releases/web-previous-ced659942a844a35ae0b77560f0b3c7d`.
+- Opération Windows : `b85233fa7b124fd79fa7229c74dd4bde`.
+- Journal et reçu : `%LOCALAPPDATA%\EnactSpace\WebPublications\b85233fa7b124fd79fa7229c74dd4bde`.
+- Le rapport du publieur confirme `backend_changed: false` et `mail_routing_changed: false`.
+
+**État de la livraison :** refonte publiée sur le web en 1.0.23 (26), contrôles VPS et HTTPS réussis. La revue visuelle des widgets et les tests restent distincts d’un parcours authentifié effectué dans le navigateur sur cette publication ; les écrans réels peuvent maintenant être consultés après actualisation de l’application.

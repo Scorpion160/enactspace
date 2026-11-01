@@ -31,12 +31,12 @@
     "duration_seconds": 196,
     "main_dart_js_sha256": "2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad",
     "firebase_worker_generation_confirmed": true,
-    "deployed": false
+    "deployed": true
   },
   "publication_preparation": {
     "publisher_template_commit": "614fdb493b03693b816eba62e9997906cddb1b92",
     "publisher_archive_tests_passed": 5,
-    "publisher_executed": false,
+    "publisher_executed": true,
     "reuse_existing_build": true,
     "windows_launcher": "tools/publish_prebuilt_recruitment_web_windows.ps1",
     "launcher_preflight_checks_passed": true,
@@ -49,8 +49,35 @@
     ]
   },
   "next_steps": [
-    "Recheck the current public release before publication",
-    "Package and publish the already built version 1.0.23 build 26",
-    "Verify public HTTPS version and JavaScript bytes"
-  ]
+    "Refresh the live application and review the recruitment screens with an authorized account"
+  ],
+  "publication": {
+    "date_utc": "2026-11-01",
+    "evidence": "User-supplied complete Windows publication log",
+    "windows_operation_id": "b85233fa7b124fd79fa7229c74dd4bde",
+    "windows_launcher_commit": "b51bf35691d06e91ecceee29086b7a88765b562a",
+    "build_reused": true,
+    "server_status": "WEB_DEPLOYED_LOCAL_CHECKS_PASSED",
+    "web_deployed": true,
+    "server_checks": [
+      "index.html",
+      "main.dart.js",
+      "flutter_bootstrap.js",
+      "firebase-messaging-sw.js",
+      "version.json",
+      "/academy",
+      "/archives",
+      "/recruitment/apply",
+      "/application-tracking"
+    ],
+    "publisher_tests_passed_on_vps": 5,
+    "server_report_public_https_checked": false,
+    "public_https_verified_from_windows": true,
+    "public_confirmation_marker": "WEB_PUBLIC_1.0.23_26_HTTPS_ET_EMPREINTE_OK",
+    "public_main_dart_js_sha256": "2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad",
+    "rollback_directory": "/opt/enactspace/releases/web-previous-ced659942a844a35ae0b77560f0b3c7d",
+    "backend_changed": false,
+    "mail_routing_changed": false,
+    "authenticated_production_browser_walkthrough_completed": false
+  }
 }
