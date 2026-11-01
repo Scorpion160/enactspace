@@ -18,8 +18,11 @@
     "expected_image_count": 52,
     "generation_confirmed_by_installer": true,
     "archive_name": "enactspace-recruitment-rendu-f51504dd195f4ad8afe8af067db1fb8e.zip",
-    "archive_received": false,
-    "visual_review_completed": false
+    "archive_received": true,
+    "visual_review_completed": true,
+    "reviewed_image_count": 52,
+    "archive_sha256": "94b910dbba62e34e2b886fe746e7fad53c32f8a12f1a57a8a8afe24e1ef456e4",
+    "review_scope": "13 Flutter widget views, each in light/dark themes at 390/1440 pixels; not an authenticated production-browser walkthrough"
   },
   "web_build": {
     "version": "1.0.23",
@@ -34,10 +37,18 @@
     "publisher_template_commit": "614fdb493b03693b816eba62e9997906cddb1b92",
     "publisher_archive_tests_passed": 5,
     "publisher_executed": false,
-    "reuse_existing_build": true
+    "reuse_existing_build": true,
+    "windows_launcher": "tools/publish_prebuilt_recruitment_web_windows.ps1",
+    "launcher_preflight_checks_passed": true,
+    "launcher_checks_cover": [
+      "expected build version and number",
+      "JavaScript hash",
+      "missing required file",
+      "stable fingerprint",
+      "added, edited or removed static asset"
+    ]
   },
   "next_steps": [
-    "Review the f515 capture archive",
     "Recheck the current public release before publication",
     "Package and publish the already built version 1.0.23 build 26",
     "Verify public HTTPS version and JavaScript bytes"

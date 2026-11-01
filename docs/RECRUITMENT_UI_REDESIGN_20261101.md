@@ -110,3 +110,17 @@ Les messages sur les versions plus récentes des dépendances et le dry run Wasm
 Le programme `tools/publish_web_release.py` et ses cinq tests sont repris de la version déjà utilisée pour les publications précédentes, commit `614fdb493b03693b816eba62e9997906cddb1b92`. Seules les trois constantes de contrôle du build ont été adaptées : empreinte JavaScript ci-dessus, version 1.0.23 et build 26. Les cinq tests d’archives et la compilation syntaxique Python passent. Aucun appel de publication n’a été exécuté. Après revue des captures, ce programme permettra de publier les fichiers déjà compilés, avec le mécanisme de contrôle et de retour arrière existant, puis de vérifier la version et l’empreinte servies en HTTPS. Il n’est pas nécessaire de relancer Flutter pour cette étape.
 
 Les résultats de cette exécution sont aussi consignés dans [le reçu du build 1.0.23 (26)](releases/20261101-recruitment-ui-1.0.23-build26.json).
+
+## Revue visuelle f515 terminée et publication du build existant
+
+L’archive f515 a été reçue et ses **52 captures** ont été examinées : les 13 vues, en clair et en sombre, à 390 et 1440 pixels. Les libellés Informations, Questionnaire et Aperçu candidat sont désormais lisibles dans leurs états sélectionné et non sélectionné. Le retour à la ligne sur mobile, les descriptions dépliées, les contrastes et l’icône du suivi sont cohérents avec les corrections attendues. Aucun défaut bloquant supplémentaire n’a été relevé sur ces vues. Le reçu JSON conserve l’empreinte de l’archive reçue.
+
+Ce contrôle porte sur les widgets Flutter et leurs jeux de données fictifs. Il ne constitue pas encore une recette authentifiée du site en production.
+
+Le lanceur `tools/publish_prebuilt_recruitment_web_windows.ps1` utilise le dossier `frontend/build/web` déjà compilé. Il vérifie la version 1.0.23, le build 26 et l’empreinte JavaScript confirmée par le journal Windows ; il n’appelle pas Flutter. Une empreinte de tous les fichiers est comparée avant et après création de l’archive afin de refuser un contenu modifié pendant la préparation. Les deux programmes Python de publication sont téléchargés au commit `2956b9c5…` et leurs empreintes sont vérifiées.
+
+Sans option, le lanceur prépare uniquement l’archive locale. Avec `-Publish`, il contrôle le web public 1.0.22 build 25 et la disponibilité de l’API, transfère et vérifie les trois fichiers, exécute les cinq tests du publieur sur le VPS, puis publie le bundle avec le mécanisme existant de retour arrière. Il vérifie ensuite la version et les octets JavaScript en HTTPS. Si la version 1.0.23 build 26 est déjà publique avec l’empreinte attendue, il confirme cet état sans effectuer une deuxième publication. Une version publique différente interrompt le parcours.
+
+Les contrôles PowerShell 7.5.4 du lanceur passent : syntaxe, acceptation du build attendu, refus d’une autre version, d’un autre numéro, d’un fichier obligatoire absent ou d’un JavaScript modifié, stabilité de l’empreinte et détection des ajouts/modifications/retraits de ressources. Les cinq tests Python du publieur passent également. Ces contrôles utilisent des fichiers temporaires locaux et n’exécutent aucun transfert ni déploiement.
+
+**État actuel :** captures revues, build prêt et commande de publication préparée. Le PC est toujours hors ligne pour l’accès distant. La publication reste à lancer sous Windows ; le marqueur attendu après vérification est `WEB_PUBLIC_1.0.23_26_HTTPS_ET_EMPREINTE_OK`, accompagné du chemin de retour arrière et du dossier contenant le journal et le reçu de publication.
