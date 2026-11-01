@@ -193,15 +193,17 @@
     },
     {
       "path": "frontend/test/recruitment_jury_personality_test.dart",
-      "sha256": "7318bd9407518b90102553931e89985eb6b4b4e9cc958ef8197bac8a0898608c",
+      "sha256": "c5aff72be40acecfb242c5c4f7d014f7a6ad4f38390d7ec0e89dccfacbd3d8fe",
       "baseline_sha256": null,
-      "previous_sha256": "4ce1142573ebdd607b63122b281e4746303542b125f157c48243df47a13895fd"
+      "previous_sha256": "4ce1142573ebdd607b63122b281e4746303542b125f157c48243df47a13895fd",
+      "prior_package_sha256": "7318bd9407518b90102553931e89985eb6b4b4e9cc958ef8197bac8a0898608c"
     },
     {
       "path": "frontend/test/recruitment_landing_test.dart",
       "baseline_sha256": "5044217d7534127264b51f3dd1159d69def88b97c98464c6fd78e3cc4d26b223",
       "previous_sha256": "5044217d7534127264b51f3dd1159d69def88b97c98464c6fd78e3cc4d26b223",
-      "sha256": "d7c7850382877c19f329897a501c8f07f081c509f67ac5ce447c978d7ad970a9"
+      "sha256": "72637fd7c4eaafbf14bfb15356208f1418af7358060bffa9701d68fc9b5a3142",
+      "prior_package_sha256": "d7c7850382877c19f329897a501c8f07f081c509f67ac5ce447c978d7ad970a9"
     },
     {
       "path": "frontend/test/recruitment_public_test.dart",
@@ -210,5 +212,10 @@
       "sha256": "10014ea921190c94eec287d5f3fbab79ed45f4562fc7ce1fa84fca38727f588b"
     }
   ],
-  "frontend_previous_revision": "324ecb21982be5c682db4ad08c8ea80857e532c2"
+  "frontend_previous_revision": "324ecb21982be5c682db4ad08c8ea80857e532c2",
+  "frontend_prior_package_revision": "fac041b53f6a143e0ae55744e9adbd11530409dd",
+  "frontend_test_resources": {
+    "backend/app/services/recruitment_rubric.json": "adb5fbc6a5ba4c03605a94b4e032eec8b65661d380bde77434fe94eeddfb1023",
+    "backend/app/services/recruitment_questionnaire.py": "4a92e783227a74646ae2c87bcc3c9f7041a92e2ec32c743eaaa0e22aa264cc3f"
+  }
 }

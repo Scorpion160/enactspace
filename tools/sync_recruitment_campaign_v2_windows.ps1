@@ -4,7 +4,7 @@ param(
     [string]$Frontend = 'C:\Users\DIOP\Documents\EnactSpaceRecovery\enactspace-20260927\frontend'
 )
 $ErrorActionPreference = 'Stop'
-$manifestHash = 'd568f622ac9369c46caa639154bdf47c0f677b6ae0fe4844e65e69cc11bc46d6'
+$manifestHash = '4862607c0be62f6138543354423ab0b569efc429c0cb6432e5e2b2265edf92b2'
 $id = [guid]::NewGuid().ToString('N')
 $local = Join-Path $env:LOCALAPPDATA "EnactSpace\RecruitmentClients\$id"
 $stage = Join-Path $local 'frontend'
@@ -57,6 +57,12 @@ foreach ($entry in $data.frontend) {
         Copy-Item -LiteralPath $currentFile -Destination $currentCopy
         FormatChecked $currentCopy
         if ((Hash $currentCopy) -eq (Hash $candidateFile)) { continue }
+        if ($entry.prior_package_sha256) {
+            $priorPackageFile = Join-Path $local (Join-Path 'prior-package' $relative)
+            DownloadChecked $data.frontend_prior_package_revision $entry.path $priorPackageFile $entry.prior_package_sha256
+            FormatChecked $priorPackageFile
+            if ((Hash $currentCopy) -eq (Hash $priorPackageFile)) { continue }
+        }
         if ($entry.previous_sha256) {
             $previousFile = Join-Path $previous $relative
             DownloadChecked $data.frontend_previous_revision $entry.path $previousFile $entry.previous_sha256
@@ -97,12 +103,29 @@ if ($differences.Count -gt 0) {
         [Text.UTF8Encoding]::new($false)
     )
     $archive = Join-Path $local 'recruitment-source-review.zip'
-    $reviewFiles = @($canonical, $payload, $baseline, $previous, $manifest, $review) |
+    $reviewFiles = @($canonical, $payload, $baseline, $previous, (Join-Path $local 'prior-package'), $manifest, $review) |
         Where-Object { Test-Path -LiteralPath $_ }
     Compress-Archive -LiteralPath $reviewFiles -DestinationPath $archive
     foreach ($difference in $differences) { "SOURCE_A_EXAMINER=$($difference.path)" }
     "ARCHIVE_SOURCES_A_EXAMINER=$archive"
     throw 'Des differences de code restent a examiner. Sources originales conservees.'
+}
+
+# Cross-language tests read these exact public server definitions. Stage only
+# these two checksum-pinned files beside the frontend, never a live backend.
+$testResourceNames = @(
+    'backend/app/services/recruitment_rubric.json',
+    'backend/app/services/recruitment_questionnaire.py'
+)
+if (@($data.frontend_test_resources.PSObject.Properties).Count -ne $testResourceNames.Count) {
+    throw 'Ressources de test inattendues. Sources originales conservees.'
+}
+foreach ($name in $testResourceNames) {
+    $resource = $data.frontend_test_resources.PSObject.Properties[$name]
+    if ($null -eq $resource -or [string]$resource.Value -notmatch '^[a-f0-9]{64}$') {
+        throw 'Ressource de test absente ou incorrecte. Sources originales conservees.'
+    }
+    DownloadChecked $Commit $name (Join-Path $local $name) ([string]$resource.Value)
 }
 
 # Work on a complete source copy. No original file is replaced before checks pass.
@@ -114,6 +137,7 @@ foreach ($entry in $data.frontend) {
     New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $payload $relative) -Destination $target -Force
 }
+"DOSSIER_VALIDATION=$stage"
 Push-Location $stage
 try {
     & flutter pub get

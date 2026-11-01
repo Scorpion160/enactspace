@@ -150,7 +150,7 @@ void main() {
       expect(find.text(_campaign.title), findsOneWidget);
       expect(find.text(second.title), findsOneWidget);
       expect(
-        tester.getTopLeft(find.text('Les candidatures ouvertes')).dy,
+        tester.getTopLeft(find.text('Les campagnes de recrutement')).dy,
         lessThan(300),
       );
       expect(tester.takeException(), isNull);

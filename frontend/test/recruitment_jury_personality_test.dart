@@ -154,17 +154,28 @@ const _application = ApplicationModel(
   canConvert: false,
 );
 
-Future<void> _tap(WidgetTester tester, Finder finder) async {
+Finder get _firstAnswer => find.descendant(
+  of: find.widgetWithText(Card, 'Affirmation 1'),
+  matching: find.widgetWithText(ChoiceChip, 'Tout à fait'),
+);
+
+Future<void> _reveal(WidgetTester tester, Finder finder) async {
   if (finder.evaluate().isEmpty) {
     await tester.scrollUntilVisible(
       finder,
-      300,
+      150,
       scrollable: find.byType(Scrollable).first,
-      maxScrolls: 40,
+      maxScrolls: 100,
     );
-  } else {
-    await tester.ensureVisible(finder);
   }
+  expect(finder, findsOneWidget);
+  await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
+  await tester.pumpAndSettle();
+  expect(finder.hitTestable(), findsOneWidget);
+}
+
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await _reveal(tester, finder);
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
@@ -242,7 +253,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await _tap(tester, find.text('Tout à fait').first);
+        await _tap(tester, _firstAnswer);
+        expect(tester.widget<ChoiceChip>(_firstAnswer).selected, isTrue);
         expect(tester.takeException(), isNull);
         await _tap(tester, find.text('Enregistrer pour plus tard'));
         expect(
@@ -274,13 +286,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _tap(tester, find.byType(CheckboxListTile));
-      await _tap(tester, find.text('Tout à fait').first);
+      await _tap(tester, _firstAnswer);
       await _tap(tester, find.text('Enregistrer pour plus tard'));
       expect(gateway.writes, isEmpty);
-      final selected = tester
-          .widgetList<ChoiceChip>(find.byType(ChoiceChip))
-          .where((chip) => chip.selected);
-      expect(selected, hasLength(1));
+      expect(
+        find.text(
+          'L’enregistrement n’a pas abouti. Ta saisie reste sur cette page ; réessaie avant de la quitter.',
+        ),
+        findsOneWidget,
+      );
+      await _reveal(tester, _firstAnswer);
+      expect(tester.widget<ChoiceChip>(_firstAnswer).selected, isTrue);
       gateway.failSave = false;
       await _tap(tester, find.text('Enregistrer pour plus tard'));
       expect(gateway.writes.single['application_id'], 'fixture-code');
@@ -383,7 +399,10 @@ void main() {
         find.widgetWithText(TextFormField, 'Durée en minutes *'),
         '30',
       );
-      await _tap(tester, find.byType(DropdownButtonFormField<String>));
+      await _tap(
+        tester,
+        find.widgetWithText(DropdownButtonFormField<String>, 'Format'),
+      );
       await _tap(tester, find.text('En ligne').last);
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Lien de l’entretien *'),
