@@ -189,20 +189,64 @@ L'installation locale est donc terminée. Le marqueur
 `CORRECTIF_INTERFACE_NON_ENCORE_DEPLOYE_SUR_LE_WEB` confirme que ce test
 n'a pas effectué de build ou de publication web.
 
-### Publication web suivante
+### Publication web terminée
 
-La publication prévue est le web **1.0.22, build 25**, à partir des sources
-locales qui viennent d'être analysées et testées. Le lanceur inchangé est
+La publication est le web **1.0.22, build 25**, à partir des sources
+locales analysées et testées. Le lanceur inchangé est
 `tools/build_publish_web_windows.ps1` du commit
 `5dc33c30398db9a040debb68a32778cc255f5e66`, SHA-256
 `2535e443cc5de435cd4d9953c6ac563a1583d05aa53879d4a96aae33eb9c7656`.
 Il a déjà servi aux publications précédentes et vérifie la version et
 l'empreinte du JavaScript servi publiquement après la publication.
 
-La commande préalable doit vérifier le web 1.0.21 build 24 et l'API 1.0.21.
-Le build et la publication 1.0.22 build 25 ne sont pas encore confirmés par
-un compte rendu d'exécution. Le nettoyage terminé n'est pas relancé.
+La commande préalable a contrôlé le web 1.0.21 build 24 et l'API 1.0.21.
+Le compte rendu confirme ensuite le build 1.0.22 build 25, les cinq tests du
+programme de publication et les contrôles des ressources et routes web.
+La dernière vérification du lanceur, après les contrôles locaux du VPS,
+confirme la version publique et le SHA-256 du JavaScript par HTTPS :
 
-Après publication, créer et contrôler la campagne réelle du 4 au 8 novembre
-depuis un compte habilité, puis poursuivre les vérifications de délivrabilité,
-de proxy et d'organisation du jury restantes.
+- JavaScript public :
+  `047f7328b4dc0c038b2d6e5540e73b4b9d7367647cfe385a0388cc2685d311e5`.
+- Retour arrière web :
+  `/opt/enactspace/releases/web-previous-885466447cb94d4a9640443dfabbfcd2`.
+- Backend et Android inchangés par cette publication ; aucun nouveau
+  nettoyage ni création de campagne n'a été effectué.
+
+Le champ `public_https_checked: false` appartient au compte rendu du
+programme exécuté localement sur le VPS. Le marqueur ultérieur
+`WEB_PUBLIC_1.0.22_25_HTTPS_ET_EMPREINTE_OK` est la preuve du contrôle public
+supplémentaire effectué depuis Windows.
+
+### Paramétrage de la campagne réelle
+
+La campagne réelle reste à créer depuis le compte habilité de son
+responsable, afin que `created_by` soit celui de l'utilisateur connecté.
+L'accès est `/recruitment`, puis « Gérer les campagnes » et « Créer une
+campagne ». Paramètres préparés à partir du calendrier fourni :
+
+| Champ | Valeur |
+| --- | --- |
+| Titre proposé | Recrutement Enactus ESP 2026-2027 |
+| Date de début | 04/11/2026 |
+| Date de fin | 08/11/2026 |
+| Activer après création | Oui |
+| Questions | Questionnaire préparé, à relire dans l'éditeur avant création |
+
+L'activation avec cette date future produit l'état « Planifiée » et rend
+la campagne disponible dans le calendrier public pour le compte à rebours.
+Les candidatures restent refusées avant le 4 novembre 2026 à 00:00 UTC
+(Africa/Dakar). La date de fin est inclusive : fermeture le 9 novembre à
+00:00 UTC, après toute la journée du 8.
+
+Le tri reste prévu du 9 au 14 novembre et les entretiens du 16 au 21,
+prioritairement entre 12:00 et 14:30, avec des possibilités en soirée.
+La durée par candidat, les équipes de jury et les créneaux précis restent
+à paramétrer. Aucun quota de candidatures ou de recrutements n'a été inventé.
+
+Après création, contrôler le calendrier public et reprendre l'audit de
+préparation. Il reste à vérifier notamment la délivrabilité réelle,
+le proxy et ses limites, la copie de sauvegarde hors site, les habilitations
+des jurys, le contact candidat et le calendrier de décision finale. Les
+essais privés PostgreSQL et 500/1000 dossiers de l'image déployée ont déjà
+réussi ; un inventaire en lecture seule ne constitue pas à lui seul une
+certification de tout le parcours en production.
