@@ -126,4 +126,10 @@ Le contrôle en lecture seule confirme la version API 1.0.21 et les quatre servi
 
 Le lanceur `tools/rehearse_interface_copy_backend_windows.ps1` transfère les neuf fichiers serveur du commit `575bd5ba7b75d70b8f240fe4a67735b7936c11c8` et les fichiers de test. L’image candidate est dérivée de l’image en service avec un contexte de construction limité aux neuf fichiers serveur. Les tests s’exécutent dans un conteneur en lecture seule, sans réseau, avec SQLite et les e-mails et notifications désactivés. Le compte rendu vérifie les empreintes, le schéma Alembic 0033, les 114 tests et l’état des services après la recette.
 
-Les simulations locales couvrent le transfert, le refus d’une empreinte inattendue et le déroulement de la recette. La recette réelle sur le VPS reste à lancer.
+Les simulations locales couvrent le transfert, le refus d’une empreinte inattendue et le déroulement de la recette. L’opération `09775840a54d4fee88a1fbb1108d598d` confirme ensuite sur le VPS les 114 tests réussis, sans échec, erreur ni test sauté, et le schéma candidat `20261031_0033`. L’image validée est `sha256:c39192c6670c08b4a1c1552061b95fb0290d974e01e0e5cef248c6689a72866d`.
+
+## Publication serveur préparée
+
+Le lanceur `tools/publish_interface_copy_backend_windows.ps1` vise l’API 1.0.22 avec l’image vérifiée. Il contrôle le reçu et les empreintes, compare les configurations Compose résolues, puis déclenche le service de sauvegarde vérifiée avant la bascule. La comparaison autorise les quatre identifiants d’image et la version de l’API. Le schéma PostgreSQL est vérifié en lecture seule avant et après la bascule. En cas d’échec des contrôles après bascule, le lanceur rétablit la configuration et les services précédents.
+
+Les sept nouveaux tests de publication et les vingt-neuf tests du lanceur précédent passent en local. La simulation PowerShell couvre le contrôle préalable, le refus d’une empreinte distante altérée, la remontée d’un blocage et le contrôle HTTPS après réception du compte rendu. La publication réelle reste à lancer sur le VPS.
