@@ -1,6 +1,6 @@
 # Relecture des textes de l’interface — 2 novembre 2026
 
-Les textes du recrutement expliquent désormais l’action à réaliser, les informations attendues et la suite du parcours. Les répétitions sur la lecture des réponses ou la « décision humaine » sont retirées. La relecture couvre aussi les formulations techniques et les consignes de développement repérées dans les autres rubriques.
+Le web **1.0.24 (27)** et le backend **1.0.22** intègrent les corrections depuis le 2 novembre 2026. Les textes du recrutement expliquent l’action à réaliser, les informations attendues et la suite du parcours. Les répétitions sur la lecture des réponses ou la « décision humaine » sont retirées. La relecture couvre aussi les formulations techniques et les consignes de développement repérées dans les autres rubriques.
 
 ## Principales corrections
 
@@ -128,8 +128,12 @@ Le lanceur `tools/rehearse_interface_copy_backend_windows.ps1` transfère les ne
 
 Les simulations locales couvrent le transfert, le refus d’une empreinte inattendue et le déroulement de la recette. L’opération `09775840a54d4fee88a1fbb1108d598d` confirme ensuite sur le VPS les 114 tests réussis, sans échec, erreur ni test sauté, et le schéma candidat `20261031_0033`. L’image validée est `sha256:c39192c6670c08b4a1c1552061b95fb0290d974e01e0e5cef248c6689a72866d`.
 
-## Publication serveur préparée
+## Publication serveur confirmée le 2 novembre 2026
 
 Le lanceur `tools/publish_interface_copy_backend_windows.ps1` vise l’API 1.0.22 avec l’image vérifiée. Il contrôle le reçu et les empreintes, compare les configurations Compose résolues, puis déclenche le service de sauvegarde vérifiée avant la bascule. La comparaison autorise les quatre identifiants d’image et la version de l’API. Le schéma PostgreSQL est vérifié en lecture seule avant et après la bascule. En cas d’échec des contrôles après bascule, le lanceur rétablit la configuration et les services précédents.
 
-Les sept nouveaux tests de publication et les vingt-neuf tests du lanceur précédent passent en local. La simulation PowerShell couvre le contrôle préalable, le refus d’une empreinte distante altérée, la remontée d’un blocage et le contrôle HTTPS après réception du compte rendu. La publication réelle reste à lancer sur le VPS.
+Les sept nouveaux tests de publication et les vingt-neuf tests du lanceur précédent passent en local. La simulation PowerShell couvre le contrôle préalable, le refus d’une empreinte distante altérée, la remontée d’un blocage et le contrôle HTTPS après réception du compte rendu.
+
+L’opération `03c440b036024c0c9a109b717443384c` confirme les sept tests du lanceur sur le VPS et la sauvegarde vérifiée `20261102T223838Z_b4d350`. Les quatre services exécutent l’image candidate validée. Le schéma PostgreSQL est `20261031_0033` avant et après la bascule. Le contrôle local du calendrier passe et le marqueur `BACKEND_TEXTES_1_0_22_SCHEMA_0033_HTTPS_OK` confirme les réponses publiques de l’API, du calendrier et du web 1.0.24 (27).
+
+Le VPS conserve la configuration de retour arrière dans `/opt/enactspace/operations/publish-interface-copy-03c440b036024c0c9a109b717443384c/compose.previous.yml`.
