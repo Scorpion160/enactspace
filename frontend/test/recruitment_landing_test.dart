@@ -81,7 +81,7 @@ void main() {
             await tester.tap(faq);
             await tester.pumpAndSettle();
             expect(
-              find.textContaining('Le jury regarde cinq critères'),
+              find.textContaining('L’équipe étudie tes motivations'),
               findsOneWidget,
             );
             expect(tester.takeException(), isNull);

@@ -71,3 +71,18 @@ Le script ne publie pas l’application et ne lance aucun processus backend. Les
 La synchronisation du commit `575bd5ba7b75d70b8f240fe4a67735b7936c11c8` a créé une sauvegarde et formaté les 55 fichiers Dart concernés. L’analyse Flutter a ensuite signalé un seul diagnostic : `curly_braces_in_flow_control_structures` dans `archives_api_service.dart`. Les tests et les captures n’ont pas été lancés.
 
 La condition de contrôle du type de réponse est maintenant entourée d’accolades. Son comportement et son message restent identiques. Le manifeste prend la version déjà installée comme référence et reconnaît aussi ses fichiers Dart formatés, pour permettre la relance des vérifications avec la correction. L’analyse Flutter doit de nouveau terminer sans diagnostic avant de poursuivre les tests et les captures.
+
+## Reprise après la suite complète de tests Windows
+
+Le contrôle du commit `fd5a20a220734d15eac6e3a414e893d94dd15b4b` a terminé l’analyse Flutter sans diagnostic. La suite complète a ensuite compté 1 113 réussites et 32 échecs ; aucune capture ni publication n’a suivi.
+
+Les 32 cas signalés se répartissent ainsi :
+
+- 17 attentes portant sur les anciens libellés des tâches, du retrait de responsable, de l’intégration, de l’acceptation et de la FAQ candidat. Elles utilisent maintenant les textes corrigés ; les assertions sur les boutons, confirmations, droits et mutations restent présentes.
+- 12 variantes du test de photos, sur trois largeurs, deux tailles de texte et les deux thèmes. L’accueil présente trois récits illustrés depuis la refonte. Le test vérifie désormais les trois photos identifiées, ainsi que l’accès aux pièces jointes et aux outils d’équipe, au lieu d’attendre quatre photos.
+- Deux vérifications de restauration qui dépendaient d’un ancien nom de classe et d’une disposition de sélecteur remplacée par la barre de filtres commune. Les contrôles conservent l’absence d’en-tête ajouté aux dialogues, le thème commun et une disposition encadrant les sélecteurs.
+- Un chargement du recrutement en démonstration qui créait les nouveaux outils de campagne avec les services d’authentification habituels. Ces outils reçoivent maintenant explicitement le transport et l’authentification de démonstration. Les lectures d’accès, de jury et de questionnaire utilisent des réponses locales ; leurs mutations restent bloquées par le transport de démonstration.
+
+Le test des services de démonstration inclut ces nouvelles lectures sous interception des accès réseau et vérifie le refus d’une invitation au questionnaire. Le test d’écran exige aussi la présence de la liste des candidatures, pour qu’un écran d’erreur ne puisse pas être considéré comme un chargement réussi.
+
+Aucun test ni aucune variante de largeur, de thème ou de taille de texte n’est retiré. Le nouveau manifeste inclut les huit fichiers de tests concernés et les deux fichiers de démonstration corrigés. Sa référence est la version déjà installée. La syntaxe Dart et les contrôles PowerShell ont été vérifiés ici ; l’analyse et la suite Flutter doivent être relancées sur Windows pour confirmer le résultat.

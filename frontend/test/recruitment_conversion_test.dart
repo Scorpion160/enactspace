@@ -304,7 +304,10 @@ void main() {
       find.byKey(const Key('candidate-integration-prepare')),
       findsNothing,
     );
-    expect(find.textContaining('responsables autorisés'), findsOneWidget);
+    expect(
+      find.text('Ton compte ne permet pas de préparer cette intégration.'),
+      findsOneWidget,
+    );
   });
 
   for (final role in ['Secrétaire générale', 'Team Leader', 'Administrateur']) {
@@ -554,7 +557,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('convertir automatiquement'), findsOneWidget);
+    expect(
+      find.textContaining('Après validation, prépare son intégration'),
+      findsOneWidget,
+    );
     expect(find.text('Préparer l’intégration'), findsNothing);
     expect(decisions, 0);
   });

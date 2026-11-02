@@ -261,7 +261,7 @@ void main() {
       expect(find.text('Préparer atelier'), findsOneWidget);
       expect(find.text('Modifier'), findsOneWidget);
       expect(find.text('Valider'), findsNothing);
-      expect(find.text('Historique technique'), findsOneWidget);
+      expect(find.text('Dates du suivi'), findsOneWidget);
     });
 
     testWidgets('current_user_assigned expose statut/preuve sans édition', (

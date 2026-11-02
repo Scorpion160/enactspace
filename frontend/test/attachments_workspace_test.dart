@@ -208,7 +208,16 @@ void main() {
               ),
             );
             await tester.pumpAndSettle();
-            expect(find.byType(HeritagePhoto), findsNWidgets(4));
+            expect(
+              tester
+                  .widgetList<HeritagePhoto>(find.byType(HeritagePhoto))
+                  .map((photo) => photo.photo.asset),
+              orderedEquals([
+                'haffe-2025-ecoute',
+                'dimbali-gie-favec',
+                'polytech-innovation-2025',
+              ]),
+            );
             expect(tester.takeException(), isNull);
             await tester.scrollUntilVisible(
               find.text('Choisir un autre fichier'),

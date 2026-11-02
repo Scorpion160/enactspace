@@ -585,7 +585,31 @@ class DemoNativeData {
     final parts = path.split('/').where((p) => p.isNotEmpty).toList();
     requests.add('$method $path');
     Object? result;
-    if (path == '/users/directory') {
+    if (method == 'GET' && path == '/recruitment/access') {
+      result = {
+        'can_manage_campaigns': false,
+        'can_manage_jury': false,
+        'can_schedule': false,
+        'can_export': false,
+        'can_decide': false,
+        'can_convert': false,
+        'assigned_campaign_ids': ['demo-alumni-day'],
+      };
+    } else if (method == 'GET' &&
+        path == '/recruitment/campaigns/demo-alumni-day/jury') {
+      result = {
+        'can_manage': false,
+        'members': [],
+        'teams': [],
+        'interviews_needing_reassignment': [],
+      };
+    } else if (method == 'GET' &&
+        parts.length == 4 &&
+        parts[0] == 'recruitment' &&
+        parts[1] == 'applications' &&
+        parts[3] == 'personality') {
+      result = {'status': 'not_invited', 'can_invite': false};
+    } else if (path == '/users/directory') {
       result = rows('/users');
     } else if (path == '/users/pending') {
       result = [];

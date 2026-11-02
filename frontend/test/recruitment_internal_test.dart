@@ -663,7 +663,7 @@ void main() {
     expect(find.text('Évaluation par critères'), findsOneWidget);
     expect(find.text('Non disponible'), findsWidgets);
     expect(
-      find.textContaining('sans convertir automatiquement'),
+      find.textContaining('Après validation, prépare son intégration'),
       findsOneWidget,
     );
     expect(find.text('Retenir la candidature'), findsOneWidget);

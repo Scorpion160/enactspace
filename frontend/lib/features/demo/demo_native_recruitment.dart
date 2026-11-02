@@ -2,6 +2,7 @@ import '../recruitment/models/application_model.dart';
 import '../recruitment/models/application_review_model.dart';
 import '../recruitment/models/recruitment_campaign_model.dart';
 import '../recruitment/services/internal_recruitment_gateway.dart';
+import '../recruitment/services/recruitment_campaign_tools.dart';
 import '../recruitment/services/recruitment_service.dart';
 import '../poles/services/poles_service.dart';
 import '../projects/services/projects_service.dart';
@@ -15,6 +16,7 @@ class DemoNativeRecruitmentGateway extends RecruitmentServiceGateway {
     DemoNativeAuth auth,
   ) : super(
         service: RecruitmentService(apiClient: api, authService: auth),
+        campaignTools: ApiRecruitmentCampaignTools(api: api, auth: auth),
         polesService: PolesService(apiClient: api, authService: auth),
         projectsService: ProjectsService(apiClient: api, authService: auth),
       );

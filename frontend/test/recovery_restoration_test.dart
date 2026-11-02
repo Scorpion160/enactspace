@@ -119,12 +119,12 @@ void main() {
 
     final secondaryDialogTitle = login.substring(
       login.indexOf('class _PublicDialogTitle'),
-      login.indexOf('class _BrandMark'),
+      login.indexOf('class _ErrorBanner'),
     );
     expect(secondaryDialogTitle, isNot(contains('_PublicInlineHeader')));
 
     final joinSection = login.substring(
-      login.indexOf("'Rejoindre Enactus ESP'"),
+      login.indexOf('class _JoinEnactusSheet'),
       login.indexOf('class _JoinField'),
     );
     expect(joinSection, isNot(contains('_PublicInlineHeader')));
@@ -144,7 +144,14 @@ void main() {
       'lib/features/tasks/screens/tasks_screen.dart',
     ]) {
       final source = File(path).readAsStringSync();
-      expect(source, contains('expandedInsets: EdgeInsets.zero'), reason: path);
+      expect(
+        source,
+        anyOf(
+          contains('expandedInsets: EdgeInsets.zero'),
+          contains('AppFilterToolbar('),
+        ),
+        reason: '$path must keep its selectors within a bounded layout.',
+      );
       expect(source, contains('showSelectedIcon:'), reason: path);
     }
   });

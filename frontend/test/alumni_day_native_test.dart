@@ -28,6 +28,7 @@ import 'package:frontend/features/tasks/screens/tasks_screen.dart';
 import 'package:frontend/features/tasks/models/task_center_models.dart';
 import 'package:frontend/features/documents/screens/institutional_documents_hub_screen.dart';
 import 'package:frontend/features/recruitment/screens/internal/internal_recruitment_screen.dart';
+import 'package:frontend/features/recruitment/widgets/internal/recruitment_internal_widgets.dart';
 import 'package:frontend/features/impact/screens/impact_dashboard_screen.dart';
 import 'package:frontend/features/attendance/screens/attendance_screen.dart';
 import 'package:frontend/features/members/screens/members_screen.dart';
@@ -114,6 +115,20 @@ void main() {
       await r.years.canManage();
       await r.settings.load();
       expect(r.settings.error, isNull);
+      final campaigns = await r.internalRecruitment.loadCampaigns();
+      expect(campaigns, hasLength(1));
+      expect(await r.internalRecruitment.loadApplications(), hasLength(3));
+      final tools = r.internalRecruitment.campaignTools;
+      expect((await tools.loadAccess())['can_manage_campaigns'], isFalse);
+      expect((await tools.loadJury(campaigns.single.id))['members'], isEmpty);
+      expect(
+        (await tools.loadPersonality('Awa Démo'))['status'],
+        'not_invited',
+      );
+      await expectLater(
+        tools.invitePersonality('Awa Démo', null),
+        throwsA(isA<ApiException>()),
+      );
       expect(network.attempts, 0);
       expect(await r.auth.getToken(), startsWith('demo-local-'));
     },
@@ -258,6 +273,10 @@ void main() {
       );
       await _frames(tester);
       expect(find.byType(entry.value), findsOneWidget);
+      if (entry.key == 'recruitment') {
+        expect(find.byType(ApplicationWorkbench), findsOneWidget);
+        expect(find.text('Erreur de chargement'), findsNothing);
+      }
       expect(
         find.byWidgetPredicate(
           (widget) =>
