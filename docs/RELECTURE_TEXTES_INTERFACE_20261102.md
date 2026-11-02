@@ -93,4 +93,17 @@ L’opération `b39a52771da8498a98aca4b94efa1aca` a validé le commit `de640506f
 
 Le lanceur `tools/build_interface_copy_web_windows.ps1` prépare la version 1.0.24, build 27. Il vérifie le reçu Windows, les sources du manifeste utilisées par la compilation et le fichier de configuration déjà utilisé pour Firebase. La compilation et l’archive sont produites dans un nouveau dossier `WebInterfaceBuilds`. Le reçu `build.json` donne la version et les empreintes du JavaScript et de l’archive pour préparer la publication.
 
-Le lanceur a passé une vérification avec Flutter et le contrôle de version publique simulés. La génération Firebase et la création de l’archive ont été exécutées sur des fichiers de test. Les refus d’une modification des sources, d’une autre version publique et d’un reçu de validation incomplet ont aussi été vérifiés. Le build réel reste à lancer sur Windows.
+Le lanceur a passé une vérification avec Flutter et le contrôle de version publique simulés. La génération Firebase et la création de l’archive ont été exécutées sur des fichiers de test. Les refus d’une modification des sources, d’une autre version publique et d’un reçu de validation incomplet ont aussi été vérifiés.
+
+## Compilation web 1.0.24 (27)
+
+Le reçu Windows de l’opération `aa0f9b4affa14551bd69b5ce0d7fd873` confirme la compilation Flutter Web et la création de `web-release.tar.gz`.
+
+| Fichier | SHA-256 |
+| --- | --- |
+| `main.dart.js` | `18847f88b8026e344f47ab93e8f776b8caa95e8ed5fb1ae1277256a80485d875` |
+| `web-release.tar.gz` | `87ca43801e44dccb336ae3e873862ab92f76af1cd273ea93817561b8cdadbd73` |
+
+Le lanceur `tools/publish_interface_copy_web_windows.ps1` vérifie le reçu et l’archive d’origine. Le mode de publication transfère cette archive au VPS, vérifie les empreintes après transfert et contrôle que la version 1.0.23 (26) attendue est encore en place avant la bascule. Il vérifie ensuite la version et le JavaScript servis en HTTPS. Le VPS conserve un dossier de retour arrière.
+
+Les six tests du programme de publication passent. La simulation du lanceur PowerShell confirme le refus d’une archive modifiée localement ou après transfert, le déroulement de la bascule et le contrôle lors d’une relance après publication. La relecture des captures et la mise en ligne restent à effectuer.

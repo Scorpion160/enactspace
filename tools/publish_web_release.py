@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import tarfile
 import time
@@ -12,6 +13,7 @@ import urllib.request
 import uuid
 
 MAIN_SHA = '2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad'
+DEFAULT_RELEASE = ('1.0.23', '26', MAIN_SHA)
 REQUIRED = ('index.html','main.dart.js','flutter_bootstrap.js','firebase-messaging-sw.js','version.json')
 
 def sha(path):
@@ -20,7 +22,16 @@ def sha(path):
         for block in iter(lambda:f.read(1024*1024),b''):digest.update(block)
     return digest.hexdigest()
 
-def extract_bundle(archive,target):
+def check_release(directory, release):
+    expected_version, expected_build, expected_main = release
+    if sha(directory/'main.dart.js') != expected_main:
+        raise RuntimeError('Unexpected_main_bundle')
+    version = json.loads((directory/'version.json').read_text())
+    if version.get('version') != expected_version or str(version.get('build_number')) != expected_build:
+        raise RuntimeError('Unexpected_web_version')
+    return version
+
+def extract_bundle(archive,target,release=DEFAULT_RELEASE):
     with tarfile.open(archive,'r:gz') as tar:
         members=tar.getmembers()
         seen=set();total=0
@@ -44,10 +55,7 @@ def extract_bundle(archive,target):
                 path.chmod(0o644)
     for name in REQUIRED:
         if not (target/name).is_file():raise RuntimeError('Missing_bundle_file_'+name.replace('.','_'))
-    if sha(target/'main.dart.js')!=MAIN_SHA:raise RuntimeError('Unexpected_main_bundle')
-    version=json.loads((target/'version.json').read_text())
-    if version.get('version')!='1.0.23' or str(version.get('build_number'))!='26':
-        raise RuntimeError('Unexpected_web_version')
+    version = check_release(target, release)
     worker=(target/'firebase-messaging-sw.js').read_text()
     if 'firebase.initializeApp' not in worker or 'firebase.messaging' not in worker:
         raise RuntimeError('Firebase_worker_missing_initialization')
@@ -86,10 +94,17 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive',required=True,type=Path)
     parser.add_argument('--archive-sha256',required=True)
+    parser.add_argument('--release', nargs=3, metavar=('VERSION', 'BUILD', 'MAIN_SHA256'),
+                        default=DEFAULT_RELEASE)
+    parser.add_argument('--expected-live', nargs=3, metavar=('VERSION', 'BUILD', 'MAIN_SHA256'))
     parser.add_argument('--execute',action='store_true')
     args=parser.parse_args(argv)
+    for release in (args.release, args.expected_live):
+        if release is not None and not re.fullmatch('[a-f0-9]{64}', release[2]):
+            parser.error('Invalid release SHA-256')
     report={'web_deployed':False,'backend_changed':False,'mail_routing_changed':False}
     switched=False;previous=None;failed=None;stage=None;compose=None;live=Path('/opt/enactspace/web')
+    handle = None
     try:
         if args.archive.is_symlink() or sha(args.archive)!=args.archive_sha256.lower():
             raise RuntimeError('Archive_integrity_failed')
@@ -108,8 +123,8 @@ def main(argv=None):
         releases=Path('/opt/enactspace/releases');releases.mkdir(exist_ok=True)
         identity=uuid.uuid4().hex
         stage=releases/('web-candidate-'+identity);stage.mkdir(mode=0o755)
-        version=extract_bundle(args.archive,stage)
-        report.update(status='WEB_PUBLICATION_PREPARED',version=version,main_sha256=MAIN_SHA)
+        version=extract_bundle(args.archive,stage,args.release)
+        report.update(status='WEB_PUBLICATION_PREPARED',version=version,main_sha256=args.release[2])
         if not args.execute:
             report['candidate_directory']=str(stage)
             print(json.dumps(report,indent=2));return 0
@@ -117,6 +132,11 @@ def main(argv=None):
         lock.parent.mkdir(exist_ok=True)
         handle=lock.open('a')
         os.chmod(lock,0o600);fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.expected_live is not None:
+            try:
+                check_release(live, args.expected_live)
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise RuntimeError('Unexpected_live_release') from exc
         previous=releases/('web-previous-'+identity)
         live.rename(previous)
         try:
@@ -142,5 +162,8 @@ def main(argv=None):
         reason=str(exc) if isinstance(exc,RuntimeError) else type(exc).__name__
         report.update(status='WEB_PUBLICATION_FAILED',reason=reason)
         print(json.dumps(report,indent=2));return 1
+    finally:
+        if handle is not None:
+            handle.close()
 
 if __name__=='__main__':raise SystemExit(main())
