@@ -297,7 +297,7 @@ class DocumentsService {
     if (body is Map<String, dynamic>) {
       return DocumentUploadedFileModel.fromJson(body);
     }
-    throw Exception('Réponse invalide lors de l’upload du fichier.');
+    throw Exception('Le fichier n’a pas pu être envoyé. Réessayez.');
   }
 
   Future<DocumentModel> validateDocument(String documentId) async {

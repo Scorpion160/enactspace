@@ -589,7 +589,7 @@ class ChatService {
       return ChatUploadedMediaModel.fromJson(response);
     }
 
-    throw Exception('Réponse invalide lors de l’upload du média.');
+    throw Exception('Le fichier n’a pas pu être envoyé. Réessaie.');
   }
 
   Future<Map<String, dynamic>> _readOfflineCache() async {

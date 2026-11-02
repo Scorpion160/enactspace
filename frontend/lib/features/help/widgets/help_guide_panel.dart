@@ -20,7 +20,7 @@ const helpGuideArticles = [
   ),
   HelpArticle(
     "Trouver ma place dans Enactus ESP",
-    "Votre accueil présente trois repères : apprendre dans Academy, découvrir notre histoire dans Archives et contribuer avec votre équipe. Les pôles et les projets rassemblent leurs membres, leurs objectifs et leur travail. Les outils visibles dépendent de votre profil et de vos responsabilités.\n\nUn Alumni conserve son histoire au sein de Enactus ESP. Son accueil demande l’année de fin d’études. Ses anciens rôles ne lui donnent pas automatiquement les droits de gestion de l’équipe actuelle.",
+    "Depuis l’accueil, ouvrez Academy pour vos formations, Archives pour l’histoire du club et les pôles ou projets pour suivre le travail de votre équipe. Les rubriques de gestion sont accessibles selon vos responsabilités.\n\nSi vous êtes Alumni, renseignez votre année de fin d’études dans votre profil pour retrouver les espaces qui vous sont destinés.",
     Icons.groups_outlined,
   ),
   HelpArticle(
@@ -104,7 +104,7 @@ const helpQuestions = [
   ),
   HelpQuestion(
     "Que faire si un envoi échoue ?",
-    "Le formulaire garde votre texte pour vous permettre de réessayer. Attendez le résultat avant de fermer la fenêtre. Ne considérez pas un message comme envoyé tant que l’application ne l’a pas confirmé.",
+    "Si l’envoi échoue, votre saisie reste disponible. Vérifiez votre connexion et réessayez sans fermer le formulaire.",
   ),
   HelpQuestion(
     "Que devient mon compte lorsque je deviens Alumni ?",

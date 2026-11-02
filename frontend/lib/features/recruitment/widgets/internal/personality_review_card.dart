@@ -1,3 +1,4 @@
+import '../../models/recruitment_display_copy.dart';
 import '../recruitment_style.dart';
 import 'package:flutter/material.dart';
 import '../../models/application_model.dart';
@@ -184,7 +185,7 @@ class _PersonalityReviewCardState extends State<PersonalityReviewCard> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Un support d’échange : cinq tendances déclarées et des situations Enactus. Les moyennes ne servent ni au classement ni à la note d’admission. La traduction de travail n’est pas validée localement.',
+              'Consulte ses réponses et les mises en situation pour préparer l’entretien.',
             ),
             const SizedBox(height: 12),
             if (_busy) const LinearProgressIndicator(),
@@ -259,7 +260,7 @@ class _PersonalityReviewCardState extends State<PersonalityReviewCard> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'À approfondir : ${scenario['observe']}',
+                            'À approfondir : ${recruitmentDisplayCopy(scenario['observe'])}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],

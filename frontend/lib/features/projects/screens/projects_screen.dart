@@ -1526,7 +1526,6 @@ class _ProjectLogPreview extends StatelessWidget {
         'Démarrage terrain le ${DateFormat('dd/MM/yyyy').format(project.startedAt!)}',
       if (project.endedAt != null)
         'Clôture prévue le ${DateFormat('dd/MM/yyyy').format(project.endedAt!)}',
-      'Prochaine mise à jour: rapport impact, livrables et budget réel.',
     ];
 
     return Container(

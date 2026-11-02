@@ -95,10 +95,6 @@ class _CandidateReviewDialogState extends State<CandidateReviewDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Chaque critère compte autant. Appuyez votre appréciation sur un exemple précis ; cet avis ne modifie pas le statut de la candidature.',
-              ),
-              const SizedBox(height: 16),
               if (_error != null) ...[
                 Text(
                   _error!,

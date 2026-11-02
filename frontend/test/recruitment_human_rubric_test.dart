@@ -121,15 +121,19 @@ void main() {
       );
     },
   );
-  testWidgets('an evaluator reopens the existing levels and observations', (
+  testWidgets('legacy guidance refreshes without changing saved evaluations', (
     tester,
   ) async {
+    final savedRubric = jsonDecode(jsonEncode(rubric)) as Map<String, dynamic>;
+    savedRubric['guidance'] =
+        'Les réponses sont lues par des personnes. Chaque critère compte pour 20 points sur 100. La note doit s’appuyer sur un exemple ou une observation. Une information manquante appelle une précision, pas une note inventée. Le jury prend la décision finale.';
+    final snapshot = jsonEncode(savedRubric);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
             child: HumanAssessmentEditor(
-              rubric: rubric,
+              rubric: savedRubric,
               initialAssessment: ratings(2),
               onChanged: (_) {},
             ),
@@ -137,6 +141,8 @@ void main() {
         ),
       ),
     );
+    expect(find.text(rubric['guidance'] as String), findsOneWidget);
+    expect(jsonEncode(savedRubric), snapshot);
     expect(find.text('Ton évaluation : 50/100'), findsOneWidget);
     final field = tester.widget<TextFormField>(
       find.byKey(const ValueKey('rubric-evidence-mission')),

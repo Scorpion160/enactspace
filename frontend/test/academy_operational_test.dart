@@ -403,7 +403,7 @@ void main() {
       final gateway = ApiAcademyGateway(apiClient: api, authService: _Auth());
       api.serverError = true;
       final result = await gateway.completeLesson('real-lesson');
-      expect(result.label, contains('serveur'));
+      expect(result.syncedWithGamification, isFalse);
       expect(result.label, isNot(contains('hors ligne')));
       final pending = await gateway.loadHome();
       expect(pending.offline, isFalse);

@@ -368,7 +368,7 @@ class _TaskDetailBody extends StatelessWidget {
         if (technicalDates.isNotEmpty) ...[
           const SizedBox(height: 14),
           _Section(
-            title: 'Historique technique',
+            title: 'Dates du suivi',
             icon: Icons.history_rounded,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

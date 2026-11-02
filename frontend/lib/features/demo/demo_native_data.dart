@@ -869,7 +869,7 @@ class DemoNativeData {
             'progress': 35,
             'completed_tasks': 1,
             'methodology':
-                'Données fictives de présentation, sans résultat réel revendiqué.',
+                'Exemple pour la visite de démonstration.',
           },
       ];
     } else if (path.startsWith('/gamification/ranking')) {
@@ -1117,6 +1117,6 @@ class DemoNativeData {
     statusCode: 400,
     message:
         text ??
-        'Cette action n’est pas disponible dans la démo. Vos données réelles ne sont pas modifiées.',
+        'Cette action n’est pas disponible dans la démonstration.',
   );
 }

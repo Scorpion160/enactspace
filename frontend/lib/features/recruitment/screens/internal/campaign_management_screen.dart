@@ -758,7 +758,7 @@ class _CampaignFormScreenState extends State<_CampaignFormScreen> {
                                                 CrossAxisAlignment.stretch,
                                             children: [
                                               const RecruitmentNotice(
-                                                'Aperçu de cette campagne. Aucune candidature ne sera envoyée depuis cet écran.',
+                                                'Aperçu du formulaire présenté aux candidats.',
                                               ),
                                               const SizedBox(height: 20),
                                               Text(

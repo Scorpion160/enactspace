@@ -80,7 +80,7 @@ DEFAULT_QUESTIONS = [
   {
     "id": "availability",
     "label": "Quelles sont tes disponibilités pour l’équipe ?",
-    "hint": "Indique des créneaux réalistes et tes périodes d’examens ou d’indisponibilité. Promettre plus d’heures ne donne pas automatiquement plus de points.",
+    "hint": "Indique tes créneaux disponibles et tes périodes d’examens ou d’indisponibilité.",
     "section": "availability",
     "required": True,
     "legacy_field": "availability"

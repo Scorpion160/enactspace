@@ -87,7 +87,7 @@ class AcademyService {
       return AcademyRewardResult(
         points: 0,
         label:
-            'Quiz non validé côté Academy (${backendResult.score.toStringAsFixed(0)}%)',
+            'Quiz à reprendre : ${backendResult.score.toStringAsFixed(0)} %',
         syncedWithGamification: false,
       );
     }

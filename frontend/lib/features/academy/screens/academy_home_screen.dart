@@ -592,7 +592,7 @@ class _ProgressPanel extends StatelessWidget {
             AcademyProgressBar(value: ratio),
             const SizedBox(height: 9),
             Text(
-              '${(ratio * 100).round()} % des leçons terminées · Chaque étape compte.',
+              '${(ratio * 100).round()} % des leçons terminées',
               style: TextStyle(
                 color: colors.onSurfaceVariant,
                 fontSize: 12,

@@ -112,5 +112,5 @@ String projectTeamErrorMessage(Object error) {
       normalized.contains('connexion')) {
     return 'Connexion impossible. Vérifiez le réseau puis réessayez.';
   }
-  return message.isEmpty ? 'Erreur serveur. Réessayez.' : message;
+  return message.isEmpty ? 'Le service est momentanément indisponible. Réessayez.' : message;
 }

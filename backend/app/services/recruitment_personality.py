@@ -7,11 +7,7 @@ No norms, diagnostic categories, aggregate fit score or admission recommendation
 from copy import deepcopy
 
 VERSION = "enactspace-ipip20-fr-pilot-2026-1"
-NOTICE = ("Ce questionnaire aide à préparer notre échange sur ta façon de travailler. "
-          "Il n’y a pas de profil idéal ni de note d’admission. Les réponses sont déclaratives ; "
-          "cette traduction de travail n’a pas été validée auprès des étudiants de l’ESP. "
-          "Tu peux préférer en parler pendant l’entretien. Les réponses terminées sont accessibles "
-          "aux responsables du recrutement et au jury habilité de ta campagne.")
+NOTICE = "Ce questionnaire porte sur ta façon de travailler et de participer à une équipe. Tes réponses aideront à préparer l’entretien. Tu peux les enregistrer pour les reprendre plus tard ou choisir d’en parler directement avec le jury. Une fois confirmées, elles seront accessibles au jury et aux responsables du recrutement de ta campagne. Ce questionnaire n’est pas un bilan psychologique."
 
 # Original Mini-IPIP order, polarity and four items per dimension.
 ITEMS = [
@@ -47,7 +43,7 @@ SCENARIOS = [
     {"id": "needs", "title": "Écouter avant d’agir", "question": "Ton équipe a préparé une solution, mais les personnes concernées disent qu’elle ne répond pas à leur priorité. Que fais-tu d’abord, et pourquoi ?", "observe": "Écoute, vérification des besoins et coconstruction ; demander un exemple vécu."},
     {"id": "commitment", "title": "Cours et engagement", "question": "Un examen est avancé et tu ne pourras pas finir ta mission à temps. Comment préviens-tu l’équipe et que proposes-tu ?", "observe": "Anticipation, communication et engagement réaliste ; ne pas récompenser la disponibilité illimitée."},
     {"id": "learning", "title": "Tester et apprendre", "question": "Le premier prototype ne fonctionne pas avec le budget disponible. Quelle petite étape proposes-tu pour apprendre avant de dépenser davantage ?", "observe": "Hypothèse vérifiable, apprentissage et usage responsable des ressources."},
-    {"id": "integrity", "title": "Un impact honnête", "question": "Avant une présentation, quelqu’un propose d’annoncer un nombre de bénéficiaires supérieur à ce que vous avez vérifié. Comment réagis-tu ?", "observe": "Honnêteté, distinction entre personnes touchées et impact démontré ; aucun score automatique."},
+    {"id": "integrity", "title": "Un impact honnête", "question": "Avant une présentation, quelqu’un propose d’annoncer un nombre de bénéficiaires supérieur à ce que vous avez vérifié. Comment réagis-tu ?", "observe": "Honnêteté et précision des faits présentés."},
     {"id": "team", "title": "Faire une place à chacun", "question": "En réunion, deux personnes monopolisent la discussion et une autre n’ose pas participer. Que peux-tu faire ? Donne si possible un exemple réel.", "observe": "Coopération, inclusion, écoute et capacité à s’appuyer sur plusieurs façons de contribuer."},
 ]
 
@@ -88,7 +84,7 @@ def score(snapshot, answers):
         value = answers[item["id"]]
         grouped[item["dimension"]].append(6 - value if item["reverse"] else value)
     return {"version": snapshot["version"], "scale_min": 1, "scale_max": 5,
-            "interpretation": "Moyennes déclaratives à discuter, sans seuil ni classement. Les deux extrémités décrivent des préférences, pas une valeur personnelle.",
+            "interpretation": "Cette synthèse reprend tes réponses et les thèmes à aborder pendant l’entretien.",
             "dimensions": [{"id": key, "label": DIMENSIONS[key][0],
                             "mean": round(sum(values) / len(values), 2),
                             "discussion": DIMENSIONS[key][1]} for key, values in grouped.items()]}

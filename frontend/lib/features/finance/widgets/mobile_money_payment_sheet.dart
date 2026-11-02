@@ -252,9 +252,8 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Le bouton « Payer en ligne » ouvre uniquement le checkout sécurisé '
-                  'fourni par le prestataire configuré. EnactSpace ne suppose pas qu’un '
-                  'lien non documenté peut ouvrir ou préremplir Wave ou Orange Money.',
+                  'Le paiement s’ouvre sur la page du prestataire. '
+                  'Vérifiez le montant, puis suivez les instructions pour payer.',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

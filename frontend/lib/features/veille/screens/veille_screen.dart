@@ -418,7 +418,7 @@ class _VeilleScreenState extends State<VeilleScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Les résultats se lisent avec la charge confiée, les difficultés rencontrées et les retours reçus. Un taux seul ne résume pas l’engagement d’une personne.',
+            'Consulte les engagements, les livrables et les difficultés rencontrées pour préparer le suivi.',
             style: TextStyle(height: 1.6),
           ),
           const SizedBox(height: 18),
@@ -769,7 +769,7 @@ class _VeilleScreenState extends State<VeilleScreen> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Comprendre, accompagner et transmettre. Un engagement clair, une difficulté partagée et une prochaine action : c’est ainsi que nous avançons ensemble.',
+                        'Retrouve les engagements de l’équipe, les difficultés signalées et les actions à préparer.',
                         style: TextStyle(height: 1.6),
                       ),
                       const SizedBox(height: 16),
@@ -791,7 +791,7 @@ class _VeilleScreenState extends State<VeilleScreen> {
                                 ),
                                 content: const SingleChildScrollView(
                                   child: ReadingBlocks(
-                                    '### Chaque enacteur\nRetrouve tes engagements, partage les blocages tôt et explique les éléments utiles pour adapter le travail. Les livrables sont remis puis relus par une autre personne.\n\n### Les responsables et Veille\nClarifiez les attentes, apportez une aide, relisez les résultats et convenez des prochaines étapes. L’appréciation tient compte des engagements confiés et des contraintes connues.\n\n### Les décisions\nUn dossier rassemble les faits et la réponse du membre. Veille formule une proposition, un membre d’EnacChef donne son avis et le Team Leader ou l’administration décide. Le membre peut demander un réexamen dans le délai communiqué.',
+                                    '### Chaque enacteur\nRetrouve tes engagements, signale les difficultés et ajoute tes livrables pour permettre au responsable de suivre l’avancement.\n\n### Les responsables et Veille\nClarifiez les attentes, apportez une aide, vérifiez les livrables et convenez des prochaines étapes.\n\n### Les décisions\nUn dossier rassemble les faits et la réponse du membre. Veille formule une proposition, un membre d’EnacChef donne son avis et le Team Leader ou l’administration décide. Le membre peut demander un réexamen dans le délai communiqué.',
                                   ),
                                 ),
                                 actions: [
@@ -977,7 +977,7 @@ class _VeilleScreenState extends State<VeilleScreen> {
                             style: const TextStyle(height: 1.6),
                           ),
                           const SizedBox(height: 16),
-                          ReadingBlocks(_summary['method']?.toString() ?? ''),
+                          ReadingBlocks(veilleMethodText(_summary['method'])),
                         ],
                       ),
                     ),

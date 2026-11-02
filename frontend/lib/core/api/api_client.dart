@@ -515,7 +515,7 @@ class ApiClient {
 
     throw ApiException(
       statusCode: response.statusCode,
-      message: 'Erreur serveur ${response.statusCode}',
+      message: 'Le service est momentanément indisponible. Réessayez.',
     );
   }
 
@@ -543,7 +543,7 @@ class ApiClient {
       } on FormatException {
         throw ApiException(
           statusCode: response.statusCode >= 400 ? response.statusCode : 502,
-          message: 'Réponse serveur indisponible ou invalide.',
+          message: 'Le service n’a pas pu répondre. Réessayez dans quelques instants.',
         );
       }
     }

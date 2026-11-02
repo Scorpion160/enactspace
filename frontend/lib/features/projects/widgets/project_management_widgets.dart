@@ -557,7 +557,7 @@ class ProjectStatusChangeSummary extends StatelessWidget {
 
   String _explanation(String target) => switch (target) {
     'termine' =>
-      'Le projet sera marqué comme terminé. Aucune tâche ne sera modifiée automatiquement.',
+      'Le projet sera marqué comme terminé. Les tâches ouvertes resteront à traiter.',
     'suspendu' => 'Le projet restera consultable pendant sa suspension.',
     _ => 'Le nouveau statut sera appliqué après votre confirmation.',
   };

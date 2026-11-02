@@ -32,7 +32,7 @@ class AuthService {
     final token = data['access_token'];
 
     if (token == null || token.toString().isEmpty) {
-      throw Exception('Token non reçu depuis le serveur.');
+      throw Exception('La connexion n’a pas abouti. Réessayez.');
     }
 
     await _authStorage.writeTokenPair(

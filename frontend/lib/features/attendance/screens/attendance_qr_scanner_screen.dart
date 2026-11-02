@@ -108,7 +108,7 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
                 minLines: 3,
                 maxLines: 5,
                 decoration: const InputDecoration(
-                  labelText: 'Token QR',
+                  labelText: 'Code de pointage',
                   prefixIcon: Icon(Icons.qr_code_2_rounded),
                 ),
               ),
@@ -187,7 +187,7 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
           const AppSectionHeader(title: 'Pointage de présence'),
           SizedBox(height: 6),
           Text(
-            'Le QR signé permet d’identifier automatiquement la session concernée.',
+            'Scanne le QR code affiché pour enregistrer ta présence.',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

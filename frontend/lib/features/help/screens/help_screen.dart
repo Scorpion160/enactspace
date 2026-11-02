@@ -769,7 +769,7 @@ class _TicketDialogState extends State<_TicketDialog> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Décrivez les étapes, le résultat attendu et ce qui se produit. Ne partagez jamais de mot de passe ou de code.',
+                  'Décrivez le problème et indiquez l’écran concerné. Gardez vos mots de passe et codes personnels.',
                   style: TextStyle(height: 1.5),
                 ),
                 TextFormField(
@@ -915,7 +915,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
                 const SizedBox(height: 12),
                 Text(
                   _category == 'bug'
-                      ? 'Indiquez l’écran, les étapes, le résultat attendu et le problème observé. Aucun mot de passe ni code personnel.'
+                      ? 'Décrivez ce qui s’est passé et ce que vous souhaitiez faire. Ne joignez pas de mot de passe ou de code personnel.'
                       : 'Expliquez votre idée et ce qu’elle apporterait à l’équipe.',
                   style: const TextStyle(height: 1.5),
                 ),

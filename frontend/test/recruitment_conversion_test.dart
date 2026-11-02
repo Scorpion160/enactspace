@@ -376,7 +376,7 @@ void main() {
     await _reachReview(tester, _ConversionGateway());
     expect(find.text('Vérification finale'), findsOneWidget);
     expect(
-      find.text('Cette opération est distincte de la décision de recrutement.'),
+      find.text('Vérifie les affectations avant de finaliser l’intégration.'),
       findsOneWidget,
     );
     expect(find.text('Membre EnactSpace'), findsOneWidget);

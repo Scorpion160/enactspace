@@ -1,66 +1,66 @@
 {
   "version": "enactus-esp-2026-v1",
   "scale_max": 4,
-  "guidance": "Les réponses sont lues par des personnes. Chaque critère compte pour 20 points sur 100. La note doit s’appuyer sur un exemple ou une observation. Une information manquante appelle une précision, pas une note inventée. Le jury prend la décision finale.",
+  "guidance": "Choisis un niveau de 0 à 4 pour chaque critère et ajoute une observation tirée du dossier ou de l’entretien. Si un point reste flou, demande une précision avant de le noter.",
   "criteria": [
     {
       "id": "mission",
       "label": "Motivation et mission sociale",
-      "description": "Relier son envie de rejoindre l’équipe à une action utile pour les communautés, au-delà du seul titre ou du certificat.",
+      "description": "Relier sa motivation à une action utile pour les communautés et à ce qu’il souhaite apprendre avec l’équipe.",
       "anchors": [
-        "La réponse évaluée exprime une démarche contraire à la mission ou aucune envie d’y contribuer.",
-        "L’envie est exprimée, mais le lien avec la mission reste général.",
-        "La personne relie sa motivation à une contribution sociale compréhensible.",
-        "La motivation s’appuie sur un exemple concret et une contribution envisageable.",
-        "La personne explique sa motivation, la contribution envisagée et ce qu’elle souhaite apprendre avec l’équipe."
+        "Exprime une démarche contraire à la mission ou aucune envie d’y contribuer.",
+        "Souhaite rejoindre l’équipe, mais explique peu le lien avec la mission.",
+        "Relie sa motivation à une contribution sociale.",
+        "Illustre sa motivation par un exemple et une contribution possible.",
+        "Explique sa motivation, la contribution envisagée et ce qu’il souhaite apprendre avec l’équipe."
       ]
     },
     {
       "id": "community",
       "label": "Écoute et compréhension d’un besoin",
-      "description": "Décrire un problème social, économique ou environnemental et chercher à comprendre les personnes concernées avant d’imposer une solution.",
+      "description": "Décrire le problème et les personnes concernées, puis expliquer comment vérifier leurs besoins.",
       "anchors": [
-        "La réponse évaluée refuse de considérer les besoins ou la parole des personnes concernées.",
-        "Le problème est nommé sans contexte ni personnes clairement identifiées.",
-        "Le contexte et les personnes concernées sont décrits de manière cohérente.",
-        "La personne distingue les besoins observés de ses hypothèses et propose d’écouter les personnes concernées.",
-        "La personne précise le besoin, les parties prenantes, les questions à vérifier et la manière de construire une solution avec elles."
+        "Écarte les besoins ou l’avis des personnes concernées.",
+        "Nomme un problème, sans préciser le contexte ou les personnes concernées.",
+        "Décrit le contexte et les personnes concernées.",
+        "Distingue ce qui est observé de ce qui reste à vérifier et propose d’écouter les personnes concernées.",
+        "Précise le besoin, les personnes à associer et les questions à vérifier pour construire la solution avec elles."
       ]
     },
     {
       "id": "initiative",
       "label": "Initiative et capacité à apprendre",
-      "description": "Proposer une première action réalisable, accepter les retours et apprendre d’un essai. Les exemples scolaires, personnels et familiaux ont autant leur place que le bénévolat.",
+      "description": "Proposer une première action réalisable et expliquer comment apprendre d’un essai. Les exemples scolaires, personnels, familiaux ou associatifs sont recevables.",
       "anchors": [
-        "La réponse évaluée montre un refus d’essayer ou de tenir compte d’un retour.",
-        "Une idée est avancée, sans premier pas ni apprentissage identifié.",
-        "Une première action simple et réaliste est proposée.",
-        "La personne décrit un essai, un retour ou un ajustement concret.",
-        "La personne relie l’action, les retours, les apprentissages et une amélioration réalisable."
+        "Refuse d’essayer ou de tenir compte des retours.",
+        "Propose une idée, sans première étape ni apprentissage identifié.",
+        "Propose une première action simple et réalisable.",
+        "Décrit un essai, un retour ou un ajustement concret.",
+        "Relie l’action, les retours, les apprentissages et une amélioration réalisable."
       ]
     },
     {
       "id": "teamwork",
       "label": "Coopération et responsabilité",
-      "description": "Écouter, partager le travail, prévenir en cas de difficulté et reconnaître les contributions. L’aisance à l’oral ne remplace pas la coopération.",
+      "description": "Décrire sa contribution, son écoute et sa manière de gérer un désaccord.",
       "anchors": [
-        "La réponse évaluée justifie l’exclusion, l’irrespect ou le refus de rendre compte à l’équipe.",
-        "La personne affirme aimer travailler en équipe sans préciser sa manière de contribuer.",
-        "Un exemple ou une situation explique sa contribution et son écoute des autres.",
-        "La personne explique comment elle répartit le travail, communique et traite un désaccord.",
-        "La personne décrit une coopération concrète, assume sa part et propose un traitement constructif d’un blocage."
+        "Justifie l’irrespect, l’exclusion ou le refus de rendre compte à l’équipe.",
+        "Dit apprécier le travail en équipe, sans préciser sa contribution.",
+        "Donne un exemple de sa contribution et de son écoute.",
+        "Explique la répartition du travail, les échanges et la gestion d’un désaccord.",
+        "Décrit sa contribution, assume ses responsabilités et propose une issue à un blocage."
       ]
     },
     {
       "id": "commitment",
       "label": "Engagement réaliste et fiabilité",
-      "description": "Annoncer une contribution compatible avec ses études et ses contraintes, organiser ses disponibilités et prévenir tôt. L’impossibilité de voyager ne constitue pas une exclusion automatique.",
+      "description": "Présenter des disponibilités, une organisation et des solutions en cas d’empêchement.",
       "anchors": [
-        "La réponse évaluée refuse de respecter un engagement ou de signaler une indisponibilité.",
-        "La personne promet une disponibilité générale sans organisation précise.",
-        "La personne annonce des créneaux ou une contribution réaliste et ses contraintes.",
-        "La personne explique comment elle organise ses engagements et prévient en cas de difficulté.",
-        "La personne propose un engagement réaliste, une organisation concrète et une solution de relais ou d’adaptation en cas de blocage."
+        "Refuse de tenir un engagement ou de signaler une indisponibilité.",
+        "Annonce une disponibilité générale, sans organisation précise.",
+        "Présente des créneaux ou une contribution réaliste et ses contraintes.",
+        "Explique son organisation et sa façon de prévenir l’équipe en cas de difficulté.",
+        "Propose un engagement réaliste, une organisation concrète et un relais ou une adaptation en cas d’empêchement."
       ]
     }
   ]

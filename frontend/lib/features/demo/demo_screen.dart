@@ -1986,7 +1986,7 @@ class _DemoScreenState extends State<DemoScreen> {
         (
           'Essayer le salon',
           'Aperçu de la réunion : micro, caméra, participants et partage d’écran. '
-              'Cette démonstration ne demande pas l’accès à votre caméra ou à votre microphone et ne rejoint aucune réunion réelle.',
+              'Aperçu d’une réunion. La caméra et le micro restent désactivés.',
         ),
       ],
       'attendance' => [
@@ -2024,7 +2024,7 @@ class _DemoScreenState extends State<DemoScreen> {
         (
           'Explorer sans compte',
           'Choisissez un parcours et utilisez le menu pour explorer les fonctionnalités. '
-              'Les actions sont simulées et restent dans cette visite. Les photos et dossiers publics sont issus des ressources embarquées du club.',
+              'Explorez l’application avec les exemples de cette visite.',
         ),
         (
           'Créer son propre accès',

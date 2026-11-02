@@ -802,7 +802,7 @@ class _BadgesSection extends StatelessWidget {
               _EmptyText(
                 personal
                     ? 'Tu n’as pas encore obtenu de badge.'
-                    : 'Aucun badge configuré. Initialise les badges par défaut pour commencer.',
+                    : 'Aucun badge n’est disponible pour le moment.',
               )
             else
               LayoutBuilder(
@@ -1211,7 +1211,7 @@ class _BadgeManagementDialogState extends State<_BadgeManagementDialog> {
             children: [
               TextField(
                 controller: name,
-                decoration: const InputDecoration(labelText: 'Nom technique'),
+                decoration: const InputDecoration(labelText: 'Identifiant du badge'),
               ),
               TextField(
                 controller: label,

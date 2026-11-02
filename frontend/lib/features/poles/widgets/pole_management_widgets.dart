@@ -630,7 +630,7 @@ class _PoleMemberRemovalDialogState extends State<PoleMemberRemovalDialog> {
             if (leadership) ...[
               const SizedBox(height: 8),
               const Text(
-                'Aucun remplacement automatique ne sera effectué.',
+                'Nommez un nouveau responsable pour assurer le relais.',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               CheckboxListTile(

@@ -52,7 +52,7 @@ def enqueue_candidate_update(db, application):
         message,
         "\n".join(details),
         ("Code de suivi : " + application.tracking_code) if application.tracking_code else "",
-        "Suivre ma candidature : " + APP_URL + "/application-tracking",
+        "Suivre ma candidature : " + APP_URL + "/#/application-tracking",
         "L’équipe Enactus ESP",
     ])
     fingerprint = hashlib.sha256(json.dumps({

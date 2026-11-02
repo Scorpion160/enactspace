@@ -58,10 +58,15 @@ class FrenchEmailCopyTests(unittest.TestCase):
     def test_tracking_link_and_accents_are_preserved_and_html_is_escaped(self):
         render = load_functions("app/services/email_templates.py", set())["render_email_html"]
         html = render("Votre candidature est étudiée", "Réponse reçue : <script>é</script>")
-        self.assertIn("/application-tracking", html)
+        self.assertIn('href="https://enactspace.kerunjombor.net/#/application-tracking"', html)
         self.assertIn("Réponse reçue", html)
         self.assertIn("&lt;script&gt;é&lt;/script&gt;", html)
         self.assertNotIn("<script>", html)
+        invitation = render(
+            "Préparons notre échange",
+            "Retrouver le questionnaire : https://enactspace.kerunjombor.net/#/application-tracking",
+        )
+        self.assertIn('href="https://enactspace.kerunjombor.net/#/application-tracking"', invitation)
 
 
 if __name__ == "__main__":

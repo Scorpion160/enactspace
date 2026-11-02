@@ -40,7 +40,7 @@ def get_current_user(
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide ou expiré",
+            detail="Votre session a expiré. Reconnectez-vous.",
         )
 
     try:
@@ -49,7 +49,7 @@ def get_current_user(
         if session_id is not None:
             session_id = UUID(str(session_id))
     except (ValueError, TypeError, AttributeError):
-        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
+        raise HTTPException(status_code=401, detail="Votre session a expiré. Reconnectez-vous.")
 
     user = db.query(User).filter(User.id == user_id).first()
 

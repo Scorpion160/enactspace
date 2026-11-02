@@ -167,7 +167,7 @@ class InstitutionalDocumentsService {
       token: token,
     );
     if (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-') {
-      throw Exception('Le serveur n’a pas retourné un aperçu PDF valide.');
+      throw Exception('L’aperçu du document est indisponible. Réessayez.');
     }
     return Uint8List.fromList(bytes);
   }

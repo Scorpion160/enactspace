@@ -346,7 +346,7 @@ class RecruitmentWelcome extends StatelessWidget {
               _WelcomeQuestion(
                 title: 'Comment mon dossier est-il étudié ?',
                 answer:
-                    'Le jury regarde cinq critères de même poids : ton envie d’agir avec les communautés, ta manière de comprendre un besoin, ton initiative et tes apprentissages, ta coopération, et l’engagement que tu peux tenir avec tes études. La longueur de tes réponses ne donne pas de points. Les évaluations sont faites par des personnes, qui prennent la décision après discussion.',
+                    'L’équipe étudie tes motivations, tes exemples et tes disponibilités. Si ton dossier est retenu pour la suite, tu retrouveras les prochaines étapes dans ton suivi.',
               ),
               _WelcomeQuestion(
                 title: 'Comment retrouver ma candidature ?',

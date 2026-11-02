@@ -317,7 +317,7 @@ def summary(db, user, start, end, pole_id=None, project_id=None, member_id=None,
             "attendance_due":attendance_due,"attendance_present":attendance_present,"attendance_excused":attendance_excused,
             "attendance_rate":round(100*attendance_present/attendance_due,1) if attendance_due else None},
         "tasks":task_rows,"members":people,"groups":group_rows,
-        "method":"Les livrables acceptés sont rapportés aux tâches dues sur la période. La ponctualité utilise la date de remise, et non le délai de relecture. Les tâches annulées et les indisponibilités approuvées sont exclues. Les données décrivent l’état connu au moment du bilan ; elles ne reconstituent pas un historique antérieur non enregistré. Un faible effectif appelle une lecture prudente. Aucun score global ni sanction automatique n’est calculé."}
+        "method":"Le bilan porte sur les tâches dues pendant la période. La ponctualité est mesurée à partir de la date de remise. Les tâches annulées et les indisponibilités approuvées sont exclues du calcul."}
 
 
 def create_plan(db,user,payload):

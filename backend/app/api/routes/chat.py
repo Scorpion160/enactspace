@@ -928,7 +928,7 @@ def send_message(
     if payload.message_type == "poll":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Utilisez l'endpoint sondage pour créer un sondage",
+            detail="Utilisez « Créer un sondage » pour publier un sondage.",
         )
 
     if payload.message_type == "text" and not content:

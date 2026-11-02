@@ -270,7 +270,7 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
           eyebrow: 'COLLECTION',
           title: 'Archives',
           description:
-              'Contenus documentés, sources et fichiers conservés par le club.',
+              'Documents, photos et récits de la vie du club.',
         ),
         const SizedBox(height: 16),
         AppFilterToolbar(
@@ -623,7 +623,7 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
                 eyebrow: 'HALL OF FAME',
                 title: 'Les moments qui restent',
                 description:
-                    'Une lecture chronologique et humaine, strictement fondée sur les informations disponibles.',
+                    'Les moments qui ont marqué l’histoire d’Enactus ESP.',
               ),
             ),
             if (widget.home.permissions.canCreate)
@@ -731,7 +731,7 @@ class HistoricalStatisticsCenter extends StatelessWidget {
         eyebrow: 'IMPACT HISTORIQUE',
         title: 'Chiffres et provenance',
         description:
-            'Consultez les chiffres historiques, leur période, leur source et leur validation.',
+            'Retrouvez les principaux résultats du club au fil des années.',
       ),
       const SizedBox(height: 18),
       HistoricalStatisticsWrap(
@@ -1422,11 +1422,11 @@ String _impactSummaryLabel(String key) {
     'developing_projects': 'Projets en développement',
     'developed_products': 'Produits développés',
     'touched_sdgs': 'ODD concernés',
-    'created_jobs': 'Emplois documentés',
-    'saved_lives': 'Vies préservées documentées',
-    'planted_trees': 'Arbres plantés documentés',
-    'cumulative_fcfa_gains': 'Gains cumulés documentés',
-    'impacted_lives': 'Vies touchées documentées',
+    'created_jobs': 'Emplois créés',
+    'saved_lives': 'Vies préservées',
+    'planted_trees': 'Arbres plantés',
+    'cumulative_fcfa_gains': 'Gains cumulés',
+    'impacted_lives': 'Vies touchées',
   };
   final known = labels[key];
   if (known != null) return known;

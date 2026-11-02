@@ -277,8 +277,8 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
               Text(
                 _error ??
                     (_nativeClosed
-                        ? 'Votre sortie a été synchronisée avec EnactSpace.'
-                        : 'La visioconférence utilise la fenêtre sécurisée Jitsi intégrée à EnactSpace.'),
+                        ? 'Vous pouvez revenir à la fiche de la réunion.'
+                        : 'Retrouvez la visioconférence dans la fenêtre qui vient de s’ouvrir.'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),

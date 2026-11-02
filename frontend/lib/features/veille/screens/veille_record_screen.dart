@@ -639,7 +639,7 @@ class _VeilleRecordScreenState extends State<VeilleRecordScreen> {
                   ],
                 ),
               ),
-            ReadingBlocks(snapshot['method']?.toString() ?? ''),
+            ReadingBlocks(veilleMethodText(snapshot['method'])),
             FilledButton.icon(
               onPressed: _busy ? null : _export,
               icon: const Icon(Icons.download_rounded),

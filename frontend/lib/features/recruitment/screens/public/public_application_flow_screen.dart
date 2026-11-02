@@ -1,3 +1,4 @@
+import '../../models/recruitment_display_copy.dart';
 import '../../widgets/recruitment_style.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
@@ -556,7 +557,7 @@ class _PublicApplicationFlowScreenState
                 : _longField(
                     _questionKey(questions[index]),
                     questions[index].label,
-                    questions[index].hint,
+                    recruitmentDisplayCopy(questions[index].hint),
                     required: questions[index].required,
                   ),
           ),
@@ -654,7 +655,7 @@ class _PublicApplicationFlowScreenState
 
   Widget _documentsStep() => _StepBody(
     introduction: widget.demoMode
-        ? 'Tu peux essayer la sélection d’un document fictif. Il reste dans cet essai : aucun fichier n’est transmis ni conservé dans un dossier réel.'
+        ? 'Essaie de joindre un document pour découvrir cette étape.'
         : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
     children: [
       AttachmentPickerField(
@@ -680,7 +681,7 @@ class _PublicApplicationFlowScreenState
       ),
       Text(
         widget.demoMode
-            ? 'Documents facultatifs pour cet essai. Le mode démonstration ne téléverse aucun fichier.'
+            ? 'Le document restera dans cette démonstration.'
             : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
         style: const TextStyle(height: 1.5),
       ),
@@ -689,7 +690,7 @@ class _PublicApplicationFlowScreenState
 
   Widget _reviewStep() => _StepBody(
     introduction:
-        'Relis tes informations avant l’envoi. Rien ne sera envoyé automatiquement.',
+        'Relis tes informations, puis confirme l’envoi de ta candidature.',
     children: [
       ApplicationReviewSection(
         title: 'Campagne',

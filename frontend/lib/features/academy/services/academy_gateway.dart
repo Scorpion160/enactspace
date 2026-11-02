@@ -17,7 +17,7 @@ class AcademyQuizQueuedException implements Exception {
 
   @override
   String toString() =>
-      'Réponses conservées sur cet appareil. Le serveur n’a pas pu confirmer le résultat ; la validation sera retentée à la prochaine synchronisation.';
+      'Tes réponses sont enregistrées sur cet appareil. Elles seront envoyées dès que la connexion le permettra.';
 }
 
 abstract class AcademyGateway {
@@ -348,8 +348,8 @@ class ApiAcademyGateway implements AcademyGateway {
       return AcademyRewardResult(
         points: 0,
         label: error is ApiException
-            ? 'Progression conservée sur cet appareil. Le serveur est temporairement indisponible ; nouvelle tentative au prochain chargement.'
-            : 'Progression conservée sur cet appareil : connexion au serveur impossible, synchronisation en attente',
+            ? 'Ta progression est enregistrée sur cet appareil. Elle sera mise à jour en ligne au prochain chargement.'
+            : 'Ta progression est enregistrée sur cet appareil, en attendant le retour de la connexion.',
         syncedWithGamification: false,
       );
     }

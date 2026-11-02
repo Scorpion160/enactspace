@@ -26,7 +26,7 @@ class PolesPortfolioHeader extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Gouvernance, alertes et prochaines actions réelles.',
+            'Équipes, alertes et actions à suivre.',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ],

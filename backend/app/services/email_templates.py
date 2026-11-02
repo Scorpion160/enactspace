@@ -32,8 +32,8 @@ def _action(subject: str, text_body: str) -> tuple[str, str] | None:
     lowered = subject.casefold()
     if OTP_PATTERN.search(text_body) or "code de réinitialisation" in lowered:
         return None
-    if "candidature" in lowered:
-        return ("Suivre ma candidature", APP_URL + "/application-tracking")
+    if "candidature" in lowered or APP_URL + "/#/application-tracking" in text_body:
+        return ("Suivre ma candidature", APP_URL + "/#/application-tracking")
     if "invitation" in lowered or "réunion" in lowered or "enactmeet" in lowered:
         return ("Ouvrir EnactSpace", APP_URL)
     return ("Accéder à EnactSpace", APP_URL)

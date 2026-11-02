@@ -293,13 +293,13 @@ class _CandidateDecisionDialogState extends State<CandidateDecisionDialog> {
                 '${widget.reviewCount} enregistrée${widget.reviewCount > 1 ? 's' : ''}',
               ),
               const Text(
-                'Cette action marque le dossier comme retenu sans convertir '
-                'automatiquement la personne en utilisateur.',
+                'Après validation, prépare son intégration depuis sa fiche '
+                'candidat.',
               ),
             ] else if (widget.kind == CandidateDecisionKind.rejection)
               const Text(
-                'Cette décision est sensible. Vérifiez le dossier avant de '
-                'marquer la candidature comme non retenue.',
+                'Vérifie le dossier avant de confirmer que la candidature '
+                'n’est pas retenue.',
               )
             else if (widget.kind == CandidateDecisionKind.closure)
               const Text(

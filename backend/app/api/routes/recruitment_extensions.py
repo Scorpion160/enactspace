@@ -215,9 +215,9 @@ def register_recruitment_extensions(router):
         enqueue_email_delivery(db, recipient_email=app.email,
             subject="Préparer notre échange avec Enactus ESP",
             text_body=(f"Bonjour {app.first_name},\n\nNous te proposons un questionnaire pour préparer ton entretien. "
-                "Il n’existe pas de profil idéal et il ne décide pas de l’admission. Tu peux aussi préférer en parler en entretien.\n\n"
+                "Tu peux enregistrer tes réponses pour les reprendre plus tard, ou choisir d’en parler pendant l’entretien.\n\n"
                 f"Échéance : {deadline}\nCode de suivi : {app.tracking_code or app.id}\n"
-                f"Retrouver le questionnaire : {APP_URL}/application-tracking\n\nL’équipe Enactus ESP"),
+                f"Retrouver le questionnaire : {APP_URL}/#/application-tracking\n\nL’équipe Enactus ESP"),
             dedupe_key=f"personality-invite:{app.id}:{due.isoformat() if due else 'open'}")
         create_audit_log(db, "invitation_questionnaire_candidature", user.id, "application", app.id,
                          new_value={"version": row.instrument_version, "due_at": due.isoformat() if due else None})

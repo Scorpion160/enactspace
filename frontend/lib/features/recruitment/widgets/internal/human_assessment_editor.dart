@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/recruitment_display_copy.dart';
 
 class HumanAssessmentEditor extends StatefulWidget {
   final Map<String, dynamic> rubric;
@@ -62,7 +63,7 @@ class _HumanAssessmentEditorState extends State<HumanAssessmentEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          widget.rubric['guidance']?.toString() ?? '',
+          recruitmentDisplayCopy(widget.rubric['guidance']),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
         ),
         const SizedBox(height: 12),
@@ -81,7 +82,7 @@ class _HumanAssessmentEditorState extends State<HumanAssessmentEditor> {
           ),
           const SizedBox(height: 6),
           Text(
-            criterion['description']?.toString() ?? '',
+            recruitmentDisplayCopy(criterion['description']),
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(height: 1.5),
@@ -110,8 +111,9 @@ class _HumanAssessmentEditorState extends State<HumanAssessmentEditor> {
           if (_ratings.containsKey(criterion['id'])) ...[
             const SizedBox(height: 8),
             Text(
-              (criterion['anchors'] as List)[_ratings[criterion['id']]!]
-                  .toString(),
+              recruitmentDisplayCopy(
+                (criterion['anchors'] as List)[_ratings[criterion['id']]!],
+              ),
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(height: 1.5),
@@ -136,12 +138,6 @@ class _HumanAssessmentEditorState extends State<HumanAssessmentEditor> {
             },
           ),
         ],
-        const SizedBox(height: 12),
-        const Text(
-          'Une réponse manquante reste à préciser. Le parcours scolaire, '
-          'l’apparence, le genre et la longueur du texte ne donnent aucun point. '
-          'Un déplacement impossible peut être compensé par une contribution utile avant ou après la mission.',
-        ),
       ],
     );
   }

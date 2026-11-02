@@ -874,7 +874,7 @@ class _EditMeetingSheetState extends State<_EditMeetingSheet> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.fiber_manual_record_rounded),
-            title: const Text('Enregistrement serveur'),
+            title: const Text('Enregistrement de la réunion'),
             subtitle: Text(
               widget.meeting.recordingEnabled
                   ? 'Disponible pour cette réunion.'

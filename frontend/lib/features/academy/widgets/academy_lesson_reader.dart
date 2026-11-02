@@ -127,7 +127,7 @@ class _AcademyLessonReaderState extends State<AcademyLessonReader> {
       if (uri == null ||
           !['http', 'https'].contains(uri.scheme) ||
           !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw StateError('Resource unavailable');
+        throw StateError('Ressource indisponible');
       }
     } catch (_) {
       if (mounted) {

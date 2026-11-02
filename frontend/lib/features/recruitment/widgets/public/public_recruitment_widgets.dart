@@ -431,7 +431,7 @@ class ApplicationSuccessView extends StatelessWidget {
             if (demoMode) ...[
               const SizedBox(height: 12),
               const Text(
-                'Aucun dossier réel n’a été créé et aucun e-mail n’a été envoyé. Le code ci-dessous fonctionne uniquement pendant cette visite de démonstration.',
+                'Cette candidature est un exemple. Utilise ce code pour essayer le suivi pendant la visite.',
                 textAlign: TextAlign.center,
                 style: TextStyle(height: 1.5),
               ),

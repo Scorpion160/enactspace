@@ -1,5 +1,6 @@
 import '../../widgets/recruitment_style.dart';
 import 'package:flutter/material.dart';
+import '../../models/recruitment_display_copy.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
@@ -174,7 +175,7 @@ class _PersonalityQuestionnaireScreenState
       builder: (context) => AlertDialog(
         title: const Text('Partager tes réponses avec le jury ?'),
         content: const Text(
-          'Tu pourras consulter ta synthèse dans ton suivi. Tes réponses seront conservées telles quelles pour préparer l’entretien. Elles ne décideront pas de ton admission.',
+          'Après confirmation, le jury pourra consulter tes réponses et tu retrouveras ta synthèse dans ton suivi.',
         ),
         actions: [
           TextButton(
@@ -323,17 +324,14 @@ class _PersonalityQuestionnaireScreenState
                         : 'Nous en parlerons pendant l’entretien.',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const Text(
-                    'Ce questionnaire ne donne pas de note d’admission et ne remplace pas l’échange avec le jury.',
-                  ),
                   if (_state!['results'] is Map) ...[
                     const SizedBox(height: 18),
                     Text(
-                      'Tes tendances déclarées',
+                      'Synthèse de tes réponses',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Text(
-                      'Moyennes sur 5, sans seuil ni classement. Ce sont des pistes à discuter, pas des étiquettes.',
+                      'Synthèse par thème, sur une échelle de 1 à 5.',
                     ),
                     for (final row
                         in ((_state!['results'] as Map)['dimensions'] as List)
@@ -358,7 +356,7 @@ class _PersonalityQuestionnaireScreenState
                   ],
                 ],
                 if (_state != null && !_finished) ...[
-                  Text(_state!['instrument']['notice'].toString()),
+                  Text(recruitmentDisplayCopy(_state!['instrument']['notice'])),
                   if (_state!['due_at'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
@@ -371,7 +369,7 @@ class _PersonalityQuestionnaireScreenState
                     contentPadding: EdgeInsets.zero,
                     value: _consent,
                     title: const Text(
-                      'J’ai compris à quoi servent mes réponses et qui pourra les lire.',
+                      'J’ai pris connaissance de l’utilisation de mes réponses.',
                     ),
                     onChanged: _busy
                         ? null
@@ -389,7 +387,7 @@ class _PersonalityQuestionnaireScreenState
                   const SizedBox(height: 14),
                   if (_page < 5) ...[
                     const Text(
-                      'Réponds selon ce qui te ressemble habituellement, plutôt que selon ce que tu voudrais montrer.',
+                      'Choisis la réponse qui te correspond le mieux au quotidien.',
                     ),
                     for (final item in currentItems)
                       Card(
@@ -432,11 +430,11 @@ class _PersonalityQuestionnaireScreenState
                       ),
                   ] else ...[
                     Text(
-                      'À toi de jouer, avec Enactus',
+                      'Mises en situation',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Text(
-                      'Explique ton raisonnement avec tes mots. Un exemple vécu est bienvenu ; ces situations n’ont pas de note automatique.',
+                      'Explique ce que tu ferais et pourquoi. Tu peux t’appuyer sur un exemple vécu.',
                     ),
                     for (final scenario in _situations)
                       Card(

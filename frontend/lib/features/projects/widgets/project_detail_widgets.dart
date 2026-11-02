@@ -455,7 +455,7 @@ class ProjectImpactSection extends StatelessWidget {
         semanticsLabel: 'Section Impact indisponible',
         icon: Icons.insights_rounded,
         title: 'Impact indisponible',
-        message: 'La source Impact n’a pas pu être chargée.',
+        message: 'Les indicateurs du projet n’ont pas pu être chargés.',
       );
     }
     final impact = item.impact;
@@ -465,7 +465,7 @@ class ProjectImpactSection extends StatelessWidget {
         icon: Icons.insights_rounded,
         title: 'Informations d’impact à compléter',
         message:
-            'Aucune métrique contractuelle n’est disponible pour ce projet.',
+            'Aucun indicateur de suivi n’est renseigné pour ce projet.',
       );
     }
     final metrics = <MapEntry<String, String>>[

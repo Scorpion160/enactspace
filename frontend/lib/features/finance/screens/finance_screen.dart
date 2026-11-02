@@ -1966,7 +1966,7 @@ class _ProofPreview extends StatelessWidget {
             height: 180,
             child: Center(
               child: Text(
-                'Aperçu indisponible : ${snapshot.error ?? 'fichier illisible'}',
+                'L’aperçu du justificatif est indisponible.',
                 textAlign: TextAlign.center,
               ),
             ),
@@ -2208,7 +2208,7 @@ class _ReceiptDetailsCard extends StatelessWidget {
     if (details['recipient_phone'] != null) {
       add('Destinataire', phoneValue(details['recipient_phone']));
     }
-    add('Référence OCR', details['reference']);
+    add('Référence sur le reçu', details['reference']);
 
     final amountMatch = details['amount_matches_declaration'];
     final referenceMatch = details['reference_matches_declaration'];
@@ -2239,8 +2239,8 @@ class _ReceiptDetailsCard extends StatelessWidget {
           if (amountMatch is bool)
             Text(
               amountMatch
-                  ? 'Montant cohérent avec la déclaration.'
-                  : 'Attention : le montant OCR diffère de la déclaration.',
+                  ? 'Le montant correspond à la déclaration.'
+                  : 'Le montant lu sur le reçu diffère de la déclaration.',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: amountMatch
@@ -2251,8 +2251,8 @@ class _ReceiptDetailsCard extends StatelessWidget {
           if (referenceMatch is bool && details['reference'] != null)
             Text(
               referenceMatch
-                  ? 'Référence cohérente avec la déclaration.'
-                  : 'La référence OCR doit être contrôlée manuellement.',
+                  ? 'La référence correspond à la déclaration.'
+                  : 'Vérifiez la référence sur le reçu.',
             ),
           if (providerMatch is bool && providerMatch == false)
             Text(
@@ -2265,7 +2265,7 @@ class _ReceiptDetailsCard extends StatelessWidget {
             ),
           SizedBox(height: 4),
           Text(
-            'L’OCR est une aide de lecture ; il ne confirme jamais l’encaissement.',
+            'Le justificatif reste à vérifier avant de confirmer le paiement.',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

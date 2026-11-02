@@ -22,7 +22,7 @@ class PreviewModeScope extends InheritedWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          message ?? 'Cette action est présentée dans la démo. Aucun service réel n’est activé.',
+          message ?? 'Cette action n’est pas disponible dans la démonstration.',
         ),
       ),
     );

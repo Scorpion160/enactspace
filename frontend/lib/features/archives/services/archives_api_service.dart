@@ -51,7 +51,7 @@ class ArchivesService {
   }
 
   Map<String, dynamic> _object(dynamic response) {
-    if (response is! Map) throw const FormatException('Réponse API invalide.');
+    if (response is! Map) throw const FormatException('Les archives n’ont pas pu être chargées. Réessayez.');
     return archiveMap(response);
   }
 

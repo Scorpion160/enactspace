@@ -75,8 +75,7 @@ class _CandidateIntegrationSectionState
             ),
             const SizedBox(height: 8),
             Text(
-              'L’intégration crée ou active un compte membre. Elle reste '
-              'strictement séparée de la décision de recrutement.',
+              'Prépare le compte et les affectations du candidat retenu.',
             ),
             if (_lastResult != null) ...[
               const SizedBox(height: 12),
@@ -99,8 +98,7 @@ class _CandidateIntegrationSectionState
             ] else if (!alreadyLinked && !application.canConvert) ...[
               const SizedBox(height: 10),
               Text(
-                'L’intégration est réservée aux responsables autorisés par le '
-                'serveur.',
+                'Ton compte ne permet pas de préparer cette intégration.',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -390,11 +388,6 @@ class _CandidateConversionDialogState extends State<CandidateConversionDialog> {
       _IntegrationLine(label: 'Profil', value: result.profileLabel),
       _IntegrationLine(label: 'Pôle cœur', value: _corePoleName),
       _IntegrationLine(label: 'Projet', value: _projectName),
-      const SizedBox(height: 12),
-      Text(
-        'Aucun mot de passe n’est conservé ni affiché dans ce résultat.',
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
     ],
   );
 }
@@ -532,8 +525,7 @@ class CandidateAssignmentStep extends StatelessWidget {
           value: 'Membre EnactSpace',
         ),
         Text(
-          'Le serveur attribue le rôle membre de base. Le profil ci-dessous '
-          'adapte uniquement la présentation du membre.',
+          'Choisis le profil et les affectations du nouveau membre.',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -696,7 +688,7 @@ class _ConversionNotice extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
     ),
     child: Text(
-      'Cette opération est distincte de la décision de recrutement.',
+      'Vérifie les affectations avant de finaliser l’intégration.',
       style: TextStyle(fontWeight: FontWeight.w800),
     ),
   );

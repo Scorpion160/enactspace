@@ -4944,7 +4944,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
 
     if (dataBase64.isNotEmpty && _nameController.text.trim().isEmpty) {
       setState(() {
-        _error = 'Donne un nom au fichier à uploader.';
+        _error = 'Donne un nom au fichier à envoyer.';
       });
       return;
     }
@@ -5034,7 +5034,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Choisis ton fichier, ajoute une légende si besoin, puis envoie. Le type et l’upload sont gérés automatiquement.',
+                        'Choisis un fichier et ajoute une légende si tu le souhaites.',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -5097,18 +5097,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                     prefixIcon: Icon(Icons.link_rounded),
                   ),
                 ),
-              const SizedBox(height: 12),
-              if (_showAdvanced)
-                TextField(
-                  controller: _dataBase64Controller,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Données base64 à uploader',
-                    prefixIcon: Icon(Icons.cloud_upload_rounded),
-                  ),
-                ),
-              const SizedBox(height: 12),
+              if (_showAdvanced) const SizedBox(height: 12),
               if (_showAdvanced)
                 TextField(
                   controller: _nameController,
@@ -5146,25 +5135,6 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                   ),
                 ),
               ),
-              if (_showAdvanced) const SizedBox(height: 8),
-              if (_showAdvanced)
-                TextField(
-                  controller: _mimeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Type MIME optionnel',
-                    prefixIcon: Icon(Icons.code_rounded),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              if (_showAdvanced)
-                TextField(
-                  controller: _sizeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Taille en octets optionnelle',
-                    prefixIcon: Icon(Icons.storage_rounded),
-                  ),
-                ),
               if (showDuration) ...[
                 const SizedBox(height: 12),
                 TextField(
@@ -5217,7 +5187,7 @@ class _AttachmentMessageDialogState extends State<_AttachmentMessageDialog> {
                   ),
                 )
               : Icon(Icons.send_rounded),
-          label: Text(_uploading ? 'Upload...' : 'Envoyer'),
+          label: Text(_uploading ? 'Envoi…' : 'Envoyer'),
         ),
       ],
     );

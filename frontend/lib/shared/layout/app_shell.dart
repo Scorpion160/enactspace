@@ -402,7 +402,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         messenger.showSnackBar(
           const SnackBar(
             content: Text(
-              'Déconnexion serveur non confirmée. Vérifiez votre connexion avant de réessayer.',
+              'La déconnexion n’a pas abouti. Vérifiez votre connexion puis réessayez.',
             ),
           ),
         );

@@ -264,7 +264,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                           leading: Icon(Icons.offline_bolt_rounded),
                           title: Text('Mode hors connexion'),
                           subtitle: Text(
-                            'La dernière liste sécurisée de documents reste consultable. '
+                            'La dernière liste de documents enregistrée reste consultable. '
                             'Les filtres fonctionnent localement ; un fichier distant non '
                             'déjà disponible sur l’appareil nécessite une connexion.',
                           ),

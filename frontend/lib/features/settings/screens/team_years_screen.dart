@@ -57,7 +57,7 @@ class _TeamYearsScreenState extends State<TeamYearsScreen> {
       builder: (context) => AlertDialog(
         title: Text('Ouvrir ${year['name']} ?'),
         content: const Text(
-          'L’année précédente rejoindra l’historique. Les tâches ouvertes, les équipes et les projets restent accessibles. Chaque membre confirmera son cursus pour la nouvelle année ; aucun passage Alumni n’est automatique.',
+          'L’année précédente rejoindra l’historique. Les tâches, les équipes et les projets restent accessibles. Chaque membre sera invité à confirmer son cursus pour la nouvelle année.',
         ),
         actions: [
           TextButton(

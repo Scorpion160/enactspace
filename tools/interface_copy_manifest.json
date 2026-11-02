@@ -1,0 +1,806 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "ef13a5a50bee6514dbab6a6a366789d68dbcba16",
+  "files": [
+    {
+      "path": "backend/app/services/recruitment_questionnaire.py",
+      "sha256": "b08656904cefd477be2ad2d999f0e235f61b2f6996bf898d412c93ca09e3e7a0",
+      "baseline_sha256": "4a92e783227a74646ae2c87bcc3c9f7041a92e2ec32c743eaaa0e22aa264cc3f",
+      "allow_missing": true
+    },
+    {
+      "path": "backend/app/services/recruitment_rubric.json",
+      "sha256": "aea372c6b1028e5e7b1e135bf6e8324ab6331dc280bf338a7890029c9916c6b9",
+      "baseline_sha256": "adb5fbc6a5ba4c03605a94b4e032eec8b65661d380bde77434fe94eeddfb1023",
+      "allow_missing": true
+    },
+    {
+      "path": "frontend/lib/core/api/api_client.dart",
+      "sha256": "7409a1eea619bea6c1ee384cc6a782f68dc612eb9d5ed8c73eedaa6dcbd8e07f",
+      "baseline_sha256": "3370c9e89c2d7eeabea11973369de720ec784a5ac3ab4a180d4c25c253b4ace5",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/core/auth/auth_service.dart",
+      "sha256": "548021b10cc9c6da57eb71f6edbf5f651e4c7dec0ac267db45ef31c185eecb60",
+      "baseline_sha256": "e2d5c905e5b8033d6cc4548ef9c7eeee389227e2580c7c09ac1e4ceb13a8dfdb",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/core/widgets/preview_mode_scope.dart",
+      "sha256": "b644e6df2fd57905abaafd431343bf1e262600da5e605e55657a492a06a67947",
+      "baseline_sha256": "6a7a0ac7491c57a17a01b8a2f671ac7c40184128d8978279de7bb2a0327854df",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/academy/screens/academy_home_screen.dart",
+      "sha256": "d1258826b3c64cc146caa1f2f65cfc0971b35f07452ba2ff6a2671c4cde287d3",
+      "baseline_sha256": "0be615ce0351558a24a5ef5ca3e4b609e6a46e225123e251c7d1872001525a51",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/academy/services/academy_gateway.dart",
+      "sha256": "c29cfd2ca2bd2c03653ff2f7ef72fa0c69a956d10c6a3089186e107618888d28",
+      "baseline_sha256": "6b0c9a37f8f4e8097c4a4c5fd52ee404d150378658d7309c747683b57eef1bf4",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/academy/services/academy_service.dart",
+      "sha256": "7697d2ba510122dbab19eb3c2db0ec1dd823454cec69c82c3ca482d23a3a8d70",
+      "baseline_sha256": "06796d5b4659db648dbec6eed049f1f7f74235c48401732cc5e5ba77621895f5",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/academy/widgets/academy_lesson_reader.dart",
+      "sha256": "f4b561ff01dd85d9d0c87428f9d6cc787537180306ab6e537224f0d57207780b",
+      "baseline_sha256": "dda523d3ebb83e33d8a322f89c02cb1f3b54c9ee7730c4d9a39a56f38eeee9ae",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/archives/screens/archives_center_sections.dart",
+      "sha256": "f618779f92eb726a5e8b5ed246704210cdf6bc9b8319d97d87c3476334b51620",
+      "baseline_sha256": "ba31d92cb7dd64fc56f69cf43e73e98d49d5340a92727eef76d619cbd504b5cc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/archives/services/archives_api_service.dart",
+      "sha256": "aed9ac866277857025521f1347f1de6dc422d6d9b1fc315f69b4db182f2f0fe5",
+      "baseline_sha256": "e68bbf557d7371cdbbb7d17929297fa0e42d6b43d27468ea9b03c0afaae18c35",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/attendance/screens/attendance_qr_scanner_screen.dart",
+      "sha256": "8b523054a44ac44848d1a07d1a9ec303760cf0bb987aaac201f23d1b8e7bf5c9",
+      "baseline_sha256": "7a793163cd23280e8323946f736be84a1b1138d80a42af0df0d73743f8f365bd",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/attendance/widgets/qr_attendance_section.dart",
+      "sha256": "8356976ce8127216e7322d2ed306ba55f2fe562b776751bedb8d8dcf90e055e9",
+      "baseline_sha256": "fd42b9ff4edc9a410d3a21c2f88de1eff5f17a877a094f72c300af6c2ae75b62",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/chat/screens/chat_screen.dart",
+      "sha256": "6c968a727d1df71ff6153d543c93a478f900106e600946d4fcb84f5e6c026473",
+      "baseline_sha256": "def7099c22a28f18a981e38f4d1eaba3bfb171fbe1b344ee5afa1289b7346769",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/chat/services/chat_service.dart",
+      "sha256": "5b9ac5e998cb92de011b211f783ac6f42f267c7fa02fb7adbaae345ce1a3cf2b",
+      "baseline_sha256": "a294991df4872246b390f8475eb0995cb53b8471d5bfa70832956ffba9ff6ed7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/demo/demo_native_data.dart",
+      "sha256": "e8fae55c99694e2ef8332b8fb289c42cac9adaf911222cd27b5ed3874ceab0e3",
+      "baseline_sha256": "30e79d89f51545b99818f91213a7d8cf2bd872fb19d68aee5593f57935af4652",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/demo/demo_screen.dart",
+      "sha256": "20cab9a928f366086bc0bacc10e0c79579560f7277b0c17c79a37140aa05d0e0",
+      "baseline_sha256": "c81a1420f38e24dafda7f57abc18abf00585e0ea3a21e6016090426a5625adda",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/documents/screens/documents_screen.dart",
+      "sha256": "b5650f57dfccf3cb01f48e407557c4e2ae074cde55cda4847f20a4b224671e78",
+      "baseline_sha256": "214e8111627e2f7297a59176aae759f2762a4659e43fe0c36b771f3ec90d21a7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/documents/services/documents_service.dart",
+      "sha256": "b68b720ebeb46951a446395d4aebfc2195c5f9bf8731cbec9b85e754110fdc12",
+      "baseline_sha256": "ceff097e5d4b0076b72db2360da14c11d0822dd73ed94f473f10657b8e811230",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/documents/services/institutional_documents_service.dart",
+      "sha256": "618161e24333e85701b6bd6d0bc3ea9ef50e16c33828db0f6e19c82e61363fbe",
+      "baseline_sha256": "b6ed4842929c33403d2486eb8290316fdbcccd81df3ce971e60056f8143d24d1",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/finance/screens/finance_screen.dart",
+      "sha256": "ee059824963c9efd69ffc99d6fb966bfbf46b9a27142e0c85d15780d0d6863f1",
+      "baseline_sha256": "637dc365b42bb1776de7ad077e0f33e3e836bfb447ba0b925e5f249253fdb954",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/finance/widgets/mobile_money_payment_sheet.dart",
+      "sha256": "a659f15ba681ae9d3d306d029d30e6d88f353410bd7113c1ed36ff64d3ef85ad",
+      "baseline_sha256": "56003a96b5deeb4b023dc669d90dccdee9f3f76f1bff6480ae9fcf1819b05140",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/gamification/screens/gamification_screen.dart",
+      "sha256": "973882cc9c4cc5247fb25c26c9869c041422d4c54fdff3eadb1d75b14db8dd7e",
+      "baseline_sha256": "72b0ce4d33e90cb2b9392bc1132b5f3dd7d4a9abb050963afedeee7fd0824f7e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/help/screens/help_screen.dart",
+      "sha256": "be08a3a11a2bd23a3e859d4cf306847d37f0cb11c3193410c7a73b641026d580",
+      "baseline_sha256": "afb3fb4e135dd94f316dd888bfcfc10ac5e6693b27a9a3caea9e217df0ad10b2",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/help/widgets/help_guide_panel.dart",
+      "sha256": "aa80e1db081991d558f2901bdbc0779e2c9b66133d6e7e1202974659080bb53d",
+      "baseline_sha256": "9937ed4de8a9597c98c71165743b2996cdee1d20f2e646c6846dbdcdffa90ba7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/meetings/screens/meeting_conference_screen.dart",
+      "sha256": "613ae039fdaa4cf702872966582eadccb603f67b4e2b659baa8ccce97801b1e2",
+      "baseline_sha256": "663ba8c6a156be9d7e663b9e41f55fae4d41c506448d92cee955c9a68146ef2c",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/meetings/screens/meeting_detail_screen.dart",
+      "sha256": "e9cbf84cd0fca1a97853d4a034d0dfaa343b709a4a59370a5b8c7770da0a9a7d",
+      "baseline_sha256": "c6d8430ace26440b6eec39ea20456bbd1089ee7b3b5867743ea5aeab66fe7c4b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/poles/models/pole_management_models.dart",
+      "sha256": "39e129a6622ed5eca4f0676802f426a9c80a6a7cdee3cbd75dcdc229f4c95818",
+      "baseline_sha256": "f2fb9b2468a68355825061a9e34507edb0cb6018d0a4ce80eb38a9b346b33db0",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/poles/widgets/pole_management_widgets.dart",
+      "sha256": "7d7306171970696318e5a4e044af16fd8a2b25d1013783d618ee9035b9e8c3ff",
+      "baseline_sha256": "3b554d63d2de0be2ef10b722805f20e36a663de4896ce0c7a63eff0315a4274b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/poles/widgets/poles_portfolio_widgets.dart",
+      "sha256": "71bea44b481315d8e4902725660e10fa79e9792d3e5ae62df5ec42111f954203",
+      "baseline_sha256": "dfd027f8d2db78ba64bb6a471d23db4f7bca8ee8bf66901f159f00eb923f96e2",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/posts/services/posts_service.dart",
+      "sha256": "5063bb81865fc5b4f5847a5123cad99e2371047eb740be5a4ad7259c5d8c0ccb",
+      "baseline_sha256": "967eb388e7796d152c1bf270f49414aa02c9e5924b521e57e2142b231f4a2f9b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/projects/models/project_team_management_models.dart",
+      "sha256": "cf72d8d92e7ada6cf69b2d621d71cf02b44aab9f2df740b1fe866808c56a7ac2",
+      "baseline_sha256": "7a08353affbf94a488bd1e85e90d05d8e196e7b5b3efa480ba8c0bdcbc5400ba",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/projects/screens/projects_screen.dart",
+      "sha256": "e65366e7824530b7a81386fae175ae10a7c9fe7233c0609e67cde5013f25c5a8",
+      "baseline_sha256": "0cf3dabeca88adec318b2cdfc9f530c3b7c7ac264e47338244c12510b16cca31",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/projects/widgets/project_detail_widgets.dart",
+      "sha256": "57e37577e2a46f1f6bf18b9bf840e64fcae8ee4ffc355fbbf3dbba8aeca4d395",
+      "baseline_sha256": "1f784216b66e5b8f5e8733ed6f1f8051ea852accf09e600429ff52a913eb22a1",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/projects/widgets/project_management_widgets.dart",
+      "sha256": "c02bafca20ac14bf0ce7101e3d47ed9ff977fe630f9426f6c1479b7a9a790d12",
+      "baseline_sha256": "acca20ae1e3d64bd58045bbd2dcee09a7e6992ee1c3cc7ed6c3c0de5ee6e1e3b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/models/recruitment_display_copy.dart",
+      "sha256": "7b4bf976cd22b1feb2d58b5a9e380aa4675ba4199ddcc3b989dc39c5c037e84f",
+      "baseline_sha256": "",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/models/recruitment_question_model.dart",
+      "sha256": "c4207737e73d3a3e9df7586f7985d6a36577c5c6c63f2014529537ff9dcb9a5d",
+      "baseline_sha256": "3a594be82e56057031f7defc830e1d67f788e5cc35005b373bbcaaf00221ba71",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/screens/internal/campaign_management_screen.dart",
+      "sha256": "7f541c008744b6c1db649a94b7db8ec667dba2114d2951fd4890bd6bef7e1cd4",
+      "baseline_sha256": "d76abb4a654757ccb277cd768216e1bcff82c49cd9c21b38ac3f4feb56c7bdbc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/screens/public/personality_questionnaire_screen.dart",
+      "sha256": "d0bb7533beabe770b138122c8357d6c413a9435fd70eddc7ea6e87ba226d040a",
+      "baseline_sha256": "5353bd259e591f0ec8d6c3eec91ea6534cbd66a33ebe3871ce83cf2de1b240d2",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/screens/public/public_application_flow_screen.dart",
+      "sha256": "085c76421fe2d35e56bcaf372a06bd88df6e87627bb8bba6e271a9d05f60db3d",
+      "baseline_sha256": "25847d8812f1d3bb7ce0ac2b3b53ac17ba6a18295b9329d234806d736f7b3995",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/candidate_actions.dart",
+      "sha256": "3232068685b0463fd754481f12e111a1edc3cf5d7dc258f575add1a7e6b02d6e",
+      "baseline_sha256": "3f9f27f3eb51f64bd4a5b9cbf26c40b7af01d607fac52e739afc01ccbe3b4942",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/candidate_conversion.dart",
+      "sha256": "d104ff84fa3877983118486f0d6ee8fc7e804988eb8368473d60ac9e30034e5e",
+      "baseline_sha256": "8cb9fac0e48973b28dd698e16bd8350f9f853c47e6111ed1b318d8d68b4498db",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/candidate_review_dialog.dart",
+      "sha256": "596fe211e5182d8e0634181c9616c1e5cedc7382d881dd5735b9db7fc68e0dc8",
+      "baseline_sha256": "39914cac31abf1087a84cd64efd82f97a90fea1004f00310cb9e9820b9a9fa52",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/human_assessment_editor.dart",
+      "sha256": "fa01d1edb810630d75a4ea43144929f7af4066da2ddcc214a9c5665186944b61",
+      "baseline_sha256": "8a53ba5b1e6999b475a086c49492866cfaf8aad43bb249df62569c3617780400",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/personality_review_card.dart",
+      "sha256": "373af9a3b1ac47780d3256774369269e038f8537471eec942bebc356ffe0c402",
+      "baseline_sha256": "a6f7cc7fb3905afe49d006938aaff38f6aa4eb2ee21b9c1a6abae80df539bab9",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/internal/questionnaire_editor.dart",
+      "sha256": "f02012aad7b682ae0ee1635ef8429787195b2b0f61c6678b21854406121cc9b2",
+      "baseline_sha256": "b43f0799c0b967bca52a7a0a728bef7191ba946e135d935e3d9467641e89bbf6",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/public/public_recruitment_widgets.dart",
+      "sha256": "f10526b895322604ae99e9fb73e7c88fd19126b680c567969c9873fa4dda9919",
+      "baseline_sha256": "f437430fa719f74a5d67be5e0cb8d8f57e8292cf06348c6a77dfe6ff57fdf1ba",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/recruitment/widgets/public/recruitment_welcome.dart",
+      "sha256": "ec7db15bca1ac1f3c272553cc9be957ea5c367d2e64eacc60111ae61fd6a891d",
+      "baseline_sha256": "e7a6319f7fadaad97cc2ab655c3d5edccae097d11b3705b0ebd250f0c91eb5d5",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/settings/screens/team_years_screen.dart",
+      "sha256": "4815caa83e54c43e4fd33aae18db3b7ebffb85f1bdaa7ecfeb1b258fd32da6fd",
+      "baseline_sha256": "8f8e00c21e7fd27ea36414c2ae9087e38c8e6720f502d6f10ec609aa5c7c6ce6",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/tasks/screens/task_detail_screen.dart",
+      "sha256": "000ac3cc9c71ef7143dddc79a90ffae2177a1982b05b1821dc5a0666dd2cc026",
+      "baseline_sha256": "b1a5a616f7c3b07d767f86c7005e3b9300ade6d98cf75d35c2a1c6451ecec340",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/veille/screens/veille_record_screen.dart",
+      "sha256": "94409cfd334e195f213bb4a034894cb03116071cc82ab3d352f8b075e03cc37a",
+      "baseline_sha256": "56985cf127a7a93a3a5c9fb9c7578caab1d0c6576e6a3860eac7965c0dd1ba8d",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/veille/screens/veille_screen.dart",
+      "sha256": "f95cb2c30cc444a2cf69c81e284ebe6160f8d30eda16d7f0349df8c347fcbf6c",
+      "baseline_sha256": "9368c23f8a09d69bd0a014a6298b1cca4affb76f264a6fc5a434eea3c3081f47",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/features/veille/widgets/veille_ui.dart",
+      "sha256": "c3eb9db5cc13dd25d19b6f621ac9ad3b390c020380b953067c6de8048905fbbe",
+      "baseline_sha256": "9a5e7d49a06544bd7f0cc0229910a3efd96d29b152925f246c221d1f4fcd9f86",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/lib/shared/layout/app_shell.dart",
+      "sha256": "6d8008f7ff22587d60b3683752ea5f498f01edb8f2093f24264086ee632529ae",
+      "baseline_sha256": "a1851b51c3e6bd523a4f3717bc6d027300be4e9a285c67c173b63848e40ca181",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/academy_operational_test.dart",
+      "sha256": "07934f40a8076ca133e7d2528624954b8b5f1082236f302e98a5f5ebe815ef01",
+      "baseline_sha256": "5c970583aa3a47a2b0473790422537734f8346d223984348b5652945bfed3828",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_conversion_test.dart",
+      "sha256": "1d2a338cc8d4be905db61f32e6b76db3f89ef758ee5c35e4674ca818466b030f",
+      "baseline_sha256": "f94999184832e07613be985542727682f7538700c4ef8e7daf541f52712ec16b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_human_rubric_test.dart",
+      "sha256": "89f6935799f5f5236b7a610e98177407befaeec060933b32c717d41e8c70d07b",
+      "baseline_sha256": "2137f54742faa4a5241ee0a855916ab37dd471d668c58a89cff4e1bfb717584f",
+      "allow_missing": false
+    }
+  ],
+  "requirements": [
+    {
+      "path": "frontend/test/academy_home_redesign_test.dart",
+      "sha256": "0cb556ff137dea1942cace5b792decb59974ee5d015c76821ee00332c36d5444",
+      "baseline_sha256": "0cb556ff137dea1942cace5b792decb59974ee5d015c76821ee00332c36d5444",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/academy_impact_visual_test.dart",
+      "sha256": "5f9f39a81a58744046e27707fb58d3ea817ef528081318ee4d6eba668dfc8a22",
+      "baseline_sha256": "5f9f39a81a58744046e27707fb58d3ea817ef528081318ee4d6eba668dfc8a22",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/academy_learning_redesign_test.dart",
+      "sha256": "98cb13e4ca798d3ab706101849fafe70ce78e3be296758ffb12e4393cd389e83",
+      "baseline_sha256": "98cb13e4ca798d3ab706101849fafe70ce78e3be296758ffb12e4393cd389e83",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/alumni_day_demo_test.dart",
+      "sha256": "7fe8386a91e8fcea593fc989b46a4e6e42c585ca6bed1c17fdefd65db8cb712e",
+      "baseline_sha256": "7fe8386a91e8fcea593fc989b46a4e6e42c585ca6bed1c17fdefd65db8cb712e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/alumni_day_native_test.dart",
+      "sha256": "27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0",
+      "baseline_sha256": "27582ae8ddc282398554612281532ecfea24a51ad894eadcad79151637f6f0c0",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/alumni_error_message_test.dart",
+      "sha256": "a45cb1c074563d17acd55e4d7f5fef2a1bceca177430c7356376d0bca20501fc",
+      "baseline_sha256": "a45cb1c074563d17acd55e4d7f5fef2a1bceca177430c7356376d0bca20501fc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/alumni_gamification_academy_impact_test.dart",
+      "sha256": "68ad55e7dd7be0197d3e096a5bfbbb51fc1981cf61203ead57ca441456766534",
+      "baseline_sha256": "68ad55e7dd7be0197d3e096a5bfbbb51fc1981cf61203ead57ca441456766534",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/alumni_year_followup_test.dart",
+      "sha256": "1b59fb7ce2f8dac1258cd39d884e967d91f63940e788bb3f9bb2fb3205362cf6",
+      "baseline_sha256": "1b59fb7ce2f8dac1258cd39d884e967d91f63940e788bb3f9bb2fb3205362cf6",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/app_filter_toolbar_test.dart",
+      "sha256": "7aceec6d90b5aa833c589e144ab250a4780a3635a8d5f24fe253a83db6890c66",
+      "baseline_sha256": "7aceec6d90b5aa833c589e144ab250a4780a3635a8d5f24fe253a83db6890c66",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/app_system_back_test.dart",
+      "sha256": "4dc0087177cce35fab73715b4b30406a7b44d070ef73ad5604b5bb6fe575d5b1",
+      "baseline_sha256": "4dc0087177cce35fab73715b4b30406a7b44d070ef73ad5604b5bb6fe575d5b1",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/archive_minutes_test.dart",
+      "sha256": "2aa650468d356ff1fd0ecad462aaedffb81327c97d354965e88694da7ee25376",
+      "baseline_sha256": "2aa650468d356ff1fd0ecad462aaedffb81327c97d354965e88694da7ee25376",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/archives_api_contract_test.dart",
+      "sha256": "bfb593a57ba4b0ee6d8df0c3d2a5f904c59236e937ba8afd3da6468ef53bf6f7",
+      "baseline_sha256": "bfb593a57ba4b0ee6d8df0c3d2a5f904c59236e937ba8afd3da6468ef53bf6f7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/archives_hall_of_fame_test.dart",
+      "sha256": "9d535687a237a164193b1f6a979bbfe70e8a5125f3ef6b69576a6bd16d449259",
+      "baseline_sha256": "9d535687a237a164193b1f6a979bbfe70e8a5125f3ef6b69576a6bd16d449259",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/archives_responsive_test.dart",
+      "sha256": "8401f42fc3dbd8698c7c6f5a3cec1d13faf07ea13bcd1eda8acedb1de1764910",
+      "baseline_sha256": "8401f42fc3dbd8698c7c6f5a3cec1d13faf07ea13bcd1eda8acedb1de1764910",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/archives_story_detail_test.dart",
+      "sha256": "9489ff3a72644c1dbf5854219e2a6cc93bf0a80fd8eeb6f7887e7171601f41c7",
+      "baseline_sha256": "9489ff3a72644c1dbf5854219e2a6cc93bf0a80fd8eeb6f7887e7171601f41c7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/attachments_workspace_test.dart",
+      "sha256": "d19b3e75c50bb463b8dbc251425953e204a5ba2464bc84f047e6fdce6f85b6c9",
+      "baseline_sha256": "d19b3e75c50bb463b8dbc251425953e204a5ba2464bc84f047e6fdce6f85b6c9",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/auth_session_test.dart",
+      "sha256": "c84820e56cce349f948d9a218e54e837e41140cb82eeac871561aedbcc7c1bf2",
+      "baseline_sha256": "c84820e56cce349f948d9a218e54e837e41140cb82eeac871561aedbcc7c1bf2",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/auth_storage_test.dart",
+      "sha256": "2af9a998ea85c5950db41f47b4d11370a101a2da4003390eaed2db99d78b3805",
+      "baseline_sha256": "2af9a998ea85c5950db41f47b4d11370a101a2da4003390eaed2db99d78b3805",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/biometric_unlock_test.dart",
+      "sha256": "6858fa9a86206b7b2976b7cf7614e17f38e31efd21db8c73d3cbe53815502769",
+      "baseline_sha256": "6858fa9a86206b7b2976b7cf7614e17f38e31efd21db8c73d3cbe53815502769",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/chat_attachment_card_test.dart",
+      "sha256": "26edf3441abe18041141e0a426a54b649e615b0a26c5fa39b61bb52a59820f7d",
+      "baseline_sha256": "26edf3441abe18041141e0a426a54b649e615b0a26c5fa39b61bb52a59820f7d",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/chat_gif_picker_test.dart",
+      "sha256": "4735be40ea943c18fc41af2aa9ff663141800dce32ef65cb5bb29d91dcc28aff",
+      "baseline_sha256": "4735be40ea943c18fc41af2aa9ff663141800dce32ef65cb5bb29d91dcc28aff",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/chat_giphy_service_test.dart",
+      "sha256": "fa5df24502c883b0973c0af38bcfef5b9efb24405290126d0ea5dfed56fc6b66",
+      "baseline_sha256": "fa5df24502c883b0973c0af38bcfef5b9efb24405290126d0ea5dfed56fc6b66",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/chat_privacy_test.dart",
+      "sha256": "c166c82d261833a8db07c3181fb25f1e880432e546af0dffbf368fa44462e972",
+      "baseline_sha256": "c166c82d261833a8db07c3181fb25f1e880432e546af0dffbf368fa44462e972",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/communication_test.dart",
+      "sha256": "a6ec6deac361fe2b825174f7fafbab1748521882ed709123ea1a5035c2dcea3e",
+      "baseline_sha256": "a6ec6deac361fe2b825174f7fafbab1748521882ed709123ea1a5035c2dcea3e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/dashboard_tasks_test.dart",
+      "sha256": "697960b02f577674419945ee7b2fc0b4dfc843668f49c083b82044fee784d7a7",
+      "baseline_sha256": "697960b02f577674419945ee7b2fc0b4dfc843668f49c083b82044fee784d7a7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/documents_offline_test.dart",
+      "sha256": "6b0300081a213c38f1fdc592e6b2f81dec127a66dadced73e39fe40f3f18ebdf",
+      "baseline_sha256": "6b0300081a213c38f1fdc592e6b2f81dec127a66dadced73e39fe40f3f18ebdf",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/events_documents_test.dart",
+      "sha256": "3341e91346a98aa560c996cf1da95503f2f57665148d364d0a95a25d89586431",
+      "baseline_sha256": "3341e91346a98aa560c996cf1da95503f2f57665148d364d0a95a25d89586431",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/firebase_push_platform_test.dart",
+      "sha256": "08de504bda54027ba0b56d1b6e74ba533de1919013870fb88d99545cadd1b21b",
+      "baseline_sha256": "08de504bda54027ba0b56d1b6e74ba533de1919013870fb88d99545cadd1b21b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/first_access_service_test.dart",
+      "sha256": "683f2230006599e456be1072468109730ff8f2156b4fa36d0ed4b2454a5fdf2d",
+      "baseline_sha256": "683f2230006599e456be1072468109730ff8f2156b4fa36d0ed4b2454a5fdf2d",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/first_access_test.dart",
+      "sha256": "335b5bebf8af324263a0471675c3b95a3b1eb6844cf5c25db327adf4f837d3dc",
+      "baseline_sha256": "335b5bebf8af324263a0471675c3b95a3b1eb6844cf5c25db327adf4f837d3dc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/games_ui_test.dart",
+      "sha256": "30cf194cc19ce875175df7e03dce68b9067a0376e6b4a90ae6b5f72d0074c22e",
+      "baseline_sha256": "30cf194cc19ce875175df7e03dce68b9067a0376e6b4a90ae6b5f72d0074c22e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/help_gateway_test.dart",
+      "sha256": "507b9e5fe02ba8e936b742b822154d4f894ed2b0c208b17b9a584f3839b46e7c",
+      "baseline_sha256": "507b9e5fe02ba8e936b742b822154d4f894ed2b0c208b17b9a584f3839b46e7c",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/help_operational_test.dart",
+      "sha256": "e944f63c168056d8e1b62c4d2fd66e19f7ca7fb408b8e567290d48795bf63880",
+      "baseline_sha256": "e944f63c168056d8e1b62c4d2fd66e19f7ca7fb408b8e567290d48795bf63880",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/impact_pdf_export_test.dart",
+      "sha256": "72b06f5f05fbe69284ca922a80c0c2444df17c4fc7354f8515cc3f321c8cc3c5",
+      "baseline_sha256": "72b06f5f05fbe69284ca922a80c0c2444df17c4fc7354f8515cc3f321c8cc3c5",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/impact_truth_test.dart",
+      "sha256": "a3f73de421f1cedef95dc50cd505ce47d626bb17d20e1f993f0d585a5a7407d7",
+      "baseline_sha256": "a3f73de421f1cedef95dc50cd505ce47d626bb17d20e1f993f0d585a5a7407d7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/institutional_documents_service_test.dart",
+      "sha256": "e173cbe1d61754444bfb9fc3a2fab29ab3c1133df5e274bf2a9c934f8db3b5c3",
+      "baseline_sha256": "e173cbe1d61754444bfb9fc3a2fab29ab3c1133df5e274bf2a9c934f8db3b5c3",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/institutional_documents_test.dart",
+      "sha256": "c72c6b9fd3915408d4a35d08d4274bf7222b656ed465ad6d2053c83969a63102",
+      "baseline_sha256": "c72c6b9fd3915408d4a35d08d4274bf7222b656ed465ad6d2053c83969a63102",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/institutional_draft_edit_test.dart",
+      "sha256": "8d42c094e967cbfbc4059c7c97cd5ffb38cfbbcf9e537cc91e3364d5ae11fd32",
+      "baseline_sha256": "8d42c094e967cbfbc4059c7c97cd5ffb38cfbbcf9e537cc91e3364d5ae11fd32",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/member_alphabetical_order_test.dart",
+      "sha256": "2996d10cd5b4e124e85f47b8a6c55629286ce56a97b2aa9040a5b3dbd806e5fa",
+      "baseline_sha256": "2996d10cd5b4e124e85f47b8a6c55629286ce56a97b2aa9040a5b3dbd806e5fa",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/member_join_requests_test.dart",
+      "sha256": "491f80f85a8cf43e23668123035a0359e79a5c2b2fe093ece38bb8c4237aedc0",
+      "baseline_sha256": "491f80f85a8cf43e23668123035a0359e79a5c2b2fe093ece38bb8c4237aedc0",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/mobile_navigation_labels_test.dart",
+      "sha256": "e236e567e4922f8342f90c612c8b20712e9da030383af123204c9ca2465571bc",
+      "baseline_sha256": "e236e567e4922f8342f90c612c8b20712e9da030383af123204c9ca2465571bc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/nfc_tag_payload_test.dart",
+      "sha256": "57986fbe0e2781f581657fdc757ab99ce5cf987a758308300dcbe42f18e304b3",
+      "baseline_sha256": "57986fbe0e2781f581657fdc757ab99ce5cf987a758308300dcbe42f18e304b3",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/operational_integrity_test.dart",
+      "sha256": "310367da867054c14c9fb0bd71a163daf77bc2e3fc0dc940a8c1b9deab8a5579",
+      "baseline_sha256": "310367da867054c14c9fb0bd71a163daf77bc2e3fc0dc940a8c1b9deab8a5579",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/poles_management_test.dart",
+      "sha256": "68cac2bb3d31c07d095373c809da8c6eb842eab4091db679016537c6f798f77d",
+      "baseline_sha256": "68cac2bb3d31c07d095373c809da8c6eb842eab4091db679016537c6f798f77d",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/poles_portfolio_test.dart",
+      "sha256": "f24000ea00f86d69e5e479cc2fce1b025ee9d495cde3a7fdfcaf848d39a3cf3c",
+      "baseline_sha256": "f24000ea00f86d69e5e479cc2fce1b025ee9d495cde3a7fdfcaf848d39a3cf3c",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/product_readiness_test.dart",
+      "sha256": "1980f1d3b5161a52a6480e349c61c3e1d9c8e13706b65178d0ac9c2a4c5ae7a4",
+      "baseline_sha256": "1980f1d3b5161a52a6480e349c61c3e1d9c8e13706b65178d0ac9c2a4c5ae7a4",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/profile_preview_navigation_test.dart",
+      "sha256": "895c704787b2b66425dcd0fb3624b516f21366a49e6fa292460254beb57b75e7",
+      "baseline_sha256": "895c704787b2b66425dcd0fb3624b516f21366a49e6fa292460254beb57b75e7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/project_presentations_test.dart",
+      "sha256": "ea02cd3d0c9bfb9bef1e5729897b7451339e25e27641323b4653a1ed4c49b02e",
+      "baseline_sha256": "ea02cd3d0c9bfb9bef1e5729897b7451339e25e27641323b4653a1ed4c49b02e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/projects_management_test.dart",
+      "sha256": "33685bf662a1fd4b33c1b991e2ca5306ddeef0d9ccfcfb9202eb1e6f200d817e",
+      "baseline_sha256": "33685bf662a1fd4b33c1b991e2ca5306ddeef0d9ccfcfb9202eb1e6f200d817e",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/projects_portfolio_test.dart",
+      "sha256": "7ad930efc4f25619e8375626b456c560af43b943654edb5e499518d2123e8f6f",
+      "baseline_sha256": "7ad930efc4f25619e8375626b456c560af43b943654edb5e499518d2123e8f6f",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/projects_team_test.dart",
+      "sha256": "954e4bd4b319511bd3745b7b9ecec109240b424bbecf2465bc32aa71984e068b",
+      "baseline_sha256": "954e4bd4b319511bd3745b7b9ecec109240b424bbecf2465bc32aa71984e068b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/push_lifecycle_test.dart",
+      "sha256": "ac79a77e7a35601bd8488599075b6fdbbc36cd6bc86365940fefa44649ac0cbc",
+      "baseline_sha256": "ac79a77e7a35601bd8488599075b6fdbbc36cd6bc86365940fefa44649ac0cbc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recovery_restoration_test.dart",
+      "sha256": "f824ab5cc42f78688700d6810ea53900f46b7328bc52d4651532029b8b955bb7",
+      "baseline_sha256": "f824ab5cc42f78688700d6810ea53900f46b7328bc52d4651532029b8b955bb7",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_application_metadata_test.dart",
+      "sha256": "a5d13dd0bfa131fa8624a008f0af598aaed09ccba290bb1227a276e654affbdc",
+      "baseline_sha256": "a5d13dd0bfa131fa8624a008f0af598aaed09ccba290bb1227a276e654affbdc",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_campaigns_test.dart",
+      "sha256": "b3f4bf21078e66c634cc2d51ba93eca7781c14c05295b37eecd9b13db9007cd9",
+      "baseline_sha256": "b3f4bf21078e66c634cc2d51ba93eca7781c14c05295b37eecd9b13db9007cd9",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_countdown_teams_test.dart",
+      "sha256": "a13d58dc78e2f9bbfe1cd4eb538f621a0cae078dedec1f75abd68af4a3e9b767",
+      "baseline_sha256": "a13d58dc78e2f9bbfe1cd4eb538f621a0cae078dedec1f75abd68af4a3e9b767",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_internal_test.dart",
+      "sha256": "5e20933473d0ca1879f36a5426ca320c974f5927e6b340ac57502ac46981eff8",
+      "baseline_sha256": "5e20933473d0ca1879f36a5426ca320c974f5927e6b340ac57502ac46981eff8",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_journey_test.dart",
+      "sha256": "772832c8f22fdb52b12734d15d8919e8d9b9bf1f1fc9809f8904887f72a0b9f3",
+      "baseline_sha256": "772832c8f22fdb52b12734d15d8919e8d9b9bf1f1fc9809f8904887f72a0b9f3",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_jury_personality_test.dart",
+      "sha256": "5e4bb53a9bac90e7d907a674a35c83bdf73371b008b14f3bcac93675b13f7e72",
+      "baseline_sha256": "5e4bb53a9bac90e7d907a674a35c83bdf73371b008b14f3bcac93675b13f7e72",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_landing_test.dart",
+      "sha256": "72637fd7c4eaafbf14bfb15356208f1418af7358060bffa9701d68fc9b5a3142",
+      "baseline_sha256": "72637fd7c4eaafbf14bfb15356208f1418af7358060bffa9701d68fc9b5a3142",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_mobile_text_test.dart",
+      "sha256": "a143ce6fea231312f47bab4ea91c17021494cf231bbf92f6dee34cbbdacc06b3",
+      "baseline_sha256": "a143ce6fea231312f47bab4ea91c17021494cf231bbf92f6dee34cbbdacc06b3",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_photo_caption_test.dart",
+      "sha256": "2f5beaea1f99479d7a1f59aaacaa5c2635c37396ca3b430e0db12ac6b754c945",
+      "baseline_sha256": "2f5beaea1f99479d7a1f59aaacaa5c2635c37396ca3b430e0db12ac6b754c945",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_public_test.dart",
+      "sha256": "10014ea921190c94eec287d5f3fbab79ed45f4562fc7ce1fa84fca38727f588b",
+      "baseline_sha256": "10014ea921190c94eec287d5f3fbab79ed45f4562fc7ce1fa84fca38727f588b",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_questionnaire_editor_test.dart",
+      "sha256": "9ecfd0b6e2d95725bd4ce7dbb6590ed32044d1e3589c7e2ed252c81332d2ea92",
+      "baseline_sha256": "9ecfd0b6e2d95725bd4ce7dbb6590ed32044d1e3589c7e2ed252c81332d2ea92",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_redesign_test.dart",
+      "sha256": "cd54bcb439fc942d487ec1b5263894027d17d694902d528284f3d65411f4be44",
+      "baseline_sha256": "cd54bcb439fc942d487ec1b5263894027d17d694902d528284f3d65411f4be44",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_review_path_test.dart",
+      "sha256": "ea0ba1c28ce32836fa28dd90738d23dc6e031ef0fd8e2c10f89c85fa7a7a22d9",
+      "baseline_sha256": "ea0ba1c28ce32836fa28dd90738d23dc6e031ef0fd8e2c10f89c85fa7a7a22d9",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/recruitment_submission_contract_test.dart",
+      "sha256": "40cae6e6f6c12dcb658cafec2504d0a8d630c1a69b235748bf7730793d10b626",
+      "baseline_sha256": "40cae6e6f6c12dcb658cafec2504d0a8d630c1a69b235748bf7730793d10b626",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/settings_help_legal_about_test.dart",
+      "sha256": "5394d5f52223d6fb073528ee964cff07aee2a3bc340afc5ddf3a76a8cd737dd8",
+      "baseline_sha256": "5394d5f52223d6fb073528ee964cff07aee2a3bc340afc5ddf3a76a8cd737dd8",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/support/recruitment_redesign_fixture.dart",
+      "sha256": "f2b99c48b43c26057dbae00ce9708a5088313e88127fd17395171a00ff2cbe12",
+      "baseline_sha256": "f2b99c48b43c26057dbae00ce9708a5088313e88127fd17395171a00ff2cbe12",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/ui_final_acceptance_test.dart",
+      "sha256": "b365ff3a5f82344bec15bf9e7373fdee1e478f0effd7b56117782104c774a024",
+      "baseline_sha256": "b365ff3a5f82344bec15bf9e7373fdee1e478f0effd7b56117782104c774a024",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/veille_gateway_contract_test.dart",
+      "sha256": "9498cc424d3a702642d0e1d504091adfbf6fea4f0e79448e8c2f4dfa3e28a87f",
+      "baseline_sha256": "9498cc424d3a702642d0e1d504091adfbf6fea4f0e79448e8c2f4dfa3e28a87f",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/veille_operational_test.dart",
+      "sha256": "fc24715b70431cedf8cac1f04940372b3b2ea9d6b0d1252322b60931cc5c6dd3",
+      "baseline_sha256": "fc24715b70431cedf8cac1f04940372b3b2ea9d6b0d1252322b60931cc5c6dd3",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/test/widget_test.dart",
+      "sha256": "bdf5463a0427ecf40859afad28b51eda3e6fa42e15aae7188d24f9cdcf57e253",
+      "baseline_sha256": "bdf5463a0427ecf40859afad28b51eda3e6fa42e15aae7188d24f9cdcf57e253",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/tool/recruitment_redesign_preview_test.dart",
+      "sha256": "a91647547977d71be969d8e85b20c9ee4df9ce993f89523461254b648e873034",
+      "baseline_sha256": "a91647547977d71be969d8e85b20c9ee4df9ce993f89523461254b648e873034",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/pubspec.yaml",
+      "sha256": "a64383afd9fb8c94e7e5b1ce9a816f57b12abbf0bad96f7b32b815d966aec378",
+      "baseline_sha256": "a64383afd9fb8c94e7e5b1ce9a816f57b12abbf0bad96f7b32b815d966aec378",
+      "allow_missing": false
+    },
+    {
+      "path": "frontend/pubspec.lock",
+      "sha256": "6b57c4c523f6b476b0358c0e3ec1feb2b90c78b93c1ed0b152a341901a78b1a6",
+      "baseline_sha256": "6b57c4c523f6b476b0358c0e3ec1feb2b90c78b93c1ed0b152a341901a78b1a6",
+      "allow_missing": false
+    }
+  ]
+}

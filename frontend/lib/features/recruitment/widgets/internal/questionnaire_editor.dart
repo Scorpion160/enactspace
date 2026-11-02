@@ -1,3 +1,4 @@
+import '../../models/recruitment_display_copy.dart';
 import '../recruitment_workspace.dart';
 import 'package:flutter/material.dart';
 import '../../models/recruitment_question_model.dart';
@@ -300,7 +301,7 @@ class RecruitmentQuestionnairePreview extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 5),
                       child: Text(
-                        q.hint,
+                        recruitmentDisplayCopy(q.hint),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
