@@ -106,4 +106,10 @@ Le reçu Windows de l’opération `aa0f9b4affa14551bd69b5ce0d7fd873` confirme l
 
 Le lanceur `tools/publish_interface_copy_web_windows.ps1` vérifie le reçu et l’archive d’origine. Le mode de publication transfère cette archive au VPS, vérifie les empreintes après transfert et contrôle que la version 1.0.23 (26) attendue est encore en place avant la bascule. Il vérifie ensuite la version et le JavaScript servis en HTTPS. Le VPS conserve un dossier de retour arrière.
 
-Les six tests du programme de publication passent. La simulation du lanceur PowerShell confirme le refus d’une archive modifiée localement ou après transfert, le déroulement de la bascule et le contrôle lors d’une relance après publication. La relecture des captures et la mise en ligne restent à effectuer.
+Les six tests du programme de publication passent. La simulation du lanceur PowerShell confirme le refus d’une archive modifiée localement ou après transfert, le déroulement de la bascule et le contrôle lors d’une relance après publication.
+
+## Relecture des captures Flutter
+
+Les 52 captures de l’opération `b39a52771da8498a98aca4b94efa1aca` couvrent 13 vues à 390 et 1440 pixels, chacune en clair et en sombre. La revue confirme l’affichage intégral de la description de campagne après « Lire la suite », la lisibilité des statuts observés, des consignes d’évaluation et des actions de suivi. Les captures utilisent les données fictives du scénario de test.
+
+À 390 pixels, le sélecteur fermé du jury coupe la fin du nom de campagne. Les champs du titre et de la description dans l’éditeur montrent la fin du texte saisi et permettent de faire défiler le contenu. Ces observations ne bloquent pas la mise en ligne de cette version. La publication reste à exécuter depuis le poste Windows qui contient l’archive du build.
