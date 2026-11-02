@@ -65,3 +65,9 @@ Le script `tools/sync_interface_copy_windows.ps1`, appelé avec le commit préci
 Le script ne publie pas l’application et ne lance aucun processus backend. Les deux fichiers backend copiés localement servent à la correspondance des définitions avec les tests Flutter.
 
 À ce stade, les corrections sont dans les sources. L’analyse Flutter, les tests de widgets, la relecture des nouvelles captures et la publication sont encore à confirmer. Le build public 1.0.23+26 précédemment vérifié précède cette correction. Les nouveaux textes d’e-mails nécessiteront également la mise à jour du backend.
+
+## Reprise après la première analyse Windows
+
+La synchronisation du commit `575bd5ba7b75d70b8f240fe4a67735b7936c11c8` a créé une sauvegarde et formaté les 55 fichiers Dart concernés. L’analyse Flutter a ensuite signalé un seul diagnostic : `curly_braces_in_flow_control_structures` dans `archives_api_service.dart`. Les tests et les captures n’ont pas été lancés.
+
+La condition de contrôle du type de réponse est maintenant entourée d’accolades. Son comportement et son message restent identiques. Le manifeste prend la version déjà installée comme référence et reconnaît aussi ses fichiers Dart formatés, pour permettre la relance des vérifications avec la correction. L’analyse Flutter doit de nouveau terminer sans diagnostic avant de poursuivre les tests et les captures.
