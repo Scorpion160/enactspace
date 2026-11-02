@@ -112,4 +112,10 @@ Les six tests du programme de publication passent. La simulation du lanceur Powe
 
 Les 52 captures de l’opération `b39a52771da8498a98aca4b94efa1aca` couvrent 13 vues à 390 et 1440 pixels, chacune en clair et en sombre. La revue confirme l’affichage intégral de la description de campagne après « Lire la suite », la lisibilité des statuts observés, des consignes d’évaluation et des actions de suivi. Les captures utilisent les données fictives du scénario de test.
 
-À 390 pixels, le sélecteur fermé du jury coupe la fin du nom de campagne. Les champs du titre et de la description dans l’éditeur montrent la fin du texte saisi et permettent de faire défiler le contenu. Ces observations ne bloquent pas la mise en ligne de cette version. La publication reste à exécuter depuis le poste Windows qui contient l’archive du build.
+À 390 pixels, le sélecteur fermé du jury coupe la fin du nom de campagne. Les champs du titre et de la description dans l’éditeur montrent la fin du texte saisi et permettent de faire défiler le contenu. Ces observations ne bloquent pas la mise en ligne de cette version.
+
+## Publication web confirmée le 2 novembre 2026
+
+Le journal Windows `0eedd66f14a54f1595943ebae3f64811` confirme la publication web **1.0.24 (27)**. Le VPS sert les cinq fichiers vérifiés et les routes `/academy`, `/archives`, `/recruitment/apply` et `/application-tracking`. Le contrôle HTTPS suivant confirme le numéro de build, l’empreinte du JavaScript et la disponibilité du point de contrôle de l’API. Le répertoire de retour arrière est `/opt/enactspace/releases/web-previous-1d7ef5d77dce4c919f6e5ef7c07401cc`.
+
+Les textes serveur font partie d’une livraison distincte. Les versions antérieures des neuf fichiers concernés concordent avec les quatre fichiers du manifeste de publication du backend 1.0.21 et les cinq fichiers correspondants de l’image de base. Le contrôle des empreintes de l’image réellement en service reste à faire avant de préparer le candidat serveur.
