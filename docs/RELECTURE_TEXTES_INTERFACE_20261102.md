@@ -118,4 +118,12 @@ Les 52 captures de l’opération `b39a52771da8498a98aca4b94efa1aca` couvrent 13
 
 Le journal Windows `0eedd66f14a54f1595943ebae3f64811` confirme la publication web **1.0.24 (27)**. Le VPS sert les cinq fichiers vérifiés et les routes `/academy`, `/archives`, `/recruitment/apply` et `/application-tracking`. Le contrôle HTTPS suivant confirme le numéro de build, l’empreinte du JavaScript et la disponibilité du point de contrôle de l’API. Le répertoire de retour arrière est `/opt/enactspace/releases/web-previous-1d7ef5d77dce4c919f6e5ef7c07401cc`.
 
-Les textes serveur font partie d’une livraison distincte. Les versions antérieures des neuf fichiers concernés concordent avec les quatre fichiers du manifeste de publication du backend 1.0.21 et les cinq fichiers correspondants de l’image de base. Le contrôle des empreintes de l’image réellement en service reste à faire avant de préparer le candidat serveur.
+Les textes serveur font partie d’une livraison distincte. Les versions antérieures des neuf fichiers concernés concordent avec les quatre fichiers du manifeste de publication du backend 1.0.21 et les cinq fichiers correspondants de l’image de base.
+
+## Recette de l’image serveur
+
+Le contrôle en lecture seule confirme la version API 1.0.21 et les quatre services sur l’image `sha256:415403e80c33ab717337d3e742bfea544dcc3651fc147da107450d76582bcc04`. Quatre empreintes concordent directement. Les cinq autres concordent à l’octet près après conversion des fins de ligne en CRLF. Le manifeste fixe les neuf empreintes brutes observées sur le VPS.
+
+Le lanceur `tools/rehearse_interface_copy_backend_windows.ps1` transfère les neuf fichiers serveur du commit `575bd5ba7b75d70b8f240fe4a67735b7936c11c8` et les fichiers de test. L’image candidate est dérivée de l’image en service avec un contexte de construction limité aux neuf fichiers serveur. Les tests s’exécutent dans un conteneur en lecture seule, sans réseau, avec SQLite et les e-mails et notifications désactivés. Le compte rendu vérifie les empreintes, le schéma Alembic 0033, les 114 tests et l’état des services après la recette.
+
+Les simulations locales couvrent le transfert, le refus d’une empreinte inattendue et le déroulement de la recette. La recette réelle sur le VPS reste à lancer.

@@ -1,0 +1,50 @@
+{
+  "source_commit": "575bd5ba7b75d70b8f240fe4a67735b7936c11c8",
+  "base_image_id": "sha256:415403e80c33ab717337d3e742bfea544dcc3651fc147da107450d76582bcc04",
+  "base_version": "1.0.21",
+  "schema_head": "20261031_0033",
+  "baseline": {
+    "backend/app/api/deps.py": "b45bf8d1ae3ab62b6c8164552238475a555045eb3ba7092cb5c52fbfbd70580a",
+    "backend/app/api/routes/chat.py": "7cc47cd3d17e2532a971812beb0fc81a2e1462623cc7f7a18cb55b829fa467c5",
+    "backend/app/api/routes/recruitment_extensions.py": "9decabb0e7be3c9143bc40a7f4ddf17bb4ba9f238aa21d5e273b80851b5e5326",
+    "backend/app/services/email_templates.py": "5fa8f23e26d5438f84ca983251a5b588f4327648ea94fc1a7169ae1629b4fb2a",
+    "backend/app/services/recruitment_emails.py": "cb8d5bc64b06a7a11c2d942e1a2b1254557e861418162278e90be72463384bbc",
+    "backend/app/services/recruitment_personality.py": "40632b9a4d80061941eac4c5d772f9551c03153bb65a5f28d02ea65265310f78",
+    "backend/app/services/recruitment_questionnaire.py": "708cf6c4e0536f22d4fa874c578bdaa5cff5ef3fad1535cda1b56ed844bc3e87",
+    "backend/app/services/recruitment_rubric.json": "674a9c5876722136642082fd7c4cc70a318a2a611a1273d0ae15ed5c17fc09f8",
+    "backend/app/services/veille_service.py": "e3c8532837a5f08a92318fb026ad89637c4127bca0b78c8606753200708a5e72"
+  },
+  "runtime": {
+    "backend/app/api/deps.py": "c881b009702d00e2936b5589a43f2a7613b61eef4d4afc82bca0ca5569641306",
+    "backend/app/api/routes/chat.py": "ff4c1e0be35c8e619dcdc88b141fd6e22d44943498d1f6847c175563544b11be",
+    "backend/app/api/routes/recruitment_extensions.py": "85799b1da2925850724a16d8cac4f669a708759b4ee6c3dc6ed07efd4ca62bdc",
+    "backend/app/services/email_templates.py": "15056ae5d674dc0d3bb68827776ad701521b6dfb0519d14774ff98f56446be2e",
+    "backend/app/services/recruitment_emails.py": "547a0084832bcb5d661238dcd14b90e34d2a7471295dd9784eadb36463099b12",
+    "backend/app/services/recruitment_personality.py": "88d43034dae6adbff62a5472ea814fb234ed54ee470d8c7d73e559d87cc7d168",
+    "backend/app/services/recruitment_questionnaire.py": "b08656904cefd477be2ad2d999f0e235f61b2f6996bf898d412c93ca09e3e7a0",
+    "backend/app/services/recruitment_rubric.json": "aea372c6b1028e5e7b1e135bf6e8324ab6331dc280bf338a7890029c9916c6b9",
+    "backend/app/services/veille_service.py": "1ffeebf9189eab3e3876c5cc24a44815d0097b94d42811da390289b79d8841c4"
+  },
+  "tests": {
+    "backend/test_email_french_copy.py": "416b206dc52c2ae4ca73f316c9f692bad12c90843caa6e75f1322f1f85ef5068",
+    "backend/test_recruitment_rubric.py": "172a43081b6f428f072e6f8d7730cc6e258ead3293eaa6c810f64ec1b9b387c2",
+    "backend/test_recruitment_questionnaire.py": "c59b2087dd67171478c541e4a728c0b01f94b6ef96501a01069c2865d3cea52c",
+    "backend/test_recruitment_jury_personality.py": "8a836f771ca7579b9493d8437012d83aaaf9eaabbeecfe65723b7c627e9a94fe",
+    "backend/test_recruitment_campaign_lifecycle.py": "401ef6cc965abcb7c1d63611d0e20e55d24f8a9616525302ea976021b41c1f64",
+    "backend/test_veille.py": "8d8bfb22a368b3bfc920baaad2ca6f9182c70b65fb313cc6df05291bee3206a2",
+    "backend/test_auth_sessions.py": "417a7440270dbe07c241b9f668626a50a663e75769a5d35e248286043ab80cbc",
+    "backend/test_chat_polls.py": "633a19f64cd29668b853cb2429be32e9ea35580dd151b4da4bce6bd73cf20310",
+    "backend/test_attachments_lifecycle.py": "e270616dbb314a8887eb07ddcc83f1f910b91221968375bfe14af0fc30ea2b95"
+  },
+  "test_modules": [
+    "test_email_french_copy",
+    "test_recruitment_rubric",
+    "test_recruitment_questionnaire",
+    "test_recruitment_jury_personality",
+    "test_recruitment_campaign_lifecycle",
+    "test_veille",
+    "test_auth_sessions",
+    "test_chat_polls"
+  ],
+  "tests_expected": 114
+}
