@@ -86,3 +86,11 @@ Les 32 cas signalés se répartissent ainsi :
 Le test des services de démonstration inclut ces nouvelles lectures sous interception des accès réseau et vérifie le refus d’une invitation au questionnaire. Le test d’écran exige aussi la présence de la liste des candidatures, pour qu’un écran d’erreur ne puisse pas être considéré comme un chargement réussi.
 
 Aucun test ni aucune variante de largeur, de thème ou de taille de texte n’est retiré. Le nouveau manifeste inclut les huit fichiers de tests concernés et les deux fichiers de démonstration corrigés. Sa référence est la version déjà installée. La syntaxe Dart et les contrôles PowerShell ont été vérifiés ici ; l’analyse et la suite Flutter doivent être relancées sur Windows pour confirmer le résultat.
+
+## Validation Windows réussie
+
+L’opération `b39a52771da8498a98aca4b94efa1aca` a validé le commit `de640506fe8d07bd93f19528ebf0a6d8a488ebcb`. L’analyse Flutter termine sans diagnostic et les 1 145 tests passent. Les quatre séries à 390 et 1440 pixels, en clair et en sombre, produisent les 52 captures dans `enactspace-interface-rendu-b39a52771da8498a98aca4b94efa1aca.zip`. Le journal confirme la génération de l’archive. La relecture visuelle attend sa réception.
+
+Le lanceur `tools/build_interface_copy_web_windows.ps1` prépare la version 1.0.24, build 27. Il vérifie le reçu Windows, les sources du manifeste utilisées par la compilation et le fichier de configuration déjà utilisé pour Firebase. La compilation et l’archive sont produites dans un nouveau dossier `WebInterfaceBuilds`. Le reçu `build.json` donne la version et les empreintes du JavaScript et de l’archive pour préparer la publication.
+
+Le lanceur a passé une vérification avec Flutter et le contrôle de version publique simulés. La génération Firebase et la création de l’archive ont été exécutées sur des fichiers de test. Les refus d’une modification des sources, d’une autre version publique et d’un reçu de validation incomplet ont aussi été vérifiés. Le build réel reste à lancer sur Windows.
