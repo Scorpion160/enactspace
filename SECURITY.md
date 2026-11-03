@@ -1,19 +1,11 @@
-# Security policy
+# Politique de sécurité
 
-## Reporting a vulnerability
+## Signalement
 
-Report suspected vulnerabilities privately to the designated Pôle IT security contact or, until that contact is formally mapped, to the current repository fallback owner `@Scorpion160`. Do not open a public issue containing exploit details, credentials, private user information, or production logs.
+Transmettre un signalement en privé au référent sécurité du pôle IT. Tant que le contact institutionnel GitHub n’est pas formalisé, utiliser le contact de repli `@Scorpion160` via un canal privé. Préciser la version, l’impact, l’environnement et les étapes reproductibles expurgées. Les détails d’exploitation, preuves privées, jetons et dossiers ne doivent pas apparaître dans une issue publique.
 
-Include a concise impact description, affected version/commit, reproducible sanitized steps, and suggested containment if known. The recipient should acknowledge the report, restrict evidence access, assess exposure, rotate affected secrets, and coordinate remediation and disclosure with Enactus ESP.
+## Versions et contrôles
 
-## Supported release
+La [fiche de publication](docs/releases/20261103-web-1.0.25-backend-1.0.23.md) établit les versions à considérer pour le lot en service. Enactus ESP définit la politique de support et les délais de réponse. Les workflows contrôlent les dépendances et des catégories de fichiers sensibles. La protection de branche, le contrôle d’accès et les dispositifs GitHub administratifs doivent être vérifiés séparément.
 
-The active release target is V1.0.0. Security fixes are assessed against the deployed version and the current product-readiness branch. Support windows and response-time commitments must be approved by Enactus ESP; none are implied by this document.
-
-## Repository controls
-
-CI includes dependency, tracked-secret-material, environment-file, and immutable-action-reference guards. These controls do not replace review or provider-side protections. CodeQL, GitHub Advanced Security, secret scanning, branch protection, and required checks are optional administrative controls until repository capability and configuration are explicitly verified.
-
-The dependency audit has one explicit exception for `PYSEC-2026-1325`: the transitive `ecdsa` library has no fixed release, while EnactSpace runtime configuration enforces `HS256` and rejects algorithms that could use the affected ECDSA signing operation. Any change to `ALGORITHM`, `python-jose`, or signing behavior must first remove or re-justify this exception. The exception must also be reconsidered during PR-8 and each dependency review.
-
-Never place secrets or signing assets in issues, pull requests, workflow YAML, build artifacts, or source control. Follow [Secrets and environments](docs/SECRETS_AND_ENVIRONMENTS.md) for storage and incident response.
+La branche de reprise utilise PyJWT pour les jetons et limite l’algorithme applicatif à HS256. Examiner tout changement d’algorithme ou de rotation avec le référent sécurité. Séparer développement, recette et production. En cas de fuite, contenir, révoquer ou faire tourner à la source, évaluer les sessions et données affectées, puis documenter la reprise. Voir [les règles de configuration](docs/SECRETS_AND_ENVIRONMENTS.md).

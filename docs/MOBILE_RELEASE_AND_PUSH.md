@@ -8,14 +8,16 @@ Si ADB indique `unauthorized`, déverrouiller le téléphone, accepter le débog
 
 Aucune livraison iOS ni publication de store n’est attestée. Les contrôles physiques de permissions, réception en arrière-plan, rotation des tokens et déconnexion restent à terminer. Voir [les identifiants d’artefacts](releases/20261010-release-1.0.13.md).
 
-## Procédures générales et contexte antérieur
+Le [lot web/API du 3 novembre](releases/20261103-web-1.0.25-backend-1.0.23.md) ne fournit aucune nouvelle preuve Android, iOS ni boutique.
+
+## Procédure de livraison
 
 Repository builds prove compilation and automated behavior; they do not prove distribution signing, provider entitlement, store ownership, or physical-device delivery.
 
 ## Shared release rules
 
 - Keep the application/bundle identifier `sn.enactusesp.enactspace`.
-- The delivered Flutter identity is `1.0.13+16`; increment build numbers for subsequent distributed artifacts.
+- The Android installation attested on 10 October used `1.0.13+16`. Verify the current store and device build numbers before choosing the next mobile version.
 - Release API configuration must be an authorized HTTPS endpoint.
 - No keystore, private key, provisioning profile, provider JSON/plist, APNs key, or password belongs in Git or ordinary CI artifacts.
 - Android debug signing is never valid release evidence. `EXTERNAL_SIGNING_REQUIRED` remains enforced.

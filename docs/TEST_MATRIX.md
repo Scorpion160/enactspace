@@ -1,44 +1,66 @@
-# Test matrix
+# Matrice de tests
 
-## Résultats observés pour la release du 10 octobre
+## Dernière preuve de livraison
 
-| Vérification | Résultat constaté | Limite |
-|---|---|---|
-| Aide et première connexion Flutter | 25 tests réussis | Avant le dernier correctif administratrice |
-| Recrutement public Flutter | 19 tests réussis | Pas un parcours réel de candidature |
-| Acceptation UI finale | 39 tests réussis | Pas une validation de toutes les fonctions métier |
-| Publication web | 5 tests d’extraction sûre réussis | Tests du publieur |
-| Backend candidat | pip check, import API, catalogue Alembic, lecture PostgreSQL réussis | Suite backend complète après résolution des dépendances à relancer |
-| Correctif de première connexion | Syntaxe et 7 cas de politique réussis | Tests ciblés de la fonction, sans activation réelle |
-| Déploiement | API publique 1.0.13, version web 1.0.13+16, APK installé 1.0.13+16 | Réception des mails/push et parcours utilisateurs restent à confirmer |
+Le [lot du 3 novembre](releases/20261103-web-1.0.25-backend-1.0.23.md) atteste 1 146 tests Flutter et 115 tests sur l’image backend isolée. Les nombres sont datés. Utiliser les cas ci-dessous et les workflows pour valider une prochaine modification.
 
-Les anciens rapports restent datés; ils ne constituent pas une nouvelle exécution complète sur le checkpoint final. Ne pas additionner ces compteurs comme une mesure de couverture. Voir [la liste des contrôles restants](RELEASE_CHECKLIST.md).
+| Surface | Cas à couvrir |
+| --- | --- |
+| Comptes et droits | Anonyme, rôle autorisé, rôle insuffisant, ressource d’un autre périmètre, révocation et rotation concurrente |
+| Recrutement | Ouverture/clôture à la limite Dakar, doublons, suivi après fermeture, questionnaire, jury, fichier privé, conversion et reprise |
+| Académie, tâches, Veille | Progression, concurrence, nouvelle tentative, cohérence des statuts et des récompenses |
+| Finance et fichiers | Accès et visibilité, justificatifs, preuves, états fournisseur, absence de doublon |
+| Messages et accès | Modèle, liens, horaires, reprise de session, file, tentative, réception contrôlée et désinscription push |
+| Interface | Clair/sombre, petit écran, clavier et taille de texte, états vide/chargement/erreur |
+| Publication | Provenance, empreinte, sauvegarde, migration si applicable, santé, quatre services et retour arrière |
 
-## Procédures générales et contexte antérieur
+## Backend et PostgreSQL
 
-CI and release evidence are based on behavior families, not fixed test counts.
+Depuis `backend/`, avec l’environnement Python de [développement](DEVELOPMENT.md) :
 
-| Family | Primary evidence | PostgreSQL required |
-| --- | --- | --- |
-| Auth and refresh sessions | Backend unit, rotation, revocation, logout, concurrent refresh | Yes for rotation/concurrency |
-| Account, privacy, and legal | Backend policy and lifecycle tests | Where migration/constraints apply |
-| Impact truth and provenance | Claim state, canonical totals, provenance, migration tests | Yes |
-| Institutional memory | Visibility, validation, lifecycle, migration tests | Yes |
-| Product services | Domain behavior, constraints, migration tests | Yes |
-| Push lifecycle | Token protection, delivery state, retries, migration tests | Yes |
-| Operational integrity | State transitions, authority, migration tests | Yes |
-| PR-6.6 memory/heritage | Capture provenance, final-state authority, 0007↔0008 round trip | Yes |
-| Flutter regression | Widget/unit/service tests and static analysis | No |
-| Build checks | Web release compile and Android debug compile | No |
+```bash
+python -m compileall -q app
+python -c "from app.main import app; assert app.openapi().get('paths')"
+python -m alembic heads
+python -m unittest ops_checks.backup_integrity_checks -v
+python -m unittest discover -v
+```
 
-## Shared backend gate
+Pour la suite complète, utiliser `APP_ENV=test`, `AUTO_CREATE_TABLES=false`, `DATABASE_URL=sqlite://`, une clé éphémère, un répertoire fichiers isolé, et les fournisseurs e-mail, push et paiement désactivés. Garder les deux variables de tests PostgreSQL distinctes des paramètres applicatifs. Les deux peuvent désigner la même base locale jetable dont le nom commence par `enactspace_pr2b_test_`. Le suffixe est nécessaire à certaines suites Veille et de reprise.
 
-Run backend compilation, OpenAPI generation, assert the single Alembic head `20261007_0031`, and run `python -m unittest discover -v` with the safe split configuration: SQLite application engine plus an isolated PostgreSQL 16 `TEST_DATABASE_URL`. PostgreSQL-dependent suites must not skip because the test URL is absent or invalid.
+Exemple PowerShell pour créer cette base dans un projet Compose de test distinct. Le mot de passe est généré pour cette session et le port reste en boucle locale.
 
-## Shared Flutter gate
+```powershell
+$env:PR2B_TEST_DB_PASSWORD = python -c "import secrets; print(secrets.token_hex(32))"
+$env:PR2B_TEST_DB_PORT = '55433'
+docker compose -p enactspace-it-tests -f docker-compose.test.yml up -d --wait
+docker compose -p enactspace-it-tests -f docker-compose.test.yml exec -T postgres createdb -U pr2b_test enactspace_pr2b_test_it
+$env:APP_ENV = 'test'
+$env:APP_DEBUG = 'false'
+$env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(48))"
+$env:DATABASE_URL = 'sqlite://'
+$env:AUTO_CREATE_TABLES = 'false'
+$env:ENABLE_SEED = 'false'
+$env:EMAIL_ENABLED = 'false'
+$env:PUSH_ENABLED = 'false'
+$env:MOBILE_MONEY_ENABLED = 'false'
+$env:PAYMENT_PROVIDER_ENABLED = 'false'
+$env:TEST_DATABASE_URL = "postgresql+psycopg://pr2b_test:$($env:PR2B_TEST_DB_PASSWORD)@127.0.0.1:55433/enactspace_pr2b_test_it"
+$env:VEILLE_TEST_POSTGRESQL_URL = $env:TEST_DATABASE_URL
+python -m unittest discover -v
+```
 
-Run `flutter pub get`, verify `frontend/pubspec.lock` is unchanged, then run `flutter analyze --no-pub`, `flutter test --no-pub`, the release web build against `https://example.invalid`, and the unsigned Android debug build.
+Lancer le bloc dans un terminal de test neuf. Vérifier la présence de `pdflatex` et GnuPG pour les suites documentaires et de sauvegarde. Après la recette, arrêter le projet jetable avec `docker compose -p enactspace-it-tests -f docker-compose.test.yml down` et fermer ce terminal. Tout test ignoré doit être expliqué et rejoué pour la recette concernée. SQLite seul ne valide ni PostgreSQL ni les courses concurrentes. Le head attendu est `20261031_0033` sur cette branche.
 
-The last observed pre-PR-7 baseline was 204 backend tests and 604 Flutter tests. These counts are informational snapshots only and must never be hard-coded as CI pass conditions; suites may grow.
+## Flutter et publication
 
-Physical Android FCM, physical iOS APNs/FCM, signed mobile archives, store metadata, backup restoration, and production smoke tests are separate evidence gates in the release checklist.
+```bash
+flutter pub get
+git diff --exit-code -- pubspec.lock
+flutter analyze --no-pub
+flutter test --no-pub
+flutter build web --release --no-pub --dart-define=ENACTSPACE_API_URL=https://example.invalid
+flutter build apk --debug --no-pub
+```
+
+Ces compilations utilisent une configuration de test. Pour publier, appliquer [Firebase web](FIREBASE_WEB_DEPLOYMENT.md), [livraison mobile](MOBILE_RELEASE_AND_PUSH.md) et [checklist](RELEASE_CHECKLIST.md). Les tests physiques, la réception réelle et la restauration restent des preuves distinctes. Vérifier le workflow du commit concerné dans Actions et consigner son résultat ou l’écart.

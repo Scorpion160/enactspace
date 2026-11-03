@@ -1,5 +1,12 @@
 # Changelog
 
+## Web 1.0.25 (28) et backend 1.0.23 · 2026-11-03
+
+- Modèle d’e-mail commun, liens publics corrigés et salutation calculée à l’heure d’envoi à Dakar.
+- Destination interne conservée après authentification pour les liens e-mail pris en charge.
+- Web vérifié en HTTPS. API et trois workers basculés avec le schéma Alembic 0033, sans migration.
+- [Identifiants, résultats de tests et limites des preuves](docs/releases/20261103-web-1.0.25-backend-1.0.23.md).
+
 ## 1.0.13+16 — 2026-10-10
 
 - Web publié et APK Android installé; API 1.0.13 déployée avec le schéma 20261007_0031.

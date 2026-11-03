@@ -1,14 +1,12 @@
-# Secrets and environments
+# Secrets et environnements
 
-## Configuration effective — 10 octobre 2026
+## État attesté
 
-Les mails et push sont activés; `EMAIL_RESTRICT_TO_TEST_RECIPIENT=false`. L’expéditeur institutionnel est `enactus@esp.sn`, via SMTP Gmail port 587. `MOBILE_MONEY_ENABLED=false` reste la valeur attendue. La présence d’identifiants ne prouve ni la réception finale d’un mail ni la livraison de chaque push.
+Le contrôle backend du [3 novembre](releases/20261103-web-1.0.25-backend-1.0.23.md) a vérifié les quatre services et la configuration attendue du lot. La configuration de référence maintient les e-mails et push actifs, sans redirection de test, avec le paiement Mobile Money désactivé. Tester la réception séparément. Les restrictions effectives des clés clientes Firebase se vérifient dans la console du fournisseur.
 
-Le fichier VPS `/etc/enactspace/enactspace.env`, les defines Flutter, les fichiers Firebase natifs, la signature Android et les clés de sauvegarde restent privés. Le worker Firebase web généré est exclu des checkpoints et doit être régénéré lors du build. Les restrictions de la clé API Firebase n’ont pas encore été vérifiées.
+Les valeurs des services, les fichiers Firebase natifs, les clés de signature et la clé de déchiffrement des sauvegardes sont confiés à un coffre institutionnel. Les defines web distribués sont des paramètres clients, visibles dans les artefacts. Ils ne doivent contenir aucune clé privée, donnée de connexion base ou identifiant d’administration fournisseur. Générer le worker Firebase web à partir de paramètres clients autorisés lors de la compilation.
 
-Ne jamais copier les codes d’activation, mots de passe, tokens, corps de messages ou fichiers d’environnement dans les rapports. Voir [le diagnostic des notifications](MESSAGING_TROUBLESHOOTING.md).
-
-## Procédures générales et contexte antérieur
+## Inventaire et séparation
 
 This document names configuration classes only. Never add values, fingerprints, private URLs, credentials, provider files, or signing material to Git, CI YAML, tickets, or review bundles.
 

@@ -1,39 +1,38 @@
 # EnactSpace
 
-EnactSpace is the private digital workspace for Enactus ESP. It brings membership, projects, communication, attendance, finance, impact, operational integrity, and institutional memory into one maintained platform.
+EnactSpace est l’espace numérique d’Enactus ESP. L’application réunit les membres, les projets, les pôles, les tâches, la présence, les finances, la communication, le recrutement, l’Academy et la mémoire du club.
 
-Le web, l’API et l’APK Android installé sont en **1.0.13** (build clients **16**) au 10 octobre 2026. Le dernier checkpoint source est `b152677372ded22d63b544b1336240902613b559`, qui conserve le correctif backend de première connexion. Voir [l’état de release](docs/releases/20261010-release-1.0.13.md) et les [vérifications restantes](docs/RELEASE_CHECKLIST.md). La livraison technique est confirmée; toutes les validations fonctionnelles et les publications de stores ne sont pas encore terminées.
+## Reprendre le projet
 
-## Platform
+La branche de travail documentée est `feature/recruitment-ui-20261101`. Le point de reprise vérifié pour le lot web et API est le commit `d65d22402af4debb620260346a6174f717ab47bb`. Ouvrir un clone de cette branche, puis suivre le [dossier de passation du pôle IT](docs/POLE_IT_HANDOFF.md).
 
-- Flutter `3.47.5` used for the latest builds for Android, iOS, and web clients.
-- FastAPI on Python 3.12 for the API and background operations.
-- PostgreSQL 16 for production and concurrency-sensitive validation.
-- Alembic migrations through `20261007_0031`.
+| Composant | État attesté le 3 novembre 2026 |
+| --- | --- |
+| Web | 1.0.25, build 28, servi en HTTPS avec empreinte contrôlée |
+| API et workers | Image 1.0.23 vérifiée pour l’API et les workers e-mail, push et Veille |
+| Données | PostgreSQL 16, révision Alembic `20261031_0033` |
+| Mobile | La publication du 3 novembre couvre le web et le backend. Voir les [preuves et contrôles mobiles](docs/MOBILE_RELEASE_AND_PUSH.md). |
 
-Android and iOS are the primary mobile targets; web is a supported build target. Production endpoints are supplied through external build configuration. Provider credentials, signing material and secrets are never committed.
+La [fiche de publication](docs/releases/20261103-web-1.0.25-backend-1.0.23.md) distingue les artefacts déployés, les versions par défaut du dépôt et les validations qui exigent encore une recette externe.
 
-## Repository map
+## Carte du dépôt
 
-- `frontend/` — Flutter client and native platform shells.
-- `backend/` — FastAPI service, migrations, and backend tests.
-- `docs/` — canonical operations/development guidance plus historical evidence.
-- `.github/` — CI, security automation, dependency updates, and contribution governance.
+| Répertoire | Rôle |
+| --- | --- |
+| `frontend/` | Client Flutter, ressources, tests, intégrations Android, iOS et web |
+| `backend/` | API FastAPI, modèles SQLAlchemy, workers, migrations Alembic et tests |
+| `deploy/` et `tools/` | Modèles d’infrastructure, contrôles et outils de publication |
+| `.github/` | Contrôles GitHub Actions et règles de contribution |
+| `docs/` | Références techniques, exploitation et comptes rendus datés |
 
-## Start here
+## Documentation
 
-- [Documentation index](docs/README.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Portable development setup](docs/DEVELOPMENT.md)
-- [Test matrix](docs/TEST_MATRIX.md)
-- [Operations runbook](docs/OPERATIONS_RUNBOOK.md)
-- [Secrets and environments](docs/SECRETS_AND_ENVIRONMENTS.md)
-- [Mobile release and push](docs/MOBILE_RELEASE_AND_PUSH.md)
-- [Release checklist](docs/RELEASE_CHECKLIST.md)
-- [Pôle IT handoff](docs/POLE_IT_HANDOFF.md)
+- [Index des procédures](docs/README.md)
+- [Architecture et carte des domaines](docs/ARCHITECTURE.md)
+- [Installation et développement local](docs/DEVELOPMENT.md)
+- [Matrice de tests](docs/TEST_MATRIX.md) et [checklist de publication](docs/RELEASE_CHECKLIST.md)
+- [Exploitation et reprise sur incident](docs/OPERATIONS_RUNBOOK.md)
+- [Environnements et secrets](docs/SECRETS_AND_ENVIRONMENTS.md)
+- [Contribution](CONTRIBUTING.md), [maintenance](MAINTAINERS.md) et [signalement privé](SECURITY.md)
 
-## Ownership and status
-
-V1 conçue et développée par Chicodev — 2026. Maintenance: Pôle IT — Enactus ESP. The exact Pôle IT GitHub team remains an administrative handoff item; `@Scorpion160` is the current repository fallback owner.
-
-This is a private repository and no public open-source license is currently declared. See [NOTICE](NOTICE.md). GitHub Actions execution, protected-branch policy, organizational ownership mapping, and PR-8 mobile distribution gates must be closed before release as described in the canonical checklist.
+V1 conçue et développée par Chicodev en 2026. La maintenance relève du pôle IT d’Enactus ESP. Le dépôt est publiquement consultable, sans licence open source déclarée. Voir [NOTICE](NOTICE.md).

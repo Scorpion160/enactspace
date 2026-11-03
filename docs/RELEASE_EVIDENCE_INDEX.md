@@ -1,12 +1,8 @@
-# Release evidence index
+# Registre des preuves de publication
 
-## Référence la plus récente
+La [fiche du 3 novembre](releases/20261103-web-1.0.25-backend-1.0.23.md) associe les résultats Flutter, backend, web et la bascule des quatre services aux artefacts du lot. La [fiche du 10 octobre](releases/20261010-release-1.0.13.md) conserve la preuve Android de cette date. Les preuves mobiles, la réception de bout en bout et les contrôles Actions sont suivis séparément.
 
-[L’état de release du 10 octobre 2026](releases/20261010-release-1.0.13.md) synthétise les comptes rendus PowerShell transmis par l’opérateur : publications web/API, installation Android, sauvegarde, configuration normale des notifications et correctif de première connexion. Ces constats ne proviennent pas d’une nouvelle inspection distante exécutée lors de cette mise à jour documentaire.
-
-Les éléments ci-dessous restent des preuves historiques. La réception du code, les invitations aux responsables et la validation complète des parcours ne sont pas attestées par les comptes rendus disponibles.
-
-## Procédures générales et contexte antérieur
+## Historique des preuves antérieures
 
 This matrix links every unchecked gate in [the V1.0.0 release checklist](RELEASE_CHECKLIST.md) to its evidence contract. It does not close the checklist or authorize a release. Product baseline: `3445160e7af4ea592c1c340cb52f35514b4d05f9`; validated compliance head: `af3cbd263410090f9f29b9ceac0c5327820aee97`; Flutter target `1.0.0+1`; backend `1.0.0`.
 

@@ -1,8 +1,12 @@
 # Diagnostic mails, première connexion et push
 
+## Flux du lot 1.0.23
+
+Le modèle commun est généré par `backend/app/services/email_templates.py`. `email_delivery_service.py` met en file, réévalue l’éligibilité et fixe la salutation sur l’heure effective de tentative d’envoi. Le seuil actuel est 18 h, heure de Dakar. Les liens publics d’activation et de suivi utilisent les routes web dédiées. Les destinations internes prises en charge sont conservées après connexion par le routeur Flutter. Voir [la fiche du lot](releases/20261103-web-1.0.25-backend-1.0.23.md).
+
 ## Interpréter les résultats
 
-Les paramètres actuels activent les mails et push sans redirection de test. L’adresse institutionnelle est enactus@esp.sn. Le statut email_deliveries.sent signifie que le transport a accepté l’envoi selon le worker; il ne prouve pas la présence dans la boîte du destinataire. L’absence dans le dossier « Envoyés » n’est pas non plus une preuve de non-envoi SMTP.
+La configuration attendue du lot active les mails et push sans redirection de test. L’adresse institutionnelle est enactus@esp.sn. Le statut email_deliveries.sent signifie que le transport a accepté l’envoi selon le worker; il ne prouve pas la présence dans la boîte du destinataire. L’absence dans le dossier « Envoyés » n’est pas non plus une preuve de non-envoi SMTP.
 
 Une notification de changement de responsabilités n’est pas un mail d’activation. Vérifier le sujet, le type de parcours, le compte et l’existence d’un challenge avant de conclure qu’un code a été envoyé.
 

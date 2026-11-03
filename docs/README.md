@@ -1,45 +1,25 @@
-# EnactSpace documentation
+# Documentation EnactSpace
 
-Use this page to distinguish maintained operating instructions from historical evidence.
+## Parcours de prise en main
 
-## Canonical
+1. Lire la [passation du pôle IT](POLE_IT_HANDOFF.md), la [fiche de publication du 3 novembre](releases/20261103-web-1.0.25-backend-1.0.23.md) et la [carte d’architecture](ARCHITECTURE.md).
+2. Préparer l’[environnement de développement](DEVELOPMENT.md), puis exécuter la [matrice de tests](TEST_MATRIX.md).
+3. Avant tout changement en service, utiliser le [guide d’exploitation](OPERATIONS_RUNBOOK.md), la [checklist](RELEASE_CHECKLIST.md) et le [registre des preuves](RELEASE_EVIDENCE_INDEX.md).
 
-These documents describe the current 1.0.13 deployment and maintained procedures. The dated release record takes precedence for actual deployed versions and verified results:
+## Procédures par domaine
 
-- [Release 1.0.13 — current state, build and rollback](releases/20261010-release-1.0.13.md)
-- [Mail, activation and push diagnostics](MESSAGING_TROUBLESHOOTING.md)
+| Sujet | Guide |
+| --- | --- |
+| Confidentialité et configuration | [Environnements et secrets](SECRETS_AND_ENVIRONMENTS.md), [politique de sécurité](../SECURITY.md) |
+| Activation et support | [Première connexion](FIRST_ACCESS_ONBOARDING.md), [centre d’aide](HELP_SUPPORT_OPERATIONS.md) |
+| E-mail et notifications | [Diagnostic des messages](MESSAGING_TROUBLESHOOTING.md), [Firebase web](FIREBASE_WEB_DEPLOYMENT.md) |
+| Android, iOS et publication en boutique | [Livraison mobile](MOBILE_RELEASE_AND_PUSH.md), [métadonnées de store](STORE_RELEASE_METADATA.md), [confidentialité](PRIVACY_DISCLOSURE_WORKSHEET.md) |
+| Campagne 2026 | [Préparation](RECRUITMENT_CAMPAIGN_READINESS_202611.md), [jury et questionnaire](RECRUITMENT_CAMPAIGN_2026_JURY_AND_QUESTIONNAIRE.md), [guide du jury](recruitment-jury-guide.md) |
+| Sauvegarde et restauration | [Exploitation](OPERATIONS_RUNBOOK.md), [répétition de restauration](releases/20261008-prelaunch-lot26-backup-restore.md), [copie de secours Windows](BACKUP_RECOVERY_WINDOWS.md) |
+| Identification des artefacts | [Provenance](ARTIFACT_PROVENANCE.md), [preuves de release](RELEASE_EVIDENCE_INDEX.md) |
 
-- [Repository overview](../README.md)
-- [Architecture](ARCHITECTURE.md)
-- [Development](DEVELOPMENT.md)
-- [Test matrix](TEST_MATRIX.md)
-- [Operations runbook](OPERATIONS_RUNBOOK.md)
-- [First access and onboarding](FIRST_ACCESS_ONBOARDING.md)
-- [Secrets and environments](SECRETS_AND_ENVIRONMENTS.md)
-- [Mobile release and push](MOBILE_RELEASE_AND_PUSH.md)
-- [Release checklist](RELEASE_CHECKLIST.md)
-- [Store release metadata](STORE_RELEASE_METADATA.md)
-- [Privacy disclosure worksheet](PRIVACY_DISCLOSURE_WORKSHEET.md)
-- [Release evidence index](RELEASE_EVIDENCE_INDEX.md)
-- [Artifact provenance](ARTIFACT_PROVENANCE.md)
-- [Pôle IT handoff](POLE_IT_HANDOFF.md)
+## Gouvernance et archives
 
-Repository governance also lives in [CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md), [MAINTAINERS](../MAINTAINERS.md), [NOTICE](../NOTICE.md), and [CHANGELOG](../CHANGELOG.md).
+La [contribution](../CONTRIBUTING.md), la [maintenance](../MAINTAINERS.md), les [droits d’usage](../NOTICE.md) et le [journal des versions](../CHANGELOG.md) se lisent à la racine du dépôt.
 
-## Historical / audit evidence
-
-Files under `docs/audits/`, `docs/product_readiness/`, `docs/security/`, review bundles, test reports, design captures, and dated implementation records preserve evidence from a specific point in time. They may mention old versions, counts, branches, limitations, or deployment experiments. Treat them as evidence, not as current operating instructions.
-
-All non-canonical `V1_*` and `v1_*` documents are retained for historical context, including dated Android/LAN/build records. The eight legacy operational guides reviewed for PR-7 contain prominent redirects to current canonical procedures. Other dated V1 records are evidence only, even when they contain commands. A historical filename does not define the current product version.
-
-## Deprecated
-
-`V1_INSTALLATION_GUIDE.md`, `V1_RELEASE_NOTES.md`, `V1_KNOWN_LIMITATIONS.md`, `v1_test_accounts.md`, and operational `V1_1_*` guides are deprecated as authoritative instructions. They remain only to explain earlier decisions and must not override the canonical documents above.
-
-If documents conflict, stop and use the current canonical documentation and latest dated release record. Record any unresolved operational decision in the release checklist instead of guessing.
-
-- [Centre d’aide et traitement des retours](HELP_SUPPORT_OPERATIONS.md)
-
-- [Sauvegarde et restauration des données](V1_1_BACKUP_RESTORE.md)
-
-- [Copie chiffrée et récupération Windows](BACKUP_RECOVERY_WINDOWS.md)
+Les dossiers d’audit, rapports `V1_*`, captures et fiches de release datées conservent le contexte des décisions. Pour une intervention, partir de la procédure active et de la fiche correspondant à la version réellement servie. Vérifier les paramètres de l’environnement auprès de son responsable si les documents divergent.

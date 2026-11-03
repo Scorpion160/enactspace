@@ -1,16 +1,8 @@
 # Configuration Firebase du navigateur
 
-## État et compilation actuels
+Le [web 1.0.25, build 28](releases/20261103-web-1.0.25-backend-1.0.23.md) a été compilé avec le worker Firebase généré et contrôlé par empreinte en HTTPS. Le lot utilise `tools/release_email_windows.ps1` et la publication d’une archive déjà validée. Les clés clientes et l’URL API proviennent des paramètres du build. Une recette navigateur doit vérifier l’origine HTTPS, la permission, l’inscription et la réception physique. Contrôler les restrictions des clés dans Firebase/GCP.
 
-Le web public est en **1.0.23 build 26**, publié le 1er novembre 2026 avec la refonte du recrutement. Le journal Windows confirme les contrôles locaux du VPS puis la version et l’empreinte JavaScript en HTTPS. Voir [les preuves de publication](releases/20261101-recruitment-ui-1.0.23-build26.json) et [le compte rendu de la refonte](RECRUITMENT_UI_REDESIGN_20261101.md).
-
-Pour les compilations suivantes, utiliser `tools/build_web_with_firebase.ps1` avec un fichier de defines privé complet : API HTTPS, projet Firebase, sender ID, clé/app ID web et clé publique VAPID. Le worker généré est exclu de la sauvegarde Git; ne pas le remplacer par un fichier obsolète après build.
-
-Les restrictions de clé API ne sont pas encore attestées. La présence de `firebase-messaging-sw.js` et l’activation backend des push ne prouvent pas la réception sur navigateur : vérifier permission, enregistrement, réception et déconnexion.
-
-La publication 1.0.23 utilise `tools/publish_prebuilt_recruitment_web_windows.ps1` pour réutiliser le build déjà compilé, contrôler l’archive transférée, conserver la publication précédente et vérifier les octets servis en HTTPS. Son publieur est épinglé à cette version, à ce numéro de build et à cette empreinte JavaScript. Chaque release suivante doit disposer de contrôles adaptés à ses propres valeurs. Le [compte rendu 1.0.13](releases/20261010-release-1.0.13.md) conserve la procédure historique.
-
-## Procédures générales et contexte antérieur
+## Fonctionnement et procédure
 
 Le worker `frontend/web/firebase-messaging-sw.js` est un fichier généré pour le déploiement. Il reste sur le PC, mais ne fait pas partie du code publié. Son modèle et son générateur sont versionnés dans `tools/`. Cette séparation ne sécurise pas Firebase à elle seule : la configuration cliente devient accessible au navigateur lors du déploiement.
 

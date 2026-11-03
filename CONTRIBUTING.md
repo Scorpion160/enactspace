@@ -1,21 +1,11 @@
-# Contributing to EnactSpace
+# Contribuer à EnactSpace
 
-EnactSpace is currently a private Enactus ESP repository. Contributions require authorized repository access and review.
+Préparer les évolutions sur une branche issue de `feature/recruitment-ui-20261101`, la branche de reprise documentée. Ouvrir une pull request (PR) vers cette branche pour les évolutions du lot en service. La convergence vers `main` fait l’objet d’une revue d’intégration distincte. Le dépôt est consultable publiquement. Les décisions de maintenance et de déploiement relèvent d’Enactus ESP.
 
-## Integration model
+1. Décrire le besoin, le périmètre et la manière de reproduire. Garder les changements concentrés sur le sujet.
+2. Vérifier les contrats API, les permissions, les migrations éventuelles et la compatibilité client. Pour l’interface, joindre des captures fictives et vérifier clair/sombre si le changement est visuel.
+3. Consigner les commandes et résultats des [tests](docs/TEST_MATRIX.md). Si le schéma change, documenter la recette PostgreSQL et le retour arrière.
+4. Faire relire par un mainteneur autorisé. Examiner les checks du commit et les écarts. La cible de gouvernance est une revue, des checks obligatoires et l’interdiction des réécritures de branches de référence. Vérifier les réglages effectifs dans GitHub.
+5. La publication suit la [checklist](docs/RELEASE_CHECKLIST.md) et produit un reçu propre au lot.
 
-Until V1.0.0 and PR-8 closure, integration work remains on `feat/product-readiness-v1`. The long-term target after release is pull-request-based integration into `main`. Branch protection and required checks are not currently enabled; do not describe local success as equivalent to protected-branch enforcement.
-
-Create focused changes, link the relevant issue or decision context, and preserve unrelated work. Never commit production credentials, real environment files, private member data, provider configuration files, private keys, or mobile signing material.
-
-## Expected checks
-
-Run the checks relevant to the change and record exact results in the pull request. Application changes normally require backend compilation/tests and/or Flutter analysis/tests. Schema changes require an Alembic migration with upgrade/downgrade validation on PostgreSQL. Operational changes require documentation and rollback review.
-
-The repository workflows are the intended shared gate once GitHub Actions billing/execution is restored. A reviewer must still assess security, privacy, migrations, release impact, and external gates.
-
-## Review and merge
-
-At least one authorized review is the target policy for `main`. After CI is functional, administrators should require the application and security checks, prohibit force pushes and branch deletion, and select one documented merge strategy. Until those controls can be enforced, the repository owner must apply the same checks manually and preserve evidence.
-
-Do not merge or release solely because a checklist is present. Release authority and production access remain with Enactus ESP.
+Conserver hors de Git et des PR les secrets, signatures, fichiers de fournisseurs, exports de membres, CV, résultats de jury et journaux non expurgés. Voir [SECURITY](SECURITY.md) pour le signalement privé.

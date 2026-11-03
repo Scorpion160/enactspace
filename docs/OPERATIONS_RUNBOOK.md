@@ -1,80 +1,53 @@
-# Operations runbook
+# Exploitation EnactSpace
 
-## Procédure en vigueur — release 1.0.13
+La [fiche de publication du 3 novembre 2026](releases/20261103-web-1.0.25-backend-1.0.23.md) donne le dernier état attesté. Vérifier l’état en service avant toute intervention et obtenir l’accès auprès du pôle IT.
 
-La référence opérationnelle actuelle est [le runbook de release du 10 octobre](releases/20261010-release-1.0.13.md). Les anciens exemples 1.0.0 ci-dessous sont des exemples de procédure, pas l’état de production.
+## Contrôles en lecture seule
 
-Avant toute bascule : contrôler l’image et son identité, le schéma courant, la configuration effective des quatre services et l’état de santé; prendre le verrou de publication; sauvegarder la configuration. Pour une capture cohérente, arrêter l’API et les trois workers puis lancer la sauvegarde vérifiée. Contrôler un rapport frais, son succès et le nettoyage de l’environnement de restauration. Redémarrer les anciens services si cette étape échoue.
+```powershell
+Invoke-RestMethod 'https://enactspace.kerunjombor.net/version.json'
+Invoke-RestMethod 'https://api-enactspace.kerunjombor.net/health'
+$calendar = Invoke-RestMethod 'https://api-enactspace.kerunjombor.net/api/recruitment/campaigns/timeline'
+$calendar.campaigns | Select-Object title, start_date, end_date
+```
 
-Le dernier déploiement n’a effectué aucune migration : la base était déjà au head attendu. Ne pas lancer systématiquement une migration sans comparer le schéma et examiner le changement. Un retour à une image précédente ne restaure pas le schéma ou les données : vérifier la compatibilité avant restauration.
+Comparer ces réponses au reçu de publication. Contrôler aussi l’état des quatre conteneurs applicatifs et leurs identifiants d’image dans le contexte Compose autorisé. Lire les journaux ciblés par service et intervalle. Conserver des preuves expurgées avec l’heure UTC, la version et l’identifiant d’opération. Une réponse 200 de `/health` atteste le processus API. La base, les fichiers, les droits et les workers exigent des contrôles dédiés.
 
-Lancer les sondes candidates avec Docker Compose et un override temporaire, `run --rm -T --no-deps --entrypoint python backend -`. Le lancement brut avec `docker run --env-file` a mal interprété une URL de base entourée de guillemets. Ne pas réécrire les secrets pour contourner ce problème.
+## Préparer et publier une version
 
-## Procédures générales et contexte antérieur
+1. **Figer la source.** Noter commit, révisions source client/backend, versions, build, révision Alembic, empreintes et opérateur. Vérifier les suites pertinentes, les accès et la place disque. Obtenir une revue indépendante.
+2. **Répéter.** Construire le bundle web et l’image candidate à partir des sources identifiées. Tester hors production avec une base et des fournisseurs isolés. Valider le plan Compose résolu sans imprimer les valeurs. Vérifier l’ancien artefact et l’effet attendu d’un retour arrière.
+3. **Sécuriser la bascule.** Acquérir le verrou de publication. Vérifier une sauvegarde récente de PostgreSQL et du volume des pièces jointes. Appliquer le plan de maîtrise des écritures pour une capture cohérente. Conserver le Compose précédent et les artefacts vérifiés.
+4. **Décider de la migration.** Comparer le head livré et le schéma en service. Si une migration est nécessaire, évaluer compatibilité et verrous, la répéter, puis l’exécuter dans la fenêtre prévue avant de démarrer le code qui en dépend. Garder `AUTO_CREATE_TABLES=false`. La publication du 3 novembre a conservé la révision 0033.
+5. **Basculer et contrôler.** Publier le bundle, vérifier la version et l’empreinte des octets servis. Pour une évolution du backend, recréer les quatre services avec le même identifiant d’image prévu. Vérifier état, schéma, santé et parcours sensibles selon le changement. Observer latence, erreurs, files et stockage.
+6. **Clore.** Archiver preuves, portée fonctionnelle, écarts et décision de sortie de fenêtre. Mettre à jour la fiche de publication et conserver les chemins précis du retour arrière dans le dossier d’exploitation restreint.
 
-This is the canonical V1.0.0 production operations sequence. It records required controls, not evidence that a deployment has occurred.
+Les lanceurs datés sous `tools/` épinglent leurs sources, versions et manifestes. Le lot e-mail utilise `release_email_windows.ps1`, `publish_web_release.py` et `publish_interface_copy_backend.py`. Relire les contrôles et préparer de nouveaux manifestes pour un autre lot. Le Compose Git sert de modèle. Le Compose effectif du VPS est la référence opérationnelle et contient la sélection des artefacts en service.
 
-## Prerequisites
+## Suivre une opération en cours
 
-- An approved release commit and completed [release checklist](RELEASE_CHECKLIST.md).
-- Authorized Pôle IT operator plus a second reviewer for migration/release decisions.
-- PostgreSQL 16, persistent file storage, HTTPS reverse proxy, monitoring, and restricted service accounts.
-- Production environment values delivered through the approved secret store, never Git.
-- A verified database backup and file-store backup tied to the same release window.
+Le lanceur Windows émet un identifiant d’unité systemd pour la bascule backend. Interroger l’unité par `systemctl show` et `journalctl -u`. Lire le reçu `deployment.json` dans le dossier d’opération communiqué par le lanceur. L’attente d’un reçu depuis Windows peut se poursuivre pendant que le travail serveur suit son cours. Vérifier l’état et le reçu avant de décider d’une reprise. Pour le lot e-mail, `-Resume` reprend la publication à partir de l’opération locale dont le reçu de préparation et l’archive correspondent aux empreintes.
 
-RPO and RTO are **to be approved by Enactus ESP**. Until approved, do not promise a recovery window; record actual rehearsal measurements and escalate the decision.
+## Retour arrière et données
 
-## Deployment sequence
+| Situation | Décision |
+| --- | --- |
+| Régression web | Utiliser le dossier web précédent vérifié, puis contrôler `version.json`, l’empreinte et les routes. |
+| API ou workers défaillants, schéma compatible | Rétablir la configuration et l’image précédentes, recréer les quatre services et contrôler leur état. |
+| Migration incompatible ou données incertaines | Stabiliser les écritures et conserver les preuves. Avec le responsable base, choisir un correctif en avant ou une restauration validée. |
+| Candidatures ou autres écritures après la sauvegarde | Inventorier puis réconcilier les écritures avant toute restauration de données. |
 
-1. Record commit, application version, operator, reviewer, date, and change window.
-2. Confirm monitoring, free storage, database health, provider status, and rollback artifact availability.
-3. Quiesce writes if the migration/release plan requires it.
-4. Create and verify backups before any migration.
-5. Validate environment names with the repository validator without printing values.
-6. From `backend/`, confirm `python -m alembic heads` returns only `20261007_0031 (head)`.
-7. Apply `python -m alembic upgrade head` before starting the new application. Keep `AUTO_CREATE_TABLES=false`.
-8. Deploy the approved backend and client artifacts. The public API must use HTTPS; bind the application service to a private/loopback interface behind the proxy.
-9. Run health, authentication, authorization, file-access, and representative domain smoke checks with dedicated non-production-like operator identities.
-10. Observe error rate, latency, worker/push status, database connections, storage, and logs through the change window.
+Une restauration associe PostgreSQL et les fichiers cohérents avec la même capture. Restaurer d’abord dans un environnement isolé. Vérifier révision, contraintes, comptages, pièces jointes représentatives, sessions et parcours. Contrôler que la copie hors site et l’accès au déchiffrement sont disponibles, puis mesurer la durée de récupération. Faire valider par Enactus ESP les objectifs de perte de données (RPO) et de durée de rétablissement (RTO). Voir [le compte rendu de restauration](releases/20261008-prelaunch-lot26-backup-restore.md).
 
-## Health and inspection
+## Incidents courants
 
-Check the public `/health` endpoint, expected V1.0.0 metadata, reverse-proxy TLS, database reachability, file storage read/write permissions, and background worker state. Inspect logs through the hosting platform or service manager. Sanitize evidence: never paste tokens, authorization headers, private records, SMTP/provider payloads, or environment contents.
+| Symptôme | Premiers éléments à vérifier |
+| --- | --- |
+| Web ancien après publication | Version publique, empreinte du bundle, service worker et caches |
+| API 5xx ou indisponible | Version API, conteneur, proxy HTTPS, connexions PostgreSQL, dernières erreurs expurgées |
+| 401 récurrent ou 403 | Session et révocation pour le 401. Rôle, ressource et portée pour le 403. |
+| Candidature impossible | Fenêtre de campagne côté serveur en heure de Dakar, éligibilité, version des questions, pièces et limites |
+| E-mail ou push absent | File, tentatives, état du worker, configuration, résultat du fournisseur et réception réelle. Voir [le diagnostic](MESSAGING_TROUBLESHOOTING.md). |
+| Fichier manquant | Métadonnées, droits d’accès, volume, espace et cohérence avec la sauvegarde |
 
-## Rollback decision tree
-
-- If the application fails before a migration, restore the prior application artifact and verify health.
-- If a backward-compatible migration succeeded but the app fails, prefer application rollback only after confirming the prior code supports the migrated schema.
-- If a migration is not backward compatible, stop writes and follow the migration-specific downgrade/data-restoration plan. Do not improvise `alembic downgrade` on production.
-- If data integrity is uncertain, stop the rollout, preserve logs and backups, restrict writes, and escalate to the database owner and release authority.
-- If credentials or private data may be exposed, contain access first, rotate affected values, preserve sanitized evidence, and follow `SECURITY.md`.
-
-Database rollback can lose or reinterpret data written after migration. A successful Alembic downgrade is not proof of business-data restoration. Restore rehearsals must validate record counts, constraints, provenance, files, and application behavior.
-
-## Backup and restore
-
-Backups must cover PostgreSQL and persistent uploaded files, be encrypted, access-controlled, retention-approved, and restoration-tested in an isolated environment. Record backup identifier, timestamp, source release/schema, file-store snapshot, checksum where available, restore duration, validation owner, and disposal evidence. Never restore production data into an uncontrolled developer environment.
-
-## Incident triage and escalation
-
-1. Establish severity, affected surface, first-known time, and current user/data impact.
-2. Contain unsafe writes or access without destroying evidence.
-3. Notify the on-call Pôle IT maintainer, service owner, privacy/security contact, and Enactus ESP release authority as applicable.
-4. Record sanitized timeline, decisions, mitigations, and validation.
-5. Recover using a rehearsed path, monitor recurrence, and complete a post-incident review.
-
-Contact names, escalation time objectives, RPO, RTO, and hosting/provider support channels are administrative fields in [Pôle IT handoff](POLE_IT_HANDOFF.md) and remain **to be approved by Enactus ESP** until supplied.
-
-## Première connexion à l'ouverture
-
-Le parcours source du lot 24 doit être livré avec la mise à jour backend et Flutter correspondante. Suivre [Premières connexions](FIRST_ACCESS_ONBOARDING.md) : préparation des contacts par la SG/Team Leader, activation individuelle, récupération des comptes utilisés réservée à l'administrateur, profil obligatoire et confirmation de l'année. Ne pas distribuer de mot de passe collectif ou choisi par un responsable. Les invitations de 30 minutes sont préparées après la mise à disposition de l'application. La redirection des courriels de test est conservée jusqu'à la bascule finale approuvée.
-
-## Centre d’aide — lot 25
-
-Suivre [Centre d’aide et traitement](HELP_SUPPORT_OPERATIONS.md). Le guide public reste accessible avant connexion ; l’accueil ouvre les demandes personnelles. Administration, Team Leader et SG actifs et habilités traitent les retours, avec réponses publiques et notes internes séparées. Livrer la migration 0031 et les versions backend/app/web compatibles ensemble. Vérifier les notifications en redirection avant la bascule approuvée ; aucun envoi réel n’a été effectué dans ce lot.
-
-## Sauvegarde et restauration — lot 26
-
-Restauration locale isolée vérifiée : 19 tests de protection, 111 tables et 721 lignes comparées, schéma complet contrôlé, 14 fichiers et leurs références intacts. Les modifications synthétiques de contrainte, d’index et de colonne sont détectées. La copie Windows et la récupération depuis sa clé DPAPI sont vérifiées. Restent le second secours de clé, la reprise sur un hôte neuf, la planification, la conservation et les objectifs RPO/RTO. Voir [les preuves](releases/20261008-prelaunch-lot26-backup-restore.md) et [la procédure](V1_1_BACKUP_RESTORE.md).
-
-Sauvegardes planifiées : timer actif à 03 h 00 UTC et premier lancement systemd validé, quatre tests de garde réussis. La copie automatique hors du VPS, le secours de clé remis à un second détenteur et la reprise sur un hôte neuf restent à terminer. Voir les preuves du lot 26.
+Pour chaque incident, dater l’impact et les décisions, protéger les preuves et signaler l’incident selon [SECURITY](../SECURITY.md). Le responsable de publication décide du rétablissement avec les responsables métier, données et sécurité.
