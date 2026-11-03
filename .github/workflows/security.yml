@@ -6,11 +6,13 @@ on:
       - main
       - recovery/final-20260927
       - feat/product-readiness-v1
+      - feature/recruitment-ui-20261101
   push:
     branches:
       - main
       - recovery/final-20260927
       - feat/product-readiness-v1
+      - feature/recruitment-ui-20261101
   schedule:
     - cron: "17 6 * * 1"
   workflow_dispatch:

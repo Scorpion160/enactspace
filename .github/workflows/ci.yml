@@ -8,6 +8,7 @@ on:
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
+      - feature/recruitment-ui-20261101
   push:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
+      - feature/recruitment-ui-20261101
   workflow_dispatch:
 
 permissions:
@@ -37,6 +39,7 @@ jobs:
       PUSH_ENABLED: "false"
       DATABASE_URL: sqlite://
       TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
+      VEILLE_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
     services:
       postgres:
         image: postgres:16
@@ -115,7 +118,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261007_0031 (head)"
+          test "$output" = "20261031_0033 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v
@@ -125,8 +128,8 @@ jobs:
         run: |
           set -o pipefail
           python -m unittest discover -v 2>&1 | tee "$RUNNER_TEMP/backend-tests.log"
-          if grep -Eq 'TEST_DATABASE_URL missing: real PostgreSQL tests NOT RUN' "$RUNNER_TEMP/backend-tests.log"; then
-            echo "PostgreSQL-dependent tests were skipped." >&2
+          if grep -Eq '^OK \(skipped=[1-9][0-9]*\)' "$RUNNER_TEMP/backend-tests.log"; then
+            echo "Required backend tests were skipped." >&2
             exit 1
           fi
 
