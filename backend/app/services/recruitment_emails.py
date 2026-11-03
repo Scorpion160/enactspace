@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from app.services.email_delivery_service import enqueue_email_delivery
-from app.services.email_templates import APP_URL
+from app.services.email_templates import app_link
 
 MESSAGES = {
     "under_review": ("Votre candidature est en cours d’étude",
@@ -47,14 +47,14 @@ def enqueue_candidate_update(db, application):
             details.append("Lien de l’entretien : " + application.interview_link.strip())
         if not details:
             details.append("L’équipe vous communiquera prochainement la date et le lieu de l’entretien.")
-    body = "\n\n".join([
+    body = "\n\n".join(part for part in (
         f"Bonjour {application.first_name},",
         message,
         "\n".join(details),
         ("Code de suivi : " + application.tracking_code) if application.tracking_code else "",
-        "Suivre ma candidature : " + APP_URL + "/#/application-tracking",
+        "Suivre ma candidature : " + app_link("application-tracking"),
         "L’équipe Enactus ESP",
-    ])
+    ) if part)
     fingerprint = hashlib.sha256(json.dumps({
         "status":state,
         "revision":application.updated_at.isoformat() if application.updated_at else None,

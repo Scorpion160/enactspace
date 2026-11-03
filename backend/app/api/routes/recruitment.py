@@ -53,6 +53,7 @@ from app.core.roles import BASE_ACTIVE_ROLE, RECRUITMENT_ACCESS_ROLES, is_veille
 from app.services.notification_service import notify_user, notify_users
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.email_delivery_service import enqueue_email_delivery
+from app.services.email_templates import app_link
 from app.services.recruitment_emails import enqueue_candidate_update
 from app.services.operational_integrity import lock_row, to_naive_utc
 
@@ -666,7 +667,8 @@ def create_application(payload, db, attachments=None, created_files=None):
             f"Bonjour {application.first_name},\n\n"
             "Votre candidature à Enactus ESP a bien été reçue.\n"
             f"Code de suivi : {application.tracking_code}\n\n"
-            "Conservez ce code pour suivre l'avancement de votre candidature."
+            "Conservez ce code pour suivre l'avancement de votre candidature.\n"
+            f"Suivre ma candidature : {app_link('application-tracking')}"
         ),
         dedupe_key=f"recruitment-submission:{application.id}",
     )

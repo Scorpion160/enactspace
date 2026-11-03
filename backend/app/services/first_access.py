@@ -17,7 +17,7 @@ from app.services.annual_transition import lock_year_transition
 from app.services.academic_profile import progression_for
 from app.models.first_access import ActivationChallenge
 from app.services.email_delivery_service import enqueue_email_delivery
-from app.services.email_templates import APP_URL
+from app.services.email_templates import app_link
 from app.services.session_service import revoke_user_sessions
 
 GENERIC_MESSAGE="Si votre compte est prêt et son adresse renseignée, un code d'activation vous sera envoyé. Sinon, contactez la SG."
@@ -91,7 +91,7 @@ def issue_activation(db,user):
         text_body=(f"Bonjour {user.first_name},\n\nBienvenue dans l’espace numérique Enactus ESP !\n"
             f"Votre identifiant : {user.username}\nVotre code personnel : {code}\n"
             "Ce code expire dans 30 minutes et ne peut être utilisé qu'une fois. "
-            f"Ouvrez {APP_URL}/activate, puis créez votre propre mot de passe.\n\n"
+            f"Ouvrez {app_link('activate')}, puis créez votre propre mot de passe.\n\n"
             "Vous pourrez ensuite compléter votre profil et découvrir votre espace. "
             "Ne partagez pas ce code ; les responsables n'ont pas besoin de connaître votre mot de passe."),
         dedupe_key=f"activation:{challenge.id or user.id}:{now.isoformat()}")

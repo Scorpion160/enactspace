@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from sqlalchemy import and_, or_
@@ -8,7 +9,9 @@ from app.core.time import utc_now
 from app.models.account import UserPreference
 from app.models.email_delivery import EmailDelivery
 from app.models.notification import Notification
-from app.services.email_templates import render_email_html, APP_URL
+from app.services.email_templates import (
+    app_link, prepare_email_text, render_email_html, uses_standard_template,
+)
 from app.services.email_provider import (
     EmailFailureKind,
     EmailProvider,
@@ -90,9 +93,17 @@ def enqueue_notification_email(
     body = (
         "Vous avez reçu une nouvelle notification dans votre conversation.\n\n"
         "Ouvrez EnactSpace pour consulter le message et ses pièces jointes : "
-        + APP_URL + "/chat"
+        + app_link("chat")
         if private_chat else notification.message
     )
+    if not private_chat:
+        if notification.type == "application_received":
+            route = "recruitment"
+        elif notification.type.startswith("meeting_"):
+            route = "meetings"
+        else:
+            route = "notifications"
+        body = f"{body}\n\nConsulter dans EnactSpace : {app_link(route)}"
     return enqueue_email_delivery(
         db,
         recipient_email=recipient_email,
@@ -199,6 +210,12 @@ def process_email_delivery(
     )
     try:
         message = enforce_test_recipient(message)
+        if uses_standard_template(message.html_body):
+            text_body = prepare_email_text(message.text_body, utc_now())
+            message = replace(
+                message, text_body=text_body,
+                html_body=render_email_html(message.subject, text_body),
+            )
         delivery.recipient_email = message.recipient
         delivery.subject = message.subject
         delivery.text_body = message.text_body

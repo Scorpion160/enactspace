@@ -141,6 +141,26 @@ void main() {
       }
     });
 
+    test('la connexion reprend uniquement les destinations internes des mails', () {
+      for (final path in const [
+        '/chat',
+        '/meetings',
+        '/notifications',
+        '/recruitment',
+      ]) {
+        expect(AppRouter.emailDestinationAfterSignIn(path), path);
+      }
+      for (final path in const <String?>[
+        null,
+        'https://example.test',
+        '//example.test',
+        '/chat?next=https://example.test',
+        '/settings',
+      ]) {
+        expect(AppRouter.emailDestinationAfterSignIn(path), '/dashboard');
+      }
+    });
+
     test('les deep-links dynamiques suivent les gardes du module parent', () {
       final member = _user('membre', const {'enacteur'});
       final lead = _user('chef-projet', const {'chef_projet'});

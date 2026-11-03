@@ -63,6 +63,24 @@ class PrelaunchEmailTests(unittest.TestCase):
         provider=CaptureProvider()
         for delivery_id in claim_email_deliveries(self.db):process_email_delivery(self.db,delivery_id,provider)
         return provider.messages
+
+    def test_worker_renders_existing_queue_at_actual_send_time(self):
+        from app.services.email_templates import render_email_html
+        body = "Bonjour Awa,\n\nConsultez https://enactspace.kerunjombor.net/chat."
+        row = EmailDelivery(recipient_email="outsider@example.test", subject="Nouveau message sur EnactSpace",
+                            text_body=body, html_body=render_email_html("Nouveau message sur EnactSpace", body))
+        self.db.add(row)
+        self.db.commit()
+        provider = CaptureProvider()
+        (delivery_id,) = claim_email_deliveries(self.db)
+        with patch("app.services.email_delivery_service.utc_now", return_value=datetime(2026, 11, 3, 20)):
+            self.assertEqual(process_email_delivery(self.db, delivery_id, provider), "sent")
+        (sent,) = provider.messages
+        self.assertIn("Bonsoir Awa,", sent.text_body)
+        self.assertIn("Bonsoir Awa,", sent.html_body)
+        self.assertIn("/#/chat", sent.text_body)
+        self.assertIn('href="https://enactspace.kerunjombor.net/#/chat"', sent.html_body)
+
     def test_old_queue_is_contained_at_send_time(self):
         row=EmailDelivery(recipient_email="outsider@example.test",subject="Legacy event",text_body="<script>bad</script>")
         self.db.add(row);self.db.commit()

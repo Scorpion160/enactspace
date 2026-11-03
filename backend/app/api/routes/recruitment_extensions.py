@@ -15,7 +15,7 @@ from app.models.user import User
 from app.schemas.recruitment import ApplicationTrackingRequest
 from app.services.audit_service import create_audit_log
 from app.services.email_delivery_service import enqueue_email_delivery
-from app.services.email_templates import APP_URL
+from app.services.email_templates import app_link
 from app.services.operational_integrity import lock_row, to_naive_utc
 from app.services.recruitment_access import (
     can_manage_jury, capabilities, eligible_juror, is_recruitment_staff, require_campaign_access, require_staff,
@@ -217,7 +217,7 @@ def register_recruitment_extensions(router):
             text_body=(f"Bonjour {app.first_name},\n\nNous te proposons un questionnaire pour préparer ton entretien. "
                 "Tu peux enregistrer tes réponses pour les reprendre plus tard, ou choisir d’en parler pendant l’entretien.\n\n"
                 f"Échéance : {deadline}\nCode de suivi : {app.tracking_code or app.id}\n"
-                f"Retrouver le questionnaire : {APP_URL}/#/application-tracking\n\nL’équipe Enactus ESP"),
+                f"Retrouver le questionnaire : {app_link('application-tracking')}\n\nL’équipe Enactus ESP"),
             dedupe_key=f"personality-invite:{app.id}:{due.isoformat() if due else 'open'}")
         create_audit_log(db, "invitation_questionnaire_candidature", user.id, "application", app.id,
                          new_value={"version": row.instrument_version, "due_at": due.isoformat() if due else None})

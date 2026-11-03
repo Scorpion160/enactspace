@@ -1,5 +1,6 @@
 """Offline regression checks for French notification copy and email rendering."""
 import ast
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import re
 import unittest
@@ -23,6 +24,31 @@ def load_functions(relative, names):
 
 
 class FrenchEmailCopyTests(unittest.TestCase):
+    def test_salutation_matches_dakar_at_delivery(self):
+        prepare = load_functions("app/services/email_templates.py", set())["prepare_email_text"]
+        body = "MODE DE TEST ENACTSPACE\nDestinataire initial : fixture@example.test\n\nBonjour Awa,\n\nTexte."
+        self.assertIn("\n\nBonjour Awa,", prepare(body, datetime(2026, 11, 3, 17, 59)))
+        evening = datetime(2026, 11, 3, 20, tzinfo=timezone(timedelta(hours=2)))
+        updated = prepare(body, evening)
+        self.assertIn("\n\nBonsoir Awa,", updated)
+        self.assertEqual(prepare(updated, evening), updated)
+        self.assertEqual(prepare("Information.", datetime(2026, 11, 3, 10)), "Bonjour,\n\nInformation.")
+
+    def test_activation_chat_staff_and_interview_links(self):
+        render = load_functions("app/services/email_templates.py", set())["render_email_html"]
+        url = "https://enactspace.kerunjombor.net"
+        activation = render("Activez votre accès", f"Votre code personnel : 01234567\nOuvrez {url}/activate.")
+        self.assertIn(f'href="{url}/#/activate"', activation)
+        self.assertNotIn("01234567", activation.split("</div>", 1)[0])
+        self.assertNotRegex(activation, r"(?i)d[’']Enactus")
+        self.assertIn(f'href="{url}/#/chat"', render("Nouveau message sur EnactSpace", f"Ouvrez {url}/chat"))
+        staff = render("Nouvelle candidature reçue", "Un dossier est disponible.")
+        self.assertIn(f'href="{url}/#/recruitment"', staff)
+        self.assertNotIn("#/application-tracking", staff)
+        interview = render("Votre entretien avec Enactus ESP", "Lien de l’entretien : https://meeting.example.test/a?x=1&y=2")
+        self.assertIn('href="https://meeting.example.test/a?x=1&amp;y=2"', interview)
+        self.assertNotIn('href="https://x@', render("Votre entretien avec Enactus ESP", "Lien de l’entretien : https://x@meeting.example.test"))
+
     def test_generated_notification_copy_has_no_known_unaccented_words(self):
         forbidden = re.compile(r"\b(ete|etre|reglement|appliquee|refuse|recu|liee|tache|ajoute|privee|reussi|confirme|annule|modifie|terminee|enregistre|assignee|bientot|echeance)\b")
         for path in (ROOT / "app").rglob("*.py"):

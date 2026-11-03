@@ -83,6 +83,16 @@ import '../shared/layout/app_shell.dart';
 class AppRouter {
   static final AuthService _authService = AuthService();
 
+  static const _emailDestinations = {
+    '/chat',
+    '/meetings',
+    '/notifications',
+    '/recruitment',
+  };
+
+  static String emailDestinationAfterSignIn(String? path) =>
+      _emailDestinations.contains(path) ? path! : '/dashboard';
+
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: AuthStorage.instance.sessionChanges,
@@ -104,11 +114,14 @@ class AppRouter {
       }
 
       if (!loggedIn && !publicPath) {
-        return '/login';
+        final path = state.uri.path;
+        return _emailDestinations.contains(path)
+            ? Uri(path: '/login', queryParameters: {'next': path}).toString()
+            : '/login';
       }
 
       if (loggedIn && goingToLogin && !unlocking) {
-        return '/dashboard';
+        return emailDestinationAfterSignIn(state.uri.queryParameters['next']);
       }
 
       if (publicPath) return null;
@@ -182,7 +195,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/login',
-            builder: (context, state) => const LoginScreen(),
+            builder: (context, state) => LoginScreen(
+              afterSignInPath: emailDestinationAfterSignIn(
+                state.uri.queryParameters['next'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/welcome-help',
