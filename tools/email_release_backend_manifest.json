@@ -1,0 +1,50 @@
+{
+  "source_commit": "0b3671e282cedb5efdf9497129119ab2d139e29c",
+  "base_image_id": "sha256:c39192c6670c08b4a1c1552061b95fb0290d974e01e0e5cef248c6689a72866d",
+  "base_version": "1.0.22",
+  "target_version": "1.0.23",
+  "schema_head": "20261031_0033",
+  "baseline": {
+    "backend/app/api/routes/recruitment.py": "37442fb6942da15ae2e02cdede2a92816a1f1df1d0f8c56de759765901747179",
+    "backend/app/api/routes/recruitment_extensions.py": "85799b1da2925850724a16d8cac4f669a708759b4ee6c3dc6ed07efd4ca62bdc",
+    "backend/app/services/email_delivery_service.py": "ba6bcd3b4a8fc14ef5c8e188b1bf4a77a8d51d0e92bb1c70e7833b48a5a5d186",
+    "backend/app/services/email_templates.py": "15056ae5d674dc0d3bb68827776ad701521b6dfb0519d14774ff98f56446be2e",
+    "backend/app/services/first_access.py": [
+      "f544c11d64f91cc08b1d37c5642170691c969c66764b50c23ad2d1af74fb5864",
+      "ee4b938fb2e68c6b1a7035f5b98f70754b8ed1273687ca3d7b4f2aaa513f8d44"
+    ],
+    "backend/app/services/recruitment_emails.py": "547a0084832bcb5d661238dcd14b90e34d2a7471295dd9784eadb36463099b12"
+  },
+  "runtime": {
+    "backend/app/api/routes/recruitment.py": "b6fb1aa96851f93316e94ca0dc5df0b6719e034613c23766802ddb30d807558f",
+    "backend/app/api/routes/recruitment_extensions.py": "96e006b9d844664d1e824fb9873bf2d505df36c42c87bfad2e9fe78c11a5db5f",
+    "backend/app/services/email_delivery_service.py": "cffe69bac9d6fa115de73b13b4dd833c635e91ad1bcb8ba44c115766aca43eb8",
+    "backend/app/services/email_templates.py": "329b01a039c79243cad08b9251f246a6416512c88bf24a8b822a92f7cea85dfd",
+    "backend/app/services/first_access.py": "59a6888cf28f1eab1a7955c002467300278c23567514236678daa3f0cea69268",
+    "backend/app/services/recruitment_emails.py": "ea5493c8c7ac032701e6404f5af250b4c9d1784fbfa9912a5a984e750ccbf205"
+  },
+  "tests": {
+    "backend/test_email_french_copy.py": "b097bc51ec9daa97954a84ccd5abb0f1ede6cb1e0d9843f41ee9ae28b13c3415",
+    "backend/test_prelaunch_email_lifecycle.py": "277fe076a1d8c335470583425da40104d19adbe84d298dc8b34396f6adbd6f4e",
+    "backend/test_prelaunch_first_access.py": "9e6b8edd851c97f99bd9a3da0dac2e59f1ee552415cdc8337a6810c960843c92",
+    "backend/test_recruitment_campaign_lifecycle.py": "401ef6cc965abcb7c1d63611d0e20e55d24f8a9616525302ea976021b41c1f64",
+    "backend/test_recruitment_jury_personality.py": "8a836f771ca7579b9493d8437012d83aaaf9eaabbeecfe65723b7c627e9a94fe",
+    "backend/test_password_reset_guard.py": "b77e36c2de4df982d4a824791ceda35437bfb08cbb75127170b9b1b35d62e005",
+    "backend/test_auth_sessions.py": "417a7440270dbe07c241b9f668626a50a663e75769a5d35e248286043ab80cbc",
+    "backend/test_chat_polls.py": "633a19f64cd29668b853cb2429be32e9ea35580dd151b4da4bce6bd73cf20310",
+    "backend/test_profile_photo.py": "9843400d037fe83b558d8037c509e1a92a350c5aed2d709a47561550fd2d834d",
+    "backend/test_attachments_lifecycle.py": "e270616dbb314a8887eb07ddcc83f1f910b91221968375bfe14af0fc30ea2b95",
+    "backend/test_veille.py": "8d8bfb22a368b3bfc920baaad2ca6f9182c70b65fb313cc6df05291bee3206a2"
+  },
+  "test_modules": [
+    "test_email_french_copy",
+    "test_prelaunch_email_lifecycle",
+    "test_prelaunch_first_access",
+    "test_recruitment_campaign_lifecycle",
+    "test_recruitment_jury_personality",
+    "test_password_reset_guard",
+    "test_auth_sessions",
+    "test_chat_polls"
+  ],
+  "tests_expected": 115
+}

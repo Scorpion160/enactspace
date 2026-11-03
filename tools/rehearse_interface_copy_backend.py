@@ -1,4 +1,4 @@
-"""Rehearse nine text updates in a derivative of the pinned production image."""
+"""Rehearse a scoped patch in a derivative of the pinned production image."""
 import argparse
 import hashlib
 import json
@@ -94,15 +94,19 @@ def check_baseline(manifest):
     lines = run(["docker", "exec", SERVICES[0], "sha256sum", *paths]).splitlines()
     actual = {name.removeprefix("/app/"): digest
               for digest, name in (line.split(maxsplit=1) for line in lines)}
-    if actual != manifest["baseline"]:
+    expected = manifest["baseline"]
+    if actual.keys() != expected.keys() or any(
+        actual[name] not in (digests if isinstance(digests, list) else [digests])
+        for name, digests in expected.items()
+    ):
         raise RuntimeError("Production_source_changed_since_probe")
     return inspect("image", image_id)[0]
 
 
-def load_manifest(directory):
+def load_manifest(directory, manifest_sha256=MANIFEST_SHA256):
     payload = directory / "payload"
     data = (directory / "manifest.json").read_bytes()
-    if hashlib.sha256(data).hexdigest() != MANIFEST_SHA256:
+    if hashlib.sha256(data).hexdigest() != manifest_sha256:
         raise RuntimeError("Manifest_integrity_failed")
     manifest = json.loads(data)
     for name, expected in (manifest["runtime"] | manifest["tests"]).items():
@@ -184,7 +188,11 @@ def test_candidate(directory, manifest, owner, image_id):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
-    directory = parser.parse_args().directory.resolve()
+    parser.add_argument("--manifest-sha256", default=MANIFEST_SHA256)
+    args = parser.parse_args()
+    if not re.fullmatch(r"[a-f0-9]{64}", args.manifest_sha256):
+        parser.error("Invalid manifest SHA-256")
+    directory = args.directory.resolve()
     match = re.fullmatch(r"interface-copy-backend-([a-f0-9]{32})", directory.name)
     if directory.parent != STAGING or not match:
         parser.error("Owned staging directory required")
@@ -194,7 +202,7 @@ def main():
               "operation_id": owner, "deployment_performed": False}
     stage = "payload"
     try:
-        manifest = load_manifest(directory)
+        manifest = load_manifest(directory, args.manifest_sha256)
         stage = "production_baseline"
         base = check_baseline(manifest)
         if base["Id"] != manifest["base_image_id"] or base["Config"].get("User") in (None, "", "0", "root"):

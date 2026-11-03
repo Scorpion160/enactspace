@@ -155,6 +155,22 @@ class ReleaseTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(release.ops.ReleaseError):
                 release.validate_rehearsal({**receipt, field: 1}, MANIFEST)
 
+    def test_pinned_alternate_release_preserves_preflight_guards(self):
+        alternate = release.Release("b" * 32, "sha256:" + "c" * 64, "1.0.23")
+        target = release.updated_compose(ORIGINAL, MANIFEST, alternate)
+        self.assertEqual(target.count("image: " + alternate.image), 4)
+        self.assertIn('APP_VERSION: "1.0.23"', target)
+        with tempfile.TemporaryDirectory() as temporary:
+            host = FakeHost(Path(temporary))
+            report = release.perform_release(host, ORIGINAL, MANIFEST, False, alternate)
+            self.assertEqual(report["status"], "INTERFACE_COPY_BACKEND_PREFLIGHT_PASSED")
+            self.assertEqual((report["image_id"], report["version"]), (alternate.image, alternate.version))
+            self.assertNotIn("backup", host.events)
+            host.image = alternate.image
+            report = release.perform_release(host, target, MANIFEST, True, alternate)
+            self.assertEqual(report["status"], "INTERFACE_COPY_BACKEND_ALREADY_DEPLOYED")
+            self.assertNotIn("compose:up", host.events)
+
 
 if __name__ == "__main__":
     unittest.main()
