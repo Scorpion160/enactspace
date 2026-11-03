@@ -1,10 +1,14 @@
 # EnactSpace
 
-EnactSpace is the private digital workspace for Enactus ESP. It brings membership, projects, communication, attendance, finance, impact, operational integrity, and institutional memory into one maintained platform.
+EnactSpace est l’espace numérique d’Enactus ESP. L’application réunit les membres, les projets, les pôles, la communication, la présence, les finances, le recrutement, l’Academy et la mémoire du club.
 
-The current release target is **V1.0.0** (`1.0.0+1` for the Flutter application). This repository does not claim that V1.0.0 is deployed or publicly released; the remaining release and external mobile gates are tracked in the [release checklist](docs/RELEASE_CHECKLIST.md).
+## Reprendre le projet
 
-## Platform
+Le code de reprise et la documentation à jour se trouvent sur [la branche `feature/recruitment-ui-20261101`](https://github.com/Scorpion160/enactspace/tree/feature/recruitment-ui-20261101). Le [guide de passation du pôle IT](https://github.com/Scorpion160/enactspace/blob/feature/recruitment-ui-20261101/docs/POLE_IT_HANDOFF.md) donne l’ordre de prise en main. La [fiche de publication du 3 novembre 2026](https://github.com/Scorpion160/enactspace/blob/feature/recruitment-ui-20261101/docs/releases/20261103-web-1.0.25-backend-1.0.23.md) atteste le web 1.0.25 (28), le backend 1.0.23 et le schéma Alembic `20261031_0033`.
+
+La branche `main` contient le code et les procédures de la base historique V1.0.0. Les références ci-dessous décrivent cette base.
+
+## Platform at the V1.0.0 checkpoint
 
 - Flutter `3.44.9` / Dart `3.12.2` for Android, iOS, and web clients.
 - FastAPI on Python 3.12 for the API and background operations.
@@ -36,4 +40,4 @@ Android and iOS are the primary mobile targets; web is a supported build target.
 
 V1 conçue et développée par Chicodev — 2026. Maintenance: Pôle IT — Enactus ESP. The exact Pôle IT GitHub team remains an administrative handoff item; `@Scorpion160` is the current repository fallback owner.
 
-This is a private repository and no public open-source license is currently declared. See [NOTICE](NOTICE.md). GitHub Actions execution, protected-branch policy, organizational ownership mapping, and PR-8 mobile distribution gates must be closed before release as described in the canonical checklist.
+No public open-source license is currently declared. See [NOTICE](NOTICE.md). The checklist on this branch records the original V1.0.0 release gates.
