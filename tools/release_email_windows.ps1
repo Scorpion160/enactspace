@@ -67,7 +67,7 @@ function Get-DartHash([string]$Path) {
     try {
         [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
         $lines = @(& dart format --output=show --summary=none --show=none --language-version=latest --page-width=80 --trailing-commas=automate $Path)
-        if ($LASTEXITCODE -ne 0) { throw "Lecture Dart impossible : $Path" }
+        if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) { throw "Lecture Dart impossible : $Path" }
         Get-TextHash (($lines -join "`n") + "`n")
     }
     finally { [Console]::OutputEncoding = $encoding }
@@ -79,13 +79,18 @@ function Get-PinnedFile([string]$Ref, [string]$Path, [string]$Target, [string]$H
     if ((Get-Hash $Target) -cne $Hash) { throw "Integrite incorrecte : $Path" }
 }
 
-function Assert-Source([string]$Path, [string]$Expected, [string]$Reference) {
+function Assert-Source([string]$Relative, [string]$Expected) {
+    $path = Join-Path $snapshot $Relative
     $normalized = [IO.File]::ReadAllText($Path).Replace("`r`n", "`n")
     if ((Get-TextHash $normalized) -ceq $Expected) { return }
-    if (!$Path.EndsWith('.dart') -or !(Test-Path -LiteralPath $Reference -PathType Leaf) -or
-        (Get-Hash $Reference) -cne $Expected -or (Get-DartHash $Path) -cne (Get-DartHash $Reference)) {
-        throw "Source locale differente de la reference : $Path"
+    if ($Relative.EndsWith('.dart')) {
+        $reference = Join-Path $local ('baseline/' + $Relative)
+        if (!(Test-Path -LiteralPath $reference -PathType Leaf) -or (Get-Hash $reference) -cne $Expected) {
+            Get-PinnedFile $previousSource $Relative $reference $Expected
+        }
+        if ((Get-DartHash $Path) -ceq (Get-DartHash $reference)) { return }
     }
+    throw "Source locale differente de la reference : $Relative"
 }
 
 function Read-Json([string]$Path) {
@@ -162,15 +167,13 @@ function Build-ValidatedWeb {
     foreach ($entry in @($old.files) + @($old.requirements)) {
         if ($entry.path -like 'frontend/*' -or
             $entry.path -in @("$fixtures/recruitment_rubric.json", "$fixtures/recruitment_questionnaire.py")) {
-            Assert-Source (Join-Path $snapshot $entry.path) $entry.sha256 (Join-Path $PreviousValidation ('staging/target/' + $entry.path))
+            Assert-Source $entry.path $entry.sha256
         }
     }
     foreach ($entry in $webPatch) {
-        $reference = Join-Path $local ('baseline/' + $entry.path)
+        Assert-Source $entry.path $entry.before
         Get-PinnedFile $sourceCommit $entry.path (Join-Path $snapshot ('patch/' + $entry.path)) $entry.after
-        Get-PinnedFile $previousSource $entry.path $reference $entry.before
         $destination = Join-Path $snapshot $entry.path
-        Assert-Source $destination $entry.before $reference
         Copy-Item -LiteralPath (Join-Path $snapshot ('patch/' + $entry.path)) -Destination $destination -Force
     }
     foreach ($path in $buildTools.Keys) {
