@@ -34,7 +34,7 @@ void main() {
     test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
-        r"path:\s*'([^']+)'",
+        r"\bGoRoute\(\s*path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
       const expectedRoutes = [

@@ -21,7 +21,7 @@ $api = 'https://api-enactspace.kerunjombor.net'
 $webPatch = @(
     @{ path = 'frontend/lib/app/app_router.dart'; before = '84152e2f3555f4f60f9b7e4bd09f7e06d636fea42abc91cba0f1884d46ba4552'; after = '55db7028cfbaddbc75aab6d4353f68e4cb56e7ca990f4558d9988210d168f7db' },
     @{ path = 'frontend/lib/features/auth/screens/login_screen.dart'; before = '9640ae50902099d8ae6cc01054868821233bc22c7b19b4b9c01b5fa274bef96c'; after = 'eae97a10027f44b5b0e3897a6c1d1f49d5dbe2867e0b1e335163e81f89df2cba' },
-    @{ path = 'frontend/test/ui_final_acceptance_test.dart'; before = 'b365ff3a5f82344bec15bf9e7373fdee1e478f0effd7b56117782104c774a024'; after = '8ca3d150d8ade844e0aa597ee8b0856fced4b0d8d50b68c5cf23a43be62a0054' }
+    @{ path = 'frontend/test/ui_final_acceptance_test.dart'; before = 'b365ff3a5f82344bec15bf9e7373fdee1e478f0effd7b56117782104c774a024'; after = '78a91426b29332101ad07d8a361153e2b3fc693c38dd393a2780eee78dfdff40' }
 )
 $buildTools = [ordered]@{
     'tools/build_web_with_firebase.ps1' = '8fb0982bb33b282a6ea3ec1a2f4a4718dc66cfdddc2694085e641994032abb5c'
@@ -154,8 +154,15 @@ function Build-ValidatedWeb {
         & robocopy.exe (Join-Path $Repository "frontend/$directory") (Join-Path $frontend $directory) /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Host
         if ($LASTEXITCODE -ge 8) { throw "Copie du projet interrompue : $directory" }
     }
-    foreach ($name in @('analysis_options.yaml', 'pubspec.yaml', 'pubspec.lock', '.metadata')) {
-        Copy-Item -LiteralPath (Join-Path $Repository "frontend/$name") -Destination $frontend
+    foreach ($name in @(
+        'analysis_options.yaml', 'pubspec.yaml', 'pubspec.lock', '.metadata',
+        'android/app/src/main/AndroidManifest.xml',
+        'android/app/src/main/kotlin/sn/enactusesp/enactspace/MainActivity.kt',
+        'ios/Runner/Info.plist'
+    )) {
+        $target = Join-Path $frontend $name
+        New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $Repository "frontend/$name") -Destination $target
     }
     $fixtures = 'backend/app/services'
     New-Item -ItemType Directory -Path (Join-Path $snapshot $fixtures) -Force | Out-Null
@@ -172,7 +179,7 @@ function Build-ValidatedWeb {
     }
     foreach ($entry in $webPatch) {
         Assert-Source $entry.path $entry.before
-        Get-PinnedFile $sourceCommit $entry.path (Join-Path $snapshot ('patch/' + $entry.path)) $entry.after
+        Get-PinnedFile $Commit $entry.path (Join-Path $snapshot ('patch/' + $entry.path)) $entry.after
         $destination = Join-Path $snapshot $entry.path
         Copy-Item -LiteralPath (Join-Path $snapshot ('patch/' + $entry.path)) -Destination $destination -Force
     }
