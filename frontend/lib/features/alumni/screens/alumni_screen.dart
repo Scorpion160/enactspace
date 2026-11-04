@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -13,10 +15,12 @@ import '../../projects/models/project_model.dart';
 import '../models/alumni_directory.dart';
 import '../models/alumni_profile_model.dart';
 import '../models/mentorship_model.dart';
+import '../models/individual_mentorship.dart';
 import '../services/alumni_error_message.dart';
 import '../services/alumni_gateway.dart';
 import '../widgets/alumni_avatar.dart';
 import '../widgets/alumni_community_hero.dart';
+import '../widgets/individual_mentorship_form.dart';
 
 class AlumniScreen extends StatefulWidget {
   final AlumniGateway? gateway;
@@ -31,6 +35,18 @@ class _AlumniScreenState extends State<AlumniScreen>
   late final AlumniGateway _gateway;
   late final TabController _tabs;
   int _loadSequence = 0;
+  int _individualLoadSequence = 0;
+  bool _individualLoading = false;
+  String? _individualError;
+  List<IndividualMentorship> _individualRequests = [];
+  final Set<String> _updatingRequests = {};
+  String _individualStatus = 'all';
+
+  IndividualMentorshipGateway? get _individualGateway {
+    final Object gateway = _gateway;
+    return gateway is IndividualMentorshipGateway ? gateway : null;
+  }
+
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -89,6 +105,7 @@ class _AlumniScreenState extends State<AlumniScreen>
         if (!_years.contains(_graduationYear)) _graduationYear = null;
         if (!_domains.containsKey(_domain)) _domain = null;
       });
+      unawaited(_loadIndividualRequests());
     } catch (error) {
       if (!mounted || request != _loadSequence) return;
       setState(() => _error = alumniErrorMessage(error));
@@ -97,6 +114,290 @@ class _AlumniScreenState extends State<AlumniScreen>
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _loadIndividualRequests() async {
+    final gateway = _individualGateway;
+    if (!mounted || gateway == null) return;
+    final sequence = ++_individualLoadSequence;
+    setState(() {
+      _individualLoading = true;
+      _individualError = null;
+    });
+    try {
+      final requests = await gateway.listIndividualRequests();
+      if (!mounted || sequence != _individualLoadSequence) return;
+      setState(() => _individualRequests = requests);
+    } catch (error) {
+      if (!mounted || sequence != _individualLoadSequence) return;
+      setState(() {
+        _individualRequests = [];
+        _individualError = alumniErrorMessage(error);
+      });
+    } finally {
+      if (mounted && sequence == _individualLoadSequence) {
+        setState(() => _individualLoading = false);
+      }
+    }
+  }
+
+  List<AlumniProfileModel> get _individualMentors =>
+      filterAlumniDirectory(
+            profiles: _profiles,
+            membersById: _membersById,
+            availableMentorIds: _availableMentorIds,
+            search: '',
+            mentorsOnly: true,
+          )
+          .where(
+            (profile) =>
+                profile.visibility == 'internal' ||
+                (profile.visibility == 'enacchef_only' &&
+                    _userExperience?.isEnacchef == true),
+          )
+          .toList();
+
+  Future<void> _openIndividualRequest({String? mentorId}) async {
+    final user = _userExperience;
+    final gateway = _individualGateway;
+    if (user == null || !user.isActiveMember || gateway == null) return;
+    final mentors = _individualMentors;
+    if (mentorId != null &&
+        !mentors.any((mentor) => mentor.userId == mentorId)) {
+      _showMentorUnavailable();
+      return;
+    }
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => IndividualMentorshipForm(
+        user: user,
+        mentors: mentors,
+        members: _members
+            .where(
+              (member) =>
+                  member.status == 'active' &&
+                  member.isActive == true &&
+                  member.emailVerified == true &&
+                  const {'enacteur', 'enactrice'}.contains(member.profileType),
+            )
+            .toList(),
+        gateway: gateway,
+        initialMentorId: mentorId,
+      ),
+    );
+    if (created != true || !mounted) return;
+    setState(() => _individualStatus = 'all');
+    await _loadIndividualRequests();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Demande envoyée pour validation.')),
+      );
+    }
+  }
+
+  Future<void> _updateIndividualRequest(
+    IndividualMentorship request,
+    IndividualMentorshipStatus status,
+  ) async {
+    final gateway = _individualGateway;
+    if (gateway == null || _updatingRequests.contains(request.id)) return;
+    if (status == IndividualMentorshipStatus.cancelled) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Annuler ce mentorat ?'),
+          content: Text('${request.mentorName} et ${request.menteeName}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Revenir'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirmer l’annulation'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true ||
+          !mounted ||
+          _updatingRequests.contains(request.id))
+        return;
+    }
+    setState(() => _updatingRequests.add(request.id));
+    try {
+      await gateway.updateIndividualRequest(request.id, status);
+      await _loadIndividualRequests();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(alumniErrorMessage(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _updatingRequests.remove(request.id));
+    }
+  }
+
+  void _showMentorUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ce mentor n’est plus disponible.')),
+    );
+  }
+
+  Widget _buildIndividualMentorships(BuildContext context) {
+    final canCreate = _userExperience?.isActiveMember == true;
+    final canManage = _userExperience?.canManageMembers == true;
+    final requests = _individualRequests.where(
+      (request) =>
+          _individualStatus == 'all' ||
+          request.status.name == _individualStatus,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 14,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Mentorat individuel',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (canCreate)
+              FilledButton.icon(
+                onPressed: _individualMentors.isEmpty
+                    ? null
+                    : _openIndividualRequest,
+                icon: const Icon(Icons.person_add_alt_outlined),
+                label: const Text('Demander un mentorat'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_individualLoading)
+          const _LoadingCard()
+        else if (_individualError != null)
+          _ErrorCard(
+            message: _individualError!,
+            onRetry: _loadIndividualRequests,
+          )
+        else if (_individualRequests.isEmpty)
+          _EmptyCard(
+            message: 'Aucune demande de mentorat individuel.',
+            actionLabel: 'Voir les mentors disponibles',
+            onAction: () {
+              _resetDirectoryFilters(mentorsOnly: true);
+              _tabs.animateTo(0);
+            },
+          )
+        else ...[
+          AppFilterToolbar(
+            collapsible: false,
+            filters: [
+              DropdownButtonFormField<String>(
+                key: ValueKey(_individualStatus),
+                initialValue: _individualStatus,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Statut du mentorat individuel',
+                ),
+                items: [
+                  const DropdownMenuItem(value: 'all', child: Text('Tous')),
+                  for (final status in IndividualMentorshipStatus.values)
+                    DropdownMenuItem(
+                      value: status.name,
+                      child: Text(status.label),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _individualStatus = value);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (requests.isEmpty)
+            _EmptyCard(
+              message: 'Aucun mentorat individuel avec ce statut.',
+              actionLabel: 'Afficher toutes les demandes',
+              onAction: () => setState(() => _individualStatus = 'all'),
+            ),
+          for (final request in requests)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text('Mentor · ${request.mentorName}'),
+                        Text('Mentoré · ${request.menteeName}'),
+                        AppStatusBadge(
+                          label: request.status.label,
+                          tone: switch (request.status) {
+                            IndividualMentorshipStatus.pending =>
+                              AppStatusTone.warning,
+                            IndividualMentorshipStatus.active =>
+                              AppStatusTone.success,
+                            IndividualMentorshipStatus.completed =>
+                              AppStatusTone.info,
+                            IndividualMentorshipStatus.cancelled =>
+                              AppStatusTone.neutral,
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(request.objective),
+                    if (canManage &&
+                        (request.status == IndividualMentorshipStatus.pending ||
+                            request.status ==
+                                IndividualMentorshipStatus.active))
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          TextButton(
+                            onPressed: _updatingRequests.contains(request.id)
+                                ? null
+                                : () => _updateIndividualRequest(
+                                    request,
+                                    IndividualMentorshipStatus.cancelled,
+                                  ),
+                            child: const Text('Annuler'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: _updatingRequests.contains(request.id)
+                                ? null
+                                : () => _updateIndividualRequest(
+                                    request,
+                                    request.status ==
+                                            IndividualMentorshipStatus.pending
+                                        ? IndividualMentorshipStatus.active
+                                        : IndividualMentorshipStatus.completed,
+                                  ),
+                            child: Text(
+                              request.status ==
+                                      IndividualMentorshipStatus.pending
+                                  ? 'Valider'
+                                  : 'Terminer',
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
   }
 
   List<int> get _years =>
@@ -133,26 +434,23 @@ class _AlumniScreenState extends State<AlumniScreen>
   }
 
   Future<void> _openProfile(AlumniProfileModel profile) async {
-    final mentorId = await context.push<String>(
+    final selection = await context.push<AlumniMentorSelection>(
       '/alumni/${profile.id}',
       extra: AlumniProfileRouteArgs(_gateway),
     );
     if (!mounted) return;
     await _loadAlumni();
-    if (!mounted ||
-        mentorId == null ||
-        _error != null ||
-        !_canCreateMentorship) {
-      return;
-    }
+    if (!mounted || selection == null || _error != null) return;
     _tabs.animateTo(1);
-    if (!_availableMentorIds.contains(mentorId)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ce mentor n’est plus disponible.')),
-      );
+    if (!_availableMentorIds.contains(selection.mentorId)) {
+      _showMentorUnavailable();
       return;
     }
-    await _openCreateMentorshipSheet(mentorId: mentorId);
+    if (selection.individual) {
+      await _openIndividualRequest(mentorId: selection.mentorId);
+    } else if (_canCreateMentorship) {
+      await _openCreateMentorshipSheet(mentorId: selection.mentorId);
+    }
   }
 
   Map<String, MemberModel> get _membersById {
@@ -307,11 +605,19 @@ class _AlumniScreenState extends State<AlumniScreen>
                       AlumniCommunityHero(
                         total: _profiles.length,
                         mentors: _availableMentorIds.length,
-                        activeMentorships: _mentorships
-                            .where(
-                              (mentorship) => mentorship.status == 'active',
-                            )
-                            .length,
+                        activeMentorships:
+                            _mentorships
+                                .where(
+                                  (mentorship) => mentorship.status == 'active',
+                                )
+                                .length +
+                            _individualRequests
+                                .where(
+                                  (request) =>
+                                      request.status ==
+                                      IndividualMentorshipStatus.active,
+                                )
+                                .length,
                         onMemories: () => _tabs.animateTo(2),
                         showHeritagePhoto: false,
                         actions: [
@@ -405,13 +711,22 @@ class _AlumniScreenState extends State<AlumniScreen>
                               : null,
                         ),
                       ] else ...[
+                        if (_individualGateway != null) ...[
+                          _buildIndividualMentorships(context),
+                          const SizedBox(height: 22),
+                        ],
                         Wrap(
                           spacing: 14,
                           runSpacing: 8,
                           alignment: WrapAlignment.spaceBetween,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text('Mentorat', style: theme.textTheme.titleLarge),
+                            Text(
+                              _individualGateway == null
+                                  ? 'Mentorat'
+                                  : 'Mentorat de pôles et projets',
+                              style: theme.textTheme.titleLarge,
+                            ),
                             if (_canCreateMentorship)
                               FilledButton.icon(
                                 onPressed: _availableMentorIds.isEmpty

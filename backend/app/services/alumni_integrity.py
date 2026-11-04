@@ -32,9 +32,14 @@ def can_manage_profiles(db, user):
 def is_enacchef(db, user):
     return is_operational(user) and bool(get_user_role_names(db, user.id) & ENACCHEF_ROLES)
 
+def lock_alumni_accounts(db, *user_ids):
+    return {
+        row.id: row for row in db.query(User).filter(User.id.in_(set(user_ids)))
+        .order_by(User.id.asc()).populate_existing().with_for_update().all()
+    }
+
 def lock_people(db, actor_id, target_id):
-    people = {row.id: row for row in db.query(User).filter(User.id.in_({actor_id, target_id}))
-              .order_by(User.id.asc()).populate_existing().with_for_update().all()}
+    people = lock_alumni_accounts(db, actor_id, target_id)
     actor = people.get(actor_id)
     if actor is None:
         raise HTTPException(403, "Compte indisponible.")
@@ -91,3 +96,16 @@ def assert_available_mentor(db, user):
 def assert_mentorship_dates(started_at, ended_at):
     if started_at is not None and ended_at is not None and ended_at < started_at:
         raise HTTPException(422, "La date de fin ne peut pas précéder la date de début.")
+
+
+def can_view_profile(db: Session, user: User, profile: AlumniProfile) -> bool:
+    assert_valid_reader(user)
+    if profile.user_id == user.id or can_manage_profiles(db, user):
+        return True
+    if profile.visibility == "private":
+        return False
+    if profile.visibility == "enacchef_only":
+        return is_enacchef(db, user)
+    if profile.visibility == "alumni_only":
+        return user.status == "alumni"
+    return profile.visibility == "internal"

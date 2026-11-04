@@ -32,7 +32,7 @@ class AcademyQuizPostgreSQLTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        raw_url = os.environ.get("TEST_DATABASE_URL")
+        raw_url = os.environ.get("ACADEMY_TEST_POSTGRESQL_URL") or os.environ.get("TEST_DATABASE_URL")
         if not raw_url:
             raise unittest.SkipTest(
                 "TEST_DATABASE_URL missing: PostgreSQL test not run"

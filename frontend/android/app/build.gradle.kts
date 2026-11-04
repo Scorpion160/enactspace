@@ -5,7 +5,12 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
+    id("com.google.gms.google-services") apply false
+}
+
+val ciWithoutFirebase = providers.gradleProperty("enactspaceCiWithoutFirebase").orNull == "true"
+if (!ciWithoutFirebase) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -86,6 +91,9 @@ tasks.configureEach {
         )
     ) {
         doFirst {
+            if (ciWithoutFirebase) {
+                throw GradleException("Release builds require the Firebase configuration.")
+            }
             if (!releaseSigningConfigured) {
                 throw GradleException(
                     "EXTERNAL_SIGNING_REQUIRED: configure android/key.properties " +

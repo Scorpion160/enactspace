@@ -51,7 +51,7 @@ from app.models.recruitment import (
     Application,
     ApplicationReview,
 )
-from app.models.alumni import AlumniProfile, Mentorship
+from app.models.alumni import AlumniProfile, IndividualMentorship, Mentorship
 from app.models.notification import Notification
 from app.models.email_delivery import EmailDelivery
 from app.models.gamification import EngagementPoint, Badge, UserBadge

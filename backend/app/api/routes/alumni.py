@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.routes.alumni_individual import router as individual_router
 from app.db.database import get_db
 from app.models.alumni import AlumniProfile, Mentorship
 from app.models.user import User
@@ -13,7 +14,7 @@ from app.services.operational_integrity import lock_row
 from app.services.alumni_integrity import (
     is_directory_alumni, is_valid_alumni, assert_valid_reader, can_manage_profiles, is_enacchef,
     lock_people, lock_profile_write, ensure_mentorship_scope,
-    assert_available_mentor, assert_mentorship_dates,
+    assert_available_mentor, assert_mentorship_dates, can_view_profile,
 )
 from app.core.roles import ENACCHEF_ROLES, SECRETARIAT_ROLES
 from app.schemas.alumni import (
@@ -32,6 +33,7 @@ from app.api.deps import (
 
 
 router = APIRouter(prefix="/alumni", tags=["Alumni & Mentorat"])
+router.include_router(individual_router)
 
 
 VALID_ALUMNI_VISIBILITIES = {
@@ -54,19 +56,6 @@ ALUMNI_ENACCHEF_ROLES = ENACCHEF_ROLES
 
 def can_manage_alumni(db: Session, user: User) -> bool:
     return can_manage_profiles(db, user)
-
-
-def can_view_profile(db: Session, user: User, profile: AlumniProfile) -> bool:
-    assert_valid_reader(user)
-    if profile.user_id == user.id or can_manage_alumni(db, user):
-        return True
-    if profile.visibility == "private":
-        return False
-    if profile.visibility == "enacchef_only":
-        return is_enacchef(db, user)
-    if profile.visibility == "alumni_only":
-        return user.status == "alumni"
-    return profile.visibility == "internal"
 
 
 def ensure_profile_access(

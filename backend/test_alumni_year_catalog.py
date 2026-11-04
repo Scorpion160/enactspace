@@ -211,3 +211,38 @@ class AlumniYearPostgresqlTests(unittest.TestCase):
             self.assertEqual(db.query(AlumniProfile).count(),2)
             self.assertFalse(db.query(AlumniProfile).filter_by(user_id=ids[0]).one().available_for_mentoring)
             self.assertEqual(db.query(AlumniProfile).filter_by(user_id=ids[1]).one().graduation_year,2024)
+
+    def test_concurrent_individual_requests_create_one_pair(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        from app.api.routes.alumni_individual import IndividualRequestCreate, create_individual_request
+        from app.models.alumni import IndividualMentorship
+        from app.models.user import User
+
+        with Session(self.engine) as db:
+            mentor = User(first_name="Mentor", last_name="Test", email="mentor@example.test",
+                          password_hash="unused", status="alumni", profile_type="alumni",
+                          is_active=True, email_verified=True)
+            mentee = User(first_name="Membre", last_name="Test", email="mentee@example.test",
+                          password_hash="unused", status="active", profile_type="enacteur",
+                          is_active=True, email_verified=True)
+            db.add_all([mentor, mentee])
+            db.flush()
+            db.add(AlumniProfile(user_id=mentor.id, available_for_mentoring=True))
+            mentor_id, mentee_id = mentor.id, mentee.id
+            db.commit()
+
+        barrier = threading.Barrier(2)
+        payload = IndividualRequestCreate(mentor_id=mentor_id, objective="Préparer un entretien")
+
+        def submit():
+            with Session(self.engine) as db:
+                actor = db.get(User, mentee_id)
+                barrier.wait(timeout=10)
+                return create_individual_request(payload, db, actor).id
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            first, second = [workers.submit(submit) for _ in range(2)]
+            self.assertEqual(first.result(timeout=15), second.result(timeout=15))
+        with Session(self.engine) as db:
+            self.assertEqual(db.query(IndividualMentorship).count(), 1)

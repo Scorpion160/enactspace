@@ -160,9 +160,9 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     }
   }
 
-  void _backToDirectory([String? mentorId]) {
+  void _backToDirectory([AlumniMentorSelection? selection]) {
     if (context.canPop()) {
-      context.pop(mentorId);
+      context.pop(selection);
     } else {
       context.go('/alumni');
     }
@@ -262,10 +262,32 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                                     _user?.isActiveMember == true &&
                                     _user?.isEnacchef == true)
                                   FilledButton.icon(
-                                    onPressed: () =>
-                                        _backToDirectory(profile.userId),
+                                    onPressed: () => _backToDirectory((
+                                      mentorId: profile.userId,
+                                      individual: false,
+                                    )),
                                     icon: const Icon(Icons.handshake_outlined),
                                     label: const Text('Proposer un mentorat'),
+                                  ),
+                                if (widget.fromDirectory &&
+                                    _gateway is IndividualMentorshipGateway &&
+                                    _mentorAvailable &&
+                                    _user?.isActiveMember == true &&
+                                    (profile.visibility == 'internal' ||
+                                        (profile.visibility ==
+                                                'enacchef_only' &&
+                                            _user?.isEnacchef == true)))
+                                  FilledButton.tonalIcon(
+                                    onPressed: () => _backToDirectory((
+                                      mentorId: profile.userId,
+                                      individual: true,
+                                    )),
+                                    icon: const Icon(
+                                      Icons.person_add_alt_outlined,
+                                    ),
+                                    label: const Text(
+                                      'Demander un mentorat individuel',
+                                    ),
                                   ),
                                 if (_canManage)
                                   FilledButton.tonalIcon(

@@ -4,6 +4,7 @@ from datetime import date,timedelta
 from uuid import uuid4
 from app.api.routes import alumni
 from app.models.alumni import AlumniProfile,Mentorship
+from app.models.audit import AuditLog
 from app.models.role import UserRole
 from app.models.user import User
 from app.services.operational_integrity import get_or_create_role
@@ -28,6 +29,95 @@ class AlumniBoundaryTests(governance.GovernanceTests):
             self.assertFalse(user.email_verified)
         self.as_user("a")
         self.call("PATCH", f"alumni/profiles/{self.profile.id}", {"current_company": "Interdit"}, 403)
+
+    def test_individual_requests_keep_participants_and_collective_scopes_separate(self):
+        self.as_user("a")
+        path = "alumni/individual-mentorships"
+        payload = {"mentor_id": str(self.users["mentor"].id), "objective": "  Préparer un entretien.  "}
+        created = self.call("POST", path, payload).json()
+        self.assertEqual(created["objective"], "Préparer un entretien.")
+        self.assertEqual(created["status"], "pending")
+        self.assertEqual(created["mentee_id"], str(self.users["a"].id))
+        self.assertEqual(self.call("POST", path, payload).json()["id"], created["id"])
+        self.call("POST", path, {**payload, "objective": "Autre objectif"}, 409)
+        self.call("POST", path, {**payload, "mentee_id": str(self.users["b"].id)}, 403)
+        self.call("POST", path, {**payload, "objective": " "}, 422)
+        detail = f"{path}/{created['id']}"
+        self.call("PATCH", detail, {"status": "active"}, 403)
+        self.assertEqual(self.call("GET", "alumni/mentorships").json(), [])
+        for actor in ("a", "mentor", "sg"):
+            self.as_user(actor)
+            self.assertEqual(self.call("GET", path).json(), [created])
+        for actor in ("b", "lead"):
+            self.as_user(actor)
+            self.assertEqual(self.call("GET", path).json(), [])
+            self.call("PATCH", detail, {"status": "active"}, 403)
+
+        self.as_user("sg")
+        self.call("PATCH", detail, {"status": "completed"}, 409)
+        self.profile.available_for_mentoring = False
+        self.db.commit()
+        self.call("PATCH", detail, {"status": "active"}, 409)
+        self.profile.available_for_mentoring = True
+        self.db.commit()
+        self.assertEqual(self.call("PATCH", detail, {"status": "active"}).json()["status"], "active")
+        self.profile.available_for_mentoring = False
+        self.db.commit()
+        self.assertEqual(self.call("GET", path).json()[0]["status"], "active")
+        self.assertEqual(self.call("PATCH", detail, {"status": "completed"}).json()["status"], "completed")
+        self.call("PATCH", detail, {"status": "active"}, 409)
+
+    def test_individual_manager_can_select_mentee_and_cancel(self):
+        self.as_user("admin")
+        path = "alumni/individual-mentorships"
+        payload = {"mentor_id": str(self.users["mentor"].id), "mentee_id": str(self.users["a"].id),
+                   "objective": "Préparer un entretien."}
+        for visibility in ("private", "alumni_only", "enacchef_only"):
+            self.profile.visibility = visibility
+            self.db.commit()
+            self.call("POST", path, payload, 409)
+        self.profile.visibility = "internal"
+        self.db.commit()
+        row = self.call("POST", path, payload).json()
+        self.assertEqual(self.call("PATCH", f"{path}/{row['id']}", {"status": "cancelled"}).json()["status"], "cancelled")
+        self.assertNotEqual(self.call("POST", path, payload).json()["id"], row["id"])
+
+    def test_transition_control_repair_uses_audit_and_preserves_restrictions(self):
+        self.as_user("admin")
+        path = f"users/{self.users['a'].id}/alumni-transition"
+        original_alumni = f"users/{self.users['mentor'].id}/alumni-transition"
+        self.assertEqual(self.call("GET", original_alumni).json()["control"]["state"], "unconfirmed")
+        self.call("POST", f"{original_alumni}/repair", code=409)
+        self.assertEqual(self.call("GET", path).json()["control"]["state"], "unconfirmed")
+        self.call("POST", f"{path}/repair", code=409)
+        self.call("POST", f"users/{self.users['a'].id}/make-alumni")
+        initial = self.call("GET", path).json()["control"]
+        self.assertEqual(initial["state"], "linked_visible")
+        self.assertIsNotNone(initial["confirmed_at"])
+        self.db.query(AlumniProfile).filter_by(user_id=self.users["a"].id).delete()
+        self.db.commit()
+        self.assertTrue(self.call("GET", path).json()["control"]["can_repair"])
+
+        self.as_user("sg")
+        self.call("GET", path, code=403)
+        self.call("POST", f"{path}/repair", code=403)
+        self.as_user("tl")
+        repaired = self.call("POST", f"{path}/repair").json()
+        self.assertEqual(repaired["state"], "linked_visible")
+        self.assertNotEqual(initial["profile_id"], repaired["profile_id"])
+        self.assertEqual(self.call("POST", f"{path}/repair").json(), repaired)
+        profile = self.db.query(AlumniProfile).filter_by(user_id=self.users["a"].id).one()
+        self.assertFalse(profile.available_for_mentoring)
+        profile.visibility = "private"
+        self.db.commit()
+        self.assertEqual(self.call("POST", f"{path}/repair").json()["state"], "linked_restricted")
+        self.assertEqual(self.call("GET", path).json()["control"]["visibility"], "private")
+        self.assertEqual(self.db.query(AuditLog).filter_by(action="reparation_fiche_alumni").count(), 1)
+        self.db.refresh(self.users["a"])
+        self.users["a"].profile_type = "enacteur"
+        self.db.commit()
+        self.assertEqual(self.call("GET", path).json()["control"]["state"], "inconsistent_account")
+        self.call("POST", f"{path}/repair", code=409)
 
     def new_mentorship(self,scope=None,code=200):
         return self.call("POST","alumni/mentorships",dict(alumni_id=str(self.users["mentor"].id),

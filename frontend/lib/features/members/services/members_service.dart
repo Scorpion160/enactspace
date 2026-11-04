@@ -151,6 +151,16 @@ class MembersService {
     return Map<String, dynamic>.from(result as Map);
   }
 
+  Future<Map<String, dynamic>> repairAlumniTransition(String memberId) async {
+    final token = await _authService.getToken();
+    final result = await _apiClient.postJson(
+      '/users/$memberId/alumni-transition/repair',
+      token: token,
+      data: {},
+    );
+    return Map<String, dynamic>.from(result as Map);
+  }
+
   Future<MemberModel> makeAlumni(String userId) {
     return _postMemberAction(userId, 'make-alumni');
   }

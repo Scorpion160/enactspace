@@ -38,7 +38,8 @@ jobs:
       EMAIL_ENABLED: "false"
       PUSH_ENABLED: "false"
       DATABASE_URL: sqlite://
-      TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
+      TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1/enactspace_pr2b_test_ci
+      ACADEMY_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1/enactspace_academy_pg_test_ci
       VEILLE_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
     services:
       postgres:
@@ -103,6 +104,10 @@ jobs:
               version = connection.execute(text("SHOW server_version_num")).scalar_one()
           assert str(version).startswith("16"), version
           engine.dispose()
+          academy_url = make_url(os.environ["ACADEMY_TEST_POSTGRESQL_URL"])
+          assert academy_url == url.set(database="enactspace_academy_pg_test_ci")
+          with create_engine(url, isolation_level="AUTOCOMMIT").connect() as connection:
+              connection.exec_driver_sql("CREATE DATABASE enactspace_academy_pg_test_ci")
           PY
 
       - name: Compile backend
@@ -118,7 +123,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261031_0033 (head)"
+          test "$output" = "20261104_0034 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v
@@ -169,4 +174,6 @@ jobs:
           --dart-define=ENACTSPACE_API_URL=https://example.invalid
 
       - name: Build unsigned Android debug APK
+        env:
+          ORG_GRADLE_PROJECT_enactspaceCiWithoutFirebase: "true"
         run: flutter build apk --debug --no-pub

@@ -2,7 +2,7 @@ from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean, Integer
+from sqlalchemy import String, Text, Date, DateTime, ForeignKey, Boolean, Integer, CheckConstraint, Index, text
 from app.db.types import GUID
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -108,3 +108,38 @@ class Mentorship(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class IndividualMentorship(Base):
+    __tablename__ = "individual_mentorships"
+    __table_args__ = (
+        CheckConstraint("mentor_id <> mentee_id", name="ck_individual_distinct_people"),
+        CheckConstraint(
+            "status IN ('pending', 'active', 'completed', 'cancelled')",
+            name="ck_individual_mentorship_status",
+        ),
+        Index(
+            "ux_individual_mentorship_open", "mentor_id", "mentee_id", unique=True,
+            sqlite_where=text("status IN ('pending', 'active')"),
+            postgresql_where=text("status IN ('pending', 'active')"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    mentor_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    mentee_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    objective: Mapped[str] = mapped_column(String(2000))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+    mentor = relationship("User", foreign_keys=[mentor_id])
+    mentee = relationship("User", foreign_keys=[mentee_id])
+
+    @property
+    def mentor_name(self) -> str:
+        return f"{self.mentor.first_name} {self.mentor.last_name}".strip()
+
+    @property
+    def mentee_name(self) -> str:
+        return f"{self.mentee.first_name} {self.mentee.last_name}".strip()
