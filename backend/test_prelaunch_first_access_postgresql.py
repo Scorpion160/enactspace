@@ -3,6 +3,7 @@ import os,threading,unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 from sqlalchemy import create_engine,select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import test_prelaunch_first_access as fixture
@@ -13,11 +14,25 @@ from app.models.user import User
 from app.models.audit import AuditLog
 from app.models.first_access import ActivationChallenge
 
+def prelaunch_postgresql_engine(test_case, *, pool_size):
+    raw_url = os.environ.get("TEST_DATABASE_URL")
+    if not raw_url:
+        raw_url = os.environ.get("DATABASE_URL", "")
+        if not raw_url.startswith("postgresql"):
+            test_case.skipTest("Dedicated PostgreSQL test database required")
+    url = make_url(raw_url)
+    if (
+        url.get_backend_name() != "postgresql"
+        or url.host != "127.0.0.1"
+        or not (url.database or "").startswith("enactspace_pr2b_test_")
+    ):
+        raise RuntimeError("Refusing a non-isolated prelaunch test database")
+    return create_engine(url, pool_size=pool_size, max_overflow=2)
+
+
 class FirstAccessPostgreSQLTests(fixture.FirstAccessTests):
     def make_engine(self):
-        url=os.environ["DATABASE_URL"]
-        assert "enactspace_pr2b_test_" in url and "@127.0.0.1/" in url
-        return create_engine(url,pool_size=6,max_overflow=2)
+        return prelaunch_postgresql_engine(self, pool_size=6)
     def test_concurrent_activation_consumes_code_once(self):
         self.request();barrier=threading.Barrier(2)
         def worker():

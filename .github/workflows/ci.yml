@@ -38,8 +38,8 @@ jobs:
       EMAIL_ENABLED: "false"
       PUSH_ENABLED: "false"
       DATABASE_URL: sqlite://
-      TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1/enactspace_pr2b_test_ci
-      ACADEMY_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1/enactspace_academy_pg_test_ci
+      TEST_DATABASE_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
+      ACADEMY_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_academy_pg_test_ci
       VEILLE_TEST_POSTGRESQL_URL: postgresql+psycopg://pr2b_test:ci-only-disposable-password@127.0.0.1:5432/enactspace_pr2b_test_ci
     services:
       postgres:

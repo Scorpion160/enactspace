@@ -1,7 +1,7 @@
 """Private help authorization and concurrent writes on a disposable PostgreSQL."""
-import os,time,threading,unittest,uuid
+import time,threading,unittest,uuid
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import create_engine,select,text
+from sqlalchemy import select,text
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.user import User
@@ -11,12 +11,11 @@ from app.models.audit import AuditLog
 from app.schemas.product_services import SupportTicketCreate,SupportTicketMessageCreate,SupportTicketManage
 from app.services import help_service as service
 import test_prelaunch_help_boundaries as fixture
+from test_prelaunch_first_access_postgresql import prelaunch_postgresql_engine
 
 class HelpPostgreSQLTests(fixture.HelpBoundariesTests):
     def make_engine(self):
-        url=os.environ["DATABASE_URL"]
-        assert "enactspace_pr2b_test_" in url and "@127.0.0.1/" in url
-        return create_engine(url,pool_size=8,max_overflow=2)
+        return prelaunch_postgresql_engine(self, pool_size=8)
     def wait_blocked(self):
         deadline=time.monotonic()+6
         while time.monotonic()<deadline:
