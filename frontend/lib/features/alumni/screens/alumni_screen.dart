@@ -222,8 +222,9 @@ class _AlumniScreenState extends State<AlumniScreen>
       );
       if (confirmed != true ||
           !mounted ||
-          _updatingRequests.contains(request.id))
+          _updatingRequests.contains(request.id)) {
         return;
+      }
     }
     setState(() => _updatingRequests.add(request.id));
     try {

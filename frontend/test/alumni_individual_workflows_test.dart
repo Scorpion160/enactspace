@@ -9,6 +9,7 @@ import 'package:frontend/features/alumni/services/alumni_gateway.dart';
 import 'package:frontend/features/members/models/member_model.dart';
 import 'package:frontend/features/members/services/members_service.dart';
 import 'package:frontend/features/members/widgets/alumni_transition_dialog.dart';
+import 'package:frontend/shared/ui/app_components.dart';
 
 void main() {
   for (final size in [const Size(360, 900), const Size(1280, 900)]) {
@@ -47,7 +48,13 @@ void main() {
           'member',
           'Préparer un entretien.',
         ));
-        expect(find.text('À valider'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AppStatusBadge),
+            matching: find.text('À valider'),
+          ),
+          findsOneWidget,
+        );
         expect(find.text('Valider'), findsNothing);
         expect(tester.takeException(), isNull);
       });
