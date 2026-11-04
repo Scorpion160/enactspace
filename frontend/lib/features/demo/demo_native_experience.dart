@@ -12,6 +12,7 @@ import '../academy/screens/academy_home_screen.dart';
 import '../academy/screens/academy_path_screen.dart';
 import '../alumni/screens/alumni_profile_detail_screen.dart';
 import '../alumni/screens/alumni_screen.dart';
+import '../alumni/services/alumni_gateway.dart';
 import '../archives/screens/archive_detail_screens.dart';
 import '../archives/screens/archive_minutes_screen.dart';
 import '../archives/screens/archives_center_screen.dart';
@@ -150,6 +151,7 @@ class _DemoNativeExperienceState extends State<DemoNativeExperience> {
         (s) => AlumniProfileDetailScreen(
           profileId: param(s, 'profileId'),
           gateway: r.alumni,
+          fromDirectory: s.extra is AlumniProfileRouteArgs,
         ),
       ),
       route('/projects', (_) => ProjectsPortfolioScreen(gateway: r.projects)),

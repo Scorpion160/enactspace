@@ -166,6 +166,7 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
     def test_upgrade_from_a_0031_schema_preserves_candidate_and_private_cv_reference(self):
         from alembic import command
         from alembic.config import Config
+        from alembic.script import ScriptDirectory
         from app.core.config import settings
         schema = 'recruitment_0031_upgrade_' + uuid.uuid4().hex
         isolated_url = make_url(self.url).update_query_dict({'options': '-csearch_path=' + schema}).render_as_string(hide_password=False)
@@ -174,6 +175,8 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
             connection.execute(text('CREATE SCHEMA ' + schema))
         try:
             config = Config('alembic.ini')
+            head = ScriptDirectory.from_config(config).get_current_head()
+            self.assertIsNotNone(head)
             with patch.object(settings, 'DATABASE_URL', isolated_url):
                 command.upgrade(config, '20261007_0031')
                 with engine.begin() as connection:
@@ -192,7 +195,7 @@ class RecruitmentJuryRacesPostgreSQLTests(TestCase):
                     row = connection.execute(text('SELECT id, status, tracking_code, cv_url, campus_resident FROM applications')).one()
                     self.assertEqual(str(row.id), application_id)
                     self.assertEqual((row.status, row.tracking_code, row.cv_url, row.campus_resident), ('under_review', 'SYNTHETIC-TRACKING-CODE', 'private-cv-reference', None))
-                    self.assertEqual(connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one(), '20261031_0033')
+                    self.assertEqual(connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one(), head)
         finally:
             engine.dispose()
             with self.admin_engine.begin() as connection:

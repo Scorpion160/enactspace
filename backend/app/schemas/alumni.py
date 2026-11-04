@@ -65,6 +65,8 @@ class AlumniProfileRead(BaseModel):
     portfolio_url: Optional[str]
     visibility: str
     display_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     photo_url: Optional[str]
     created_at: datetime
     updated_at: datetime

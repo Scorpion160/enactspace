@@ -222,6 +222,7 @@ void main() {
           '/events',
           '/poles',
           '/projects',
+          '/alumni',
         },
         deniedRoutes: const {'/members', '/impact', '/recruitment'},
       ),

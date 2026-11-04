@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
@@ -33,10 +32,6 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
             database_path = Path(directory) / "product.sqlite3"
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
-            self.assertEqual(
-                ScriptDirectory.from_config(config).get_heads(),
-                ["20261004_0022"],
-            )
 
             def upgrade(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -46,7 +41,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
                 with patch.object(settings, "DATABASE_URL", database_url):
                     command.downgrade(config, revision)
 
-            upgrade("head")
+            upgrade("20261004_0022")
             engine = create_engine(database_url, poolclass=NullPool)
 
             @event.listens_for(engine, "connect")
@@ -126,7 +121,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
                     {"id": notification_id, "user_id": user_id},
                 )
 
-            upgrade("head")
+            upgrade("20261004_0022")
             inspector = inspect(engine)
             self.assertTrue(PRODUCT_TABLES.issubset(inspector.get_table_names()))
             with engine.begin() as connection:
@@ -285,7 +280,7 @@ class SQLiteProductServicesMigrationTests(unittest.TestCase):
                     ).scalar_one(),
                     "Historique",
                 )
-            upgrade("head")
+            upgrade("20261004_0022")
             with engine.connect() as connection:
                 self.assertEqual(
                     connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),

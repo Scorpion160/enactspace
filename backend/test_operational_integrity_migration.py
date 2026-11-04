@@ -45,16 +45,14 @@ class OperationalIntegrityMigrationTests(unittest.TestCase):
             command.downgrade(self.config, revision)
 
     def test_fresh_upgrade_downgrade_reupgrade_and_single_head(self):
-        self.assertEqual(
-            ScriptDirectory.from_config(self.config).get_heads(),
-            ["20261004_0022"],
-        )
+        head = ScriptDirectory.from_config(self.config).get_current_head()
+        self.assertIsNotNone(head)
         self._upgrade("head")
         engine = create_engine(self.url)
         with engine.connect() as connection:
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
-                "20261004_0022",
+                head,
             )
         inspector = inspect(engine)
         self.assertIn(
@@ -154,13 +152,13 @@ class OperationalIntegrityMigrationTests(unittest.TestCase):
             connection.execute(
                 text(
                     "INSERT INTO users "
-                    "(id, first_name, last_name, email, password_hash, profile_type, "
+                    "(id, first_name, last_name, email, username, password_hash, profile_type, "
                     "status, email_verified, is_active, created_at, updated_at) VALUES "
                     "('00000000-0000-0000-0000-000000000001', 'Foo', 'One', "
-                    "'Foo@Example.test', 'unused', 'enacteur', 'active', 1, 1, "
+                    "'Foo@Example.test', 'synthetic.one', 'unused', 'enacteur', 'active', 1, 1, "
                     "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
                     "('00000000-0000-0000-0000-000000000002', 'Foo', 'Two', "
-                    "'foo@example.test', 'unused', 'enacteur', 'active', 1, 1, "
+                    "'foo@example.test', 'synthetic.two', 'unused', 'enacteur', 'active', 1, 1, "
                     "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
                 )
             )

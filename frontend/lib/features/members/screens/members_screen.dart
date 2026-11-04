@@ -3,6 +3,7 @@ import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../widgets/alumni_transition_dialog.dart';
 import '../../../core/academic/esp_academic_catalog.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
@@ -47,6 +48,7 @@ class _MembersScreenState extends State<MembersScreen> {
   bool _loading = true;
   String? _error;
   List<MemberModel> _members = [];
+  List<MemberModel> _transitionMembers = [];
   UserExperience? _userExperience;
   String _search = '';
   String _statusFilter = 'all';
@@ -77,6 +79,20 @@ class _MembersScreenState extends State<MembersScreen> {
           pendingMembers.where((member) => knownIds.add(member.id)),
         );
       }
+      final transitionMembers = user.isAdmin || user.isTeamLeader
+          ? members
+                .where(
+                  (member) =>
+                      member.id != user.id &&
+                      const {
+                        'active',
+                        'alumni',
+                        'inactive',
+                        'suspended',
+                      }.contains(member.status),
+                )
+                .toList()
+          : <MemberModel>[];
       members.removeWhere(
         (member) => !member.visibleInMemberManagement(
           canReviewJoinRequests: user.canReviewJoinRequests,
@@ -89,6 +105,7 @@ class _MembersScreenState extends State<MembersScreen> {
       setState(() {
         _userExperience = user;
         _members = members;
+        _transitionMembers = transitionMembers;
       });
     } catch (e) {
       if (!mounted) return;
@@ -254,6 +271,20 @@ class _MembersScreenState extends State<MembersScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Rôle assigné à ${member.displayName}.')),
       );
+    }
+  }
+
+  Future<void> _openAlumniTransition() async {
+    final profileId = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlumniTransitionDialog(
+        service: _membersService,
+        members: _transitionMembers,
+      ),
+    );
+    if (profileId != null && mounted) {
+      await context.push<void>('/alumni/${Uri.encodeComponent(profileId)}');
     }
   }
 
@@ -518,6 +549,15 @@ class _MembersScreenState extends State<MembersScreen> {
                     onPressed: () => context.go('/members/first-access'),
                     icon: const Icon(Icons.key_outlined),
                     label: const Text('Préparer les premières connexions'),
+                  ),
+                if (canManageLifecycle)
+                  OutlinedButton.icon(
+                    onPressed:
+                        _loading || _error != null || _transitionMembers.isEmpty
+                        ? null
+                        : _openAlumniTransition,
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Contrôler un passage Alumni'),
                   ),
                 SizedBox(height: 18),
                 _SearchAndActions(

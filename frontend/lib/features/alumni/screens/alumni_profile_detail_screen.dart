@@ -5,20 +5,24 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/user_experience.dart';
+import '../../../shared/ui/app_components.dart';
 import '../models/alumni_profile_model.dart';
 import '../../members/screens/members_screen.dart' show EditMemberDialog;
 import '../../members/services/members_service.dart';
 import '../services/alumni_gateway.dart';
 import '../services/alumni_error_message.dart';
+import '../widgets/alumni_avatar.dart';
 
 class AlumniProfileDetailScreen extends StatefulWidget {
   final String profileId;
   final AlumniGateway? gateway;
+  final bool fromDirectory;
 
   const AlumniProfileDetailScreen({
     super.key,
     required this.profileId,
     this.gateway,
+    this.fromDirectory = false,
   });
 
   @override
@@ -32,6 +36,8 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
   UserExperience? _user;
   String? _error;
   bool _loading = true;
+  bool _mentorAvailable = false;
+  int _loadSequence = 0;
 
   @override
   void initState() {
@@ -41,6 +47,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
   }
 
   Future<void> _load() async {
+    final request = ++_loadSequence;
     setState(() {
       _loading = true;
       _error = null;
@@ -50,15 +57,22 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
         _gateway.getProfile(widget.profileId),
         _gateway.loadCenter(),
       ]);
-      if (!mounted) return;
+      if (!mounted || request != _loadSequence) return;
+      final profile = results[0] as AlumniProfileModel;
+      final center = results[1] as AlumniCenterData;
       setState(() {
-        _profile = results[0] as AlumniProfileModel;
-        _user = (results[1] as AlumniCenterData).user;
+        _profile = profile;
+        _user = center.user;
+        _mentorAvailable = center.isMentorAvailable(profile);
       });
     } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      if (mounted && request == _loadSequence) {
+        setState(() => _error = _message(error));
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && request == _loadSequence) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -67,10 +81,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     final profile = _profile;
     return user != null &&
         profile != null &&
-        (profile.userId == user.id ||
-            user.isAdmin ||
-            user.isTeamLeader ||
-            user.isSecretary);
+        (profile.userId == user.id || user.canManageMembers);
   }
 
   Future<void> _edit() async {
@@ -80,7 +91,11 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
       builder: (context) =>
           _AlumniEditDialog(profile: profile, gateway: _gateway),
     );
-    if (updated == true) await _load();
+    if (!mounted || updated != true) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profil enregistré.')));
+    await _load();
   }
 
   Future<void> _editIdentity() async {
@@ -88,11 +103,17 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
       final service = MembersService();
       final member = await service.getMember(_profile!.userId);
       if (!mounted) return;
-      final saved = await showDialog<bool>(context: context,
-        builder: (_) => EditMemberDialog(member: member, membersService: service));
-      if (saved == true) await _load();
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (_) =>
+            EditMemberDialog(member: member, membersService: service),
+      );
+      if (mounted && saved == true) await _load();
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(error))));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
     }
   }
 
@@ -119,7 +140,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     if (confirmed != true) return;
     try {
       await _gateway.deleteProfile(widget.profileId);
-      if (mounted) context.go('/alumni');
+      if (mounted) _backToDirectory();
     } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -139,32 +160,25 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     }
   }
 
+  void _backToDirectory([AlumniMentorSelection? selection]) {
+    if (context.canPop()) {
+      context.pop(selection);
+    } else {
+      context.go('/alumni');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null)
-      return Center(
-        child: _StateCard(message: _error!, onRetry: _load),
-      );
-    final profile = _profile!;
-    final links = <Widget>[
-      if ((profile.linkedinUrl ?? '').trim().isNotEmpty)
-        OutlinedButton.icon(
-          onPressed: () => _openLink(profile.linkedinUrl!),
-          icon: const Icon(Icons.work_outline_rounded),
-          label: const Text('LinkedIn'),
-        ),
-      if ((profile.portfolioUrl ?? '').trim().isNotEmpty)
-        OutlinedButton.icon(
-          onPressed: () => _openLink(profile.portfolioUrl!),
-          icon: const Icon(Icons.language_rounded),
-          label: const Text('Portfolio'),
-        ),
-    ];
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final profile = _profile;
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         children: [
           Center(
             child: ConstrainedBox(
@@ -172,63 +186,151 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 38,
-                        backgroundImage: profile.photoUrl == null
-                            ? null
-                            : NetworkImage(profile.photoUrl!),
-                        child: profile.photoUrl == null
-                            ? const Icon(Icons.person_rounded, size: 38)
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _backToDirectory,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Retour à l’annuaire'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_loading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_error != null || profile == null)
+                    _StateCard(
+                      message: _error ?? 'Profil Alumni indisponible.',
+                      onRetry: _load,
+                    )
+                  else ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              profile.displayName,
-                              style: Theme.of(context).textTheme.headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AlumniAvatar(
+                                  name: profile.displayName,
+                                  photoUrl: profile.photoUrl,
+                                  radius: 32,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        profile.displayName,
+                                        style: theme.textTheme.headlineSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        _value(
+                                          profile.currentPosition,
+                                          fallback: 'Poste non renseigné',
+                                        ),
+                                        style: TextStyle(
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              [profile.currentPosition, profile.currentCompany]
-                                  .whereType<String>()
-                                  .where((v) => v.trim().isNotEmpty)
-                                  .join(' · '),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                AppStatusBadge(label: profile.visibilityLabel),
+                                if (_mentorAvailable)
+                                  const AppStatusBadge(
+                                    label: 'Mentorat disponible',
+                                    tone: AppStatusTone.success,
+                                  ),
+                                if (widget.fromDirectory &&
+                                    _mentorAvailable &&
+                                    _user?.isActiveMember == true &&
+                                    _user?.isEnacchef == true)
+                                  FilledButton.icon(
+                                    onPressed: () => _backToDirectory((
+                                      mentorId: profile.userId,
+                                      individual: false,
+                                    )),
+                                    icon: const Icon(Icons.handshake_outlined),
+                                    label: const Text('Proposer un mentorat'),
+                                  ),
+                                if (widget.fromDirectory &&
+                                    _gateway is IndividualMentorshipGateway &&
+                                    _mentorAvailable &&
+                                    _user?.isActiveMember == true &&
+                                    (profile.visibility == 'internal' ||
+                                        (profile.visibility ==
+                                                'enacchef_only' &&
+                                            _user?.isEnacchef == true)))
+                                  FilledButton.tonalIcon(
+                                    onPressed: () => _backToDirectory((
+                                      mentorId: profile.userId,
+                                      individual: true,
+                                    )),
+                                    icon: const Icon(
+                                      Icons.person_add_alt_outlined,
+                                    ),
+                                    label: const Text(
+                                      'Demander un mentorat individuel',
+                                    ),
+                                  ),
+                                if (_canManage)
+                                  FilledButton.tonalIcon(
+                                    onPressed: _edit,
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Modifier le profil'),
+                                  ),
+                                if (_canManage)
+                                  PopupMenuButton<String>(
+                                    tooltip: 'Autres actions',
+                                    onSelected: (value) {
+                                      if (value == 'identity') {
+                                        _editIdentity();
+                                      } else {
+                                        _delete();
+                                      }
+                                    },
+                                    itemBuilder: (_) => [
+                                      if (_user?.canManageMembers == true)
+                                        const PopupMenuItem(
+                                          value: 'identity',
+                                          child: Text(
+                                            'Identité et coordonnées',
+                                          ),
+                                        ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Supprimer le profil'),
+                                      ),
+                                    ],
+                                  ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                      if (_canManage)
-                        PopupMenuButton<String>(
-                          tooltip: 'Gérer le profil',
-                          onSelected: (value) =>
-                              value == 'edit' ? _edit() : value == 'identity' ? _editIdentity() : _delete(),
-                          itemBuilder: (_) => [
-                            if (_user?.isAdmin == true || _user?.isSecretary == true || _user?.isTeamLeader == true)
-                              const PopupMenuItem(value: 'identity', child: Text('Identité et coordonnées')),
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Modifier'),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Supprimer'),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileSection(
+                      title: 'Repères',
                       child: Wrap(
-                        spacing: 28,
-                        runSpacing: 18,
+                        spacing: 20,
+                        runSpacing: 14,
                         children: [
                           _Datum(
                             'Promotion',
@@ -239,56 +341,111 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                           _Datum('Visibilité', profile.visibilityLabel),
                           _Datum(
                             'Mentorat',
-                            profile.availableForMentoring
-                                ? 'Disponible'
-                                : 'Indisponible',
+                            _mentorAvailable ? 'Disponible' : 'Indisponible',
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+                    _ProfileSection(
+                      title: 'Parcours',
+                      child: Text(
+                        _value(
+                          profile.experienceSummary,
+                          fallback: 'Parcours à compléter.',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileSection(
+                      title: 'Expérience',
+                      child: Wrap(
+                        spacing: 20,
+                        runSpacing: 14,
                         children: [
-                          Text(
-                            'Expérience',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(_value(profile.experienceSummary)),
-                          const SizedBox(height: 18),
-                          Text(
-                            'Compétences',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _skills(
-                              profile.skills,
-                            ).map((value) => Chip(label: Text(value))).toList(),
-                          ),
-                          if (links.isNotEmpty) ...[
-                            const SizedBox(height: 18),
-                            Wrap(spacing: 10, runSpacing: 10, children: links),
-                          ],
+                          _Datum('Entreprise', _value(profile.currentCompany)),
+                          _Datum('Poste', _value(profile.currentPosition)),
                         ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    _ProfileSection(
+                      title: 'Compétences',
+                      child: _ProfileSkills(value: profile.skills),
+                    ),
+                    if ((profile.linkedinUrl ?? '').trim().isNotEmpty ||
+                        (profile.portfolioUrl ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _ProfileSection(
+                        title: 'Liens professionnels',
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            if ((profile.linkedinUrl ?? '').trim().isNotEmpty)
+                              OutlinedButton.icon(
+                                onPressed: () =>
+                                    _openLink(profile.linkedinUrl!),
+                                icon: const Icon(Icons.work_outline_rounded),
+                                label: const Text('LinkedIn'),
+                              ),
+                            if ((profile.portfolioUrl ?? '').trim().isNotEmpty)
+                              OutlinedButton.icon(
+                                onPressed: () =>
+                                    _openLink(profile.portfolioUrl!),
+                                icon: const Icon(Icons.language_rounded),
+                                label: const Text('Portfolio'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileSection extends StatelessWidget {
+  const _ProfileSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    ),
+  );
+}
+
+class _ProfileSkills extends StatelessWidget {
+  const _ProfileSkills({required this.value});
+
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final skills = _skills(value);
+    if (skills.isEmpty) return const Text('Compétences non renseignées.');
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [for (final skill in skills) Chip(label: Text(skill))],
     );
   }
 }
@@ -384,6 +541,8 @@ class _AlumniEditDialogState extends State<_AlumniEditDialog> {
             ]) ...[
               TextField(
                 controller: fields[item.$1],
+                enabled: !submitting,
+                keyboardType: item.$1 == 'year' ? TextInputType.number : null,
                 minLines: item.$1 == 'summary' ? 3 : 1,
                 maxLines: item.$1 == 'summary' ? 5 : 1,
                 decoration: InputDecoration(labelText: item.$2),
@@ -392,6 +551,7 @@ class _AlumniEditDialogState extends State<_AlumniEditDialog> {
             ],
             DropdownButtonFormField<String>(
               initialValue: visibility,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Visibilité'),
               items: const [
                 DropdownMenuItem(value: 'internal', child: Text('Membres')),
@@ -478,8 +638,8 @@ class _StateCard extends StatelessWidget {
   );
 }
 
-String _value(String? value) =>
-    value == null || value.trim().isEmpty ? 'Non renseigné' : value.trim();
+String _value(String? value, {String fallback = 'Non renseigné'}) =>
+    value == null || value.trim().isEmpty ? fallback : value.trim();
 List<String> _skills(String? value) => value == null
     ? const []
     : value

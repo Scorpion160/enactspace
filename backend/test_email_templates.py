@@ -16,10 +16,10 @@ class EmailTemplateSafetyTests(unittest.TestCase):
         self.assertIn('name="viewport"', html)
         self.assertIn("EnactSpace", html)
         self.assertIn("Enactus ESP", html)
-        self.assertIn("#ffc222", html)
-        self.assertIn("#070d0d", html)
+        self.assertIn("#ffca28", html)
+        self.assertIn("#102634", html)
         self.assertNotIn("#176b3a", html)
-        self.assertIn("Ouvrir EnactSpace", html)
+        self.assertIn("Se connecter à EnactSpace", html)
         self.assertNotIn("envoyÃ", html)
         self.assertNotIn("Â·", html)
 

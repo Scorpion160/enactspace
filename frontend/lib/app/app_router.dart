@@ -479,12 +479,18 @@ class AppRouter {
                 routes: [
                   GoRoute(
                     path: ':profileId',
-                    builder: (context, state) => AlumniProfileDetailScreen(
-                      profileId: state.pathParameters['profileId']!,
-                      gateway: state.extra is AlumniGateway
-                          ? state.extra! as AlumniGateway
-                          : null,
-                    ),
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      return AlumniProfileDetailScreen(
+                        profileId: state.pathParameters['profileId']!,
+                        gateway: switch (extra) {
+                          AlumniProfileRouteArgs(:final gateway) => gateway,
+                          AlumniGateway gateway => gateway,
+                          _ => null,
+                        },
+                        fromDirectory: extra is AlumniProfileRouteArgs,
+                      );
+                    },
                   ),
                 ],
               ),

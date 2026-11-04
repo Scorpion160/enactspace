@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Shared visual identity for the real alumni directory and the public demo.
 class AlumniCommunityHero extends StatelessWidget {
@@ -9,12 +10,14 @@ class AlumniCommunityHero extends StatelessWidget {
     required this.activeMentorships,
     required this.onMemories,
     this.actions = const [],
+    this.showHeritagePhoto = true,
   });
   final int total;
   final int mentors;
   final int activeMentorships;
   final VoidCallback onMemories;
   final List<Widget> actions;
+  final bool showHeritagePhoto;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -102,35 +105,13 @@ class AlumniCommunityHero extends StatelessWidget {
           ],
         ),
       );
-      final photo = Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'assets/heritage/world-cup-2022-emotion.jpg',
-            fit: BoxFit.cover,
-            alignment: const Alignment(0, .25),
-            errorBuilder: (_, error, stack) =>
-                const ColoredBox(color: Color(0xFF214C57)),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0xCC092734)],
-              ),
-            ),
-          ),
-          const Positioned(
-            left: 20,
-            right: 20,
-            bottom: 18,
-            child: Text(
-              'Des moments qu’on n’oublie pas.\nPhotothèque Enactus ESP · World Cup 2022',
-              style: TextStyle(color: Colors.white, height: 1.5, fontSize: 12),
-            ),
-          ),
-        ],
+      final theme = Theme.of(context);
+      final mode = theme.brightness == Brightness.dark ? 'sombre' : 'clair';
+      final artwork = Image.asset(
+        'assets/heritage/alumni-generations-$mode.png',
+        fit: BoxFit.contain,
+        alignment: Alignment.bottomRight,
+        excludeFromSemantics: true,
       );
       return ClipRRect(
         borderRadius: BorderRadius.circular(26),
@@ -146,14 +127,31 @@ class AlumniCommunityHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(flex: 3, child: content),
-                      Expanded(flex: 2, child: photo),
+                      Expanded(
+                        flex: 2,
+                        child: showHeritagePhoto
+                            ? const _AlumniMemoriesPhoto()
+                            : artwork,
+                      ),
                     ],
                   ),
                 )
-              : Column(
+              : showHeritagePhoto
+              ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: 190, child: photo),
+                    const SizedBox(height: 190, child: _AlumniMemoriesPhoto()),
+                    content,
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      width: constraints.maxWidth * 0.62,
+                      child: Opacity(opacity: 0.20, child: artwork),
+                    ),
                     content,
                   ],
                 ),
@@ -161,4 +159,103 @@ class AlumniCommunityHero extends StatelessWidget {
       );
     },
   );
+}
+
+class AlumniMemoriesCard extends StatelessWidget {
+  const AlumniMemoriesCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 210, child: _AlumniMemoriesPhoto()),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('World Cup 2022', style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Retrouve les photos et les récits de cette édition dans les Archives.',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        Uri(
+                          path: '/archives',
+                          queryParameters: {'search': 'World Cup 2022'},
+                        ).toString(),
+                      ),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Ouvrir les Archives'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AlumniMemoriesPhoto extends StatelessWidget {
+  const _AlumniMemoriesPhoto();
+
+  @override
+  Widget build(BuildContext context) {
+    final mode = Theme.of(context).brightness == Brightness.dark
+        ? 'sombre'
+        : 'clair';
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/heritage/world-cup-2022-emotion.jpg',
+          fit: BoxFit.cover,
+          alignment: const Alignment(0, .25),
+          excludeFromSemantics: true,
+          errorBuilder: (_, _, _) => ColoredBox(
+            color: const Color(0xFF214C57),
+            child: Image.asset(
+              'assets/heritage/alumni-phototheque-$mode.png',
+              fit: BoxFit.cover,
+              excludeFromSemantics: true,
+            ),
+          ),
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Color(0xE6092734)],
+            ),
+          ),
+        ),
+        const Positioned(
+          left: 20,
+          right: 20,
+          bottom: 18,
+          child: Text(
+            'Des moments qu’on n’oublie pas.\nPhotothèque Enactus ESP · World Cup 2022',
+            style: TextStyle(color: Colors.white, height: 1.5, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
 }

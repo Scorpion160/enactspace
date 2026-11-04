@@ -6,10 +6,12 @@ import 'package:frontend/features/academy/models/academy_models.dart';
 import 'package:frontend/features/academy/screens/academy_course_screen.dart';
 import 'package:frontend/features/academy/screens/academy_home_screen.dart';
 import 'package:frontend/features/academy/services/academy_gateway.dart';
+import 'package:frontend/features/alumni/models/alumni_directory.dart';
 import 'package:frontend/features/alumni/models/alumni_profile_model.dart';
 import 'package:frontend/features/alumni/models/mentorship_model.dart';
 import 'package:frontend/features/alumni/screens/alumni_screen.dart';
 import 'package:frontend/features/alumni/services/alumni_gateway.dart';
+import 'package:frontend/features/alumni/widgets/alumni_community_hero.dart';
 import 'package:frontend/features/gamification/models/gamification_models.dart';
 import 'package:frontend/features/gamification/screens/gamification_screen.dart';
 import 'package:frontend/features/gamification/services/gamification_gateway.dart';
@@ -36,12 +38,95 @@ void main() {
     expect(_mentorship('cancelled').statusLabel, 'Annulé');
   });
 
+  test('Annuaire Alumni combine les filtres et trie par nom puis prénom', () {
+    AlumniProfileModel profile(
+      String id,
+      String firstName,
+      String lastName, {
+      int year = 2024,
+    }) => AlumniProfileModel.fromJson({
+      'id': id,
+      'user_id': id,
+      'first_name': firstName,
+      'last_name': lastName,
+      'display_name': '$firstName $lastName',
+      'graduation_year': year,
+      'current_company': 'Solevia',
+      'domain': 'Énergie',
+      'skills': 'Électronique, Gestion de projet',
+      'available_for_mentoring': true,
+    });
+    final profiles = [
+      profile('z', 'Ada', 'Diop'),
+      profile('b', 'Nafi', 'Ba'),
+      profile('c', 'Aïda', 'Ba'),
+      profile('a', 'Amy', 'Ba', year: 2023),
+    ];
+    const mentorIds = {'z', 'c', 'a'};
+    expect(
+      filterAlumniDirectory(
+        profiles: profiles,
+        membersById: const {},
+        availableMentorIds: mentorIds,
+        search: '',
+        mentorsOnly: false,
+      ).map((item) => item.id),
+      ['c', 'a', 'b', 'z'],
+    );
+    expect(
+      filterAlumniDirectory(
+        profiles: profiles,
+        membersById: const {},
+        availableMentorIds: mentorIds,
+        search: '  ELECTRONIQUE   solevia ',
+        mentorsOnly: true,
+        graduationYear: 2024,
+        domain: 'energie',
+      ).map((item) => item.id),
+      ['c', 'z'],
+    );
+  });
+
   testWidgets('annuaire Alumni utilise le gateway mémoire', (tester) async {
     await tester.pumpWidget(_app(AlumniScreen(gateway: _AlumniFake())));
     await tester.pumpAndSettle();
     expect(find.text('Awa Alumni'), findsOneWidget);
     expect(find.text('Mentorat'), findsWidgets);
     expect(_AlumniFake.networkRequests, 0);
+  });
+
+  testWidgets('Alumni garde des compteurs stables pendant la recherche', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(body: AlumniScreen(gateway: _AlumniFake())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Awa Alumni'), findsOneWidget);
+
+    final input = find.byType(TextField);
+    await tester.ensureVisible(input);
+    await tester.enterText(input, 'profil introuvable');
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Aucun profil ne correspond à cette recherche.'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(AlumniCommunityHero),
+        matching: find.text('1'),
+      ),
+      findsNWidgets(3),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   test('Gamification humanise toutes les sources confirmées', () {
