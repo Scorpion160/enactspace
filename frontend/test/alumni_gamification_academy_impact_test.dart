@@ -11,6 +11,7 @@ import 'package:frontend/features/alumni/models/alumni_profile_model.dart';
 import 'package:frontend/features/alumni/models/mentorship_model.dart';
 import 'package:frontend/features/alumni/screens/alumni_screen.dart';
 import 'package:frontend/features/alumni/services/alumni_gateway.dart';
+import 'package:frontend/features/alumni/widgets/alumni_community_hero.dart';
 import 'package:frontend/features/gamification/models/gamification_models.dart';
 import 'package:frontend/features/gamification/screens/gamification_screen.dart';
 import 'package:frontend/features/gamification/services/gamification_gateway.dart';
@@ -118,7 +119,13 @@ void main() {
       find.text('Aucun profil ne correspond à cette recherche.'),
       findsOneWidget,
     );
-    expect(find.text('1'), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(AlumniCommunityHero),
+        matching: find.text('1'),
+      ),
+      findsNWidgets(3),
+    );
     expect(tester.takeException(), isNull);
   });
 
