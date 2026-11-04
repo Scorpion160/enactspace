@@ -379,7 +379,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
         self.assertLessEqual(db.query(ClubTransaction).filter_by(payment_id=payment_id).count(), 1)
         db.close()
 
-    def _mobile_transaction(self):
+    def _mobile_transaction(self, provider="fake"):
         member_id = self._user()
         db = self.Session()
         fee = Fee(user_id=member_id, type="cotisation", label="Mobile fee", amount=100, amount_paid=0)
@@ -389,7 +389,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
         transaction = MobileMoneyTransaction(
             member_id=member_id,
             finance_item_id=fee.id,
-            provider="fake",
+            provider=provider,
             idempotency_key=f"pr65-{uuid.uuid4()}",
             amount=100,
             currency="XOF",
@@ -397,6 +397,8 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
             metadata_json={"finance_item_ids": [str(fee.id)]},
         )
         db.add(transaction)
+        db.flush()
+        transaction.provider_invoice_token = f"provider-token-{transaction.id}"
         db.commit()
         result = (member_id, transaction.id)
         db.close()
@@ -489,7 +491,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
             db.close()
 
     def test_09_ipn_vs_refresh_creates_one_payment(self):
-        member_id, transaction_id = self._mobile_transaction()
+        member_id, transaction_id = self._mobile_transaction(provider="paydunya")
         provider_event_id = "ipn-refresh"
         provider = self._SuccessfulProvider(transaction_id, provider_event_id)
 
@@ -527,7 +529,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
         self._assert_mobile_money_truth(transaction_id, provider_event_id)
 
     def test_10_refresh_vs_reconcile_creates_one_payment(self):
-        member_id, transaction_id = self._mobile_transaction()
+        member_id, transaction_id = self._mobile_transaction(provider="paydunya")
         admin_id = self._admin()
         provider_event_id = "refresh-reconcile"
         provider = self._SuccessfulProvider(transaction_id, provider_event_id)

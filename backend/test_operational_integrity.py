@@ -599,6 +599,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_rejects_incompatible_user_and_preserves_active_user(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Campaign")
         self.db.add(campaign)
         self.db.flush()
@@ -626,6 +627,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_profile_type_is_operational_and_existing_identity_is_preserved(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Profile conversion")
         core_pole = Pole(name="Existing conversion core", type="core")
         support_pole = Pole(name="Existing conversion support", type="support")

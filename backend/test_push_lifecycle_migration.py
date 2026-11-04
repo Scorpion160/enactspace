@@ -7,18 +7,13 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import settings
 
 
 class PushLifecycleMigrationTests(unittest.TestCase):
-    def test_0005_upgrade_downgrade_reupgrade_and_fresh_head(self):
-        self.assertEqual(
-            ScriptDirectory.from_config(Config("alembic.ini")).get_heads(),
-            ["20261004_0022"],
-        )
+    def test_0005_upgrade_downgrade_reupgrade_and_fresh_historical_revision(self):
         for start_at_0005 in (True, False):
             with self.subTest(start_at_0005=start_at_0005), tempfile.TemporaryDirectory(prefix="pr5_sqlite_") as directory:
                 url = f"sqlite+pysqlite:///{(Path(directory) / 'push.sqlite3').as_posix()}"
@@ -26,7 +21,7 @@ class PushLifecycleMigrationTests(unittest.TestCase):
                 with patch.object(settings, "DATABASE_URL", url):
                     if start_at_0005:
                         command.upgrade(config, "20260906_0005")
-                    command.upgrade(config, "head")
+                    command.upgrade(config, "20261004_0022")
                 engine = create_engine(url)
                 inspector = inspect(engine)
                 self.assertIn("push_deliveries", inspector.get_table_names())

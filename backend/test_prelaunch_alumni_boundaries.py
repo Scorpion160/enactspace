@@ -30,6 +30,41 @@ class AlumniBoundaryTests(governance.GovernanceTests):
         self.as_user("a")
         self.call("PATCH", f"alumni/profiles/{self.profile.id}", {"current_company": "Interdit"}, 403)
 
+    def test_signed_sessions_obey_individual_request_visibility(self):
+        import secrets
+
+        from app.api.deps import get_current_active_validated_user
+        from app.api.routes import auth
+        from app.core.security import hash_password
+
+        self.client.app.include_router(auth.router, prefix="/api")
+        self.client.app.dependency_overrides.pop(get_current_active_validated_user)
+        password = secrets.token_urlsafe(24)
+        password_hash = hash_password(password)
+        identities = ("a", "b", "mentor", "admin")
+        for identity in identities:
+            self.users[identity].password_hash = password_hash
+        self.db.commit()
+
+        headers = {}
+        for identity in identities:
+            login = self.call("POST", "auth/login", {
+                "email": self.users[identity].email, "password": password, "platform": "web",
+            })
+            headers[identity] = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        path = "/api/alumni/individual-mentorships"
+        request = self.client.post(path, headers=headers["a"], json={
+            "mentor_id": str(self.users["mentor"].id), "objective": "Préparer un entretien.",
+        })
+        self.assertEqual(request.status_code, 200, request.text)
+        self.assertIn(self.client.get(path).status_code, {401, 403})
+        for identity in identities:
+            response = self.client.get(path, headers=headers[identity])
+            self.assertEqual(response.status_code, 200, response.text)
+            expected = [] if identity == "b" else [request.json()]
+            self.assertEqual(response.json(), expected)
+
     def test_individual_requests_keep_participants_and_collective_scopes_separate(self):
         self.as_user("a")
         path = "alumni/individual-mentorships"

@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.pool import NullPool
 
@@ -291,8 +290,6 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
             database_path = Path(directory) / "memory.sqlite3"
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
-            heads = ScriptDirectory.from_config(config).get_heads()
-            self.assertEqual(heads, ["20261004_0022"])
 
             def upgrade(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -302,7 +299,7 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
                 with patch.object(settings, "DATABASE_URL", database_url):
                     command.downgrade(config, revision)
 
-            upgrade("head")
+            upgrade("20261004_0022")
             engine = create_engine(database_url, poolclass=NullPool)
             inspector = inspect(engine)
             self.assertTrue(MEMORY_TABLES.issubset(inspector.get_table_names()))
@@ -374,7 +371,7 @@ class SQLiteInstitutionalMemoryMigrationTests(unittest.TestCase):
                     "Legacy award",
                 )
 
-            upgrade("head")
+            upgrade("20261004_0022")
             inspector = inspect(engine)
             self.assertTrue(MEMORY_TABLES.issubset(inspector.get_table_names()))
             with engine.connect() as connection:

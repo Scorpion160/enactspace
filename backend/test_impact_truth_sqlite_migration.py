@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.pool import NullPool
 
@@ -24,8 +23,6 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
             database_path = Path(directory) / "impact.sqlite3"
             database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
             config = Config("alembic.ini")
-            heads = ScriptDirectory.from_config(config).get_heads()
-            self.assertEqual(heads, ["20261004_0022"])
 
             def migrate(revision: str) -> None:
                 with patch.object(settings, "DATABASE_URL", database_url):
@@ -35,7 +32,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
                 with patch.object(settings, "DATABASE_URL", database_url):
                     command.downgrade(config, revision)
 
-            migrate("head")
+            migrate("20261004_0022")
             downgrade("20260902_0002")
 
             engine = create_engine(database_url, poolclass=NullPool)
@@ -120,7 +117,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
                     },
                 )
 
-            migrate("head")
+            migrate("20261004_0022")
             with engine.begin() as connection:
                 record = connection.execute(
                     text(
@@ -223,7 +220,7 @@ class SQLiteImpactTruthMigrationTests(unittest.TestCase):
                 {str(user_claim_id), str(explicit_zero_id)},
             )
 
-            migrate("head")
+            migrate("20261004_0022")
             with engine.connect() as connection:
                 regenerated_rows = connection.execute(
                     text(
