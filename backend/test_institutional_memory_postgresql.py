@@ -228,7 +228,7 @@ class PostgreSQLInstitutionalMemoryTests(unittest.TestCase):
                     member_id=None,
                     event_id=None,
                     validation_status=None,
-                    search="Repère PostgreSQL",
+                    search="repere postgresql",
                     review=False,
                     limit=100,
                     cursor=cursor,

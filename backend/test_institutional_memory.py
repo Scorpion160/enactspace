@@ -41,6 +41,7 @@ from app.models.institutional_memory import (
 from app.models.role import Role, UserRole
 from app.models.stored_file import StoredFile
 from app.models.user import User
+from app.schemas.archive import HistoricalImpactStatisticCreate, HistoricalImpactStatisticUpdate
 from app.schemas.institutional_memory import (
     AwardMemoryCreate,
     CanonicalProjectCreate,
@@ -365,6 +366,73 @@ class InstitutionalMemoryTests(unittest.TestCase):
             )
         self.assertEqual(failure.exception.status_code, 403)
         self.assertEqual(self.db.query(InstitutionalSource).count(), 0)
+
+    def test_timeline_search_folds_accents_and_preserves_private_file_rights(self):
+        stored = StoredFile(
+            original_filename="repere.pdf",
+            stored_filename="repere-test.pdf",
+            file_size=1,
+            storage_path="private/repere-test.pdf",
+            uploaded_by_id=self.user.id,
+            visibility="private",
+        )
+        self.db.add(stored)
+        self.db.flush()
+        source = InstitutionalSource(
+            source_type="file",
+            title="Source interne",
+            file_id=stored.id,
+            visibility="internal",
+            validation_status="VERIFIED",
+        )
+        self.db.add(source)
+        self.db.flush()
+        self.db.add(InstitutionalEvent(
+            title="ÉTÉ à l’Œuvre",
+            event_type="project_milestone",
+            year=2024,
+            source_id=source.id,
+            visibility="internal",
+            validation_status="VERIFIED",
+        ))
+        self.db.commit()
+
+        def page(reader, term):
+            return memory.list_timeline(
+                db=self.db, current_user=reader, search=term, resource_type=None, limit=25,
+            )["items"]
+
+        owner_item, = page(self.user, "ete à l’oeuvre")
+        self.assertEqual(owner_item["source"]["capability"], {
+            "type": "stored_file", "url": f"/api/files/{stored.id}/download",
+        })
+        reader_item, = page(self.member(), "été")
+        self.assertIsNone(reader_item["source"]["capability"])
+        self.assertEqual(page(self.user, "%"), [])
+
+    def test_statistic_correction_keeps_a_minimum_and_records_the_editor(self):
+        created = archives.create_historical_impact_statistic(
+            HistoricalImpactStatisticCreate(
+                metric_key="lives_impacted", label="Vies impactées",
+                value=150000, unit="personnes", source_label="Registre d’origine",
+            ),
+            db=self.db, current_user=self.user,
+        )
+        self.assertTrue(created["minimum"])
+        updated = archives.update_historical_impact_statistic(
+            str(created["id"]), HistoricalImpactStatisticUpdate(value=155000),
+            db=self.db, current_user=self.user,
+        )
+        self.assertTrue(updated["minimum"])
+        self.assertEqual(updated["value"], 155000)
+        self.assertEqual(updated["source_label"], "Registre d’origine")
+        self.assertEqual(
+            self.db.query(AuditLog).filter_by(
+                user_id=self.user.id, entity_id=created["id"],
+                action="correction_statistique_historique",
+            ).count(),
+            1,
+        )
 
     def test_private_source_visibility_attachment_and_curator_access(self):
         private_source = self.source(

@@ -176,6 +176,7 @@ class PR66MemoryHeritageTests(unittest.TestCase):
             memory.list_events(review=True, db=self.db, current_user=self.reader)
 
     def test_timeline_source_capabilities_never_externalize_protected_files(self):
+        other_reader = self._user("Other reader")
         stored_file = StoredFile(
             original_filename="source.pdf",
             stored_filename="source.pdf",
@@ -210,6 +211,12 @@ class PR66MemoryHeritageTests(unittest.TestCase):
             str(file_source.id),
             review=False,
         )
+        other_reader_payload = memory._timeline_source_payload(
+            self.db,
+            other_reader,
+            str(file_source.id),
+            review=False,
+        )
         document_payload = memory._timeline_source_payload(
             self.db,
             self.reader,
@@ -224,7 +231,11 @@ class PR66MemoryHeritageTests(unittest.TestCase):
         )
 
         self.assertEqual(file_payload["label"], "PV institutionnel")
-        self.assertIsNone(file_payload["capability"])
+        self.assertEqual(
+            file_payload["capability"],
+            {"type": "stored_file", "url": f"/api/files/{stored_file.id}/download"},
+        )
+        self.assertIsNone(other_reader_payload["capability"])
         self.assertEqual(
             document_payload["capability"],
             {"type": "document", "url": f"/api/documents/{document.id}"},
@@ -236,7 +247,7 @@ class PR66MemoryHeritageTests(unittest.TestCase):
                 "url": "https://example.test/institutional-source",
             },
         )
-        for payload in (document_payload, external_payload):
+        for payload in (file_payload, document_payload, external_payload):
             capability_url = payload["capability"]["url"].lower()
             self.assertNotIn("?", capability_url)
             self.assertNotIn("token", capability_url)

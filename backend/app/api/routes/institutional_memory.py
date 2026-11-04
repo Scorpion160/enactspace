@@ -1014,9 +1014,8 @@ def _timeline_source_payload(
             ensure_file_access(db, stored_file, current_user)
         except HTTPException:
             pass
-        # Protected file routes require the EnactSpace Bearer credential. Until
-        # an authenticated in-app byte viewer exists, source metadata is safe
-        # but advertising an external-launch capability would be misleading.
+        else:
+            capability = {"type": "stored_file", "url": f"/api/files/{stored_file.id}/download"}
     elif source.document_id:
         visible_document = (
             visible_documents_query(db, current_user)
@@ -1145,6 +1144,34 @@ def _timeline_item_payload(
     }
 
 
+_TIMELINE_ACCENTS = "àâäáãçéèêëîïíôöóõùûüúÿ"
+_TIMELINE_PLAIN = "aaaaaceeeeiiioooouuuuy"
+_TIMELINE_MARKS = "\u0300\u0301\u0302\u0303\u0308\u0327"
+_TIMELINE_TRANSLATION = str.maketrans({
+    **dict(zip(_TIMELINE_ACCENTS, _TIMELINE_PLAIN)),
+    **dict.fromkeys(_TIMELINE_MARKS, ""),
+    "œ": "oe",
+    "æ": "ae",
+})
+
+
+def _timeline_search_text(value):
+    return (value or "").lower().translate(_TIMELINE_TRANSLATION)
+
+
+def _timeline_search_column(column, *, sqlite: bool):
+    if sqlite:
+        return func.enactspace_timeline_search_text(column)
+    folded = func.translate(
+        func.lower(column),
+        _TIMELINE_ACCENTS + _TIMELINE_ACCENTS.upper() + _TIMELINE_MARKS,
+        _TIMELINE_PLAIN * 2,
+    )
+    for ligature, plain in (("œ", "oe"), ("Œ", "oe"), ("æ", "ae"), ("Æ", "ae")):
+        folded = func.replace(folded, ligature, plain)
+    return folded
+
+
 @router.get("/timeline")
 def list_timeline(
     start_year: int | None = None,
@@ -1196,10 +1223,18 @@ def list_timeline(
             raise HTTPException(status_code=403, detail="Le statut demande requiert le mode de revision")
         query = query.where(timeline.c.validation_status == validation_status)
     if search and search.strip():
-        pattern = f"%{search.strip().lower()}%"
-        query = query.where(
-            or_(func.lower(timeline.c.title).like(pattern), func.lower(func.coalesce(timeline.c.summary, "")).like(pattern))
-        )
+        term = _timeline_search_text(search.strip())
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        sqlite = db.get_bind().dialect.name == "sqlite"
+        if sqlite:
+            db.connection().connection.driver_connection.create_function(
+                "enactspace_timeline_search_text", 1, _timeline_search_text, deterministic=True
+            )
+        query = query.where(or_(
+            _timeline_search_column(timeline.c.title, sqlite=sqlite).like(pattern, escape="\\"),
+            _timeline_search_column(func.coalesce(timeline.c.summary, ""), sqlite=sqlite).like(pattern, escape="\\"),
+        ))
     if cursor:
         query = query.where(_timeline_cursor_condition(timeline, cursor))
     query = query.order_by(
