@@ -277,7 +277,8 @@ class UserExperience {
       routes.add('/impact');
     }
 
-    if (user.isAdmin ||
+    if ((user.isActiveMember && user.hasAnyRole({'enacteur', 'enactrice'})) ||
+        user.isAdmin ||
         user.isTeamLeader ||
         user.isSecretary ||
         user.isProjectOrPoleLead) {

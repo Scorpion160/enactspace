@@ -81,6 +81,11 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
 }
 
+configurations.configureEach {
+    // Jitsi supplies placeholder RTSP classes. App video sources use local files or HTTP(S).
+    exclude(group = "androidx.media3", module = "media3-exoplayer-rtsp")
+}
+
 tasks.configureEach {
     if (
         name in setOf(
