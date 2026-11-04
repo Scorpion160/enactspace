@@ -91,6 +91,10 @@ void main() {
     expect(find.text('Fiche liée et visible'), findsOneWidget);
     expect(find.text('Visibilité de la fiche · Membres'), findsOneWidget);
     expect(find.text('Ouvrir la fiche Alumni'), findsOneWidget);
+    expect(find.text('Rôles actuels · Alumni'), findsOneWidget);
+    expect(find.text('Statut du compte · Alumni'), findsOneWidget);
+    expect(find.text('Confirmé le 04/11/2026'), findsOneWidget);
+    expect(find.textContaining('setState()'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
@@ -180,6 +184,7 @@ class _TransitionService extends MembersService {
       'can_repair': false,
       'profile_id': 'linked-profile',
       'visibility': 'internal',
+      'confirmed_at': '2026-11-04T12:00:00',
     };
   }
 }

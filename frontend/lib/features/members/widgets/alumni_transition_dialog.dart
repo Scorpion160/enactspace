@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../models/member_model.dart';
 import '../services/members_service.dart';
@@ -42,9 +43,10 @@ class _AlumniTransitionDialogState extends State<AlumniTransitionDialog> {
     try {
       final control = await widget.service.repairAlumniTransition(id);
       if (mounted) {
-        setState(
-          () => _preview = Future.value({...preview, 'control': control}),
-        );
+        final updatedPreview = Future.value({...preview, 'control': control});
+        setState(() {
+          _preview = updatedPreview;
+        });
       }
     } catch (error) {
       if (mounted) {
@@ -123,7 +125,7 @@ class _AlumniTransitionDialogState extends State<AlumniTransitionDialog> {
   Widget _details(BuildContext context, Map<String, dynamic> preview) {
     final control = preview['control'] as Map<String, dynamic>;
     final state = control['state'];
-    final roles = (preview['roles'] as List).join(', ');
+    final account = MemberModel.fromJson(preview);
     final confirmation = DateTime.tryParse(
       control['confirmed_at']?.toString() ?? '',
     );
@@ -167,11 +169,13 @@ class _AlumniTransitionDialogState extends State<AlumniTransitionDialog> {
         const SizedBox(height: 6),
         Text(explanation),
         const SizedBox(height: 12),
-        Text('Rôles actuels · ${roles.isEmpty ? 'Aucun' : roles}'),
-        Text('Statut du compte · ${preview['status']}'),
+        Text(
+          'Rôles actuels · ${account.roles.isEmpty ? 'Aucun' : account.rolesLabel}',
+        ),
+        Text('Statut du compte · ${account.statusLabel}'),
         if (confirmation != null)
           Text(
-            'Confirmé le ${MaterialLocalizations.of(context).formatMediumDate(confirmation.toLocal())}',
+            'Confirmé le ${DateFormat('dd/MM/yyyy').format(confirmation.toLocal())}',
           ),
         if (visibility != null) Text('Visibilité de la fiche · $visibility'),
         if (_repairError != null)
