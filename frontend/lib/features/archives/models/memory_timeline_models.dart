@@ -201,7 +201,7 @@ class MemoryTimelineFilters {
         poleId: poleId,
         memberId: memberId,
         eventId: eventId,
-        search: search,
+        search: search ?? this.search,
         review: review ?? this.review,
       );
 

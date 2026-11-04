@@ -407,7 +407,8 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
       ArchiveBanner(
         eyebrow: 'ARCHIVES & MÉMOIRE COLLECTIVE',
         title: 'Mémoire Enactus ESP',
-        description: 'Les projets, les rencontres et les moments qui racontent Enactus ESP.',
+        description:
+            'Les projets, les rencontres et les moments qui racontent Enactus ESP.',
         motif: ArchiveMotif.binder,
         actions: Wrap(
           spacing: 8,
@@ -437,6 +438,9 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
       ),
       const SizedBox(height: 12),
       AppFilterToolbar(
+        quickFiltersWidth: _filters.isFiltered && _permissions.canValidate
+            ? 340
+            : null,
         search: TextField(
           key: const Key('archives_search'),
           controller: _search,
@@ -585,8 +589,9 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     if (uri == null ||
         !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Source non accessible')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Source non accessible')));
     }
   }
 }
@@ -626,8 +631,9 @@ class _MemoryTimelineCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               item.title,
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             if (!review && item.summary != null) ...[
               const SizedBox(height: 6),
@@ -752,7 +758,9 @@ class _MemoryEmpty extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  filtered ? 'Aucun repère ne correspond à ces filtres.' : 'Explore l’histoire du club à travers ses projets, ses rencontres et ses moments marquants.',
+                  filtered
+                      ? 'Aucun repère ne correspond à ces filtres.'
+                      : 'Explore l’histoire du club à travers ses projets, ses rencontres et ses moments marquants.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 18,
