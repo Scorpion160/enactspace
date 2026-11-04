@@ -303,7 +303,7 @@ class _AlumniScreenState extends State<AlumniScreen>
                 initialValue: _individualStatus,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Statut du mentorat individuel',
+                  labelText: 'Statut individuel',
                 ),
                 items: [
                   const DropdownMenuItem(value: 'all', child: Text('Tous')),
