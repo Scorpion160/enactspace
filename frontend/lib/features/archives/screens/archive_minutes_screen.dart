@@ -162,6 +162,7 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
   );
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final all = widget.home.media
         .where((m) => m.mediaType == 'minute_enacteur')
         .toList();
@@ -209,15 +210,17 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
             ),
           ),
           quickFilters: [
-            ChoiceChip(
-              label: const Text('Toutes les voix'),
-              selected: theme == null,
-              onSelected: (_) => setState(() => theme = null),
-            ),
-            for (final value in themes)
+            for (final value in <String?>[null, ...themes])
               ChoiceChip(
-                label: Text(value),
+                label: Text(value ?? 'Toutes les voix'),
                 selected: theme == value,
+                labelStyle: theme == value
+                    ? TextStyle(
+                        color: colors.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      )
+                    : null,
+                showCheckmark: true,
                 onSelected: (_) => setState(() => theme = value),
               ),
           ],

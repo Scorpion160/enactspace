@@ -329,7 +329,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
               MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
               0,
             ),
-            sliver: SliverToBoxAdapter(child: _header()),
+            sliver: SliverToBoxAdapter(child: Builder(builder: _header)),
           ),
           if (_loading)
             const SliverFillRemaining(
@@ -401,7 +401,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     ),
   );
 
-  Widget _header() => Column(
+  Widget _header(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       ArchiveBanner(
@@ -471,6 +471,8 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
             FilterChip(
               key: const Key('memory_review_mode'),
               selected: _filters.review,
+              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+              showCheckmark: true,
               onSelected: _setReview,
               label: const Text('Mode révision'),
             ),

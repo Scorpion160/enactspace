@@ -680,6 +680,8 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
             FilterChip(
               label: const Text('Mis en avant'),
               selected: _featured,
+              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+              showCheckmark: true,
               onSelected: (value) => setState(() => _featured = value),
             ),
           ],

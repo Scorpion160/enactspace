@@ -64,6 +64,15 @@ class ArchiveTheme extends StatelessWidget {
             side: BorderSide(color: colors.outlineVariant),
           ),
         ),
+        chipTheme: base.chipTheme.copyWith(
+          selectedColor: colors.primaryContainer,
+          secondarySelectedColor: colors.primaryContainer,
+          secondaryLabelStyle: base.chipTheme.secondaryLabelStyle?.copyWith(
+            color: colors.onPrimaryContainer,
+          ),
+          checkmarkColor: colors.primary,
+          showCheckmark: true,
+        ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFFFC72C),
