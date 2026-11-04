@@ -81,10 +81,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     final profile = _profile;
     return user != null &&
         profile != null &&
-        (profile.userId == user.id ||
-            user.isAdmin ||
-            user.isTeamLeader ||
-            user.isSecretary);
+        (profile.userId == user.id || user.canManageMembers);
   }
 
   Future<void> _edit() async {
@@ -262,6 +259,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                                   ),
                                 if (widget.fromDirectory &&
                                     _mentorAvailable &&
+                                    _user?.isActiveMember == true &&
                                     _user?.isEnacchef == true)
                                   FilledButton.icon(
                                     onPressed: () =>
@@ -286,9 +284,7 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                                       }
                                     },
                                     itemBuilder: (_) => [
-                                      if (_user?.isAdmin == true ||
-                                          _user?.isSecretary == true ||
-                                          _user?.isTeamLeader == true)
+                                      if (_user?.canManageMembers == true)
                                         const PopupMenuItem(
                                           value: 'identity',
                                           child: Text(

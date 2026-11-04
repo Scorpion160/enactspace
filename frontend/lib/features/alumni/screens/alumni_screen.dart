@@ -99,10 +99,9 @@ class _AlumniScreenState extends State<AlumniScreen>
     }
   }
 
-  List<int> get _years => {
-    for (final profile in _profiles)
-      if (profile.graduationYear case final year?) year,
-  }.toList()..sort((left, right) => right.compareTo(left));
+  List<int> get _years =>
+      {for (final profile in _profiles) ?profile.graduationYear}.toList()
+        ..sort((left, right) => right.compareTo(left));
 
   Map<String, String> get _domains {
     final names = <String, String>{};
@@ -187,21 +186,22 @@ class _AlumniScreenState extends State<AlumniScreen>
     if (mounted && created == true) await _loadAlumni();
   }
 
-  bool get _canManageAlumni {
-    final user = _userExperience;
-    return user?.isAdmin == true ||
-        user?.isTeamLeader == true ||
-        user?.isSecretary == true;
-  }
+  bool get _canManageAlumni => _userExperience?.canManageMembers == true;
 
   bool get _canCreateOwnProfile {
     final user = _userExperience;
-    if (user?.isAlumni != true) return false;
-    return !_profiles.any((profile) => profile.userId == user!.id);
+    if (user == null ||
+        user.status != 'alumni' ||
+        user.profileType != 'alumni') {
+      return false;
+    }
+    return !_profiles.any((profile) => profile.userId == user.id);
   }
 
   bool get _canCreateProfile => _canManageAlumni || _canCreateOwnProfile;
-  bool get _canCreateMentorship => _userExperience?.isEnacchef == true;
+  bool get _canCreateMentorship =>
+      _userExperience?.isActiveMember == true &&
+      _userExperience?.isEnacchef == true;
 
   Future<void> _openCreateMentorshipSheet({String? mentorId}) async {
     final created = await showModalBottomSheet<bool>(

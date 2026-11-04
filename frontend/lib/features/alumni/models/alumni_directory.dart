@@ -14,8 +14,9 @@ List<AlumniProfileModel> filterAlumniDirectory({
     search,
   ).split(' ').where((word) => word.isNotEmpty);
   final visible = profiles.where((profile) {
-    if (mentorsOnly && !availableMentorIds.contains(profile.userId))
+    if (mentorsOnly && !availableMentorIds.contains(profile.userId)) {
       return false;
+    }
     if (graduationYear != null && graduationYear != profile.graduationYear) {
       return false;
     }
