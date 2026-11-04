@@ -1,4 +1,5 @@
 import '../../../shared/ui/project_photo_gallery.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -78,9 +79,8 @@ class _ArchiveItemDetailScreenState extends State<ArchiveItemDetailScreen> {
         const SizedBox(height: 8),
         Text(
           item.title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -244,9 +244,8 @@ class _ArchiveItemDetailScreenState extends State<ArchiveItemDetailScreen> {
       _item = await action();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$error')));
       }
     } finally {
       if (mounted) setState(() => _acting = false);
@@ -266,9 +265,8 @@ class _ArchiveItemDetailScreenState extends State<ArchiveItemDetailScreen> {
     final uri = value == null ? null : Uri.tryParse(value);
     if (uri == null || !await launchUrl(uri, webOnlyWindowName: '_blank')) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Lien indisponible.')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Lien indisponible.')));
       }
     }
   }
@@ -348,6 +346,7 @@ class _HistoricalProjectDetailScreenState
   }
 
   Future<void> _load() async {
+    setState(() => _error = null);
     try {
       final project = await _gateway.getHistoricalProject(widget.projectId);
       if (mounted) setState(() => _project = project);
@@ -372,15 +371,19 @@ class _HistoricalProjectDetailScreenState
         const SizedBox(height: 8),
         Text(
           project.name,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
 
         const SizedBox(height: 28),
-        if (project.imageAsset != null) ...[
-          HeritageImage(asset: project.imageAsset!, title: project.name),
-          const SizedBox(height: 20),
+        if (project.imageAsset != null)
+          HeritageImage(asset: project.imageAsset!, title: project.name)
+        else
+          const ArchivePlaceholder(motif: ArchiveMotif.binder),
+        const SizedBox(height: 20),
+        if (project.sourceLabel != null) ...[
+          Text('Source : ${project.sourceLabel}'),
+          const SizedBox(height: 12),
         ],
         if (project.sourceUrl != null)
           DetailSection(
@@ -534,9 +537,8 @@ class _HallOfFameDetailScreenState extends State<HallOfFameDetailScreen> {
         const SizedBox(height: 8),
         Text(
           entry.title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         if (entry.subtitle != null) ...[
           const SizedBox(height: 8),
@@ -622,9 +624,8 @@ class DetailSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 10),
         child,
@@ -691,15 +692,17 @@ class ArchiveDetailLayout extends StatelessWidget {
   final List<Widget> children;
   const ArchiveDetailLayout({super.key, required this.children});
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => ListView(
-      padding: EdgeInsets.symmetric(
-        horizontal: constraints.maxWidth > 980
-            ? (constraints.maxWidth - 920) / 2
-            : 20,
-        vertical: 24,
+  Widget build(BuildContext context) => ArchiveTheme(
+    child: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        padding: EdgeInsets.symmetric(
+          horizontal: constraints.maxWidth > 980
+              ? (constraints.maxWidth - 920) / 2
+              : 20,
+          vertical: 24,
+        ),
+        children: children,
       ),
-      children: children,
     ),
   );
 }
@@ -781,9 +784,8 @@ class _ArchiveCollectionDetailScreenState
         const SizedBox(height: 10),
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 24),
         if (image != null) ...[

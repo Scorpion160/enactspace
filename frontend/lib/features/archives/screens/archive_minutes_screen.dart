@@ -1,9 +1,12 @@
-import '../../../shared/ui/project_photo_gallery.dart';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import 'package:go_router/go_router.dart';
+
+import '../../../core/text/searchable_text.dart';
+import '../../../shared/ui/project_photo_gallery.dart';
 import '../../../shared/ui/reading_blocks.dart';
 import '../models/archive_models.dart';
 import '../services/archives_gateway.dart';
@@ -12,7 +15,15 @@ import 'archive_visuals.dart';
 class ArchiveMinutesScreen extends StatefulWidget {
   final String? minuteId;
   final ArchivesGateway? gateway;
-  const ArchiveMinutesScreen({super.key, this.minuteId, this.gateway});
+  final String? search;
+  final String? theme;
+  const ArchiveMinutesScreen({
+    super.key,
+    this.minuteId,
+    this.gateway,
+    this.search,
+    this.theme,
+  });
   @override
   State<ArchiveMinutesScreen> createState() => _ArchiveMinutesScreenState();
 }
@@ -21,68 +32,106 @@ class _ArchiveMinutesScreenState extends State<ArchiveMinutesScreen> {
   late final ArchivesGateway gateway = widget.gateway ?? ApiArchivesGateway();
   late Future<ArchivesHomeData> home = gateway.loadHome();
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Minute de l’enacteur'),
-      leading: IconButton(
-        tooltip: 'Retour',
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () =>
-            context.canPop() ? context.pop() : context.go('/archives'),
+  Widget build(BuildContext context) => ArchiveTheme(
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('Minute de l’enacteur'),
+        leading: IconButton(
+          tooltip: 'Retour',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/archives'),
+        ),
       ),
-    ),
-    body: FutureBuilder<ArchivesHomeData>(
-      future: home,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: FilledButton.icon(
-              onPressed: () => setState(() => home = gateway.loadHome()),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
+      body: FutureBuilder<ArchivesHomeData>(
+        future: home,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: FilledButton.icon(
+                onPressed: () {
+                  setState(() {
+                    home = gateway.loadHome();
+                  });
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Réessayer'),
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data!;
+          final all = data.media.where(
+            (item) => item.mediaType == 'minute_enacteur',
+          );
+          final minute = all
+              .where((item) => item.id == widget.minuteId)
+              .firstOrNull;
+          final alternatives = all
+              .where(
+                (item) =>
+                    item.id != widget.minuteId &&
+                    _matchesMinute(item, widget.search, widget.theme),
+              )
+              .toList();
+          return LayoutBuilder(
+            builder: (context, constraints) => ListView(
+              key: ValueKey(widget.minuteId),
+              padding: EdgeInsets.symmetric(
+                vertical: 24,
+                horizontal: constraints.maxWidth > 1100
+                    ? (constraints.maxWidth - 1040) / 2
+                    : 16,
+              ),
+              children: [
+                widget.minuteId == null
+                    ? ArchiveMinutesCollection(home: data, gateway: gateway)
+                    : minute == null
+                    ? const Text('Cette Minute n’est pas disponible.')
+                    : ArchiveMinuteReading(
+                        item: minute,
+                        onNext: alternatives.isEmpty
+                            ? null
+                            : () {
+                                final next =
+                                    alternatives[Random().nextInt(
+                                      alternatives.length,
+                                    )];
+                                context.replace(
+                                  _minuteLocation(
+                                    next,
+                                    widget.search,
+                                    widget.theme,
+                                  ),
+                                  extra: gateway,
+                                );
+                              },
+                      ),
+              ],
             ),
           );
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final data = snapshot.data!;
-        final matches = data.media.where((m) => m.id == widget.minuteId);
-        return LayoutBuilder(
-          builder: (context, constraints) => ListView(
-            padding: EdgeInsets.symmetric(
-              vertical: 24,
-              horizontal: constraints.maxWidth > 1100
-                  ? (constraints.maxWidth - 1040) / 2
-                  : 16,
-            ),
-            children: [
-              widget.minuteId == null
-                  ? ArchiveMinutesCollection(home: data, gateway: gateway)
-                  : matches.isEmpty
-                  ? const Text('Cette Minute n’est pas disponible.')
-                  : ArchiveMinuteReading(
-                      item: matches.first,
-                      onNext: () {
-                        final minutes = data.media
-                            .where((m) => m.mediaType == 'minute_enacteur')
-                            .toList();
-                        final next =
-                            minutes[(minutes.indexOf(matches.first) + 1) %
-                                minutes.length];
-                        context.replace(
-                          '/archives/minutes/${next.id}',
-                          extra: gateway,
-                        );
-                      },
-                    ),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     ),
   );
 }
+
+bool _matchesMinute(ArchiveMediaModel item, String? search, String? theme) =>
+    (theme == null || theme == item.theme) &&
+    searchableText(
+      '${item.title} ${item.speaker ?? ''} ${item.theme ?? ''} ${item.description ?? ''} ${item.year ?? ''}',
+    ).contains(searchableText(search ?? ''));
+
+String _minuteLocation(ArchiveMediaModel item, String? search, String? theme) =>
+    Uri(
+      pathSegments: ['', 'archives', 'minutes', item.id],
+      queryParameters: {
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        'theme': ?theme,
+      },
+    ).toString();
 
 class ArchiveMinutesCollection extends StatefulWidget {
   final ArchivesHomeData home;
@@ -98,8 +147,19 @@ class ArchiveMinutesCollection extends StatefulWidget {
 }
 
 class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
-  String search = '';
+  final _search = TextEditingController();
   String? theme;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _open(ArchiveMediaModel item) => context.push(
+    _minuteLocation(item, _search.text, theme),
+    extra: widget.gateway,
+  );
   @override
   Widget build(BuildContext context) {
     final all = widget.home.media
@@ -108,61 +168,41 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
     final themes = all.map((m) => m.theme).whereType<String>().toSet().toList()
       ..sort();
     final visible = all
-        .where(
-          (m) =>
-              (theme == null || m.theme == theme) &&
-              '${m.title} ${m.speaker ?? ''} ${m.theme ?? ''} ${m.description ?? ''} ${m.year ?? ''}'
-                  .toLowerCase()
-                  .contains(search.toLowerCase()),
-        )
+        .where((item) => _matchesMinute(item, _search.text, theme))
         .toList();
+    final filtered = _search.text.trim().isNotEmpty || theme != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(
-          Icons.record_voice_over_rounded,
-          size: 44,
-          color: Theme.of(context).colorScheme.primary,
+        ArchiveBanner(
+          eyebrow: 'MINUTE DE L’ENACTEUR',
+          title: 'Une minute. Une voix. De quoi avancer.',
+          description:
+              'À la fin de nos réunions, un enacteur ou une enactrice prend la parole : une réflexion, un conseil, un bout de son expérience. Ce petit rituel fait vivre les liens et transmet ce qui nous anime, au-delà des projets.',
+          motif: ArchiveMotif.minute,
+          actions: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Chip(label: Text('${all.length} voix à découvrir')),
+              if (filtered) Chip(label: Text('${visible.length} résultat(s)')),
+              FilledButton.icon(
+                onPressed: visible.isEmpty
+                    ? null
+                    : () => _open(visible[Random().nextInt(visible.length)]),
+                icon: const Icon(Icons.shuffle_rounded),
+                label: const Text('Surprends-moi !'),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Une minute. Une voix. De quoi avancer.',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'À la fin de nos réunions, un enacteur ou une enactrice prend la parole : une réflexion, un conseil, un bout de son expérience. Ce petit rituel fait vivre les liens et transmet ce qui nous anime, au-delà des projets.',
-          style: TextStyle(height: 1.6),
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Chip(label: Text('${all.length} voix à découvrir')),
-            FilledButton.icon(
-              onPressed: all.isEmpty
-                  ? null
-                  : () {
-                      final pool = visible.isEmpty ? all : visible;
-                      context.push(
-                        '/archives/minutes/${pool[Random().nextInt(pool.length)].id}',
-                        extra: widget.gateway,
-                      );
-                    },
-              icon: const Icon(Icons.shuffle_rounded),
-              label: const Text('Surprends-moi !'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         AppFilterToolbar(
           search: TextField(
             key: const Key('minute_search'),
-            onChanged: (value) => setState(() => search = value),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'Une personne, un thème, une année…',
               prefixIcon: Icon(Icons.search),
@@ -183,7 +223,11 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
           ],
           filters: const [],
           actions: const [],
-          activeFilterCount: 0,
+          activeFilterCount: filtered ? 1 : 0,
+          onReset: () => setState(() {
+            _search.clear();
+            theme = null;
+          }),
         ),
         const SizedBox(height: 24),
         if (visible.isEmpty)
@@ -233,10 +277,7 @@ class _ArchiveMinutesCollectionState extends State<ArchiveMinutesCollection> {
                       ),
                       const SizedBox(height: 16),
                       TextButton.icon(
-                        onPressed: () => context.push(
-                          '/archives/minutes/${item.id}',
-                          extra: widget.gateway,
-                        ),
+                        onPressed: () => _open(item),
                         icon: const Icon(Icons.auto_stories_outlined),
                         label: const Text('Lire sa Minute'),
                       ),
@@ -280,7 +321,8 @@ class ArchiveMinuteReading extends StatelessWidget {
           ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 10),
-        Text(item.speaker ?? '', style: Theme.of(context).textTheme.titleLarge),
+        if (item.speaker != null)
+          Text(item.speaker!, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 24),
         if (item.imageAsset != null) ...[
           HeritageImage(asset: item.imageAsset!, title: item.title),
@@ -316,7 +358,14 @@ class ArchiveMinuteReading extends StatelessWidget {
           ),
         const SizedBox(height: 24),
         if (item.challenge != null)
-          ReadingBlocks('À toi de jouer\n${item.challenge}'),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: ReadingBlocks('À toi de jouer\n${item.challenge}'),
+          ),
         if (item.editorialNote != null)
           Text(
             item.editorialNote!,
@@ -324,7 +373,9 @@ class ArchiveMinuteReading extends StatelessWidget {
           ),
         const SizedBox(height: 12),
         Text(
-          'Source : ${item.sourceLabel ?? 'Archives Enactus ESP'}',
+          item.sourceLabel == null
+              ? 'Source non renseignée'
+              : 'Source : ${item.sourceLabel}',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 24),

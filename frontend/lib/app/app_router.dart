@@ -576,6 +576,8 @@ class AppRouter {
                         path: ':minuteId',
                         builder: (context, state) => ArchiveMinutesScreen(
                           minuteId: state.pathParameters['minuteId'],
+                          search: state.uri.queryParameters['search'],
+                          theme: state.uri.queryParameters['theme'],
                           gateway: state.extra is ArchivesGateway
                               ? state.extra! as ArchivesGateway
                               : null,

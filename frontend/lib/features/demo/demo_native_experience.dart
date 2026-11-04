@@ -298,6 +298,8 @@ class _DemoNativeExperienceState extends State<DemoNativeExperience> {
         '/archives/minutes/:minuteId',
         (s) => ArchiveMinutesScreen(
           minuteId: param(s, 'minuteId'),
+          search: s.uri.queryParameters['search'],
+          theme: s.uri.queryParameters['theme'],
           gateway: r.archives,
         ),
       ),

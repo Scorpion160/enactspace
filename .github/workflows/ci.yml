@@ -9,6 +9,7 @@ on:
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
       - feature/recruitment-ui-20261101
+      - feature/alumni-refonte-20261104
   push:
     branches:
       - main

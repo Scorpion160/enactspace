@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -783,6 +784,10 @@ def _historical_statistic_has_provenance(
 
 def _historical_statistic_payload(statistic: HistoricalImpactStatistic) -> dict:
     data = HistoricalImpactStatisticRead.model_validate(statistic).model_dump()
+    data["minimum"] = any(
+        initial["metric_key"] == statistic.metric_key and initial.get("minimum", False)
+        for initial in INITIAL_HISTORICAL_STATISTICS
+    )
     provenance_ready = _historical_statistic_has_provenance(statistic)
     data["provenance_ready"] = provenance_ready
     if data["status"] == "validated" and not provenance_ready:
@@ -2229,7 +2234,22 @@ def create_historical_impact_statistic(
         statistic.validated_by_id = current_user.id
         statistic.validated_at = utc_now()
     db.add(statistic)
-    db.commit()
+    try:
+        db.flush()
+        create_audit_log(
+            db,
+            action="creation_statistique_historique",
+            user_id=current_user.id,
+            entity_type="historical_impact_statistic",
+            entity_id=statistic.id,
+            new_value={"metric_key": statistic.metric_key, "status": statistic.status},
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if db.query(HistoricalImpactStatistic.id).filter_by(metric_key=payload.metric_key).first() is None:
+            raise
+        raise HTTPException(status_code=409, detail="Cette statistique historique existe déjà")
     db.refresh(statistic)
     return _historical_statistic_payload(statistic)
 
@@ -2244,12 +2264,14 @@ def update_historical_impact_statistic(
     statistic = (
         db.query(HistoricalImpactStatistic)
         .filter(HistoricalImpactStatistic.id == statistic_id)
+        .with_for_update()
         .first()
     )
     if not statistic:
         statistic = (
             db.query(HistoricalImpactStatistic)
             .filter(HistoricalImpactStatistic.metric_key == statistic_id)
+            .with_for_update()
             .first()
         )
     if not statistic:
@@ -2291,6 +2313,14 @@ def update_historical_impact_statistic(
         statistic.validated_by_id = current_user.id
         statistic.validated_at = utc_now()
     statistic.updated_at = utc_now()
+    create_audit_log(
+        db,
+        action="correction_statistique_historique",
+        user_id=current_user.id,
+        entity_type="historical_impact_statistic",
+        entity_id=statistic.id,
+        new_value={"metric_key": statistic.metric_key, "fields": sorted(data), "status": statistic.status},
+    )
     db.commit()
     db.refresh(statistic)
     return _historical_statistic_payload(statistic)
