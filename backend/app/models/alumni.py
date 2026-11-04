@@ -49,6 +49,14 @@ class AlumniProfile(Base):
     user = relationship("User")
 
     @property
+    def first_name(self) -> str:
+        return self.user.first_name
+
+    @property
+    def last_name(self) -> str:
+        return self.user.last_name
+
+    @property
     def display_name(self) -> str:
         return f"{self.user.first_name} {self.user.last_name}".strip()
 

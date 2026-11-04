@@ -17,6 +17,7 @@ class AlumniCenterData {
   final List<MemberModel> members;
   final List<ProjectModel> projects;
   final List<PoleModel> poles;
+  final Set<String>? availableMentorIds;
 
   const AlumniCenterData({
     required this.user,
@@ -25,7 +26,19 @@ class AlumniCenterData {
     required this.members,
     required this.projects,
     required this.poles,
+    this.availableMentorIds,
   });
+
+  bool isMentorAvailable(AlumniProfileModel profile) =>
+      profile.visibility != 'private' &&
+      (availableMentorIds?.contains(profile.userId) ??
+          profile.availableForMentoring);
+}
+
+class AlumniProfileRouteArgs {
+  const AlumniProfileRouteArgs(this.gateway);
+
+  final AlumniGateway gateway;
 }
 
 abstract class AlumniGateway {
@@ -116,6 +129,8 @@ class ApiAlumniGateway implements AlumniGateway {
         availableForMentoring: mentorsOnly ? true : null,
       ),
       alumniService.getMentorships(status: mentorshipStatus),
+      if (!mentorsOnly)
+        alumniService.getProfiles(search: search, availableForMentoring: true),
     ]);
     final references = await Future.wait<dynamic>([
       if (user.canViewMembersDirectory)
@@ -138,6 +153,11 @@ class ApiAlumniGateway implements AlumniGateway {
       members: references[0] as List<MemberModel>,
       projects: references[1] as List<ProjectModel>,
       poles: references[2] as List<PoleModel>,
+      availableMentorIds: {
+        for (final profile
+            in core[mentorsOnly ? 0 : 2] as List<AlumniProfileModel>)
+          profile.userId,
+      },
     );
   }
 

@@ -45,6 +45,8 @@ class AlumniYearCatalogTests(unittest.TestCase):
             self.assertFalse(profile["available_for_mentoring"])
             self.assertIsNone(profile["graduation_year"])
             self.assertEqual(profile["photo_url"],member.photo_url)
+            self.assertEqual(profile["first_name"], member.first_name)
+            self.assertEqual(profile["last_name"], member.last_name)
             self.assertEqual(self.client.patch("/api/alumni/profiles/"+profile["id"],json={"visibility":"private","skills":"Écoute et organisation."}).status_code,200)
             self.db.expire_all();reconcile_user_lifecycle(self.db,self.db.get(type(member),member.id),"alumni");self.db.commit()
             self.assertEqual(self.db.query(AlumniProfile).filter_by(user_id=member.id).count(),1)

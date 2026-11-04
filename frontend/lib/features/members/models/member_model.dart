@@ -262,12 +262,12 @@ class MemberModel {
   }
 
   static int compareAlphabetically(MemberModel left, MemberModel right) {
-    final leftLast = _alphabeticKey(
+    final leftLast = alphabeticKey(
       left.lastName?.trim().isNotEmpty == true
           ? left.lastName!
           : _fallbackLastName(left.displayName),
     );
-    final rightLast = _alphabeticKey(
+    final rightLast = alphabeticKey(
       right.lastName?.trim().isNotEmpty == true
           ? right.lastName!
           : _fallbackLastName(right.displayName),
@@ -275,12 +275,12 @@ class MemberModel {
     final lastCompare = leftLast.compareTo(rightLast);
     if (lastCompare != 0) return lastCompare;
 
-    final leftFirst = _alphabeticKey(
+    final leftFirst = alphabeticKey(
       left.firstName?.trim().isNotEmpty == true
           ? left.firstName!
           : _fallbackFirstName(left.displayName),
     );
-    final rightFirst = _alphabeticKey(
+    final rightFirst = alphabeticKey(
       right.firstName?.trim().isNotEmpty == true
           ? right.firstName!
           : _fallbackFirstName(right.displayName),
@@ -288,9 +288,9 @@ class MemberModel {
     final firstCompare = leftFirst.compareTo(rightFirst);
     if (firstCompare != 0) return firstCompare;
 
-    final displayCompare = _alphabeticKey(
+    final displayCompare = alphabeticKey(
       left.displayName,
-    ).compareTo(_alphabeticKey(right.displayName));
+    ).compareTo(alphabeticKey(right.displayName));
     if (displayCompare != 0) return displayCompare;
 
     return left.email.toLowerCase().compareTo(right.email.toLowerCase());
@@ -308,7 +308,8 @@ class MemberModel {
     return parts.sublist(0, parts.length - 1).join(' ');
   }
 
-  static String _alphabeticKey(String value) {
+  /// Normalizes the letters used to sort or search names.
+  static String alphabeticKey(String value) {
     var result = value.trim().toLowerCase();
     const replacements = <String, String>{
       'à': 'a',
@@ -338,7 +339,9 @@ class MemberModel {
     replacements.forEach((source, target) {
       result = result.replaceAll(source, target);
     });
-    return result.replaceAll(RegExp(r'\s+'), ' ');
+    return result
+        .replaceAll(RegExp(r'[\u0300-\u036f]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ');
   }
 
   static String _formatPolePosition(String? value) {
