@@ -690,7 +690,7 @@ class _PublicApplicationFlowScreenState
   Widget _documentsStep() => _StepBody(
     introduction: widget.demoMode
         ? 'Essaie de joindre un document pour découvrir cette étape.'
-        : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
+        : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents pour compléter ton dossier.',
     children: [
       AttachmentPickerField(
         label: 'Ton CV',
@@ -716,7 +716,7 @@ class _PublicApplicationFlowScreenState
       Text(
         widget.demoMode
             ? 'Le document restera dans cette démonstration.'
-            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
+            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent masquées pendant la présélection. Les responsables habilités pourront les consulter après le premier filtre et la levée d’anonymat.',
         style: const TextStyle(height: 1.5),
       ),
     ],
