@@ -314,27 +314,32 @@ class _DetailBody extends StatefulWidget {
 
 class _DetailBodyState extends State<_DetailBody> {
   Future<void> _declineAssignment() async {
-    var reason = '';
+    var reason = 'recognition';
     final explanation = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Demander un autre évaluateur'),
-          content: TextField(
-            autofocus: true,
-            maxLength: 500,
-            maxLines: 3,
+          content: DropdownButtonFormField<String>(
+            initialValue: reason,
+            isExpanded: true,
+            itemHeight: null,
             decoration: const InputDecoration(
               labelText: 'Motif du déport',
-              helperText: 'Par exemple, tu penses reconnaître le candidat.',
+              helperText: 'Ne communique pas l’identité de la personne.',
               helperMaxLines: 3,
             ),
-            onChanged: (value) => setDialogState(() => reason = value.trim()),
+            items: const [
+              DropdownMenuItem(value: 'recognition', child: Text('Je pense reconnaître la personne')),
+              DropdownMenuItem(value: 'conflict_of_interest', child: Text('Conflit d’intérêts possible')),
+              DropdownMenuItem(value: 'unavailable', child: Text('Indisponibilité')),
+            ],
+            onChanged: (value) => setDialogState(() => reason = value ?? 'recognition'),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
             FilledButton(
-              onPressed: reason.length < 5 ? null : () => Navigator.pop(context, reason),
+              onPressed: () => Navigator.pop(context, reason),
               child: const Text('Transmettre la demande'),
             ),
           ],

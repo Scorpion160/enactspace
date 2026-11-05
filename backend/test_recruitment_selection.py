@@ -155,7 +155,24 @@ class RecruitmentSelectionTests(TestCase):
         results = self.client.get("/api/recruitment/applications", params={"search": detail["anonymous_code"]})
         self.assertEqual([row["id"] for row in results.json()], [app["id"]])
 
-    def test_answers_and_review_evidence_mask_names_without_accents_and_contact_links(self):
+    def test_dashboard_recent_activity_also_hides_candidate_names_until_the_authorized_reveal(self):
+        from app.api.routes import dashboard
+        self.client.app.include_router(dashboard.router, prefix="/api")
+        campaign, applications, _ = self.prepare()
+        full_name = applications[0]["first_name"] + " " + applications[0]["last_name"]
+        for actor in ("admin", "tl", "sg"):
+            self.as_user(actor)
+            response = self.client.get("/api/dashboard/summary")
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertNotIn(full_name, response.text)
+            self.assertIn("Candidat #", response.text)
+        self.db.refresh(campaign)
+        campaign.screening_published_at = utc_now()
+        self.db.commit()
+        self.post(f"/campaigns/{campaign.id}/selection/reveal")
+        self.assertIn(full_name, self.client.get("/api/dashboard/summary").text)
+
+    def test_answers_are_masked_without_exposing_name_guesses_in_jury_observations(self):
         from app.services.recruitment_selection import redact_candidate_text
         campaign, applications, _ = self.prepare()
         application = self.db.get(Application, UUID(applications[0]["id"]))
@@ -172,11 +189,33 @@ class RecruitmentSelectionTests(TestCase):
         assigned = self.db.query(ApplicationScreeningAssignment).first()
         self.acting = self.db.get(User, assigned.reviewer_id)
         note = assessment()
-        note["ratings"][0]["evidence"] = "Aita propose de travailler en équipe."
+        note["ratings"][0]["evidence"] = "Aita ou Fatou propose de travailler en équipe."
         result = self.post("/reviews", {"application_id": applications[0]["id"], "criteria_assessment": note})
-        self.assertNotIn("Aita", json.dumps(result))
+        # A private identifier must never be tested against text chosen by its author.
+        self.assertEqual(result["criteria_assessment"]["ratings"][0]["evidence"], note["ratings"][0]["evidence"])
+        own = self.client.get(f"/api/recruitment/applications/{application.id}/reviews").json()[0]
+        self.assertEqual(own["criteria_assessment"]["ratings"][0]["evidence"], note["ratings"][0]["evidence"])
+        self.as_user("sg")
+        peer = self.client.get(f"/api/recruitment/applications/{application.id}/reviews").json()[0]
+        self.assertNotIn("Aita", json.dumps(peer))
+        self.assertNotIn("Fatou", json.dumps(peer))
+        self.assertEqual(peer["criteria_assessment"]["ratings"][0]["evidence"], "")
         detail = self.client.get(f"/api/recruitment/applications/{application.id}")
         self.assertNotIn("Aita", detail.text)
+        for field, value in (("motivation", "Aita ou Fatou"), ("public_comment", "Aita ou Fatou"), ("phone", "771234567")):
+            response = self.client.patch(f"/api/recruitment/applications/{application.id}", json={field: value})
+            self.assertEqual(response.status_code, 409, response.text)
+
+    def test_admin_cannot_rewrite_another_juror_observations_during_anonymity(self):
+        campaign, applications, members = self.prepare(jurors=1)
+        self.db.add(RecruitmentJuryMember(campaign_id=campaign.id, user_id=self.users["admin"].id))
+        self.db.commit()
+        self.assign(campaign)
+        note = self.rate(applications[0], reviewer=members[0].user_id)
+        self.as_user("admin")
+        response = self.client.patch(f"/api/recruitment/reviews/{note['id']}", json={"comment": "Aita ou Fatou"})
+        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(self.client.delete(f"/api/recruitment/reviews/{note['id']}").status_code, 403)
 
     def test_first_filter_then_authorized_reveal_unlocks_files_for_authorities_only(self):
         campaign, _, _ = self.prepare(count=0)
@@ -233,7 +272,7 @@ class RecruitmentSelectionTests(TestCase):
         first = self.db.query(ApplicationScreeningAssignment).first()
         self.rate(application, reviewer=first.reviewer_id)
         self.post(f"/applications/{application['id']}/selection/decline", {
-            "reason": "Je pense reconnaître le candidat dans ses réponses.",
+            "reason": "recognition",
         })
         self.assertEqual(self.client.get(f"/api/recruitment/applications/{application['id']}").status_code, 403)
         self.as_user("sg")

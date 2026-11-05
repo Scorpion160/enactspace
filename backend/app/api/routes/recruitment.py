@@ -906,15 +906,17 @@ def anonymous_code(application: Application) -> str:
     return f"Candidat #{str(application.id).replace('-', '')[:12].upper()}"
 
 
-def review_payload(review, application, *, anonymized=False, reviewer_name=None):
+def review_payload(review, *, anonymized=False, reviewer_name=None, viewer_id=None):
     data = ApplicationReviewRead.model_validate(review).model_dump()
     if reviewer_name is not None:
         data["reviewer_name"] = reviewer_name
-    if anonymized:
-        data["comment"] = redact_candidate_text(data.get("comment"), application)
+    # Never test a juror's own guesses against the private candidate identity.
+    # Other authors' free text stays sealed, independently of which names it contains.
+    if anonymized and review.reviewer_id != viewer_id:
+        data["comment"] = "Observations masquées pendant l’évaluation anonyme."
         assessment = data.get("criteria_assessment") or {}
         for rating in assessment.get("ratings", []):
-            rating["evidence"] = redact_candidate_text(rating.get("evidence"), application)
+            rating["evidence"] = ""
     return data
 
 
@@ -962,7 +964,7 @@ def application_payload(
         own_review = next((review for review in stage_reviews if review.reviewer_id == current_user.id), None)
         if uses_blind_selection(campaign, application) and own_review is None and not can_manage_jury(db, current_user):
             data.update(screening_score=None, screening_spread=None, final_score=None)
-        data["my_review"] = review_payload(own_review, application, anonymized=anonymized) if own_review else None
+        data["my_review"] = review_payload(own_review, anonymized=anonymized, viewer_id=current_user.id) if own_review else None
     if include_history and current_user is not None:
         data["history"] = application_history(db, application)
     data["status"] = normalize_application_status(application.status)
@@ -1377,6 +1379,8 @@ def update_application(
     status_changed = False
 
     campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign) and payload.model_fields_set - {"status"}:
+        raise HTTPException(409, "Les réponses et les informations du dossier restent en lecture seule pendant l’anonymat.")
     if uses_blind_selection(campaign, application) and payload.status not in {None, "under_review"}:
         raise HTTPException(409, "Prépare la décision puis publie les résultats de toute la campagne.")
     if payload.status is not None:
@@ -1581,8 +1585,9 @@ def create_or_update_review(
     db.refresh(review)
 
     return review_payload(
-        review, application,
+        review,
         anonymized=uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign),
+        viewer_id=current_user.id,
     )
 
 
@@ -1604,7 +1609,7 @@ def list_application_reviews(
         own_done = any(review.reviewer_id == current_user.id and review.stage == stage for review, _ in rows)
         rows = [(review, actor) for review, actor in rows if review.stage == stage and (own_done or review.reviewer_id == current_user.id)]
     anonymized = uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign)
-    return [review_payload(review, application, anonymized=anonymized, reviewer_name=member_name(actor))
+    return [review_payload(review, anonymized=anonymized, reviewer_name=member_name(actor), viewer_id=current_user.id)
             for review, actor in rows]
 
 
@@ -1633,6 +1638,8 @@ def update_review(
     application = lock_review_application(db, str(review.application_id))
     require_review_assignment(db, current_user, application)
     campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and review.reviewer_id != current_user.id and not identity_is_visible(db, current_user, campaign):
+        raise HTTPException(403, "Pendant l’anonymat, seul l’auteur peut modifier ses observations.")
     if uses_blind_selection(campaign, application) and review.stage != review_stage(campaign, application):
         raise HTTPException(409, "Les évaluations de la présélection sont closes.")
     db.refresh(review)
@@ -1680,8 +1687,9 @@ def update_review(
     db.refresh(review)
 
     return review_payload(
-        review, application,
+        review,
         anonymized=uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign),
+        viewer_id=current_user.id,
     )
 
 
@@ -1709,6 +1717,8 @@ def delete_review(
     application = lock_review_application(db, str(review.application_id))
     require_review_assignment(db, current_user, application)
     campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and review.reviewer_id != current_user.id and not identity_is_visible(db, current_user, campaign):
+        raise HTTPException(403, "Pendant l’anonymat, seul l’auteur peut supprimer ses observations.")
     if uses_blind_selection(campaign, application) and review.stage != review_stage(campaign, application):
         raise HTTPException(409, "Les évaluations de la présélection sont closes.")
 

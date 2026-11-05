@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 import unicodedata
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
@@ -274,7 +275,7 @@ class SelectionPublication(BaseModel):
 
 
 class AssignmentDecline(BaseModel):
-    reason: str = Field(min_length=5, max_length=500)
+    reason: Literal["recognition", "conflict_of_interest", "unavailable"]
 
 
 def _manager_campaign(db, user, campaign_id):
@@ -479,7 +480,7 @@ def register_recruitment_selection(router):
         if row is None:
             raise HTTPException(403, "Ce dossier ne t’est pas attribué.")
         row.declined_at = utc_now()
-        row.decline_reason = redact_candidate_text(payload.reason.strip(), application)
+        row.decline_reason = payload.reason
         db.flush()
         result = distribute_assignments(db, campaign, user)
         create_audit_log(db, "deport_jure_recrutement", user.id, "application", application.id,
