@@ -80,7 +80,7 @@ void main() {
         onInterview: ({required DateTime interviewAt, String? location, String? link, String? jury, String? note}) async {},
       ),
     )));
-    for (final action in ('accept', 'reject', 'waiting-list', 'close', 'interview')) {
+    for (final action in ['accept', 'reject', 'waiting-list', 'close', 'interview']) {
       expect(find.byKey(Key('candidate-action-$action')), findsNothing);
     }
     expect(tester.takeException(), isNull);
