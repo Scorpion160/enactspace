@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'application_status_presentation.dart';
+import 'recruitment_schedule_model.dart';
 
 class ApplicationTrackingModel {
   final String applicationId;
@@ -23,6 +24,7 @@ class ApplicationTrackingModel {
   final String? personalityStatus;
   final DateTime? personalityDueAt;
   final String? screeningResult;
+  final RecruitmentScheduleModel? selectionSchedule;
 
   const ApplicationTrackingModel({
     required this.applicationId,
@@ -46,11 +48,13 @@ class ApplicationTrackingModel {
     this.personalityStatus,
     this.personalityDueAt,
     this.screeningResult,
+    this.selectionSchedule,
   });
 
   factory ApplicationTrackingModel.fromJson(Map<String, dynamic> json) {
     return ApplicationTrackingModel(
       screeningResult: json['screening_result']?.toString(),
+      selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
       applicationId: json['application_id']?.toString() ?? '',
       trackingCode: json['tracking_code']?.toString() ?? '',
       campaignTitle: json['campaign_title']?.toString() ?? 'Recrutement',

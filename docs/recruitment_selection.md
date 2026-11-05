@@ -2,6 +2,23 @@
 
 Les nouvelles campagnes utilisent `blind-selection-v1`. La migration `20261105_0035` applique aussi ce processus aux campagnes actives et aux dossiers encore à étudier. Les résultats déjà communiqués et les entretiens déjà engagés sont conservés. Un ancien nombre de clubs inconnu reste « Non renseigné » ; les nouveaux dossiers doivent le déclarer.
 
+## Calendrier de novembre 2026
+
+Dans le panneau de sélection de la campagne concernée, ouvrir le calendrier, charger le planning de novembre 2026, contrôler les dates et enregistrer. Activer ensuite la campagne lorsqu’elle est prête à être diffusée : sa période contrôle son ouverture et sa clôture. La migration `20261105_0036` ajoute son stockage ; elle ne modifie aucune date historique. Le calendrier enregistré est visible avant la candidature et dans son suivi.
+
+| Étape | Dates à Dakar |
+| --- | --- |
+| Diffusion et ouverture du formulaire | 6 novembre 2026 |
+| Clôture des dépôts | 9 novembre 2026 à la fin de la journée |
+| Étude des dossiers | du 9 au 14 novembre 2026 |
+| Première annonce groupée | 15 novembre 2026, proposition à confirmer avant l’enregistrement |
+| Entretiens | du 16 au 21 novembre 2026 |
+| Résultats finaux | 24 novembre 2026 |
+
+Le 15 est proposé pour informer les dossiers retenus et non retenus ensemble après le tri et avant les entretiens. Les dépôts restent possibles pendant toute la journée du 9 ; leur fermeture est effective le 10 à 00 h, heure de Dakar. Le début du tri le 9 peut donc chevaucher les derniers dépôts.
+
+Le serveur empêche la publication avant la date annoncée et refuse un entretien hors de la période enregistrée. Les dates de publication ouvrent la possibilité de publier : elles ne déclenchent aucun envoi automatique. Les responsables doivent encore vérifier les évaluations et toutes les décisions, puis publier le lot. Le calendrier est figé après la présélection pour conserver les dates communiquées.
+
 ## Parcours candidat
 
 Les critères apparaissent avant le formulaire : DIC3, DESCAF3 (alias DESCFAF3), Master2 et DIT2 sont inéligibles, ainsi qu’un engagement dans au moins trois clubs ou structures étudiantes. Le serveur contrôle ces critères même si le formulaire est contourné.
@@ -39,6 +56,6 @@ Les anciennes actions de décision ou de clôture individuelle sont désactivée
 
 Les résultats sont consultables au même instant pour tout le lot. Tous les mails ont la même date de mise à disposition dans la file existante ; leur arrivée effective dépend de la file d’envoi et des fournisseurs des destinataires. Les messages de refus remercient le candidat sans présenter le résultat comme un jugement sur ses capacités.
 
-L’envoi des e-mails doit être configuré (`EMAIL_ENABLED` et `SMTP_HOST`) et le traitement habituel de la file doit fonctionner. Le panneau affiche les envois terminés, les nouvelles tentatives et les échecs.
+L’envoi des e-mails doit être configuré (`EMAIL_ENABLED` et `SMTP_HOST`) et le traitement habituel de la file doit fonctionner. La redirection générale vers une adresse de test doit être désactivée avant la publication des résultats réels. Le panneau affiche les envois terminés, les nouvelles tentatives et les échecs. Les anciens dossiers sans code reçoivent un code de suivi dans leur mail de résultat.
 
 Après la présélection, programmer les entretiens des dossiers retenus et recueillir leurs évaluations. Les notes d’entretien sont distinctes des notes de dossier. Préparer ensuite acceptation, refus ou liste d’attente et publier ce deuxième lot. La conversion en compte membre exige une acceptation finale publiée.

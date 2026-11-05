@@ -3,6 +3,7 @@ import '../services/recruitment_campaign_tools.dart';
 import 'public/personality_questionnaire_screen.dart';
 
 import 'package:flutter/material.dart';
+import '../widgets/recruitment_schedule.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -432,6 +433,10 @@ class TrackingResultView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ApplicationTimeline(tracking: tracking),
+              if (tracking.selectionSchedule != null && tracking.screeningResult != 'not_shortlisted') ...[
+                const SizedBox(height: 18),
+                RecruitmentScheduleCard(schedule: tracking.selectionSchedule!),
+              ],
               const SizedBox(height: 18),
               _InformationPanel(
                 title: 'Prochaine étape',

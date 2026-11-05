@@ -24,6 +24,7 @@ from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row
 from app.services.recruitment_access import can_manage_jury, eligible_juror, require_campaign_access
 from app.services.recruitment_rubric import VERSION, structured_summary
+from app.schemas.recruitment_schedule import RecruitmentSchedule, NOVEMBER_2026_SCHEDULE
 
 POLICY_VERSION = "blind-selection-v1"
 
@@ -324,14 +325,21 @@ def selection_overview(db, campaign):
         "stage": stage, "rows": rows,
         "minimum": campaign.screening_min_reviews,
         "threshold": campaign.screening_disagreement_threshold,
+        "schedule": campaign.selection_schedule,
     }
     revision = hashlib.sha256(json.dumps(revision_data, sort_keys=True).encode()).hexdigest()
     published_stage = "interview" if campaign.final_published_at else "screening"
     email_counts = dict(db.query(EmailDelivery.status, func.count(EmailDelivery.id)).filter(
         EmailDelivery.dedupe_key.like(f"recruitment-results:{campaign.id}:{published_stage}:%")
     ).group_by(EmailDelivery.status).all())
+    calendar = RecruitmentSchedule.model_validate(campaign.selection_schedule) if campaign.selection_schedule else None
+    result_date = (calendar.screening_results if stage == "screening" else calendar.final_results) if calendar else None
     return {
         "stage": stage, "rows": rows, "revision": revision,
+        "selection_schedule": campaign.selection_schedule,
+        "schedule_template": NOVEMBER_2026_SCHEDULE,
+        "result_available_from": result_date,
+        "can_publish_on_date": result_date is None or utc_now().date() >= result_date,
         "screening_published_at": campaign.screening_published_at,
         "final_published_at": campaign.final_published_at,
         "identities_revealed_at": campaign.identities_revealed_at,
@@ -343,6 +351,7 @@ def selection_overview(db, campaign):
 
 
 def _enqueue_result(db, application, campaign, stage, published_at):
+    from app.api.routes.recruitment import ensure_tracking_code
     from app.services.email_delivery_service import enqueue_email_delivery
     from app.services.email_templates import app_link
     if stage == "screening":
@@ -360,9 +369,10 @@ def _enqueue_result(db, application, campaign, stage, published_at):
             "waiting_list": "Après les entretiens, ta candidature est placée en liste d’attente. L’équipe te contactera si une place se libère.",
         }[application.pending_final_decision]
         title = "Le résultat de ta candidature Enactus ESP"
+    tracking_code = ensure_tracking_code(db, application)
     delivery = enqueue_email_delivery(
         db, recipient_email=application.email, subject=title,
-        text_body=f"Bonjour {application.first_name},\n\n{message}\n\nCode de suivi : {application.tracking_code}\nSuivre ma candidature : {app_link('application-tracking')}\n\nL’équipe Enactus ESP",
+        text_body=f"Bonjour {application.first_name},\n\n{message}\n\nCode de suivi : {tracking_code}\nSuivre ma candidature : {app_link('application-tracking')}\n\nL’équipe Enactus ESP",
         dedupe_key=f"recruitment-results:{campaign.id}:{stage}:{application.id}",
     )
     if delivery is None:
@@ -372,6 +382,20 @@ def _enqueue_result(db, application, campaign, stage, published_at):
 
 
 def register_recruitment_selection(router):
+    @router.post("/campaigns/{campaign_id}/selection/planning")
+    def save_planning(campaign_id: UUID, payload: RecruitmentSchedule, db=Depends(get_db), user=Depends(require_recruitment_access)):
+        campaign = _manager_campaign(db, user, campaign_id)
+        if campaign.screening_published_at or campaign.final_published_at:
+            raise HTTPException(409, "Le calendrier est figé après la publication de la présélection.")
+        campaign.start_date = payload.applications_open
+        campaign.end_date = payload.applications_close
+        campaign.selection_schedule = payload.model_dump(mode="json")
+        campaign.updated_at = utc_now()
+        create_audit_log(db, "planning_recrutement", user.id, "recruitment_campaign", campaign.id,
+                         new_value=campaign.selection_schedule)
+        db.commit()
+        return selection_overview(db, campaign)
+
     @router.get("/campaigns/{campaign_id}/selection")
     def overview(campaign_id: UUID, db=Depends(get_db), user=Depends(require_recruitment_access)):
         campaign = _manager_campaign(db, user, campaign_id)
@@ -425,11 +449,19 @@ def register_recruitment_selection(router):
             return {"published_at": previous, "already_published": True}
         if campaign.is_active and (campaign.end_date is None or campaign.end_date >= utc_now().date()):
             raise HTTPException(409, "Clôture les dépôts de la campagne avant de publier les résultats.")
+        if campaign.selection_schedule:
+            calendar = RecruitmentSchedule.model_validate(campaign.selection_schedule)
+            result_date = calendar.screening_results if payload.stage == "screening" else calendar.final_results
+            if utc_now().date() < result_date:
+                raise HTTPException(409, "La publication de ce lot est prévue à partir du " + result_date.strftime("%d/%m/%Y") + ".")
         report = selection_overview(db, campaign)
         if report["stage"] != payload.stage or report["revision"] != payload.revision:
             raise HTTPException(409, "La sélection a changé. Relis le bilan avant de publier.")
         if not report["rows"] or any(not row["ready"] or not row["decision"] for row in report["rows"]):
             raise HTTPException(409, "Chaque dossier doit avoir ses évaluations et une décision avant la publication.")
+        from app.core.config import settings
+        if settings.EMAIL_RESTRICT_TO_TEST_RECIPIENT:
+            raise HTTPException(409, "Les mails sont redirigés vers une adresse de test. Désactive cette redirection avant de publier pour informer les candidats.")
         applications = db.query(Application).filter(
             Application.id.in_([UUID(row["application_id"]) for row in report["rows"]])
         ).order_by(Application.id).with_for_update().all()

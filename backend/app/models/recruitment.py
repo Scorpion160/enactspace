@@ -41,6 +41,7 @@ class RecruitmentCampaign(Base):
     screening_rubric_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     selection_policy_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    selection_schedule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     screening_min_reviews: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default="2")
     screening_disagreement_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=20, server_default="20")
     screening_published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

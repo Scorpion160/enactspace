@@ -72,9 +72,26 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install LaTeX renderer
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended gnupg
+          sudo python3 - <<'PY'
+          from pathlib import Path
+
+          # Avoid the regional mirror that stalled the renderer download.
+          paths = [Path('/etc/apt/sources.list')]
+          paths += list(Path('/etc/apt/sources.list.d').glob('*.list'))
+          paths += list(Path('/etc/apt/sources.list.d').glob('*.sources'))
+          paths += list(Path('/etc/apt').glob('*mirror*.txt'))
+          for path in paths:
+              if path.is_file():
+                  source = path.read_text()
+                  updated = source.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  updated = updated.replace('https://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  if updated != source:
+                      path.write_text(updated)
+          PY
+          sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 -o Acquire::https::Timeout=30 install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended gnupg
           pdflatex --version | head -n 1
 
       - name: Generate an ephemeral application secret
@@ -125,7 +142,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261105_0035 (head)"
+          test "$output" = "20261105_0036 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v

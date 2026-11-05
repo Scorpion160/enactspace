@@ -1,6 +1,6 @@
 """Eligibility, blind access, fair workloads and atomic candidate results."""
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import TestCase
 from unittest.mock import patch
 from uuid import UUID
@@ -17,6 +17,16 @@ from app.models.recruitment import (
 )
 from app.models.user import User
 from app.services.recruitment_selection import POLICY_VERSION
+from app.api.routes import recruitment as recruitment_routes
+from app.services import recruitment_selection as selection_service
+
+
+NOVEMBER_PLAN = {
+    "applications_open": "2026-11-06", "applications_close": "2026-11-09",
+    "screening_start": "2026-11-09", "screening_end": "2026-11-14",
+    "screening_results": "2026-11-15", "interviews_start": "2026-11-16",
+    "interviews_end": "2026-11-21", "final_results": "2026-11-24",
+}
 
 
 class RecruitmentSelectionTests(TestCase):
@@ -86,6 +96,87 @@ class RecruitmentSelectionTests(TestCase):
         response = self.client.get(f"/api/recruitment/campaigns/{campaign.id}/selection")
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def test_planning_controls_the_submission_window_and_exposes_the_public_dates(self):
+        campaign, _, members = self.prepare(count=0)
+        self.acting = self.db.get(User, members[0].user_id)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN, 403)
+        self.as_user("sg")
+        self.post(f"/campaigns/{campaign.id}/selection/planning", dict(NOVEMBER_PLAN, final_results="2026-11-18"), 422)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        self.db.refresh(campaign)
+        self.assertEqual(campaign.start_date.isoformat(), "2026-11-06")
+        self.assertEqual(campaign.end_date.isoformat(), "2026-11-09")
+        body = self.application_payload(campaign)
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 5, 12)):
+            self.post("/applications", body, 400)
+            timeline = self.client.get("/api/recruitment/campaigns/timeline").json()["campaigns"][0]
+            self.assertEqual(timeline["selection_schedule"], NOVEMBER_PLAN)
+            self.assertEqual(timeline["closes_at"], "2026-11-10T00:00:00Z")
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 6)):
+            self.post("/applications", body)
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 9, 23, 59)):
+            self.post("/applications", dict(body, email="last-day@example.org"))
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 10)):
+            self.post("/applications", dict(body, email="too-late@example.org"), 400)
+        changed = self.client.patch(f"/api/recruitment/campaigns/{campaign.id}", json={"end_date": "2026-11-08"})
+        self.assertEqual(changed.status_code, 409, changed.text)
+
+    def test_first_results_wait_until_the_announced_date_and_mail_supplies_any_missing_code(self):
+        campaign, applications, _ = self.prepare()
+        self.complete_screening(campaign, applications)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        self.post(f"/applications/{applications[0]['id']}/selection-decision", {"stage": "screening", "decision": "not_shortlisted"})
+        application = self.db.get(Application, UUID(applications[0]["id"]))
+        application.tracking_code = None
+        self.db.commit()
+        with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 14, 23, 59)):
+            report = self.report(campaign)
+            self.assertFalse(report["can_publish_on_date"])
+            result = self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "screening", "revision": report["revision"]}, 409)
+            self.assertIn("15/11/2026", result["detail"])
+        with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 15)), patch.object(
+            settings, "EMAIL_ENABLED", True
+        ), patch.object(settings, "SMTP_HOST", "smtp.example.test"):
+            self.assertTrue(self.report(campaign)["can_publish_on_date"])
+            self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "screening", "revision": report["revision"]})
+        self.db.refresh(application)
+        self.assertTrue(application.tracking_code.startswith("ESP-"))
+        delivery = self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).one()
+        self.assertIn("Code de suivi : " + application.tracking_code, delivery.text_body)
+        tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
+        self.assertEqual(tracking["selection_schedule"], NOVEMBER_PLAN)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN, 409)
+
+    def test_interviews_stay_in_the_announced_window_and_final_results_wait_until_november_24(self):
+        campaign, applications, members = self.prepare()
+        self.complete_screening(campaign, applications)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        self.db.refresh(campaign)
+        campaign.screening_published_at = datetime(2026, 11, 15)
+        application = self.db.get(Application, UUID(applications[0]["id"]))
+        application.screening_decision = "shortlisted"
+        self.db.commit()
+        for day, expected in ((15, 422), (22, 422), (16, 200)):
+            self.post(f"/applications/{application.id}/interview", {
+                "interview_at": f"2026-11-{day}T10:00:00Z", "interview_end_at": f"2026-11-{day}T10:30:00Z",
+                "interview_mode": "in_person", "interview_location": "ESP",
+                "jury_member_ids": [str(member.id) for member in members[:2]],
+            }, expected)
+        for member in members[:2]:
+            self.rate(applications[0], reviewer=member.user_id)
+        self.as_user("sg")
+        with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 23)):
+            self.post(f"/applications/{application.id}/selection-decision", {"stage": "interview", "decision": "accepted"})
+            report = self.report(campaign)
+            result = self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]}, 409)
+            self.assertIn("24/11/2026", result["detail"])
+        with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 24)), patch.object(
+            settings, "EMAIL_ENABLED", True
+        ), patch.object(settings, "SMTP_HOST", "smtp.example.test"):
+            self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]})
+        self.db.refresh(application)
+        self.assertEqual(application.status, "accepted")
 
     def test_new_campaign_uses_the_blind_policy(self):
         self.as_user("sg")
@@ -378,6 +469,23 @@ class RecruitmentSelectionTests(TestCase):
                 self.assertEqual(result.status_code, 409, result.text)
         self.db.expire_all()
         self.assertEqual(self.db.get(Application, UUID(application["id"])).status, "under_review")
+        self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+
+    def test_result_publication_refuses_to_redirect_the_cohort_mail_to_a_test_address(self):
+        campaign, applications, _ = self.prepare()
+        self.complete_screening(campaign, applications)
+        self.post(f"/applications/{applications[0]['id']}/selection-decision", {"stage": "screening", "decision": "not_shortlisted"})
+        self.db.refresh(campaign)
+        campaign.is_active = False
+        self.db.commit()
+        report = self.report(campaign)
+        with patch.object(settings, "EMAIL_ENABLED", True), patch.object(settings, "SMTP_HOST", "smtp.example.test"), patch.object(
+            settings, "EMAIL_RESTRICT_TO_TEST_RECIPIENT", True
+        ), patch.object(settings, "EMAIL_TEST_RECIPIENT", "test-recipient@example.org"):
+            result = self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "screening", "revision": report["revision"]}, 409)
+            self.assertIn("redirection", result["detail"])
+        self.db.expire_all()
+        self.assertIsNone(self.db.get(RecruitmentCampaign, campaign.id).screening_published_at)
         self.assertEqual(self.db.query(EmailDelivery).count(), 0)
 
     def test_incomplete_reviews_missing_decisions_and_stale_report_block_publication(self):

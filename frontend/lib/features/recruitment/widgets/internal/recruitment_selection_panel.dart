@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/application_model.dart';
 import '../../services/recruitment_message.dart';
 import '../../services/recruitment_selection_api.dart';
+import '../../models/recruitment_schedule_model.dart';
+import '../recruitment_schedule.dart';
 
 class RecruitmentSelectionPanel extends StatefulWidget {
   final String campaignId;
@@ -75,7 +77,9 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             ? '${result['created']} attribution(s) ajoutée(s). ${result['unfilled']} attribution(s) restent à pourvoir.'
             : action == 'reveal'
                 ? 'L’identité est accessible aux responsables habilités.'
-                : 'Les résultats ont été publiés et les mails ont été préparés pour tout le lot.';
+                : action == 'planning'
+                    ? 'Le calendrier de la campagne a été enregistré.'
+                    : 'Les résultats ont été publiés et les mails ont été préparés pour tout le lot.';
       });
       await _load();
       widget.onChanged();
@@ -117,7 +121,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
     final decided = rows.where((row) => row['decision'] != null).length;
     final screening = report?['stage'] != 'interview';
     final completed = report?['final_published_at'] != null;
-    final canPublish = rows.isNotEmpty && ready == rows.length && decided == rows.length && !completed;
+    final canPublish = rows.isNotEmpty && ready == rows.length && decided == rows.length && !completed && report?['can_publish_on_date'] != false;
     final emails = report?['result_emails'] as Map? ?? const {};
     return Card(
       child: ExpansionTile(
@@ -126,6 +130,13 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
         childrenPadding: const EdgeInsets.all(18),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          RecruitmentScheduleEditor(
+            schedule: RecruitmentScheduleModel.fromJson(report?['selection_schedule']),
+            template: RecruitmentScheduleModel.fromJson(report?['schedule_template']),
+            enabled: !_busy && report != null && report['screening_published_at'] == null,
+            onSave: (value) => _act('planning', value.dates),
+          ),
+          const SizedBox(height: 14),
           const Text('Les décisions préparées restent internes jusqu’à la publication du lot.'),
           const SizedBox(height: 12),
           if (report == null && _error == null) const LinearProgressIndicator(),
@@ -171,6 +182,8 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             ),
           if (!canPublish && !completed)
             const Text('Chaque dossier doit avoir ses évaluations et sa décision. La campagne doit être clôturée avant publication.'),
+          if (report?['can_publish_on_date'] == false)
+            Text('La publication de ce lot sera possible à partir du ${RecruitmentScheduleModel({"date": report!["result_available_from"].toString()}).label("date")}, après validation des dossiers.'),
           if (report?['screening_published_at'] != null && report?['identities_revealed_at'] == null)
             OutlinedButton.icon(
               onPressed: _busy ? null : () => _act('reveal', {}),

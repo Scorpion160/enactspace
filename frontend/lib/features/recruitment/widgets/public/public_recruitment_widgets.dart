@@ -10,6 +10,7 @@ import '../../../../shared/ui/app_back_button.dart';
 import '../../models/application_tracking_model.dart';
 import '../../models/recruitment_campaign_model.dart';
 import 'recruitment_countdown.dart';
+import '../recruitment_schedule.dart';
 
 class PublicRecruitmentShell extends StatelessWidget {
   final Widget child;
@@ -143,6 +144,10 @@ class _CampaignPublicCardState extends State<CampaignPublicCard> {
                   ),
                 ],
               ),
+              if (campaign.selectionSchedule != null) ...[
+                const SizedBox(height: 18),
+                RecruitmentScheduleCard(schedule: campaign.selectionSchedule!),
+              ],
               const SizedBox(height: 22),
               Semantics(
                 button: true,

@@ -427,6 +427,7 @@ def public_campaign_timeline(db: Session = Depends(get_db)):
         {"id": str(row.id), "title": row.title, "description": row.description,
          "start_date": row.start_date, "end_date": row.end_date, "is_active": True,
          "eligibility_required": uses_blind_selection(row),
+         "selection_schedule": row.selection_schedule,
          "application_questions": effective_questions(row.application_questions),
          "questionnaire_version": questionnaire_version(effective_questions(row.application_questions)),
          "opens_at": datetime.combine(row.start_date, datetime.min.time()).isoformat() + "Z" if row.start_date else None,
@@ -460,6 +461,11 @@ def update_campaign(
         payload.start_date or campaign.start_date,
         payload.end_date or campaign.end_date,
     )
+    if campaign.selection_schedule and (
+        (payload.start_date is not None and payload.start_date.isoformat() != campaign.selection_schedule["applications_open"])
+        or (payload.end_date is not None and payload.end_date.isoformat() != campaign.selection_schedule["applications_close"])
+    ):
+        raise HTTPException(409, "Modifie ces dates depuis le calendrier de sélection pour conserver un planning cohérent.")
 
     if payload.title is not None:
         campaign.title = payload.title
@@ -1081,6 +1087,7 @@ def track_application(
         "project_interest": application.project_interest,
         "status": normalized_status,
         "screening_result": screening_result,
+        "selection_schedule": campaign.selection_schedule,
         "result_published_at": published_at,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
@@ -1305,6 +1312,14 @@ def schedule_application_interview(
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     if uses_blind_selection(campaign, application) and (review_stage(campaign, application) == "screening" or application.screening_decision != "shortlisted"):
         raise HTTPException(409, "Publie d’abord la présélection de ce dossier avant de préparer son entretien.")
+    if campaign.selection_schedule:
+        from app.schemas.recruitment_schedule import RecruitmentSchedule
+        calendar = RecruitmentSchedule.model_validate(campaign.selection_schedule)
+        starts = to_naive_utc(payload.interview_at)
+        ends = to_naive_utc(payload.interview_end_at) if payload.interview_end_at else starts
+        closing = datetime.combine(calendar.interviews_end + timedelta(days=1), datetime.min.time())
+        if not calendar.interviews_start <= starts.date() <= calendar.interviews_end or ends > closing:
+            raise HTTPException(422, "L’entretien doit se dérouler dans la période prévue au calendrier de la campagne.")
     from app.services.recruitment_interviews import assign_interview
     old_interview = {
         name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)

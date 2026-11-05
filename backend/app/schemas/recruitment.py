@@ -5,6 +5,7 @@ from typing import Optional, Literal
 from urllib.parse import urlsplit
 from app.services.recruitment_application_metadata import academic_year, discovery_answer
 from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
+from app.schemas.recruitment_schedule import RecruitmentSchedule
 
 
 def _clean_optional_text(value: str | None) -> str | None:
@@ -141,6 +142,7 @@ def validate_question_list(values):
 
 class RecruitmentCampaignPublicRead(BaseModel):
     eligibility_required: bool = False
+    selection_schedule: Optional[RecruitmentSchedule] = None
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -451,6 +453,7 @@ class ApplicationTrackingRequest(BaseModel):
 
 
 class ApplicationTrackingRead(BaseModel):
+    selection_schedule: Optional[RecruitmentSchedule] = None
     application_id: UUID
     tracking_code: str
     campaign_title: str
