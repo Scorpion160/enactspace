@@ -433,6 +433,11 @@ def register_recruitment_selection(router):
             Application.id.in_([UUID(row["application_id"]) for row in report["rows"]])
         ).order_by(Application.id).with_for_update().all()
         published_at = utc_now()
+        if payload.stage == "interview" and any(
+            application.status != "interview_scheduled" or application.interview_at is None
+            or application.interview_at > published_at for application in applications
+        ):
+            raise HTTPException(409, "Chaque entretien doit être réalisé avant de publier les décisions finales.")
         for application in applications:
             if payload.stage == "screening":
                 application.status = "under_review" if application.screening_decision == "shortlisted" else "rejected"

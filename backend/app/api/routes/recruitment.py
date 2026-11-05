@@ -1377,7 +1377,7 @@ def update_application(
     status_changed = False
 
     campaign = get_campaign_or_404(db, str(application.campaign_id))
-    if uses_blind_selection(campaign, application) and payload.status not in {None, "under_review", "cancelled"}:
+    if uses_blind_selection(campaign, application) and payload.status not in {None, "under_review"}:
         raise HTTPException(409, "Prépare la décision puis publie les résultats de toute la campagne.")
     if payload.status is not None:
         status_changed = apply_application_status(application, payload.status)
@@ -1446,7 +1446,7 @@ def change_application_status(
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
     campaign = get_campaign_or_404(db, str(application.campaign_id))
-    if uses_blind_selection(campaign, application) and payload.status not in {"under_review", "cancelled"}:
+    if uses_blind_selection(campaign, application) and payload.status != "under_review":
         raise HTTPException(409, "Prépare la décision puis publie les résultats de toute la campagne.")
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, payload.status)

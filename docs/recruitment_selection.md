@@ -33,6 +33,8 @@ Pour d’anciens documents déjà hébergés sur un service externe, masquer leu
 
 La publication exige les avis et une décision pour chaque dossier du lot. Elle refuse un bilan devenu obsolète et sérialise les publications concurrentes. Les résultats et leurs mails sont enregistrés dans une seule transaction ; un échec annule tout le lot. Une relance ne crée pas de doublons.
 
+Les anciennes actions de décision ou de clôture individuelle sont désactivées pour ces dossiers. La publication finale vérifie aussi les dates d’entretien courantes, afin qu’un entretien reporté après la préparation d’une décision bloque sa publication prématurée.
+
 Les résultats sont consultables au même instant pour tout le lot. Tous les mails ont la même date de mise à disposition dans la file existante ; leur arrivée effective dépend de la file d’envoi et des fournisseurs des destinataires. Les messages de refus remercient le candidat sans présenter le résultat comme un jugement sur ses capacités.
 
 L’envoi des e-mails doit être configuré (`EMAIL_ENABLED` et `SMTP_HOST`) et le traitement habituel de la file doit fonctionner. Le panneau affiche les envois terminés, les nouvelles tentatives et les échecs.

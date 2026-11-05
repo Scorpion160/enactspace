@@ -41,7 +41,7 @@ class CandidateActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final allowed = {..._allowedTransitions(application)};
     if (application.blindSelection) {
-      allowed.removeAll({'accepted', 'rejected', 'waiting_list'});
+      allowed.removeAll({'accepted', 'rejected', 'waiting_list', 'cancelled'});
       if (application.permissions['can_schedule'] != true) allowed.remove('interview_scheduled');
     }
     final actions = <Widget>[

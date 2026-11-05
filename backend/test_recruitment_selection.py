@@ -327,6 +327,20 @@ class RecruitmentSelectionTests(TestCase):
         self.assertEqual({row.status for row in self.db.query(Application)}, {"under_review"})
         self.assertEqual(self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).count(), 0)
 
+    def test_manual_status_changes_cannot_announce_a_result_or_close_a_blind_dossier_early(self):
+        _, applications, _ = self.prepare()
+        application = applications[0]
+        self.as_user("sg")
+        self.post(f"/applications/{application['id']}/status", {"status": "under_review"})
+        with patch.object(settings, "EMAIL_ENABLED", True), patch.object(settings, "SMTP_HOST", "smtp.example.test"):
+            for status in ("accepted", "rejected", "waiting_list", "cancelled"):
+                self.post(f"/applications/{application['id']}/status", {"status": status}, 409)
+                result = self.client.patch(f"/api/recruitment/applications/{application['id']}", json={"status": status})
+                self.assertEqual(result.status_code, 409, result.text)
+        self.db.expire_all()
+        self.assertEqual(self.db.get(Application, UUID(application["id"])).status, "under_review")
+        self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+
     def test_incomplete_reviews_missing_decisions_and_stale_report_block_publication(self):
         campaign, applications, _ = self.prepare()
         campaign.is_active = False
@@ -378,6 +392,13 @@ class RecruitmentSelectionTests(TestCase):
         self.db.commit()
         report = self.report(campaign)
         with patch.object(settings, "EMAIL_ENABLED", True), patch.object(settings, "SMTP_HOST", "smtp.example.test"):
+            self.db.refresh(application)
+            application.interview_at = utc_now() + timedelta(days=1)
+            self.db.commit()
+            self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]}, 409)
+            self.assertEqual(self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).count(), 0)
+            application.interview_at = utc_now() - timedelta(hours=1)
+            self.db.commit()
             self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]})
         tracked = self.post("/applications/track", {"application_id": applications[0]["tracking_code"], "email": applications[0]["email"]})
         self.assertEqual(tracked["status"], "accepted")

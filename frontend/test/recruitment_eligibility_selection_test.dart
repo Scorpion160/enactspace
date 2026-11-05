@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:frontend/features/recruitment/models/application_tracking_model.dart';
+import 'package:frontend/features/recruitment/models/application_model.dart';
+import 'package:frontend/features/recruitment/widgets/internal/candidate_actions.dart';
 import 'package:frontend/features/recruitment/widgets/public/public_recruitment_widgets.dart';
 import 'package:frontend/features/recruitment/widgets/public/recruitment_eligibility.dart';
 
@@ -62,6 +64,25 @@ void main() {
     expect(find.text('Décision'), findsNothing);
     expect(tracking.currentStep, 2);
     expect(tracking.presentation.title, 'Dossier non retenu');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('blind dossier actions require batch publication for all outcomes', (tester) async {
+    const application = ApplicationModel(
+      id: 'blind-dossier', campaignId: 'blind-campaign', firstName: 'Candidat', lastName: 'ABC',
+      email: 'anonymous@example.org', status: 'under_review',
+      permissions: {'blind_selection': true, 'can_schedule': false},
+    );
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: CandidateActionsSection(
+        application: application, campaignTitle: 'Présélection', reviewCount: 0, reviewAverage: null,
+        onStatusChange: (_) async {},
+        onInterview: ({required DateTime interviewAt, String? location, String? link, String? jury, String? note}) async {},
+      ),
+    )));
+    for (final action in ('accept', 'reject', 'waiting-list', 'close', 'interview')) {
+      expect(find.byKey(Key('candidate-action-$action')), findsNothing);
+    }
     expect(tester.takeException(), isNull);
   });
 }
