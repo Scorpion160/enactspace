@@ -51,8 +51,13 @@ class CampaignLifecycleTests(TestCase):
         self.assertEqual(tracking.status_code, 200, tracking.text)
         self.assertEqual(self.client.post('/api/recruitment/applications/' + application['id'] + '/status',
             json={'status': 'under_review'}).status_code, 200)
+        self.assertEqual(self.client.post(f'/api/recruitment/campaigns/{campaign.id}/jury',
+            json={'user_id': str(self.users['sg'].id)}).status_code, 200)
+        self.assertEqual(self.client.post(f'/api/recruitment/campaigns/{campaign.id}/selection/assign',
+            json={'minimum_reviews': 2, 'disagreement_threshold': 20}).status_code, 200)
+        from test_recruitment_rubric import assessment
         review = self.client.post('/api/recruitment/reviews', json={'application_id': application['id'],
-            'score': 15, 'recommendation': 'favorable', 'comment': 'Synthetic observation'})
+            'score': 15, 'criteria_assessment': assessment(), 'recommendation': 'favorable', 'comment': 'Synthetic observation'})
         self.assertEqual(review.status_code, 200, review.text)
         deleted = self.client.delete('/api/recruitment/campaigns/' + campaign_id)
         self.assertEqual(deleted.status_code, 409, deleted.text)

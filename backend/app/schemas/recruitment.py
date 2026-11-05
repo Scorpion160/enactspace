@@ -140,6 +140,7 @@ def validate_question_list(values):
 
 
 class RecruitmentCampaignPublicRead(BaseModel):
+    eligibility_required: bool = False
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -156,10 +157,12 @@ class RecruitmentCampaignPublicRead(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def public_questionnaire(cls, value):
+        eligibility_required = value.get("eligibility_required", False) if isinstance(value, dict) else getattr(value, "selection_policy_version", None) == "blind-selection-v1"
         if not isinstance(value, dict):
             value = {name: getattr(value, name, None) for name in cls.model_fields}
         else:
             value = dict(value)
+        value['eligibility_required'] = eligibility_required
         questions = value.get('application_questions')
         value['application_questions'] = effective_questions(questions)
         value['questionnaire_version'] = questionnaire_version(questions)
@@ -269,6 +272,7 @@ class ApplicationCreate(BaseModel):
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
     other_clubs: Optional[str] = None
+    other_clubs_count: Optional[int] = Field(default=None, ge=0, le=100, strict=True)
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
@@ -376,6 +380,10 @@ class ApplicationRead(BaseModel):
     screening_score: Optional[float] = None
     screening_review_count: int = 0
     screening_spread: Optional[float] = None
+    assessment_stage: str = "screening"
+    screening_decision: Optional[str] = None
+    pending_final_decision: Optional[str] = None
+    screening_published: bool = False
     history: list[ApplicationHistoryRead] = Field(default_factory=list)
     questionnaire_answers: Optional[list[dict[str, str]]] = None
     id: UUID
@@ -462,6 +470,8 @@ class ApplicationTrackingRead(BaseModel):
     account_created: bool
     personality_status: Optional[str] = None
     personality_due_at: Optional[datetime] = None
+    screening_result: Optional[str] = None
+    result_published_at: Optional[datetime] = None
 
 
 class ApplicationReviewCreate(BaseModel):
@@ -480,6 +490,7 @@ class ApplicationReviewUpdate(BaseModel):
 
 
 class ApplicationReviewRead(BaseModel):
+    stage: str = "screening"
     criteria_assessment: Optional[dict] = None
     reviewer_name: Optional[str] = None
     id: UUID

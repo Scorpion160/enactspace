@@ -1,6 +1,7 @@
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/recruitment_style.dart';
 import '../../services/recruitment_campaign_tools.dart';
+import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../widgets/internal/interview_planning_dialog.dart';
 import '../../widgets/internal/personality_review_card.dart';
 import '../../models/application_history_model.dart';
@@ -515,7 +516,7 @@ class _DetailBodyState extends State<_DetailBody> {
                 children: [
                   FilledButton.icon(
                     key: const Key('candidate-review-action'),
-                    onPressed: widget.application.screeningRubric == null
+                    onPressed: widget.application.permissions['can_review'] == false || widget.application.screeningRubric == null
                         ? null
                         : widget.onReview,
                     icon: const Icon(Icons.rate_review_outlined),
@@ -594,6 +595,14 @@ class _DetailBodyState extends State<_DetailBody> {
                   title: 'Actions sur la candidature',
                   icon: Icons.admin_panel_settings_outlined,
                   children: [
+                    if (widget.application.permissions['can_prepare_selection'] == true) ...[
+                      RecruitmentSelectionDecisionCard(
+                        key: ValueKey('${widget.application.id}-${widget.application.assessmentStage}'),
+                        application: widget.application,
+                        onSaved: widget.onConversionCompleted,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
                     CandidateActionsSection(
                       application: widget.application,
                       campaignTitle: widget.campaignTitle,

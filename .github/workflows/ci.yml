@@ -10,6 +10,7 @@ on:
       - feat/institutional-pdf-generation-v1
       - feature/recruitment-ui-20261101
       - feature/alumni-refonte-20261104
+      - feature/archives-refonte-20261104
   push:
     branches:
       - main
@@ -124,7 +125,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261104_0034 (head)"
+          test "$output" = "20261105_0035 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v

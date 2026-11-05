@@ -1,3 +1,4 @@
+import 'recruitment_eligibility.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../shared/ui/heritage_photo.dart';
@@ -329,6 +330,8 @@ class RecruitmentWelcome extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
+        const SizedBox(height: 12),
+        const RecruitmentEligibilityCriteria(),
         const SizedBox(height: 12),
         const Card(
           child: Column(

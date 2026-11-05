@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../models/application_status_presentation.dart';
 import '../models/application_tracking_model.dart';
 import '../services/public_recruitment_gateway.dart';
 import '../widgets/public/public_recruitment_widgets.dart';
@@ -393,9 +392,7 @@ class TrackingResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presentation = ApplicationStatusPresentation.fromStatus(
-      tracking.status,
-    );
+    final presentation = tracking.presentation;
     return Semantics(
       container: true,
       label: 'Statut de la candidature, ${presentation.title}',

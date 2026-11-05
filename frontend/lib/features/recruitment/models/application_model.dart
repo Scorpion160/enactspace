@@ -59,6 +59,12 @@ class ApplicationModel {
   final bool isAnonymized;
   final String? serverAnonymousCode;
   final bool canConvert;
+  final String? screeningDecision;
+  final String? pendingFinalDecision;
+  final bool screeningPublished;
+
+  bool get blindSelection => permissions['blind_selection'] == true;
+  String get assessmentStage => permissions['selection_stage']?.toString() ?? 'screening';
 
   const ApplicationModel({
     this.history = const [],
@@ -117,6 +123,9 @@ class ApplicationModel {
     required this.isAnonymized,
     this.serverAnonymousCode,
     required this.canConvert,
+    this.screeningDecision,
+    this.pendingFinalDecision,
+    this.screeningPublished = false,
   });
 
   factory ApplicationModel.fromJson(Map<String, dynamic> json) {
@@ -139,6 +148,9 @@ class ApplicationModel {
               Map<String, dynamic>.from(json['my_review']),
             )
           : null,
+      screeningDecision: json['screening_decision']?.toString(),
+      pendingFinalDecision: json['pending_final_decision']?.toString(),
+      screeningPublished: json['screening_published'] == true,
       id: json['id']?.toString() ?? '',
       campaignId: json['campaign_id']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',

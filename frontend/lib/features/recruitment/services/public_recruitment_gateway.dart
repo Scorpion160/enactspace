@@ -89,6 +89,7 @@ class RecruitmentPublicGateway implements PublicRecruitmentGateway {
         knownEnactusFrom: draft.knownEnactusFrom,
         enactusKnowledge: draft.enactusKnowledge,
         otherClubs: draft.otherClubs,
+        otherClubsCount: draft.otherClubsCount,
         contribution: draft.contribution,
         projectIdeas: draft.projectIdeas,
         leadershipProfile: draft.leadershipProfile,

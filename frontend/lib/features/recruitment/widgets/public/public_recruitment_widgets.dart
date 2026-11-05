@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/ui/app_back_button.dart';
-import '../../models/application_status_presentation.dart';
 import '../../models/application_tracking_model.dart';
 import '../../models/recruitment_campaign_model.dart';
 import 'recruitment_countdown.dart';
@@ -522,27 +521,35 @@ class ApplicationTimeline extends StatelessWidget {
   static const _steps = [
     'Candidature reçue',
     'Étude du dossier',
+    'Résultat du dossier',
     'Entretien',
     'Décision',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final status = ApplicationStatusPresentation.fromStatus(tracking.status);
+    final status = tracking.presentation;
+    final labels = [..._steps];
+    if (tracking.screeningResult == 'shortlisted') labels[2] = 'Dossier retenu';
+    if (tracking.screeningResult == 'not_shortlisted') {
+      labels[2] = 'Dossier non retenu';
+      labels.removeRange(3, labels.length);
+    }
+    final current = tracking.currentStep;
     return Semantics(
       container: true,
       label: 'Chronologie de la candidature, ${status.title}',
       child: Column(
         children: [
-          for (var index = 0; index < _steps.length; index++)
+          for (var index = 0; index < labels.length; index++)
             _TimelineItem(
-              label: _steps[index],
+              label: labels[index],
               complete:
-                  !status.terminalException && index <= status.timelineStep,
-              current: index == status.timelineStep,
-              isLast: index == _steps.length - 1,
+                  index < current || (!status.terminalException && index == current),
+              current: index == current,
+              isLast: index == labels.length - 1,
               exception:
-                  status.terminalException && index == status.timelineStep,
+                  status.terminalException && index == current,
             ),
         ],
       ),

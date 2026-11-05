@@ -124,6 +124,8 @@ def save_answers(row, payload, *, complete):
 
 
 def register_recruitment_extensions(router):
+    from app.services.recruitment_selection import register_recruitment_selection
+    register_recruitment_selection(router)
     from app.services.recruitment_teams import campaign_teams, register_jury_teams
     register_jury_teams(router)
     @router.get("/access")
@@ -192,6 +194,10 @@ def register_recruitment_extensions(router):
         from app.api.routes.recruitment import lock_review_application, normalize_application_status
         require_staff(db, user)
         app = lock_review_application(db, application_id)
+        from app.services.recruitment_selection import campaign_for_application, uses_blind_selection
+        campaign = campaign_for_application(db, app)
+        if uses_blind_selection(campaign) and (not campaign.screening_published_at or app.screening_decision != "shortlisted"):
+            raise HTTPException(409, "Publie d’abord la présélection du dossier avant l’invitation à l’entretien.")
         if normalize_application_status(app.status) not in {"under_review", "interview_scheduled", "waiting_list"}:
             raise HTTPException(409, "Passe d’abord le dossier à l’étape d’étude ou d’entretien.")
         due = to_naive_utc(payload.due_at) if payload.due_at else None
@@ -229,7 +235,11 @@ def register_recruitment_extensions(router):
         app = db.get(Application, application_id)
         if app is None:
             raise HTTPException(404, "Candidature introuvable")
-        require_campaign_access(db, user, app.campaign_id)
+        from app.services.recruitment_selection import require_application_access, campaign_for_application, uses_blind_selection
+        require_application_access(db, user, app)
+        campaign = campaign_for_application(db, app)
+        if uses_blind_selection(campaign) and not campaign.screening_published_at:
+            return {"status": "not_invited"}
         row = db.get(ApplicationPersonality, app.id)
         return assessment_payload(row) if row else {"status": "not_invited"}
 

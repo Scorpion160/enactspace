@@ -1,6 +1,7 @@
 import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/internal/recruitment_interview_board.dart';
+import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import 'recruitment_jury_screen.dart';
 import '../../services/recruitment_message.dart';
@@ -359,6 +360,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final selectedCampaign = _campaignId == 'all'
         ? 'Toutes les campagnes'
         : _campaignTitle(_campaignId);
+    final selectionCampaign = _campaigns.where((campaign) => campaign.id == _campaignId).firstOrNull;
     final padding = MediaQuery.sizeOf(context).width < 560 ? 14.0 : 24.0;
     return RefreshIndicator(
       onRefresh: () => _load(initial: false),
@@ -441,6 +443,20 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                   icon: Icons.how_to_reg_outlined,
                 ),
               ],
+            ),
+          if (_section == RecruitmentSection.applications &&
+              _gateway is RecruitmentServiceGateway &&
+              _access['can_manage_jury'] == true &&
+              selectionCampaign?.eligibilityRequired == true)
+            RecruitmentSelectionPanel(
+              campaignId: _campaignId,
+              refreshToken: _generation,
+              onChanged: () => _load(initial: false),
+            ),
+          if (_section == RecruitmentSection.applications && _campaignId == 'all' && _access['can_manage_jury'] == true)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Sélectionne une campagne dans les filtres pour répartir les évaluations et publier les résultats.'),
             ),
           SizedBox(height: 14),
           InternalFilterBar(
