@@ -2,6 +2,7 @@ import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/recruitment_style.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../widgets/internal/recruitment_selection_panel.dart';
+import '../../services/recruitment_selection_api.dart';
 import '../../widgets/internal/interview_planning_dialog.dart';
 import '../../widgets/internal/personality_review_card.dart';
 import '../../models/application_history_model.dart';
@@ -25,6 +26,7 @@ class ApplicationDetailPanel extends StatefulWidget {
   final bool anonymized;
   final InternalRecruitmentGateway gateway;
   final ValueChanged<ApplicationModel>? onApplicationChanged;
+  final VoidCallback? onAssignmentDeclined;
   final VoidCallback onClose;
 
   const ApplicationDetailPanel({
@@ -34,6 +36,7 @@ class ApplicationDetailPanel extends StatefulWidget {
     required this.anonymized,
     required this.gateway,
     this.onApplicationChanged,
+    this.onAssignmentDeclined,
     required this.onClose,
   });
 
@@ -123,6 +126,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       onStatusChange: _changeStatus,
                       onInterview: _scheduleInterview,
                       onConversionCompleted: _refreshAfterMutation,
+                      onAssignmentDeclined: () {
+                        widget.onClose();
+                        widget.onAssignmentDeclined?.call();
+                      },
                     ),
             ),
           ],
@@ -285,6 +292,7 @@ class _DetailBody extends StatefulWidget {
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
   final Future<void> Function() onConversionCompleted;
+  final VoidCallback onAssignmentDeclined;
 
   const _DetailBody({
     required this.application,
@@ -297,6 +305,7 @@ class _DetailBody extends StatefulWidget {
     required this.onStatusChange,
     required this.onInterview,
     required this.onConversionCompleted,
+    required this.onAssignmentDeclined,
   });
 
   @override
@@ -304,6 +313,50 @@ class _DetailBody extends StatefulWidget {
 }
 
 class _DetailBodyState extends State<_DetailBody> {
+  Future<void> _declineAssignment() async {
+    var reason = '';
+    final explanation = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Demander un autre évaluateur'),
+          content: TextField(
+            autofocus: true,
+            maxLength: 500,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Motif du déport',
+              helperText: 'Par exemple, tu penses reconnaître le candidat.',
+              helperMaxLines: 3,
+            ),
+            onChanged: (value) => setDialogState(() => reason = value.trim()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: reason.length < 5 ? null : () => Navigator.pop(context, reason),
+              child: const Text('Transmettre la demande'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (explanation == null || !mounted) return;
+    try {
+      await RecruitmentSelectionApi().request(
+        'applications/${widget.application.id}/selection/decline',
+        body: {'reason': explanation},
+      );
+      if (mounted) widget.onAssignmentDeclined();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          recruitmentMessage(error, fallback: 'La demande n’a pas pu être enregistrée.'),
+        )));
+      }
+    }
+  }
+
   late final Map<String, GlobalKey> _anchors = {
     for (final label in [
       'Réponses',
@@ -401,6 +454,7 @@ class _DetailBodyState extends State<_DetailBody> {
                         'Projet évoqué auparavant':
                             widget.application.projectInterest!,
                       'Disponibilité': _value(widget.application.availability),
+                      'Structures étudiantes déclarées': widget.application.otherClubsCount?.toString() ?? 'Non renseigné',
                       if (!widget.anonymized)
                         'Résidence au campus':
                             widget.application.campusResident == null
@@ -526,6 +580,14 @@ class _DetailBodyState extends State<_DetailBody> {
                           : 'Modifier mon avis',
                     ),
                   ),
+                  if (widget.application.blindSelection &&
+                      widget.application.assessmentStage == 'screening' &&
+                      widget.application.permissions['can_review'] == true)
+                    TextButton.icon(
+                      onPressed: _declineAssignment,
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Demander un autre évaluateur'),
+                    ),
                   if (widget.application.screeningRubric == null)
                     const Text(
                       'Actualisez le dossier pour charger la grille d’évaluation.',

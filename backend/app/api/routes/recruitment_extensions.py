@@ -78,6 +78,21 @@ def assessment_payload(row, *, candidate=False):
     return result
 
 
+def internal_assessment_payload(db, user, application, row):
+    from app.services.recruitment_selection import (
+        campaign_for_application, identity_is_visible, redact_candidate_text, uses_blind_selection,
+    )
+    data = assessment_payload(row)
+    campaign = campaign_for_application(db, application)
+    if uses_blind_selection(campaign, application) and not identity_is_visible(db, user, campaign):
+        if "scenario_answers" in data:
+            data["scenario_answers"] = {
+                key: redact_candidate_text(value, application)
+                for key, value in data["scenario_answers"].items()
+            }
+    return data
+
+
 def public_attempt(db, payload, *, lock=False):
     from app.api.routes.recruitment import get_application_by_public_reference
     application = get_application_by_public_reference(db, payload.application_id, payload.email)
@@ -194,9 +209,9 @@ def register_recruitment_extensions(router):
         from app.api.routes.recruitment import lock_review_application, normalize_application_status
         require_staff(db, user)
         app = lock_review_application(db, application_id)
-        from app.services.recruitment_selection import campaign_for_application, uses_blind_selection
+        from app.services.recruitment_selection import campaign_for_application, review_stage, uses_blind_selection
         campaign = campaign_for_application(db, app)
-        if uses_blind_selection(campaign) and (not campaign.screening_published_at or app.screening_decision != "shortlisted"):
+        if uses_blind_selection(campaign, app) and (review_stage(campaign, app) == "screening" or app.screening_decision != "shortlisted"):
             raise HTTPException(409, "Publie d’abord la présélection du dossier avant l’invitation à l’entretien.")
         if normalize_application_status(app.status) not in {"under_review", "interview_scheduled", "waiting_list"}:
             raise HTTPException(409, "Passe d’abord le dossier à l’étape d’étude ou d’entretien.")
@@ -211,9 +226,9 @@ def register_recruitment_extensions(router):
             db.add(row)
             db.flush()
         elif row.submitted_at or row.declined_at:
-            return assessment_payload(row)
+            return internal_assessment_payload(db, user, app, row)
         elif row.due_at == due:
-            return assessment_payload(row)
+            return internal_assessment_payload(db, user, app, row)
         else:
             row.due_at, row.updated_at = due, utc_now()
         # Code/email remain in the tracking form body, never in the URL.
@@ -228,7 +243,7 @@ def register_recruitment_extensions(router):
         create_audit_log(db, "invitation_questionnaire_candidature", user.id, "application", app.id,
                          new_value={"version": row.instrument_version, "due_at": due.isoformat() if due else None})
         db.commit()
-        return assessment_payload(row)
+        return internal_assessment_payload(db, user, app, row)
 
     @router.get("/applications/{application_id}/personality")
     def read_internal(application_id: UUID, db: Session = Depends(get_db), user: User = Depends(require_recruitment_access)):
@@ -238,10 +253,10 @@ def register_recruitment_extensions(router):
         from app.services.recruitment_selection import require_application_access, campaign_for_application, uses_blind_selection
         require_application_access(db, user, app)
         campaign = campaign_for_application(db, app)
-        if uses_blind_selection(campaign) and not campaign.screening_published_at:
+        if uses_blind_selection(campaign, app) and not campaign.screening_published_at:
             return {"status": "not_invited"}
         row = db.get(ApplicationPersonality, app.id)
-        return assessment_payload(row) if row else {"status": "not_invited"}
+        return internal_assessment_payload(db, user, app, row) if row else {"status": "not_invited"}
 
     @router.post("/personality/load")
     def load_public(payload: ApplicationTrackingRequest, db: Session = Depends(get_db)):

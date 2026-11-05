@@ -49,6 +49,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   DateTime? _submittedTo;
   int _page = 0;
   int _generation = 0;
+  int _selectionRevision = 0;
   RecruitmentSection _section = RecruitmentSection.applications;
   Object? _error;
 
@@ -91,6 +92,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       setState(() {
         _campaigns = result[0] as List<RecruitmentCampaignModel>;
         _applications = result[1] as List<ApplicationModel>;
+        _selectionRevision++;
         if (_campaignId != 'all' &&
             !_campaigns.any((c) => c.id == _campaignId)) {
           _campaignId = 'all';
@@ -247,6 +249,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
+            onAssignmentDeclined: () => _load(initial: false),
             onClose: () => Navigator.of(routeContext).pop(),
           ),
         ),
@@ -270,6 +273,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
+            onAssignmentDeclined: () => _load(initial: false),
             onClose: () => Navigator.of(dialogContext).pop(),
           ),
         ),
@@ -288,6 +292,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   void _applyUpdatedApplication(ApplicationModel updated) {
     if (!mounted) return;
     setState(() {
+      _selectionRevision++;
       _applications = _applications
           .map((item) => item.id == updated.id ? updated : item)
           .toList();
@@ -450,7 +455,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               selectionCampaign?.eligibilityRequired == true)
             RecruitmentSelectionPanel(
               campaignId: _campaignId,
-              refreshToken: _generation,
+              refreshToken: _selectionRevision,
               onChanged: () => _load(initial: false),
             ),
           if (_section == RecruitmentSection.applications && _campaignId == 'all' && _access['can_manage_jury'] == true)

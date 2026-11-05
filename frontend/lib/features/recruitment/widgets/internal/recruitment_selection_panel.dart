@@ -118,6 +118,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
     final screening = report?['stage'] != 'interview';
     final completed = report?['final_published_at'] != null;
     final canPublish = rows.isNotEmpty && ready == rows.length && decided == rows.length && !completed;
+    final emails = report?['result_emails'] as Map? ?? const {};
     return Card(
       child: ExpansionTile(
         title: Text(screening ? 'Présélection des dossiers' : 'Sélection après les entretiens'),
@@ -130,8 +131,11 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           if (report == null && _error == null) const LinearProgressIndicator(),
           if (screening && !completed) ...[
             DropdownButtonFormField<int>(
+              key: ValueKey('selection-minimum-$_minimum'),
               initialValue: _minimum,
-              decoration: const InputDecoration(labelText: 'Évaluations indépendantes par dossier'),
+              isExpanded: true,
+              itemHeight: null,
+              decoration: const InputDecoration(labelText: 'Avis par dossier'),
               items: [
                 for (var count = 2; count <= 5; count++)
                   DropdownMenuItem(value: count, child: Text('$count évaluations')),
@@ -140,8 +144,11 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
+              key: ValueKey('selection-threshold-$_threshold'),
               initialValue: _threshold,
-              decoration: const InputDecoration(labelText: 'Écart déclenchant un avis supplémentaire'),
+              isExpanded: true,
+              itemHeight: null,
+              decoration: const InputDecoration(labelText: 'Écart pour un avis supplémentaire'),
               items: [
                 for (final points in ({10, 15, 20, 25, 30, _threshold}.toList()..sort()))
                   DropdownMenuItem(value: points, child: Text('$points points sur 100')),
@@ -172,6 +179,9 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             ),
           if (_feedback != null)
             Padding(padding: const EdgeInsets.only(top: 12), child: Text(_feedback!)),
+          if ((emails['total'] as num? ?? 0) > 0)
+            Text('Mails envoyés ${emails['sent'] ?? 0}/${emails['total']}. '
+                '${emails['retry'] ?? 0} en nouvelle tentative, ${emails['dead'] ?? 0} en échec.'),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -243,6 +253,7 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
         DropdownButtonFormField<String>(
           initialValue: _decision,
           isExpanded: true,
+          itemHeight: null,
           decoration: const InputDecoration(labelText: 'Décision à préparer'),
           items: [
             for (final entry in options.entries)

@@ -38,6 +38,7 @@ def upgrade():
         for column in [
             sa.Column("other_clubs_count", sa.Integer(), nullable=True),
             sa.Column("screening_decision", sa.String(24), nullable=True),
+            sa.Column("legacy_result_published", sa.Boolean(), nullable=False, server_default=sa.false()),
             sa.Column("pending_final_decision", sa.String(24), nullable=True),
         ]:
             if column.name not in application_columns:
@@ -68,6 +69,28 @@ def upgrade():
         WHERE is_active = true OR EXISTS (
             SELECT 1 FROM applications
             WHERE applications.campaign_id = recruitment_campaigns.id
+            AND applications.status IN ('submitted', 'under_review', 'received', 'preselected')
+        )
+    """))
+    op.execute(sa.text("""
+        UPDATE applications SET legacy_result_published = true
+        WHERE status IN ('accepted', 'rejected', 'waiting_list', 'cancelled')
+    """))
+    op.execute(sa.text("""
+        UPDATE applications SET screening_decision = 'shortlisted'
+        WHERE status IN ('interview_scheduled', 'interview')
+    """))
+    op.execute(sa.text("""
+        UPDATE application_reviews SET stage = 'interview' WHERE application_id IN (
+            SELECT id FROM applications WHERE status IN ('interview_scheduled', 'interview')
+        )
+    """))
+    op.execute(sa.text("""
+        UPDATE recruitment_campaigns SET screening_published_at = CURRENT_TIMESTAMP
+        WHERE selection_policy_version = 'blind-selection-v1'
+        AND EXISTS (SELECT 1 FROM applications WHERE applications.campaign_id = recruitment_campaigns.id)
+        AND NOT EXISTS (
+            SELECT 1 FROM applications WHERE applications.campaign_id = recruitment_campaigns.id
             AND applications.status IN ('submitted', 'under_review', 'received', 'preselected')
         )
     """))
@@ -103,21 +126,13 @@ def downgrade():
         raise RuntimeError("Des évaluations de dossier et d’entretien existent. Conserve la révision de sélection.")
     op.drop_table("application_screening_assignments")
     with op.batch_alter_table("application_reviews") as batch:
-        # Separate interview reviews cannot fit the former one-review constraint.
-        # Refuse a destructive downgrade once that feature has been used.
-        bind = op.get_bind()
-        duplicate = bind.execute(sa.text("""
-            SELECT application_id FROM application_reviews
-            GROUP BY application_id, reviewer_id HAVING count(*) > 1
-        """)).first()
-        if duplicate:
-            raise RuntimeError("Des évaluations de dossier et d’entretien existent. Conserve la révision de sélection.")
         batch.drop_constraint("uq_application_reviewer_stage", type_="unique")
         batch.drop_column("stage")
         batch.create_unique_constraint("uq_application_reviewer", ["application_id", "reviewer_id"])
     with op.batch_alter_table("applications") as batch:
         batch.drop_column("pending_final_decision")
         batch.drop_column("screening_decision")
+        batch.drop_column("legacy_result_published")
         batch.drop_column("other_clubs_count")
     with op.batch_alter_table("recruitment_campaigns") as batch:
         foreign_keys = sa.inspect(op.get_bind()).get_foreign_keys("recruitment_campaigns")

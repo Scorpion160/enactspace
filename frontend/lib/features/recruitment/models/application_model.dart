@@ -19,6 +19,7 @@ class ApplicationModel {
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
   final String? otherClubs;
+  final int? otherClubsCount;
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
@@ -83,6 +84,7 @@ class ApplicationModel {
     this.knownEnactusFrom,
     this.enactusKnowledge,
     this.otherClubs,
+    this.otherClubsCount,
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,
@@ -154,6 +156,7 @@ class ApplicationModel {
       id: json['id']?.toString() ?? '',
       campaignId: json['campaign_id']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
+      otherClubsCount: (json['other_clubs_count'] as num?)?.toInt(),
       lastName: json['last_name']?.toString() ?? '',
       gender: json['gender']?.toString(),
       email: json['email']?.toString() ?? '',

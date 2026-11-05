@@ -678,7 +678,8 @@ class _PublicApplicationFlowScreenState
 
   Widget _motivationStep() => _questionStep(
     'motivation',
-    'Parle-nous de toi et de ce qui te donne envie d’agir.',
+    'Parle-nous de ce qui te donne envie d’agir. Ton dossier sera étudié sans ton identité. '
+    'Évite de citer ton nom, tes coordonnées ou les liens vers tes profils dans tes réponses.',
   );
 
   Widget _availabilityStep() => _questionStep(

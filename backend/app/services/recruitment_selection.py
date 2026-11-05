@@ -3,12 +3,12 @@ import hashlib
 import json
 import re
 import secrets
-from datetime import datetime
+import unicodedata
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 
 from app.api.deps import require_recruitment_access
 from app.core.time import utc_now
@@ -18,6 +18,7 @@ from app.models.recruitment import (
     ApplicationScreeningAssignment, RecruitmentCampaign, RecruitmentJuryMember,
 )
 from app.models.user import User
+from app.models.email_delivery import EmailDelivery
 from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row
 from app.services.recruitment_access import can_manage_jury, eligible_juror, require_campaign_access
@@ -26,8 +27,10 @@ from app.services.recruitment_rubric import VERSION, structured_summary
 POLICY_VERSION = "blind-selection-v1"
 
 
-def uses_blind_selection(campaign):
-    return campaign.selection_policy_version == POLICY_VERSION
+def uses_blind_selection(campaign, application=None):
+    return campaign.selection_policy_version == POLICY_VERSION and not (
+        application is not None and application.legacy_result_published
+    )
 
 
 def campaign_for_application(db, application):
@@ -42,8 +45,9 @@ def identity_is_visible(db, user, campaign):
     )
 
 
-def review_stage(campaign):
-    return "interview" if uses_blind_selection(campaign) and campaign.screening_published_at else "screening"
+def review_stage(campaign, application=None):
+    interview_started = application is not None and application.screening_decision == "shortlisted" and application.status in {"interview_scheduled", "interview"}
+    return "interview" if uses_blind_selection(campaign, application) and (campaign.screening_published_at or interview_started) else "screening"
 
 
 def active_jurors(db, campaign_id):
@@ -76,9 +80,9 @@ def is_assigned(db, user, application):
 def require_application_access(db, user, application):
     require_campaign_access(db, user, application.campaign_id)
     campaign = campaign_for_application(db, application)
-    if not uses_blind_selection(campaign) or can_manage_jury(db, user):
+    if not uses_blind_selection(campaign, application) or can_manage_jury(db, user):
         return
-    if review_stage(campaign) == "screening" and is_assigned(db, user, application):
+    if review_stage(campaign, application) == "screening" and is_assigned(db, user, application):
         return
     interview = db.query(ApplicationInterviewJuror.application_id).join(
         RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
@@ -87,17 +91,17 @@ def require_application_access(db, user, application):
         RecruitmentJuryMember.user_id == user.id,
         RecruitmentJuryMember.is_active.is_(True),
     ).first()
-    if campaign.screening_published_at and interview:
+    if review_stage(campaign, application) == "interview" and interview:
         return
     raise HTTPException(403, "Ce dossier ne fait pas partie de tes évaluations attribuées.")
 
 
 def can_review_application(db, user, application, campaign):
-    if not uses_blind_selection(campaign):
+    if not uses_blind_selection(campaign, application):
         return True
     if campaign.final_published_at or application.status in {"accepted", "rejected", "cancelled"}:
         return False
-    if not campaign.screening_published_at:
+    if review_stage(campaign, application) == "screening":
         return is_assigned(db, user, application)
     if application.screening_decision != "shortlisted":
         return False
@@ -113,10 +117,21 @@ def can_review_application(db, user, application, campaign):
 def require_review_assignment(db, user, application):
     require_application_access(db, user, application)
     campaign = campaign_for_application(db, application)
-    if not uses_blind_selection(campaign):
+    if not uses_blind_selection(campaign, application):
         return
     if not can_review_application(db, user, application, campaign):
         raise HTTPException(403, "Une attribution ouverte à ce dossier est nécessaire pour l’évaluer.")
+
+
+def _fold_identity_with_positions(value):
+    folded, positions = [], []
+    for index, character in enumerate(value):
+        plain = "".join(letter for letter in unicodedata.normalize("NFKD", character).casefold()
+                        if not unicodedata.combining(letter))
+        plain = plain.replace("œ", "oe").replace("æ", "ae")
+        folded.append(plain)
+        positions.extend([index] * len(plain))
+    return "".join(folded), positions
 
 
 def redact_candidate_text(value, application):
@@ -124,9 +139,20 @@ def redact_candidate_text(value, application):
         return value
     result = str(value)
     identifiers = [application.first_name, application.last_name, application.email, application.phone]
-    for identifier in sorted(filter(None, identifiers), key=len, reverse=True):
+    for name in (application.first_name, application.last_name):
+        identifiers.extend(re.split(r"[\s-]+", name or ""))
+    for identifier in sorted(set(filter(None, identifiers)), key=len, reverse=True):
         if len(identifier.strip()) >= 2:
-            result = re.sub(r"(?<!\w)" + re.escape(identifier.strip()) + r"(?!\w)", "[identité masquée]", result, flags=re.IGNORECASE)
+            folded, positions = _fold_identity_with_positions(result)
+            needle, _ = _fold_identity_with_positions(identifier.strip())
+            if not needle:
+                continue
+            matches = list(re.finditer(r"(?<!\w)" + re.escape(needle) + r"(?!\w)", folded))
+            for match in reversed(matches):
+                start, end = positions[match.start()], positions[match.end() - 1] + 1
+                while end < len(result) and unicodedata.combining(result[end]):
+                    end += 1
+                result = result[:start] + "[identité masquée]" + result[end:]
     result = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[e-mail masqué]", result)
     result = re.sub(r"https?://\S+|www\.\S+", "[lien masqué]", result, flags=re.IGNORECASE)
     result = re.sub(r"(?<!\w)\+?\d[\d ()-]{6,}\d(?!\w)", "[numéro masqué]", result)
@@ -136,6 +162,19 @@ def redact_candidate_text(value, application):
 def reviewed_summary(reviews, campaign, stage):
     rows = [row for row in reviews if row.stage == stage]
     return structured_summary(rows, campaign.screening_rubric_version or VERSION)
+
+
+def valid_reviews_query(db):
+    return db.query(ApplicationReview).outerjoin(
+        ApplicationScreeningAssignment,
+        and_(
+            ApplicationScreeningAssignment.application_id == ApplicationReview.application_id,
+            ApplicationScreeningAssignment.reviewer_id == ApplicationReview.reviewer_id,
+        ),
+    ).filter(or_(
+        ApplicationReview.stage != "screening",
+        ApplicationScreeningAssignment.declined_at.is_(None),
+    ))
 
 
 def required_reviews(campaign, summary):
@@ -153,13 +192,14 @@ def distribute_assignments(db, campaign, actor):
         Application.campaign_id == campaign.id,
         Application.status.in_({"submitted", "under_review", "received", "preselected"}),
     ).order_by(Application.id).all()
-    reviews = db.query(ApplicationReview).join(Application, Application.id == ApplicationReview.application_id).filter(
+    reviews = valid_reviews_query(db).join(Application, Application.id == ApplicationReview.application_id).filter(
         Application.campaign_id == campaign.id, ApplicationReview.stage == "screening",
     ).all()
     by_application = {}
     for row in reviews:
         by_application.setdefault(row.application_id, []).append(row)
     active_ids = {user.id for user in jurors}
+    emails = {user.id: user.email.casefold() for user in jurors}
     assignments = db.query(ApplicationScreeningAssignment).join(
         Application, Application.id == ApplicationScreeningAssignment.application_id
     ).filter(Application.campaign_id == campaign.id).all()
@@ -188,7 +228,9 @@ def distribute_assignments(db, campaign, actor):
     for application in applications:
         summary = reviewed_summary(by_application.get(application.id, []), campaign, "screening")
         needed = max(0, required_reviews(campaign, summary) - len(assigned.get(application.id, set())))
-        candidates = [user_id for user_id in active_ids if user_id not in excluded.get(application.id, set())]
+        candidates = [user_id for user_id in active_ids
+                      if user_id not in excluded.get(application.id, set())
+                      and emails[user_id] != application.email.casefold()]
         rng.shuffle(candidates)
         candidates.sort(key=lambda user_id: loads[user_id])
         for user_id in candidates[:needed]:
@@ -205,8 +247,10 @@ def distribute_assignments(db, campaign, actor):
 
 
 def public_selection_state(campaign, application):
-    if not uses_blind_selection(campaign):
+    if not uses_blind_selection(campaign, application):
         return application.status, None, None
+    if not campaign.screening_published_at and review_stage(campaign, application) == "interview":
+        return application.status, "shortlisted", None
     if campaign.final_published_at and application.screening_decision == "shortlisted":
         return application.status, "shortlisted", campaign.final_published_at
     if campaign.screening_published_at:
@@ -248,7 +292,7 @@ def selection_overview(db, campaign):
     applications = db.query(Application).filter(
         Application.campaign_id == campaign.id, Application.status != "cancelled",
     ).order_by(Application.id).all()
-    reviews = db.query(ApplicationReview).join(Application, Application.id == ApplicationReview.application_id).filter(
+    reviews = valid_reviews_query(db).join(Application, Application.id == ApplicationReview.application_id).filter(
         Application.campaign_id == campaign.id,
     ).all()
     grouped = {}
@@ -257,6 +301,10 @@ def selection_overview(db, campaign):
     stage = review_stage(campaign)
     rows = []
     for application in applications:
+        if application.legacy_result_published:
+            continue
+        if stage == "screening" and review_stage(campaign, application) == "interview":
+            continue
         if stage == "interview" and application.screening_decision != "shortlisted":
             continue
         summary = reviewed_summary(grouped.get(application.id, []), campaign, stage)
@@ -277,6 +325,10 @@ def selection_overview(db, campaign):
         "threshold": campaign.screening_disagreement_threshold,
     }
     revision = hashlib.sha256(json.dumps(revision_data, sort_keys=True).encode()).hexdigest()
+    published_stage = "interview" if campaign.final_published_at else "screening"
+    email_counts = dict(db.query(EmailDelivery.status, func.count(EmailDelivery.id)).filter(
+        EmailDelivery.dedupe_key.like(f"recruitment-results:{campaign.id}:{published_stage}:%")
+    ).group_by(EmailDelivery.status).all())
     return {
         "stage": stage, "rows": rows, "revision": revision,
         "screening_published_at": campaign.screening_published_at,
@@ -285,6 +337,7 @@ def selection_overview(db, campaign):
         "minimum_reviews": campaign.screening_min_reviews,
         "disagreement_threshold": campaign.screening_disagreement_threshold,
         "eligible_jurors": len(active_jurors(db, campaign.id)),
+        "result_emails": {"total": sum(email_counts.values()), **email_counts},
     }
 
 
@@ -420,7 +473,8 @@ def register_recruitment_selection(router):
         row = db.get(ApplicationScreeningAssignment, (application.id, user.id))
         if row is None:
             raise HTTPException(403, "Ce dossier ne t’est pas attribué.")
-        row.declined_at, row.decline_reason = utc_now(), payload.reason.strip()
+        row.declined_at = utc_now()
+        row.decline_reason = redact_candidate_text(payload.reason.strip(), application)
         db.flush()
         result = distribute_assignments(db, campaign, user)
         create_audit_log(db, "deport_jure_recrutement", user.id, "application", application.id,

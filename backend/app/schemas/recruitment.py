@@ -375,6 +375,7 @@ class ApplicationHistoryRead(BaseModel):
 
 
 class ApplicationRead(BaseModel):
+    other_clubs_count: Optional[int] = None
     my_review: Optional[dict] = None
     screening_rubric: Optional[dict] = None
     screening_score: Optional[float] = None

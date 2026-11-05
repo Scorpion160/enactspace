@@ -20,7 +20,11 @@ from app.services.recruitment_selection import POLICY_VERSION
 
 
 class RecruitmentSelectionTests(TestCase):
-    setUp = fixture.AttachmentLifecycleTests.setUp
+    def setUp(self):
+        fixture.AttachmentLifecycleTests.setUp(self)
+        from app.services.request_rate_limit import protect_public_request
+        self.client.app.dependency_overrides[protect_public_request] = lambda: None
+
     tearDown = fixture.AttachmentLifecycleTests.tearDown
     as_user = fixture.AttachmentLifecycleTests.as_user
     make_task = fixture.AttachmentLifecycleTests.make_task
@@ -38,7 +42,7 @@ class RecruitmentSelectionTests(TestCase):
         self.db.commit()
         applications = []
         for index in range(count):
-            body = dict(self.application_payload(campaign), email=f"candidate-{index}@example.test", other_clubs_count=0)
+            body = dict(self.application_payload(campaign), email=f"candidate-{index}@example.org", other_clubs_count=0)
             applications.append(self.post("/applications", body))
         self.as_user("sg")
         members = []
@@ -129,6 +133,13 @@ class RecruitmentSelectionTests(TestCase):
         self.assertFalse(any(body["first_name"] in row.message or body["email"] in row.message
                              for row in self.db.query(Notification).filter_by(type="application_received")))
 
+    def test_blind_submissions_require_private_uploads_instead_of_document_links(self):
+        campaign, _, _ = self.prepare(count=0)
+        body = self.application_payload(campaign)
+        for field in ("cv_url", "motivation_letter_url", "attachment_url"):
+            self.post("/applications", dict(body, **{field: "https://example.org/identite.pdf"}), 422)
+        self.assertEqual(self.db.query(Application).count(), 0)
+
     def test_guessing_identity_in_search_or_export_does_not_identify_a_blind_dossier(self):
         campaign, applications, _ = self.prepare()
         app = applications[0]
@@ -144,6 +155,54 @@ class RecruitmentSelectionTests(TestCase):
         results = self.client.get("/api/recruitment/applications", params={"search": detail["anonymous_code"]})
         self.assertEqual([row["id"] for row in results.json()], [app["id"]])
 
+    def test_answers_and_review_evidence_mask_names_without_accents_and_contact_links(self):
+        from app.services.recruitment_selection import redact_candidate_text
+        campaign, applications, _ = self.prepare()
+        application = self.db.get(Application, UUID(applications[0]["id"]))
+        application.first_name = "Aïta Ndir"
+        application.last_name = "DIOP"
+        self.db.commit()
+        cleaned = redact_candidate_text(
+            "Aita, Ndir et Diop. Contact candidate-0@example.org, +221 77 123 45 67, https://example.org/profil",
+            application,
+        )
+        for text in ("Aita", "Ndir", "Diop", "candidate-0@example.org", "77 123", "https://"):
+            self.assertNotIn(text, cleaned)
+        self.assign(campaign)
+        assigned = self.db.query(ApplicationScreeningAssignment).first()
+        self.acting = self.db.get(User, assigned.reviewer_id)
+        note = assessment()
+        note["ratings"][0]["evidence"] = "Aita propose de travailler en équipe."
+        result = self.post("/reviews", {"application_id": applications[0]["id"], "criteria_assessment": note})
+        self.assertNotIn("Aita", json.dumps(result))
+        detail = self.client.get(f"/api/recruitment/applications/{application.id}")
+        self.assertNotIn("Aita", detail.text)
+
+    def test_first_filter_then_authorized_reveal_unlocks_files_for_authorities_only(self):
+        campaign, _, _ = self.prepare(count=0)
+        body = dict(self.application_payload(campaign), other_clubs_count=0)
+        response = self.client.post("/api/recruitment/applications/with-files",
+            data={"payload": json.dumps(body)}, files={"cv": ("cv.pdf", fixture.PDF)})
+        self.assertEqual(response.status_code, 200, response.text)
+        application = response.json()
+        self.as_user("sg")
+        self.assertEqual(self.client.get(application["cv_url"]).status_code, 403)
+        self.db.refresh(campaign)
+        campaign.screening_published_at = utc_now()
+        self.db.commit()
+        self.assertEqual(self.client.get(application["cv_url"]).status_code, 403)
+        self.post(f"/campaigns/{campaign.id}/selection/reveal")
+        self.assertEqual(self.client.get(application["cv_url"]).content, fixture.PDF)
+        self.as_user("veille")
+        self.assertEqual(self.client.get(application["cv_url"]).status_code, 403)
+        from app.models.pole import PoleMember
+        membership = self.db.query(PoleMember).filter_by(user_id=self.users["veille"].id, pole_id=self.watch.id).one()
+        for position in ("chef_pole", "adjoint_chef_pole"):
+            membership.position = position
+            self.db.commit()
+            self.post(f"/campaigns/{campaign.id}/selection/reveal")
+            self.assertEqual(self.client.get(application["cv_url"]).content, fixture.PDF)
+
     def test_unassigned_juror_cannot_read_or_evaluate_a_dossier(self):
         campaign, applications, members = self.prepare(jurors=4)
         self.assign(campaign)
@@ -153,6 +212,35 @@ class RecruitmentSelectionTests(TestCase):
         self.acting = self.db.get(User, outsider)
         self.assertEqual(self.client.get(f"/api/recruitment/applications/{application['id']}").status_code, 403)
         self.post("/reviews", {"application_id": application["id"], "criteria_assessment": assessment()}, 403)
+
+    def test_internal_id_and_guessed_email_cannot_unmask_a_blind_candidate(self):
+        campaign, applications, _ = self.prepare()
+        application = applications[0]
+        self.as_user("sg")
+        for reference in (application["id"], UUID(application["id"]).hex):
+            self.post("/applications/track", {
+                "application_id": reference, "email": application["email"],
+            }, 404)
+        tracked = self.post("/applications/track", {
+            "application_id": application["tracking_code"], "email": application["email"],
+        })
+        self.assertEqual(tracked["application_id"], application["id"])
+
+    def test_declining_a_dossier_reassigns_it_and_excludes_the_previous_grade(self):
+        campaign, applications, _ = self.prepare()
+        self.assign(campaign)
+        application = applications[0]
+        first = self.db.query(ApplicationScreeningAssignment).first()
+        self.rate(application, reviewer=first.reviewer_id)
+        self.post(f"/applications/{application['id']}/selection/decline", {
+            "reason": "Je pense reconnaître le candidat dans ses réponses.",
+        })
+        self.assertEqual(self.client.get(f"/api/recruitment/applications/{application['id']}").status_code, 403)
+        self.as_user("sg")
+        report = self.report(campaign)
+        self.assertEqual(report["rows"][0]["review_count"], 0)
+        self.assertEqual(self.db.query(ApplicationReview).count(), 1)
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).filter_by(declined_at=None).count(), 2)
 
     def test_five_hundred_dossiers_are_balanced_without_duplicates_on_retry(self):
         campaign, _, members = self.prepare(count=0, jurors=20)
@@ -208,7 +296,36 @@ class RecruitmentSelectionTests(TestCase):
         for application, outcome in zip(applications, ("shortlisted", "not_shortlisted")):
             tracking = self.post("/applications/track", {"application_id": application["tracking_code"], "email": application["email"]})
             self.assertEqual(tracking["screening_result"], outcome)
+            if outcome == "shortlisted":
+                self.assertIn("retenu", tracking["candidate_message"])
+                self.assertNotIn("en cours d'étude", tracking["next_step"])
+            else:
+                self.assertIn("présélection", tracking["final_result"])
         self.assertEqual(self.db.query(Application).filter_by(status="rejected").count(), 1)
+
+    def test_a_failure_preparing_the_second_mail_rolls_back_the_entire_publication(self):
+        from app.services.email_delivery_service import enqueue_email_delivery
+        campaign, applications, _ = self.prepare(count=2)
+        self.complete_screening(campaign, applications)
+        for application, decision in zip(applications, ("shortlisted", "not_shortlisted")):
+            self.post(f"/applications/{application['id']}/selection-decision", {"stage": "screening", "decision": decision})
+        self.db.refresh(campaign)
+        campaign.is_active = False
+        self.db.commit()
+        report = self.report(campaign)
+        calls = 0
+        def fail_second_mail(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return enqueue_email_delivery(*args, **kwargs) if calls == 1 else None
+        with patch.object(settings, "EMAIL_ENABLED", True), patch.object(settings, "SMTP_HOST", "smtp.example.test"), patch(
+            "app.services.email_delivery_service.enqueue_email_delivery", side_effect=fail_second_mail,
+        ):
+            self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "screening", "revision": report["revision"]}, 409)
+        self.db.expire_all()
+        self.assertIsNone(self.db.get(RecruitmentCampaign, campaign.id).screening_published_at)
+        self.assertEqual({row.status for row in self.db.query(Application)}, {"under_review"})
+        self.assertEqual(self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).count(), 0)
 
     def test_incomplete_reviews_missing_decisions_and_stale_report_block_publication(self):
         campaign, applications, _ = self.prepare()

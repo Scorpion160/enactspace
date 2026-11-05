@@ -92,6 +92,7 @@ class Application(Base):
     other_clubs: Mapped[str | None] = mapped_column(Text, nullable=True)
     other_clubs_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     screening_decision: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    legacy_result_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     pending_final_decision: Mapped[str | None] = mapped_column(String(24), nullable=True)
     contribution: Mapped[str | None] = mapped_column(Text, nullable=True)
     project_ideas: Mapped[str | None] = mapped_column(Text, nullable=True)
