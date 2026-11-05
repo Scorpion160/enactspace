@@ -71,6 +71,7 @@ void main() {
     const application = ApplicationModel(
       id: 'blind-dossier', campaignId: 'blind-campaign', firstName: 'Candidat', lastName: 'ABC',
       email: 'anonymous@example.org', status: 'under_review',
+      isAnonymized: true, canConvert: false,
       permissions: {'blind_selection': true, 'can_schedule': false},
     );
     await tester.pumpWidget(MaterialApp(home: Scaffold(
