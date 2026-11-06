@@ -5,7 +5,7 @@ from unittest.mock import patch
 from app.scripts import prelaunch_scheduled_backup as scheduled
 class ScheduledBackupSafetyTests(unittest.TestCase):
     def test_only_approved_release_revisions_are_accepted(self):
-        for revision in ("20261006_0025","20261007_0031","20261031_0033"):
+        for revision in ("20261006_0025","20261007_0031","20261031_0033","20261104_0034","20261106_0037"):
             self.assertEqual(scheduled.approved_revision(revision),revision)
         for revision in ("20261007_9999","20261031_0032","20261031_0034",None,"unexpected"):
             with self.assertRaises(ValueError):scheduled.approved_revision(revision)

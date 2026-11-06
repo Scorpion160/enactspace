@@ -88,8 +88,10 @@ class RecruitmentHistoryTests(unittest.TestCase):
         body = self.detail('?anonymized=true')
         self.assertTrue(body['is_anonymized'])
         self.assertNotEqual(body['email'], self.submission['email'])
-        for key in ('phone', 'known_enactus_from', 'questionnaire_answers', 'cv_url', 'motivation_letter_url', 'attachment_url'):
+        for key in ('phone', 'cv_url', 'motivation_letter_url', 'attachment_url'):
             self.assertIsNone(body[key], key)
+        self.assertEqual(body['department'], self.submission['department'])
+        self.assertTrue(body['questionnaire_answers'])
         self.assertFalse(body['can_convert'])
         self.assertEqual(len(body['history']), 2)
 

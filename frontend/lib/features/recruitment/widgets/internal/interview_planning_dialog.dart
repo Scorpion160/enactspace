@@ -33,6 +33,7 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
   String _teamId = '';
   bool _needsTeamChoice = false;
   String _mode = 'in_person';
+  bool _useEnactMeet = true;
   bool _loading = true, _sending = false;
   String? _error;
   @override
@@ -54,6 +55,7 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
         (app.interviewLink?.isNotEmpty == true ? 'online' : 'in_person');
     _location.text = app.interviewLocation ?? '';
     _link.text = app.interviewLink ?? '';
+    _useEnactMeet = app.interviewMeetingId != null || (app.interviewLink ?? '').isEmpty;
     _note.text = app.interviewNote ?? '';
     _selected.addAll(
       app.interviewJurors
@@ -170,7 +172,8 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
           'interview_location': _mode == 'online'
               ? null
               : _location.text.trim(),
-          'interview_link': _mode == 'in_person' ? null : _link.text.trim(),
+          'use_enactmeet': _mode != 'in_person' && _useEnactMeet,
+          'interview_link': _mode == 'in_person' || _useEnactMeet ? null : _link.text.trim(),
           'interview_note': _note.text.trim(),
           if (_teamId.isEmpty) 'jury_member_ids': _selected.toList(),
           if (_teamId.isNotEmpty) ...{
@@ -300,6 +303,14 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
               ],
               if (_mode != 'in_person') ...[
                 const SizedBox(height: 12),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Utiliser EnactMeet'),
+                  subtitle: const Text('Une salle privée pour ce candidat et son jury. Le candidat la rejoint depuis son suivi, sans compte membre.'),
+                  value: _useEnactMeet,
+                  onChanged: _sending ? null : (value) => setState(() => _useEnactMeet = value),
+                ),
+                if (!_useEnactMeet)
                 TextFormField(
                   controller: _link,
                   enabled: !_sending,

@@ -10,6 +10,7 @@ on:
       - feat/institutional-pdf-generation-v1
       - feature/recruitment-ui-20261101
       - feature/alumni-refonte-20261104
+      - feature/archives-refonte-20261104
   push:
     branches:
       - main
@@ -71,9 +72,26 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install LaTeX renderer
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended gnupg
+          sudo python3 - <<'PY'
+          from pathlib import Path
+
+          # Avoid the regional mirror that stalled the renderer download.
+          paths = [Path('/etc/apt/sources.list')]
+          paths += list(Path('/etc/apt/sources.list.d').glob('*.list'))
+          paths += list(Path('/etc/apt/sources.list.d').glob('*.sources'))
+          paths += list(Path('/etc/apt').glob('*mirror*.txt'))
+          for path in paths:
+              if path.is_file():
+                  source = path.read_text()
+                  updated = source.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  updated = updated.replace('https://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  if updated != source:
+                      path.write_text(updated)
+          PY
+          sudo apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=3 -o Acquire::https::Timeout=30 install -y --no-install-recommends texlive-latex-extra texlive-lang-french texlive-fonts-recommended gnupg
           pdflatex --version | head -n 1
 
       - name: Generate an ephemeral application secret
@@ -124,7 +142,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261104_0034 (head)"
+          test "$output" = "20261106_0037 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v
@@ -150,6 +168,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Verify EnactMeet browser attachment and cleanup
+        working-directory: .
+        run: python3 tools/test_enactmeet_web_bridge.py --browser google-chrome
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -166,13 +188,51 @@ jobs:
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
 
+      - name: Verify recruitment guide and meeting creation
+        run: flutter test --no-pub test/recruitment_team_guide_test.dart test/meetings_creation_test.dart
+
       - name: Run Flutter tests
         run: flutter test --no-pub
 
       - name: Build release web application
         run: >-
           flutter build web --release --no-pub
-          --dart-define=ENACTSPACE_API_URL=https://example.invalid
+          --build-name=1.0.28 --build-number=31
+          --dart-define=ENACTSPACE_API_URL=https://api-enactspace.kerunjombor.net
+
+      - name: Package verified web release
+        env:
+          RELEASE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, tarfile
+          web = pathlib.Path('build/web')
+          archive = pathlib.Path('build/enactspace-web.tar.gz')
+          with tarfile.open(archive, 'w:gz') as bundle:
+              for path in sorted(web.rglob('*')):
+                  if path.is_file():
+                      bundle.add(path, arcname=path.relative_to(web))
+          digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+          manifest = {
+              'source_commit': os.environ['RELEASE_SOURCE_SHA'],
+              'source_tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+              'version': json.loads((web / 'version.json').read_text()),
+              'main_sha256': digest(web / 'main.dart.js'),
+              'archive_sha256': digest(archive),
+          }
+          pathlib.Path('build/enactspace-web-release.json').write_text(json.dumps(manifest, indent=2))
+          print(json.dumps(manifest))
+          PY
+
+      - name: Preserve verified web release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: enactspace-web-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            frontend/build/enactspace-web.tar.gz
+            frontend/build/enactspace-web-release.json
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Build unsigned Android debug APK
         env:

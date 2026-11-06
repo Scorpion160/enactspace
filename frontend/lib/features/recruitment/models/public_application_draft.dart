@@ -16,6 +16,7 @@ class PublicApplicationDraft {
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
   final String? otherClubs;
+  final int otherClubsCount;
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
@@ -50,6 +51,7 @@ class PublicApplicationDraft {
     this.knownEnactusFrom,
     this.enactusKnowledge,
     this.otherClubs,
+    this.otherClubsCount = 0,
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,

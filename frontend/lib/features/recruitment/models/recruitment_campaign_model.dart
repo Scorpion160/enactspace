@@ -1,4 +1,5 @@
 import 'recruitment_question_model.dart';
+import 'recruitment_schedule_model.dart';
 
 class RecruitmentCampaignModel {
   final List<RecruitmentApplicationQuestion> applicationQuestions;
@@ -10,6 +11,8 @@ class RecruitmentCampaignModel {
   final String? startDate;
   final String? endDate;
   final bool isActive;
+  final bool eligibilityRequired;
+  final RecruitmentScheduleModel? selectionSchedule;
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
@@ -28,6 +31,8 @@ class RecruitmentCampaignModel {
     this.startDate,
     this.endDate,
     required this.isActive,
+    this.eligibilityRequired = false,
+    this.selectionSchedule,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
@@ -57,6 +62,8 @@ class RecruitmentCampaignModel {
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       isActive: json['is_active'] == true,
+      eligibilityRequired: json['eligibility_required'] == true,
+      selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
       createdBy: json['created_by']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
@@ -113,6 +120,8 @@ class RecruitmentCampaignModel {
     startDate: startDate ?? this.startDate,
     endDate: endDate ?? this.endDate,
     isActive: isActive ?? this.isActive,
+    eligibilityRequired: eligibilityRequired,
+    selectionSchedule: selectionSchedule,
     createdBy: createdBy,
     createdAt: createdAt,
     updatedAt: updatedAt,

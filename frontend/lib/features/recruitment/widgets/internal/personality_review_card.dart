@@ -199,8 +199,8 @@ class _PersonalityReviewCardState extends State<PersonalityReviewCard> {
             if (!_busy && _error == null) ...[
               Text(switch (status) {
                 'submitted' => 'Réponses terminées',
-                'declined' => 'Le candidat préfère en parler en entretien',
-                'invited' => 'Questionnaire proposé au candidat',
+                'declined' => 'Questionnaire obligatoire à compléter',
+                'invited' => 'Questionnaire obligatoire en attente de confirmation',
                 _ => 'Questionnaire non proposé',
               }),
               if (status == 'invited')
@@ -214,7 +214,7 @@ class _PersonalityReviewCardState extends State<PersonalityReviewCard> {
                 Text(
                   'Échéance : ${_data!['due_at'].toString().split('T').first} · heure de Dakar',
                 ),
-              if (mayInvite && status != 'submitted' && status != 'declined')
+              if (mayInvite && status != 'submitted')
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(

@@ -62,7 +62,7 @@ class AttachmentLifecycleTests(unittest.TestCase):
 
     def application_payload(self, campaign):
         return {"campaign_id":str(campaign.id),"first_name":"Aïta","last_name":"Test","gender":"femme",
-            "email":"candidate@example.org","phone":"771234567","department":"Génie Électrique","study_level":"DIC1",
+            "email":"candidate@example.org","phone":"771234567","department":"Génie Électrique","study_level":"DIC1","other_clubs_count":0,
             "motivation":"Agir avec les communautés et apprendre en équipe.","availability":"Quelques heures chaque semaine.",
             "questionnaire_version":questionnaire_version(campaign.application_questions),
             "questionnaire_answers":{q["id"]:"Une réponse complète pour partager mon expérience." for q in effective_questions(campaign.application_questions)}}

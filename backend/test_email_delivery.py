@@ -96,6 +96,26 @@ class EmailDeliveryTests(unittest.TestCase):
     def _claim_one(self):
         return claim_email_deliveries(self.db, limit=1)[0]
 
+    def test_pending_recruitment_notice_does_not_deliver_a_legacy_candidate_name(self):
+        from app.models.notification import Notification
+        from app.models.role import Role, UserRole
+        role = Role(name="administrateur")
+        self.db.add(role)
+        self.db.flush()
+        self.db.add(UserRole(user_id=self.user.id, role_id=role.id))
+        notification = Notification(user_id=self.user.id, title="Nouvelle candidature reçue",
+            message="Candidate Private a postulé.", type="application_received")
+        self.db.add(notification)
+        self.db.flush()
+        delivery = self._delivery(notification_id=notification.id)
+        delivery.text_body = "Candidate Private a postulé."
+        self.db.commit()
+        provider = FakeProvider()
+        status = process_email_delivery(self.db, self._claim_one(), provider)
+        self.assertEqual(status, "sent")
+        self.assertNotIn("Candidate Private", provider.messages[0].text_body)
+        self.assertNotIn("Candidate Private", provider.messages[0].html_body)
+
     def test_01_enqueue_and_dedupe(self):
         first = self._delivery(dedupe_key="same")
         second = enqueue_email_delivery(

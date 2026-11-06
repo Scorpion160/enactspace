@@ -310,7 +310,7 @@ class FirstAccessTests(unittest.TestCase):
         self.assertEqual(self.user.onboarding_completed_at,completed)
         self.assertFalse(verify_password("My own password 2026",self.user.password_hash))
         self.confirm(password="Recovered own password 2026")
-        completions=[mail["dedupe_key"] for mail in self.mail if mail["subject"]=="Votre accès EnactSpace est prêt"]
+        completions=[mail["dedupe_key"] for mail in self.mail if mail["dedupe_key"].startswith("activation-complete:")]
         self.assertEqual(len(completions),2);self.assertEqual(len(set(completions)),2)
         self.db.expire_all();self.assertTrue(self.user.email_verified);self.assertFalse(self.user.onboarding_required)
         self.call("GET","activities",actor=self.user)

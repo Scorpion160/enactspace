@@ -18,6 +18,16 @@ class RecruitmentService {
           apiClient ?? ApiClient(requestTimeout: const Duration(seconds: 90)),
       _authService = authService ?? AuthService();
 
+  Future<Map<String, dynamic>> getStatistics({String? campaignId}) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+    final response = await _apiClient.get(
+      '/recruitment/statistics${campaignId == null ? '' : '?campaign_id=${Uri.encodeQueryComponent(campaignId)}'}',
+      token: token,
+    );
+    return Map<String, dynamic>.from(response as Map);
+  }
+
   Future<List<RecruitmentCampaignModel>> getCampaigns() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -260,6 +270,7 @@ class RecruitmentService {
     String? knownEnactusFrom,
     String? enactusKnowledge,
     String? otherClubs,
+    int otherClubsCount = 0,
     String? contribution,
     String? projectIdeas,
     String? leadershipProfile,
@@ -303,6 +314,7 @@ class RecruitmentService {
       'known_enactus_from': _nullIfEmpty(knownEnactusFrom),
       'enactus_knowledge': _nullIfEmpty(enactusKnowledge),
       'other_clubs': _nullIfEmpty(otherClubs),
+      'other_clubs_count': otherClubsCount,
       'contribution': _nullIfEmpty(contribution),
       'project_ideas': _nullIfEmpty(projectIdeas),
       'leadership_profile': _nullIfEmpty(leadershipProfile),

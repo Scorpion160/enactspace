@@ -18,7 +18,7 @@ class ScopeError(RuntimeError):
 ORDER = (
     'push_deliveries', 'email_deliveries', 'notifications', 'audit_logs',
     'application_interview_teams', 'application_interview_jurors',
-    'application_personality', 'application_reviews',
+    'application_personality', 'application_screening_assignments', 'application_reviews',
     'recruitment_jury_team_members', 'recruitment_jury_teams',
     'recruitment_jury_members', 'applications', 'recruitment_campaigns',
 )
@@ -68,6 +68,7 @@ def build_scope(connection, campaign_id):
         'recruitment_jury_members': t['recruitment_jury_members'].c.campaign_id == campaign_id,
         'recruitment_jury_teams': t['recruitment_jury_teams'].c.campaign_id == campaign_id,
         'application_reviews': t['application_reviews'].c.application_id.in_(app_ids),
+        'application_screening_assignments': t['application_screening_assignments'].c.application_id.in_(app_ids),
         'application_personality': t['application_personality'].c.application_id.in_(app_ids),
         'notifications': entity_condition(t['notifications'], 'related_type', 'related_id', groups),
         'audit_logs': entity_condition(t['audit_logs'], 'entity_type', 'entity_id', groups),
@@ -90,6 +91,10 @@ def build_scope(connection, campaign_id):
         email.c.dedupe_key == f'recruitment-submission:{value}',
         email.c.dedupe_key.startswith(f'candidate-update:{value}:', autoescape=True),
         email.c.dedupe_key.startswith(f'personality-invite:{value}:', autoescape=True),
+        email.c.dedupe_key.in_([
+            f'recruitment-results:{campaign_id}:screening:{value}',
+            f'recruitment-results:{campaign_id}:interview:{value}',
+        ]),
     ) for value in app_ids))
     require(count(connection, email, and_(dedupe, email.c.notification_id.is_not(None),
                 ~email.c.notification_id.in_(notification_ids))) == 0,

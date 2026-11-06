@@ -6,6 +6,7 @@ from app.core.time import utc_now
 from datetime import date, datetime, timedelta
 import csv
 from io import StringIO
+from types import SimpleNamespace
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, File, Form, UploadFile
@@ -44,6 +45,8 @@ from app.schemas.recruitment import (
     ConvertApplicationToUserRequest,
 )
 from app.api.deps import (
+    get_current_active_validated_user,
+    can_access_recruitment,
     require_recruitment_access,
     require_sg_or_admin,
     user_has_any_role,
@@ -60,12 +63,40 @@ from app.services.operational_integrity import lock_row, to_naive_utc
 
 from app.services.recruitment_rubric import VERSION as RUBRIC_VERSION, rubric_payload, assess_ratings, structured_summary
 
+from app.services.recruitment_selection import (
+    POLICY_VERSION, uses_blind_selection, identity_is_visible, review_stage,
+    require_application_access, require_review_assignment,
+    redact_candidate_text, public_selection_state, reviewed_summary,
+    distribute_assignments, can_review_application, valid_reviews_query,
+)
+from app.services.recruitment_eligibility import eligibility_error
+
 from app.services.recruitment_access import (
-    assigned_campaign_ids, capabilities, is_recruitment_staff,
+    assigned_campaign_ids, capabilities, is_recruitment_staff, can_manage_jury,
     require_campaign_access, require_staff,
 )
 
 router = APIRouter(prefix="/recruitment", dependencies=[Depends(protect_public_request)], tags=["Recrutement"])
+
+
+@router.get('/statistics')
+def recruitment_statistics(
+    campaign_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    from app.services.recruitment_statistics import campaign_statistics
+    campaigns = db.query(RecruitmentCampaign).order_by(
+        RecruitmentCampaign.is_active.desc(), RecruitmentCampaign.created_at.desc()).all()
+    selected = next((row for row in campaigns if row.id == campaign_id), None) if campaign_id else next(iter(campaigns), None)
+    if campaign_id and selected is None:
+        raise HTTPException(404, 'Campagne introuvable.')
+    return {
+        'campaigns': [{'id': str(row.id), 'title': row.title} for row in campaigns],
+        'campaign_id': str(selected.id) if selected else None,
+        'can_access_applications': can_access_recruitment(db, current_user),
+        **campaign_statistics(db, selected.id if selected else None),
+    }
 
 
 VALID_APPLICATION_STATUSES = {
@@ -202,13 +233,14 @@ def apply_application_status(application: Application, value: str) -> bool:
     return True
 
 
-def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool = False) -> RecruitmentCampaign:
+def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool = False, exclusive_lock: bool = False) -> RecruitmentCampaign:
     query = db.query(RecruitmentCampaign).filter(
         RecruitmentCampaign.id == campaign_id
     )
     if submission_lock:
-        # Shared locks allow parallel submissions and serialize campaign edits/closure.
-        query = query.populate_existing().with_for_update(read=True)
+        # Automatic allocation needs the same exclusive campaign lock as jury edits.
+        # Read-only submission checks can retain the shared lock.
+        query = query.populate_existing().with_for_update(read=not exclusive_lock)
     campaign = query.first()
 
     if not campaign:
@@ -221,6 +253,8 @@ def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool 
 
 
 def campaign_is_open(campaign: RecruitmentCampaign) -> bool:
+    if uses_blind_selection(campaign) and campaign.screening_published_at:
+        return False
     today = utc_now().date()
     return (
         campaign.is_active
@@ -253,21 +287,17 @@ def get_application_or_404(db: Session, application_id: str) -> Application:
 
 
 def recompute_application_score(db: Session, application: Application):
-    avg_score = db.query(func.avg(ApplicationReview.score)).filter(
-        ApplicationReview.application_id == application.id,
-        ApplicationReview.score.isnot(None),
-    ).scalar()
-
     campaign = get_campaign_or_404(db, str(application.campaign_id))
-    reviews = db.query(ApplicationReview).filter(ApplicationReview.application_id == application.id).all()
+    stage = review_stage(campaign, application)
+    reviews = valid_reviews_query(db).filter(
+        ApplicationReview.application_id == application.id, ApplicationReview.stage == stage,
+    ).all()
     summary = structured_summary(reviews, campaign.screening_rubric_version or RUBRIC_VERSION)
-    if summary["screening_score"] is not None:
-        application.final_score = round(summary["screening_score"] / 5, 2)
-    elif avg_score is None:
-        application.final_score = None
-    else:
-        application.final_score = round(float(avg_score), 2)
-
+    values = [float(review.score) for review in reviews if review.score is not None]
+    application.final_score = (
+        round(summary["screening_score"] / 5, 2) if summary["screening_score"] is not None
+        else round(sum(values) / len(values), 2) if values else None
+    )
     application.updated_at = utc_now()
 
 
@@ -301,7 +331,7 @@ def notify_recruitment_responsibles(
     if not recipients:
         return
 
-    applicant_name = f"{application.first_name} {application.last_name}".strip()
+    applicant_name = anonymous_code(application) if uses_blind_selection(campaign, application) else f"{application.first_name} {application.last_name}".strip()
     title = "Nouvelle candidature reçue"
     message = (
         f"{applicant_name or application.email} a postulé à la campagne "
@@ -323,8 +353,15 @@ def notify_recruitment_responsibles(
 def notify_application_status(
     db: Session,
     application: Application,
+    *, interview_updated: bool = False,
 ) -> None:
-    enqueue_candidate_update(db, application)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and (
+        application.status in {"accepted", "rejected", "waiting_list"}
+        or (application.status == "interview_scheduled" and not campaign.screening_published_at)
+    ):
+        return
+    enqueue_candidate_update(db, application, interview_updated=interview_updated)
     if not application.converted_user_id:
         return
 
@@ -367,6 +404,7 @@ def create_campaign(
         application_questions=[q.model_dump() for q in payload.application_questions] if payload.application_questions is not None else None,
         is_active=payload.is_active,
         created_by=current_user.id,
+        selection_policy_version=POLICY_VERSION,
     )
 
     db.add(campaign)
@@ -402,6 +440,10 @@ def list_public_active_campaigns(
     return [campaign for campaign in campaigns if campaign_is_open(campaign)]
 
 
+def public_deposit_dates(campaign: RecruitmentCampaign) -> dict:
+    return {"applications_open": campaign.start_date, "applications_close": campaign.end_date}
+
+
 @router.get("/campaigns/timeline")
 def public_campaign_timeline(db: Session = Depends(get_db)):
     # Dakar is UTC year-round. End dates are inclusive, with closure at midnight
@@ -414,11 +456,13 @@ def public_campaign_timeline(db: Session = Depends(get_db)):
     return {"server_time": now.isoformat() + "Z", "timezone": "Africa/Dakar", "campaigns": [
         {"id": str(row.id), "title": row.title, "description": row.description,
          "start_date": row.start_date, "end_date": row.end_date, "is_active": True,
+         "eligibility_required": uses_blind_selection(row),
+         "selection_schedule": public_deposit_dates(row),
          "application_questions": effective_questions(row.application_questions),
          "questionnaire_version": questionnaire_version(effective_questions(row.application_questions)),
          "opens_at": datetime.combine(row.start_date, datetime.min.time()).isoformat() + "Z" if row.start_date else None,
          "closes_at": datetime.combine(row.end_date + timedelta(days=1), datetime.min.time()).isoformat() + "Z" if row.end_date else None}
-        for row in campaigns]}
+        for row in campaigns if not (uses_blind_selection(row) and row.screening_published_at)]}
 
 
 @router.get("/campaigns/{campaign_id}", response_model=RecruitmentCampaignRead)
@@ -447,6 +491,11 @@ def update_campaign(
         payload.start_date or campaign.start_date,
         payload.end_date or campaign.end_date,
     )
+    if campaign.selection_schedule and (
+        (payload.start_date is not None and payload.start_date.isoformat() != campaign.selection_schedule["applications_open"])
+        or (payload.end_date is not None and payload.end_date.isoformat() != campaign.selection_schedule["applications_close"])
+    ):
+        raise HTTPException(409, "Modifie ces dates depuis le calendrier de sélection pour conserver un planning cohérent.")
 
     if payload.title is not None:
         campaign.title = payload.title
@@ -483,7 +532,11 @@ def update_campaign(
         campaign.application_questions = [q.model_dump() for q in payload.application_questions]
     if payload.is_active is not None:
         campaign.is_active = payload.is_active
+        if payload.is_active and campaign.selection_policy_version is None:
+            campaign.selection_policy_version = POLICY_VERSION
 
+    if uses_blind_selection(campaign) and campaign.screening_published_at and payload.is_active is True:
+        raise HTTPException(409, "Une campagne ayant publié sa présélection ne peut plus recevoir de nouveaux dossiers.")
     campaign.updated_at = utc_now()
 
     db.commit()
@@ -534,13 +587,24 @@ def submit_application(
 
 
 def create_application(payload, db, attachments=None, created_files=None):
-    campaign = get_campaign_or_404(db, str(payload.campaign_id), submission_lock=True)
+    campaign = get_campaign_or_404(db, str(payload.campaign_id), submission_lock=True, exclusive_lock=True)
 
+    if uses_blind_selection(campaign) and campaign.screening_published_at:
+        raise HTTPException(409, "La présélection de cette campagne est déjà publiée.")
     if not campaign_is_open(campaign):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cette campagne de recrutement n'est pas ouverte",
         )
+    error = eligibility_error(payload.study_level, payload.other_clubs_count,
+                              require_count=uses_blind_selection(campaign))
+    if error:
+        raise HTTPException(422, error)
+    if uses_blind_selection(campaign) and any(
+        getattr(payload, field) and field not in (attachments or {})
+        for field in ("cv_url", "motivation_letter_url", "attachment_url")
+    ):
+        raise HTTPException(422, "Dépose les documents en pièces jointes pour protéger leur accès pendant la sélection anonyme.")
     first_name = payload.first_name.strip()
     last_name = payload.last_name.strip()
     gender = payload.gender.strip().lower()
@@ -626,6 +690,7 @@ def create_application(payload, db, attachments=None, created_files=None):
         known_enactus_from=payload.known_enactus_from,
         enactus_knowledge=payload.enactus_knowledge,
         other_clubs=payload.other_clubs,
+        other_clubs_count=payload.other_clubs_count,
         contribution=payload.contribution,
         project_ideas=payload.project_ideas,
         leadership_profile=payload.leadership_profile,
@@ -658,18 +723,18 @@ def create_application(payload, db, attachments=None, created_files=None):
             created_files.append(stored)
         setattr(application, field, f"/api/files/{stored.id}/download")
     ensure_tracking_code(db, application)
+    if uses_blind_selection(campaign):
+        allocation = distribute_assignments(db, campaign)
+        create_audit_log(db, "attribution_auto_dossiers_recrutement", entity_type="recruitment_campaign",
+                         entity_id=campaign.id, new_value={
+                             "source": "new_application", "created": allocation["created"],
+                             "unfilled": allocation["unfilled"],
+                         })
     notify_recruitment_responsibles(db, application, campaign)
+    from app.services.recruitment_mail_copy import application_mail
+    subject, body = application_mail("submitted", application)
     enqueue_email_delivery(
-        db,
-        recipient_email=application.email,
-        subject=f"EnactSpace - Candidature {campaign.title}",
-        text_body=(
-            f"Bonjour {application.first_name},\n\n"
-            "Votre candidature à Enactus ESP a bien été reçue.\n"
-            f"Code de suivi : {application.tracking_code}\n\n"
-            "Conservez ce code pour suivre l'avancement de votre candidature.\n"
-            f"Suivre ma candidature : {app_link('application-tracking')}"
-        ),
+        db, recipient_email=application.email, subject=subject, text_body=body,
         dedupe_key=f"recruitment-submission:{application.id}",
     )
     db.commit()
@@ -762,7 +827,18 @@ def get_application_by_public_reference(
     matches = query.filter(or_(*references)).limit(2).all()
     # An ambiguous legacy ID / tracking-code combination must not select an
     # arbitrary campaign. No result is disclosed unless exactly one matches.
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) != 1:
+        return None
+    application = matches[0]
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application):
+        try:
+            is_internal_id = uuid.UUID(normalized_reference) == application.id
+        except ValueError:
+            is_internal_id = False
+        if is_internal_id or (application.tracking_code or "").casefold() != normalized_reference.casefold():
+            return None
+    return application
 
 
 def candidate_email_ready() -> bool:
@@ -863,7 +939,21 @@ def ensure_project_membership(db: Session, user: User, project_id) -> None:
 
 
 def anonymous_code(application: Application) -> str:
-    return f"Candidat #{str(application.id).replace('-', '')[:6].upper()}"
+    return f"Candidat #{str(application.id).replace('-', '')[:12].upper()}"
+
+
+def review_payload(review, *, anonymized=False, reviewer_name=None, viewer_id=None):
+    data = ApplicationReviewRead.model_validate(review).model_dump()
+    if reviewer_name is not None:
+        data["reviewer_name"] = reviewer_name
+    # Never test a juror's own guesses against the private candidate identity.
+    # Other authors' free text stays sealed, independently of which names it contains.
+    if anonymized and review.reviewer_id != viewer_id:
+        data["comment"] = "Observations masquées pendant l’évaluation anonyme."
+        assessment = data.get("criteria_assessment") or {}
+        for rating in assessment.get("ratings", []):
+            rating["evidence"] = ""
+    return data
 
 
 def application_payload(
@@ -882,17 +972,43 @@ def application_payload(
     if current_user is not None:
         campaign = (prefetched_campaigns.get(application.campaign_id) if prefetched_campaigns is not None
                     else get_campaign_or_404(db, str(application.campaign_id)))
+        if uses_blind_selection(campaign, application):
+            anonymized = anonymized or not identity_is_visible(db, current_user, campaign)
+            permission_data = dict(permission_data)
+            manager = can_manage_jury(db, current_user)
+            permission_data.update(
+                can_decide=manager, can_convert=manager and bool(campaign.final_published_at) and permission_data.get("can_convert", False),
+                can_schedule=manager and bool(campaign.screening_published_at) and not campaign.final_published_at and application.screening_decision == "shortlisted",
+                can_review=can_review_application(db, current_user, application, campaign),
+                blind_selection=True, selection_stage=review_stage(campaign, application),
+                can_prepare_selection=manager and not campaign.final_published_at and (
+                    review_stage(campaign, application) == "screening" or application.screening_decision == "shortlisted"
+                ),
+            )
+            data["assessment_stage"] = review_stage(campaign, application)
+            data["screening_published"] = bool(campaign.screening_published_at)
+            if not manager:
+                data["screening_decision"] = None
+                data["pending_final_decision"] = None
         version = campaign.screening_rubric_version or RUBRIC_VERSION
         reviews = (prefetched_reviews.get(application.id, []) if prefetched_reviews is not None
-                   else db.query(ApplicationReview).filter(ApplicationReview.application_id == application.id).all())
-        data.update(structured_summary(reviews, version))
+                   else valid_reviews_query(db).filter(ApplicationReview.application_id == application.id).all())
+        stage = review_stage(campaign, application)
+        stage_reviews = [review for review in reviews if review.stage == stage]
+        data.update(structured_summary(stage_reviews, version))
         data["screening_rubric"] = rubric_payload(version)
-        own_review = next((review for review in reviews if review.reviewer_id == current_user.id), None)
-        data["my_review"] = ApplicationReviewRead.model_validate(own_review).model_dump() if own_review else None
+        own_review = next((review for review in stage_reviews if review.reviewer_id == current_user.id), None)
+        if uses_blind_selection(campaign, application) and own_review is None and not can_manage_jury(db, current_user):
+            data.update(screening_score=None, screening_spread=None, final_score=None)
+        data["my_review"] = review_payload(own_review, anonymized=anonymized, viewer_id=current_user.id) if own_review else None
     if include_history and current_user is not None:
         data["history"] = application_history(db, application)
     data["status"] = normalize_application_status(application.status)
     data["tracking_code"] = application.tracking_code or str(application.id)
+    if current_user is not None and uses_blind_selection(campaign, application):
+        # The personal tracking code also opens the candidate questionnaire
+        # and guest interview. It is never a credential for internal jurors.
+        data["tracking_code"] = anonymous_code(application)
     data["is_anonymized"] = anonymized
     data["anonymous_code"] = anonymous_code(application)
     data["can_convert"] = bool(current_user) and not anonymized and permission_data.get("can_convert", False)
@@ -908,7 +1024,7 @@ def application_payload(
             data["interview_needs_reassignment"] = (any(not row["active"] for row in data["interview_jurors"])
                 or bool(data["interview_team"] and data["interview_team"]["needs_update"]))
             attempt = db.get(ApplicationPersonality, application.id)
-            data["personality_status"] = ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None
+            data["personality_status"] = ("submitted" if attempt.submitted_at else "invited") if attempt else None
     if anonymized:
         code = str(application.id).replace("-", "")[:12]
         data.update(
@@ -917,21 +1033,28 @@ def application_payload(
                 "last_name": anonymous_code(application).split("#")[-1].strip(),
                 "email": f"candidate-{code}@example.com",
                 "phone": None,
-                "campus_resident": None,
-                "interview_availability": None,
-                "interview_preferences": None,
+                "gender": None,
+                "interview_location": None,
+                "interview_link": None,
+                "interview_meeting_id": None,
+                "interview_jury": None,
+                "interview_note": None,
+                "converted_user_id": None,
                 "tracking_code": anonymous_code(application),
                 "cv_url": None,
                 "motivation_letter_url": None,
-                "known_enactus_from": None,
-                "other_clubs": None,
-                "associative_experience": None,
-                "availability": None,
-                "public_comment": None,
-                "questionnaire_answers": None,
+                "availability": redact_candidate_text(application.availability, application),
+                "public_comment": redact_candidate_text(application.public_comment, application),
+                "questionnaire_answers": [dict(answer, answer=redact_candidate_text(answer.get("answer"), application) or "") for answer in (application.questionnaire_answers or [])],
                 "attachment_url": None,
             }
         )
+        for field in ("motivation", "contribution", "project_ideas", "leadership_profile", "enactus_knowledge",
+                      "known_enactus_from", "other_clubs", "associative_experience", "preferred_pole",
+                      "project_interest", "interview_availability"):
+            data[field] = redact_candidate_text(data.get(field), application)
+        if current_user is None:
+            data.update(availability=None, public_comment=None, questionnaire_answers=None)
     return data
 
 
@@ -961,11 +1084,22 @@ def track_application(
         )
 
     campaign = get_campaign_or_404(db, str(application.campaign_id))
-    normalized_status = normalize_application_status(application.status)
+    public_status, screening_result, published_at = public_selection_state(campaign, application)
+    normalized_status = normalize_application_status(public_status)
     tracking_code = ensure_tracking_code(db, application)
     from app.models.recruitment import ApplicationPersonality
     attempt = db.get(ApplicationPersonality, application.id)
     db.commit()
+    next_step = APPLICATION_TRACKING_NEXT_STEPS.get(normalized_status, "Votre dossier est en cours de traitement.")
+    candidate_message = APPLICATION_TRACKING_MESSAGES.get(normalized_status)
+    final_result = APPLICATION_FINAL_RESULTS.get(normalized_status)
+    if screening_result == "shortlisted" and normalized_status == "under_review":
+        next_step = "Ton dossier est retenu. Les informations de l’entretien seront communiquées ici et par e-mail."
+        candidate_message = "Dossier retenu pour un entretien."
+    elif screening_result == "not_shortlisted":
+        next_step = "La sélection s’arrête après l’étude du dossier pour cette campagne."
+        candidate_message = "Merci pour le temps consacré à ta candidature et pour ton intérêt pour Enactus ESP."
+        final_result = "Dossier non retenu à l’issue de la présélection."
     return {
         "application_id": application.id,
         "tracking_code": tracking_code,
@@ -978,24 +1112,25 @@ def track_application(
         "preferred_pole": application.preferred_pole,
         "project_interest": application.project_interest,
         "status": normalized_status,
+        "screening_result": screening_result,
+        "selection_schedule": public_deposit_dates(campaign),
+        "enactmeet_available": bool(application.interview_meeting_id and normalized_status == "interview_scheduled"),
+        "result_published_at": published_at,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
-        "next_step": APPLICATION_TRACKING_NEXT_STEPS.get(
-            normalized_status,
-            "Votre dossier est en cours de traitement.",
-        ),
-        "candidate_message": APPLICATION_TRACKING_MESSAGES.get(normalized_status),
+        "next_step": next_step,
+        "candidate_message": candidate_message,
         "interview_details": (
-            public_interview_details(application)
+            (public_interview_details(application) if normalized_status == "interview_scheduled" else None)
             or (
                 "Les détails de l'entretien seront communiqués dès validation interne."
                 if normalized_status == "interview_scheduled"
                 else None
             )
         ),
-        "final_result": APPLICATION_FINAL_RESULTS.get(normalized_status),
+        "final_result": final_result,
         "account_created": application.converted_user_id is not None,
-        "personality_status": ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None,
+        "personality_status": ("submitted" if attempt.submitted_at else "invited") if attempt else None,
         "personality_due_at": attempt.due_at if attempt else None,
     }
 
@@ -1016,7 +1151,22 @@ def list_applications(
     submitted_to: date | None = Query(default=None),
     anonymized: bool = Query(default=False),
 ):
+    from app.services.recruitment_selection import assignment_ids
+    from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
     query = db.query(Application)
+    if not can_manage_jury(db, current_user):
+        revealed_campaigns = db.query(RecruitmentCampaign.id).filter(
+            RecruitmentCampaign.screening_published_at.is_not(None),
+            RecruitmentCampaign.identities_revealed_at.is_not(None),
+            RecruitmentCampaign.id.in_(assigned_campaign_ids(db, current_user)),
+        )
+        interview_ids = db.query(ApplicationInterviewJuror.application_id).join(
+            RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
+        ).filter(RecruitmentJuryMember.user_id == current_user.id, RecruitmentJuryMember.is_active.is_(True))
+        legacy_campaigns = db.query(RecruitmentCampaign.id).filter(RecruitmentCampaign.selection_policy_version.is_(None))
+        query = query.filter(or_(Application.legacy_result_published.is_(True), Application.campaign_id.in_(legacy_campaigns),
+                                Application.id.in_(assignment_ids(db, current_user)), Application.id.in_(interview_ids),
+                                Application.campaign_id.in_(revealed_campaigns)))
     if not is_recruitment_staff(db, current_user):
         query = query.filter(Application.campaign_id.in_(assigned_campaign_ids(db, current_user)))
 
@@ -1034,26 +1184,6 @@ def list_applications(
             Application.status.in_([normalized_filter, *legacy_matches])
         )
 
-    if search and not anonymized:
-        pattern = f"%{search}%"
-        query = query.filter(
-            (Application.first_name.ilike(pattern)) |
-            (Application.last_name.ilike(pattern)) |
-            (Application.email.ilike(pattern)) |
-            (Application.department.ilike(pattern))
-        )
-
-    text_filters = {
-        Application.preferred_pole: preferred_pole,
-        Application.project_interest: project_interest,
-        Application.department: department,
-        Application.class_name: class_name,
-        Application.gender: gender,
-    }
-    for column, value in text_filters.items():
-        if value and value.strip():
-            query = query.filter(column.ilike(f"%{value.strip()}%"))
-
     if submitted_from:
         query = query.filter(Application.created_at >= submitted_from)
 
@@ -1065,11 +1195,11 @@ def list_applications(
         RecruitmentCampaign.id.in_({row.campaign_id for row in applications})).all()} if applications else {}
     reviews_by_application = {}
     if applications:
-        for review in db.query(ApplicationReview).filter(ApplicationReview.application_id.in_(
+        for review in valid_reviews_query(db).filter(ApplicationReview.application_id.in_(
                 [row.id for row in applications])).all():
             reviews_by_application.setdefault(review.application_id, []).append(review)
     permissions = capabilities(db, current_user)
-    return [
+    results = [
         application_payload(
             db,
             current_user,
@@ -1081,6 +1211,18 @@ def list_applications(
         )
         for application in applications
     ]
+    # Search only the authorized representation, so guessing an identity cannot
+    # reveal a matching blind dossier through filters or result counts.
+    filters = {"preferred_pole": preferred_pole, "project_interest": project_interest,
+               "department": department, "class_name": class_name, "gender": gender}
+    for field, value in filters.items():
+        if value and value.strip():
+            results = [row for row in results if value.strip().casefold() in (row.get(field) or "").casefold()]
+    if search and search.strip():
+        term = search.strip().casefold()
+        results = [row for row in results if term in " ".join(str(row.get(field) or "") for field in
+                   ("first_name", "last_name", "email", "anonymous_code", "department", "tracking_code")).casefold()]
+    return results
 
 
 @router.get("/applications/export.csv")
@@ -1090,7 +1232,6 @@ def export_applications_csv(
     campaign_id: uuid.UUID | None = None,
 ):
     require_staff(db, current_user)
-    del current_user
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(
@@ -1131,8 +1272,9 @@ def export_applications_csv(
             ApplicationReview.application_id.in_([row.id for row in applications])
         ).order_by(ApplicationReview.updated_at.desc(), ApplicationReview.id.desc()).all():
             latest_reviews.setdefault(review.application_id, review)
-    for application in applications:
-        latest_review = latest_reviews.get(application.id)
+    for original in applications:
+        application = SimpleNamespace(**application_payload(db, current_user, original))
+        latest_review = latest_reviews.get(original.id)
         status_value = normalize_application_status(application.status)
         writer.writerow(
             [
@@ -1183,7 +1325,7 @@ def get_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
-    require_campaign_access(db, current_user, application.campaign_id)
+    require_application_access(db, current_user, application)
     return application_payload(db, current_user, application, anonymized=anonymized, include_history=True)
 
 
@@ -1200,12 +1342,25 @@ def schedule_application_interview(
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
 
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and (review_stage(campaign, application) == "screening" or application.screening_decision != "shortlisted"):
+        raise HTTPException(409, "Publie d’abord la présélection de ce dossier avant de préparer son entretien.")
+    if campaign.selection_schedule:
+        from app.schemas.recruitment_schedule import RecruitmentSchedule
+        calendar = RecruitmentSchedule.model_validate(campaign.selection_schedule)
+        starts = to_naive_utc(payload.interview_at)
+        ends = to_naive_utc(payload.interview_end_at) if payload.interview_end_at else starts
+        closing = datetime.combine(calendar.interviews_end + timedelta(days=1), datetime.min.time())
+        if not calendar.interviews_start <= starts.date() <= calendar.interviews_end or ends > closing:
+            raise HTTPException(422, "L’entretien doit se dérouler dans la période prévue au calendrier de la campagne.")
     from app.services.recruitment_interviews import assign_interview
     old_interview = {
         name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
         for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link", "interview_jury", "interview_note")
     }
     assign_interview(db, application, payload)
+    from app.services.recruitment_meetings import sync_interview_meeting
+    sync_interview_meeting(db, application, payload, current_user)
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, "interview_scheduled")
 
@@ -1238,7 +1393,7 @@ def schedule_application_interview(
             for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link")
         )
         if public_interview_changed:
-            notify_application_status(db, application)
+            notify_application_status(db, application, interview_updated=True)
         create_audit_log(
             db=db, action="programmation_entretien_candidature", user_id=current_user.id,
             entity_type="application", entity_id=application.id,
@@ -1262,7 +1417,7 @@ def update_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     require_staff(db, current_user)
-    application = lock_row(db, Application, application_id)
+    application = lock_review_application(db, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
     if application.converted_user_id:
@@ -1273,6 +1428,11 @@ def update_application(
     old_status = normalize_application_status(application.status)
     status_changed = False
 
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign) and payload.model_fields_set - {"status"}:
+        raise HTTPException(409, "Les réponses et les informations du dossier restent en lecture seule pendant l’anonymat.")
+    if uses_blind_selection(campaign, application) and payload.status not in {None, "under_review"}:
+        raise HTTPException(409, "Prépare la décision puis publie les résultats de toute la campagne.")
     if payload.status is not None:
         status_changed = apply_application_status(application, payload.status)
 
@@ -1336,9 +1496,12 @@ def change_application_status(
     current_user: User = Depends(require_recruitment_access),
 ):
     require_staff(db, current_user)
-    application = lock_row(db, Application, application_id)
+    application = lock_review_application(db, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and payload.status != "under_review":
+        raise HTTPException(409, "Prépare la décision puis publie les résultats de toute la campagne.")
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, payload.status)
     if changed:
@@ -1367,7 +1530,7 @@ def delete_application(
     current_user: User = Depends(require_recruitment_access),
 ):
     require_staff(db, current_user)
-    application = lock_row(db, Application, application_id)
+    application = lock_review_application(db, application_id)
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
 
@@ -1415,7 +1578,11 @@ def create_or_update_review(
         )
 
     application = lock_review_application(db, str(payload.application_id))
-    require_campaign_access(db, current_user, application.campaign_id)
+    require_review_assignment(db, current_user, application)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    stage = review_stage(campaign, application)
+    if uses_blind_selection(campaign, application) and payload.criteria_assessment is None:
+        raise HTTPException(422, "Renseigne la grille commune avec tes observations pour chaque critère.")
     snapshot = None
     score = payload.score
     if payload.criteria_assessment is not None:
@@ -1433,6 +1600,7 @@ def create_or_update_review(
     review = db.query(ApplicationReview).filter(
         ApplicationReview.application_id == payload.application_id,
         ApplicationReview.reviewer_id == current_user.id,
+        ApplicationReview.stage == stage,
     ).first()
 
     if review:
@@ -1447,6 +1615,7 @@ def create_or_update_review(
         review = ApplicationReview(
             application_id=payload.application_id,
             reviewer_id=current_user.id,
+            stage=stage,
             score=score,
             criteria_assessment=snapshot,
             comment=payload.comment,
@@ -1456,12 +1625,20 @@ def create_or_update_review(
 
     db.flush()
 
+    if uses_blind_selection(campaign, application) and application.status == "submitted":
+        apply_application_status(application, "under_review")
     recompute_application_score(db, application)
+    if uses_blind_selection(campaign, application) and not campaign.screening_published_at:
+        distribute_assignments(db, campaign, current_user)
 
     db.commit()
     db.refresh(review)
 
-    return review
+    return review_payload(
+        review,
+        anonymized=uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign),
+        viewer_id=current_user.id,
+    )
 
 
 @router.get("/applications/{application_id}/reviews", response_model=list[ApplicationReviewRead])
@@ -1471,12 +1648,19 @@ def list_application_reviews(
     current_user: User = Depends(require_recruitment_access),
 ):
     application = get_application_or_404(db, application_id)
-    require_campaign_access(db, current_user, application.campaign_id)
+    require_application_access(db, current_user, application)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
 
-    rows = db.query(ApplicationReview, User).outerjoin(User, User.id == ApplicationReview.reviewer_id).filter(
+    rows = valid_reviews_query(db).add_entity(User).outerjoin(User, User.id == ApplicationReview.reviewer_id).filter(
         ApplicationReview.application_id == application_id
     ).order_by(ApplicationReview.created_at.desc()).all()
-    return [dict(ApplicationReviewRead.model_validate(review).model_dump(), reviewer_name=member_name(actor)) for review, actor in rows]
+    if uses_blind_selection(campaign, application) and not can_manage_jury(db, current_user):
+        stage = review_stage(campaign, application)
+        own_done = any(review.reviewer_id == current_user.id and review.stage == stage for review, _ in rows)
+        rows = [(review, actor) for review, actor in rows if review.stage == stage and (own_done or review.reviewer_id == current_user.id)]
+    anonymized = uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign)
+    return [review_payload(review, anonymized=anonymized, reviewer_name=member_name(actor), viewer_id=current_user.id)
+            for review, actor in rows]
 
 
 @router.patch("/reviews/{review_id}", response_model=ApplicationReviewRead)
@@ -1502,7 +1686,12 @@ def update_review(
         )
 
     application = lock_review_application(db, str(review.application_id))
-    require_campaign_access(db, current_user, application.campaign_id)
+    require_review_assignment(db, current_user, application)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and review.reviewer_id != current_user.id and not identity_is_visible(db, current_user, campaign):
+        raise HTTPException(403, "Pendant l’anonymat, seul l’auteur peut modifier ses observations.")
+    if uses_blind_selection(campaign, application) and review.stage != review_stage(campaign, application):
+        raise HTTPException(409, "Les évaluations de la présélection sont closes.")
     db.refresh(review)
     if payload.recommendation is not None:
         if payload.recommendation not in VALID_RECOMMENDATIONS:
@@ -1541,11 +1730,17 @@ def update_review(
 
     db.flush()
     recompute_application_score(db, application)
+    if uses_blind_selection(campaign, application) and review.stage == "screening":
+        distribute_assignments(db, campaign, current_user)
 
     db.commit()
     db.refresh(review)
 
-    return review
+    return review_payload(
+        review,
+        anonymized=uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign),
+        viewer_id=current_user.id,
+    )
 
 
 @router.delete("/reviews/{review_id}")
@@ -1570,7 +1765,12 @@ def delete_review(
         )
 
     application = lock_review_application(db, str(review.application_id))
-    require_campaign_access(db, current_user, application.campaign_id)
+    require_review_assignment(db, current_user, application)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if uses_blind_selection(campaign, application) and review.reviewer_id != current_user.id and not identity_is_visible(db, current_user, campaign):
+        raise HTTPException(403, "Pendant l’anonymat, seul l’auteur peut supprimer ses observations.")
+    if uses_blind_selection(campaign, application) and review.stage != review_stage(campaign, application):
+        raise HTTPException(409, "Les évaluations de la présélection sont closes.")
 
     db.delete(review)
     db.flush()
@@ -1606,6 +1806,8 @@ def convert_application_to_user(
     if application is None:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
 
+    if uses_blind_selection(campaign, application) and not campaign.final_published_at:
+        raise HTTPException(409, "Publie d’abord les résultats finaux de la campagne.")
     if application.status != "accepted":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

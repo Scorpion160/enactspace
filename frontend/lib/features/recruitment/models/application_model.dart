@@ -19,6 +19,7 @@ class ApplicationModel {
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
   final String? otherClubs;
+  final int? otherClubsCount;
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
@@ -40,6 +41,7 @@ class ApplicationModel {
   final DateTime? interviewAt;
   final String? interviewLocation;
   final String? interviewLink;
+  final String? interviewMeetingId;
   final String? interviewJury;
   final String? interviewNote;
   final String? cvUrl;
@@ -59,6 +61,12 @@ class ApplicationModel {
   final bool isAnonymized;
   final String? serverAnonymousCode;
   final bool canConvert;
+  final String? screeningDecision;
+  final String? pendingFinalDecision;
+  final bool screeningPublished;
+
+  bool get blindSelection => permissions['blind_selection'] == true;
+  String get assessmentStage => permissions['selection_stage']?.toString() ?? 'screening';
 
   const ApplicationModel({
     this.history = const [],
@@ -77,6 +85,7 @@ class ApplicationModel {
     this.knownEnactusFrom,
     this.enactusKnowledge,
     this.otherClubs,
+    this.otherClubsCount,
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,
@@ -98,6 +107,7 @@ class ApplicationModel {
     this.interviewAt,
     this.interviewLocation,
     this.interviewLink,
+    this.interviewMeetingId,
     this.interviewJury,
     this.interviewNote,
     this.cvUrl,
@@ -117,6 +127,9 @@ class ApplicationModel {
     required this.isAnonymized,
     this.serverAnonymousCode,
     required this.canConvert,
+    this.screeningDecision,
+    this.pendingFinalDecision,
+    this.screeningPublished = false,
   });
 
   factory ApplicationModel.fromJson(Map<String, dynamic> json) {
@@ -139,9 +152,13 @@ class ApplicationModel {
               Map<String, dynamic>.from(json['my_review']),
             )
           : null,
+      screeningDecision: json['screening_decision']?.toString(),
+      pendingFinalDecision: json['pending_final_decision']?.toString(),
+      screeningPublished: json['screening_published'] == true,
       id: json['id']?.toString() ?? '',
       campaignId: json['campaign_id']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
+      otherClubsCount: (json['other_clubs_count'] as num?)?.toInt(),
       lastName: json['last_name']?.toString() ?? '',
       gender: json['gender']?.toString(),
       email: json['email']?.toString() ?? '',
@@ -183,6 +200,7 @@ class ApplicationModel {
       interviewAt: _utcDate(json['interview_at']),
       interviewLocation: json['interview_location']?.toString(),
       interviewLink: json['interview_link']?.toString(),
+      interviewMeetingId: json['interview_meeting_id']?.toString(),
       interviewJury: json['interview_jury']?.toString(),
       interviewNote: json['interview_note']?.toString(),
       cvUrl: json['cv_url']?.toString(),

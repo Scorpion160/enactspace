@@ -5,6 +5,7 @@ from typing import Optional, Literal
 from urllib.parse import urlsplit
 from app.services.recruitment_application_metadata import academic_year, discovery_answer
 from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
+from app.schemas.recruitment_schedule import RecruitmentSchedule
 
 
 def _clean_optional_text(value: str | None) -> str | None:
@@ -139,7 +140,15 @@ def validate_question_list(values):
     return values
 
 
+class RecruitmentPublicSchedule(BaseModel):
+    """Candidate-facing deposit window; the selection calendar stays internal."""
+    applications_open: Optional[date] = None
+    applications_close: Optional[date] = None
+
+
 class RecruitmentCampaignPublicRead(BaseModel):
+    eligibility_required: bool = False
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -156,10 +165,16 @@ class RecruitmentCampaignPublicRead(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def public_questionnaire(cls, value):
+        eligibility_required = value.get("eligibility_required", False) if isinstance(value, dict) else getattr(value, "selection_policy_version", None) == "blind-selection-v1"
         if not isinstance(value, dict):
             value = {name: getattr(value, name, None) for name in cls.model_fields}
         else:
             value = dict(value)
+        value['eligibility_required'] = eligibility_required
+        value['selection_schedule'] = {
+            'applications_open': value.get('start_date'),
+            'applications_close': value.get('end_date'),
+        }
         questions = value.get('application_questions')
         value['application_questions'] = effective_questions(questions)
         value['questionnaire_version'] = questionnaire_version(questions)
@@ -269,6 +284,7 @@ class ApplicationCreate(BaseModel):
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
     other_clubs: Optional[str] = None
+    other_clubs_count: Optional[int] = Field(default=None, ge=0, le=100, strict=True)
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
@@ -318,6 +334,7 @@ class ApplicationUpdate(BaseModel):
 
 
 class ApplicationInterviewSchedule(BaseModel):
+    use_enactmeet: bool = False
     interview_at: datetime
     interview_end_at: Optional[datetime] = None
     interview_mode: Optional[Literal["in_person", "online", "hybrid"]] = None
@@ -345,7 +362,9 @@ class ApplicationInterviewSchedule(BaseModel):
     def validate_schedule(self):
         if self.interview_mode in {"in_person", "hybrid"} and not (self.interview_location or "").strip():
             raise ValueError("Précise le lieu de l’entretien.")
-        if self.interview_mode in {"online", "hybrid"} and not self.interview_link:
+        if self.use_enactmeet and self.interview_mode not in {"online", "hybrid"}:
+            raise ValueError("Choisis un entretien en ligne ou mixte pour EnactMeet.")
+        if self.interview_mode in {"online", "hybrid"} and not self.interview_link and not self.use_enactmeet:
             raise ValueError("Précise le lien de l’entretien.")
         if self.interview_end_at is not None:
             from app.services.operational_integrity import to_naive_utc
@@ -371,11 +390,16 @@ class ApplicationHistoryRead(BaseModel):
 
 
 class ApplicationRead(BaseModel):
+    other_clubs_count: Optional[int] = None
     my_review: Optional[dict] = None
     screening_rubric: Optional[dict] = None
     screening_score: Optional[float] = None
     screening_review_count: int = 0
     screening_spread: Optional[float] = None
+    assessment_stage: str = "screening"
+    screening_decision: Optional[str] = None
+    pending_final_decision: Optional[str] = None
+    screening_published: bool = False
     history: list[ApplicationHistoryRead] = Field(default_factory=list)
     questionnaire_answers: Optional[list[dict[str, str]]] = None
     id: UUID
@@ -413,6 +437,7 @@ class ApplicationRead(BaseModel):
     interview_at: Optional[datetime]
     interview_location: Optional[str]
     interview_link: Optional[str]
+    interview_meeting_id: Optional[UUID] = None
     interview_jury: Optional[str]
     interview_note: Optional[str]
     cv_url: Optional[str]
@@ -442,6 +467,8 @@ class ApplicationTrackingRequest(BaseModel):
 
 
 class ApplicationTrackingRead(BaseModel):
+    enactmeet_available: bool = False
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     application_id: UUID
     tracking_code: str
     campaign_title: str
@@ -462,6 +489,8 @@ class ApplicationTrackingRead(BaseModel):
     account_created: bool
     personality_status: Optional[str] = None
     personality_due_at: Optional[datetime] = None
+    screening_result: Optional[str] = None
+    result_published_at: Optional[datetime] = None
 
 
 class ApplicationReviewCreate(BaseModel):
@@ -480,6 +509,7 @@ class ApplicationReviewUpdate(BaseModel):
 
 
 class ApplicationReviewRead(BaseModel):
+    stage: str = "screening"
     criteria_assessment: Optional[dict] = None
     reviewer_name: Optional[str] = None
     id: UUID

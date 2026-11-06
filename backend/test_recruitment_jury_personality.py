@@ -242,14 +242,28 @@ class RecruitmentJuryPersonalityTests(TestCase):
             self.post('/personality/submit', dict(body, **changes), 422)
         self.assertIsNone(self.db.query(ApplicationPersonality).one().submitted_at)
 
-    def test_decline_erases_draft_and_does_not_reject_candidate(self):
+    def test_mandatory_questionnaire_cannot_be_declined_and_preserves_draft(self):
         app, credentials, state = self.prepare_assessment()
         self.post('/personality/save', dict(credentials, **self.answers(state)))
-        self.assertEqual(self.post('/personality/decline', credentials)['status'], 'declined')
+        self.post('/personality/decline', credentials, 422)
         stored = self.db.query(ApplicationPersonality).one()
-        self.assertEqual(stored.answers, {})
+        self.assertTrue(stored.answers)
+        self.assertIsNone(stored.declined_at)
         self.assertIsNone(stored.results)
         self.assertEqual(self.db.get(Application, app['id']).status, 'under_review')
+
+    def test_previously_declined_questionnaire_can_be_completed(self):
+        _, credentials, state = self.prepare_assessment()
+        row = self.db.query(ApplicationPersonality).one()
+        row.declined_at = utc_now()
+        self.db.commit()
+        loaded = self.post('/personality/load', credentials)
+        self.assertEqual(loaded['status'], 'invited')
+        self.assertTrue(loaded['instrument']['required'])
+        completed = self.post('/personality/submit', dict(credentials, **self.answers(state)))
+        self.assertEqual(completed['status'], 'submitted')
+        self.db.refresh(row)
+        self.assertIsNone(row.declined_at)
 
     def test_deadline_can_be_extended_and_uninvited_candidates_get_no_questionnaire(self):
         app, credentials, state = self.prepare_assessment()

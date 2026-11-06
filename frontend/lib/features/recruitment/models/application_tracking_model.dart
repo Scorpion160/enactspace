@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'application_status_presentation.dart';
+import 'recruitment_schedule_model.dart';
 
 class ApplicationTrackingModel {
   final String applicationId;
@@ -21,6 +23,9 @@ class ApplicationTrackingModel {
   final bool accountCreated;
   final String? personalityStatus;
   final DateTime? personalityDueAt;
+  final String? screeningResult;
+  final bool enactmeetAvailable;
+  final RecruitmentScheduleModel? selectionSchedule;
 
   const ApplicationTrackingModel({
     required this.applicationId,
@@ -43,10 +48,16 @@ class ApplicationTrackingModel {
     required this.accountCreated,
     this.personalityStatus,
     this.personalityDueAt,
+    this.screeningResult,
+    this.enactmeetAvailable = false,
+    this.selectionSchedule,
   });
 
   factory ApplicationTrackingModel.fromJson(Map<String, dynamic> json) {
     return ApplicationTrackingModel(
+      screeningResult: json['screening_result']?.toString(),
+      enactmeetAvailable: json['enactmeet_available'] == true,
+      selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
       applicationId: json['application_id']?.toString() ?? '',
       trackingCode: json['tracking_code']?.toString() ?? '',
       campaignTitle: json['campaign_title']?.toString() ?? 'Recrutement',
@@ -70,6 +81,31 @@ class ApplicationTrackingModel {
         json['personality_due_at']?.toString() ?? '',
       ),
     );
+  }
+
+  ApplicationStatusPresentation get presentation {
+    if (screeningResult == 'not_shortlisted') {
+      return const ApplicationStatusPresentation(
+        status: 'rejected',
+        title: 'Dossier non retenu',
+        explanation: 'La sélection s’arrête après l’étude de ton dossier pour cette campagne.',
+        nextAction: 'Merci pour le temps consacré à ta candidature. Tu peux suivre les prochaines campagnes et les activités du club.',
+        timelineStep: 2,
+        icon: Icons.info_outline_rounded,
+        terminalException: true,
+      );
+    }
+    if (screeningResult == 'shortlisted' && status == 'under_review') {
+      return const ApplicationStatusPresentation(
+        status: 'under_review',
+        title: 'Dossier retenu',
+        explanation: 'Ton dossier est retenu pour un entretien avec l’équipe.',
+        nextAction: 'Les informations de l’entretien te seront communiquées dans le suivi et par e-mail.',
+        timelineStep: 2,
+        icon: Icons.fact_check_outlined,
+      );
+    }
+    return ApplicationStatusPresentation.fromStatus(status);
   }
 
   String get statusLabel =>
@@ -108,15 +144,15 @@ class ApplicationTrackingModel {
         return 0;
       case 'under_review':
       case 'preselected':
-        return 1;
+        return screeningResult == 'shortlisted' ? 2 : 1;
       case 'interview_scheduled':
       case 'interview':
-        return 2;
+        return 3;
       case 'accepted':
       case 'rejected':
       case 'waiting_list':
       case 'cancelled':
-        return 3;
+        return screeningResult == 'not_shortlisted' ? 2 : 4;
       default:
         return 0;
     }

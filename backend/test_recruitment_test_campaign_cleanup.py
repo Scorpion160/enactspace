@@ -15,7 +15,7 @@ from app.models.notification import Notification
 from app.models.product_services import AppInstallation, PushDelivery
 from app.models.recruitment import (
     Application, ApplicationInterviewJuror, ApplicationInterviewTeam,
-    ApplicationPersonality, RecruitmentCampaign, RecruitmentJuryMember,
+    ApplicationPersonality, ApplicationScreeningAssignment, RecruitmentCampaign, RecruitmentJuryMember,
     RecruitmentJuryTeam, RecruitmentJuryTeamMember,
 )
 from app.models.stored_file import StoredFile
@@ -55,6 +55,7 @@ class TestCampaignCleanupTests(TestCase):
             ApplicationInterviewJuror(application_id=app.id, jury_member_id=member.id),
             ApplicationInterviewTeam(application_id=app.id, team_id=team.id, revision=1, name=team.name),
             ApplicationPersonality(application_id=app.id, instrument_version='synthetic', instrument_snapshot={}),
+            ApplicationScreeningAssignment(application_id=app.id, reviewer_id=self.users['b'].id),
             AuditLog(action='synthetic_campaign', entity_type='recruitment_campaign', entity_id=campaign.id),
         ])
         unrelated = Notification(user_id=self.users['a'].id, title='Keep', message='Unrelated')
@@ -68,6 +69,8 @@ class TestCampaignCleanupTests(TestCase):
                 subject='Keep even with the same recipient', text_body='Unrelated', dedupe_key='password-reset:keep'),
             EmailDelivery(recipient_email=app.email, subject='Synthetic', text_body='Scoped',
                 dedupe_key=f'personality-invite:{app.id}:open'),
+            EmailDelivery(recipient_email=app.email, subject='Synthetic result', text_body='Scoped',
+                dedupe_key=f'recruitment-results:{campaign.id}:screening:{app.id}'),
             AuditLog(action='unrelated', entity_type=None, entity_id=None),
             PushDelivery(notification_id=unrelated.id, installation_id=installation.id, token_hash_snapshot='a' * 64),
             PushDelivery(notification_id=targeted.id, installation_id=installation.id, token_hash_snapshot='a' * 64),
@@ -80,6 +83,7 @@ class TestCampaignCleanupTests(TestCase):
             result = scope.erase(connection, selected, selected['fingerprint'], today=TODAY)
             self.assertTrue(result['unrelated_rows_preserved'])
             self.assertEqual(result['deleted_counts']['application_personality'], 1)
+            self.assertEqual(result['deleted_counts']['application_screening_assignments'], 1)
             self.assertEqual(result['deleted_counts']['application_interview_teams'], 1)
             self.assertEqual(result['deleted_counts']['push_deliveries'], 1)
         self.db.expire_all()

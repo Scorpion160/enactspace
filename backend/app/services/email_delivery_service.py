@@ -201,6 +201,15 @@ def process_email_delivery(
         return "cancelled"
 
     delivery.attempt_count += 1
+    if delivery.notification_id is not None:
+        notification = db.get(Notification, delivery.notification_id)
+        if notification is not None and notification.type == "application_received":
+            # Pending messages created before blind screening may contain a name.
+            delivery.text_body = (
+                "Une candidature a été reçue. Consulte le recrutement dans EnactSpace : "
+                + app_link("recruitment")
+            )
+            delivery.html_body = render_email_html(delivery.subject, delivery.text_body)
     message = OutgoingEmail(
         recipient=delivery.recipient_email,
         subject=delivery.subject,

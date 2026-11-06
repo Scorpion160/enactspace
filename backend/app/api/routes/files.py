@@ -147,6 +147,10 @@ def ensure_file_access(
         from app.services.recruitment_access import can_access_campaign
         application = db.get(Application, stored_file.entity_id)
         if application and can_access_campaign(db, current_user, application.campaign_id):
+            from app.services.recruitment_selection import campaign_for_application, identity_is_visible, uses_blind_selection
+            campaign = campaign_for_application(db, application)
+            if uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign):
+                raise HTTPException(403, "Les documents nominatifs sont masqués pendant la sélection anonyme.")
             return
         raise HTTPException(403, "Cette pièce jointe est réservée à l’équipe recrutement.")
     if current_user.status == "active" and current_user.is_active and user_has_any_role(db, current_user.id, GLOBAL_FILE_ROLES):

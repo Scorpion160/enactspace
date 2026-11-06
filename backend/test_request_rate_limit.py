@@ -20,6 +20,18 @@ class SharedQuotaTests(unittest.TestCase):
     setUp=photo_fixture.ProfilePhotoTests.setUp
     tearDown=photo_fixture.ProfilePhotoTests.tearDown
 
+    def test_guest_interview_failures_consume_the_identity_quota(self):
+        path = "/api/recruitment/applications/interview/join"
+        scope, ip_limit, ip_seconds, _, id_seconds = limiter.POLICIES[path]
+        app = FastAPI()
+        app.dependency_overrides[get_db] = lambda: self.db
+        @app.post(path, dependencies=[Depends(limiter.protect_public_request)])
+        def attempt():
+            raise HTTPException(404, "Entretien introuvable")
+        with patch.dict(limiter.POLICIES, {path: (scope, ip_limit, ip_seconds, 1, id_seconds)}), TestClient(app) as client:
+            self.assertEqual(client.post(path, json={"email": "candidate@example.org"}).status_code, 404)
+            self.assertEqual(client.post(path, json={"email": "CANDIDATE@example.org"}).status_code, 429)
+
     def client(self,policy):
         app=FastAPI();app.dependency_overrides[get_db]=lambda:self.db
         @app.post("/api/auth/login",dependencies=[Depends(limiter.protect_public_request)])

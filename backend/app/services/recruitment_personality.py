@@ -7,7 +7,7 @@ No norms, diagnostic categories, aggregate fit score or admission recommendation
 from copy import deepcopy
 
 VERSION = "enactspace-ipip20-fr-pilot-2026-1"
-NOTICE = "Ce questionnaire porte sur ta façon de travailler et de participer à une équipe. Tes réponses aideront à préparer l’entretien. Tu peux les enregistrer pour les reprendre plus tard ou choisir d’en parler directement avec le jury. Une fois confirmées, elles seront accessibles au jury et aux responsables du recrutement de ta campagne. Ce questionnaire n’est pas un bilan psychologique."
+NOTICE = "Ce questionnaire est obligatoire pour poursuivre la sélection après la présélection. Il porte sur ta façon de travailler et de participer à une équipe. Tu peux enregistrer tes réponses et les reprendre plus tard, mais tu dois répondre à toutes les questions et confirmer leur envoi. Elles aideront le jury et les responsables du recrutement à préparer l’entretien. Ce questionnaire n’est pas un bilan psychologique."
 
 # Original Mini-IPIP order, polarity and four items per dimension.
 ITEMS = [
@@ -60,6 +60,8 @@ def instrument():
 
 def public_instrument(snapshot):
     result = deepcopy(snapshot)
+    result["notice"] = NOTICE
+    result["required"] = True
     result["items"] = [{"id": row["id"], "label": row["label"]} for row in snapshot["items"]]
     result["scenarios"] = [{key: value for key, value in row.items() if key != "observe"} for row in snapshot["scenarios"]]
     return result

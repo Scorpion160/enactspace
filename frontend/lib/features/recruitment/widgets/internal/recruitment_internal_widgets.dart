@@ -24,6 +24,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onToggleFilters;
   final VoidCallback onManageCampaigns;
+  final VoidCallback? onOpenGuide;
   final bool canManageCampaigns;
 
   const InternalRecruitmentHeader({
@@ -35,6 +36,7 @@ class InternalRecruitmentHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onToggleFilters,
     required this.onManageCampaigns,
+    this.onOpenGuide,
     this.canManageCampaigns = true,
   });
 
@@ -44,6 +46,9 @@ class InternalRecruitmentHeader extends StatelessWidget {
     subtitle:
         '$campaignLabel · $visibleCount dossier(s) affiché(s) sur $totalCount',
     actions: [
+      if (onOpenGuide != null)
+        IconButton(key: const Key('recruitment-team-guide'), onPressed: onOpenGuide,
+          tooltip: 'Guide équipe', icon: const Icon(Icons.menu_book_outlined)),
       IconButton(
         onPressed: onRefresh,
         tooltip: 'Actualiser la liste',

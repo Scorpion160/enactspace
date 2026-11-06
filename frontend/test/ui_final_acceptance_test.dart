@@ -73,6 +73,7 @@ void main() {
         'records/:kind/:id',
         '/finance',
         '/recruitment',
+        'dossiers',
         '/documents',
         'reglement-interieur',
         ':documentId',
@@ -224,7 +225,7 @@ void main() {
           '/projects',
           '/alumni',
         },
-        deniedRoutes: const {'/members', '/impact', '/recruitment'},
+        deniedRoutes: const {'/members', '/impact', '/recruitment/dossiers'},
       ),
       _ProfileExpectation(
         'chef de pôle',
@@ -313,7 +314,7 @@ void main() {
         'faculty advisor',
         _user('faculty', const {'faculty_advisor'}),
         requiredRoutes: const {'/poles', '/projects'},
-        deniedRoutes: const {'/members', '/alumni', '/impact', '/recruitment'},
+        deniedRoutes: const {'/members', '/alumni', '/impact', '/recruitment/dossiers'},
       ),
     ];
 

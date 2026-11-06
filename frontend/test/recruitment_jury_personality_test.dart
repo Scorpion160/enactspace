@@ -225,8 +225,10 @@ void main() {
       );
       expect(
         UserExperience.visibleRoutesFor(user(false)),
-        isNot(contains('/recruitment')),
+        contains('/recruitment'),
       );
+      expect(user(false).canViewRecruitment, isFalse);
+      expect(UserExperience.canAccessPath(user(false), '/recruitment/dossiers'), isFalse);
       expect(user(true).canManageMembers, isFalse);
     },
   );
@@ -259,6 +261,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        expect(find.text('Je préfère en parler en entretien'), findsNothing);
         await _tap(tester, _firstAnswer);
         expect(tester.widget<ChoiceChip>(_firstAnswer).selected, isTrue);
         expect(tester.takeException(), isNull);
@@ -410,6 +413,7 @@ void main() {
         find.widgetWithText(DropdownButtonFormField<String>, 'Format'),
       );
       await _tap(tester, find.text('En ligne').last);
+      await _tap(tester, find.text('Utiliser EnactMeet'));
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Lien de l’entretien *'),
         'https://example.org/meeting',
