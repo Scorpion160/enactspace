@@ -9,6 +9,13 @@ abstract interface class CampaignToolsProvider {
 abstract interface class RecruitmentCampaignTools {
   Future<Map<String, dynamic>> loadAccess();
   Future<Map<String, dynamic>> loadJury(String campaignId);
+  Future<Map<String, dynamic>> loadReaders(String campaignId);
+  Future<List<Map<String, dynamic>>> eligibleReaders(
+    String campaignId,
+    String search,
+  );
+  Future<void> grantReader(String campaignId, String userId);
+  Future<void> revokeReader(String campaignId, String grantId);
   Future<List<Map<String, dynamic>>> eligibleJury(
     String campaignId,
     String search,
@@ -68,6 +75,48 @@ class ApiRecruitmentCampaignTools implements RecruitmentCampaignTools {
             )
             as Map,
       );
+  @override
+  Future<Map<String, dynamic>> loadReaders(String campaignId) async =>
+      Map<String, dynamic>.from(
+        await _api.get(
+              '/recruitment/campaigns/$campaignId/viewers',
+              token: await _token(),
+            )
+            as Map,
+      );
+
+  @override
+  Future<List<Map<String, dynamic>>> eligibleReaders(
+    String campaignId,
+    String search,
+  ) async {
+    final raw = await _api.get(
+      '/recruitment/campaigns/$campaignId/viewers/eligible?search=${Uri.encodeQueryComponent(search)}',
+      token: await _token(),
+    );
+    return (raw as List)
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
+  @override
+  Future<void> grantReader(String campaignId, String userId) async {
+    await _api.postJson(
+      '/recruitment/campaigns/$campaignId/viewers',
+      token: await _token(),
+      data: {'user_id': userId},
+    );
+  }
+
+  @override
+  Future<void> revokeReader(String campaignId, String grantId) async {
+    await _api.delete(
+      '/recruitment/campaigns/$campaignId/viewers/$grantId',
+      token: await _token(),
+    );
+  }
+
   @override
   Future<List<Map<String, dynamic>>> eligibleJury(
     String campaignId,

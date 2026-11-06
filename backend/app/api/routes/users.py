@@ -4,7 +4,8 @@ from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, Request, UploadFile
-from sqlalchemy import func
+from sqlalchemy import func, text
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from app.db.database import get_db
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
 from app.models.user import User
+from app.models.email_delivery import EmailDelivery
 from app.models.stored_file import StoredFile
 from app.models.role import Role, UserRole
 from app.schemas.user import (
@@ -462,6 +464,124 @@ def list_pending_users(
     ).order_by(User.created_at.desc()).all()
 
     return [build_user_with_roles(db, user) for user in users]
+
+
+# Les suppressions irreversibles sont reservees aux administrateurs et
+# protegees par un inventaire transactionnel des dependances du compte.
+class _AccountDeletionConfirmation(BaseModel):
+    confirm_email: str = Field(min_length=3, max_length=320)
+
+
+_EPHEMERAL_ACCOUNT_LINKS = frozenset({
+    ("notifications", "user_id"),
+    ("email_deliveries", "user_id"),
+    ("auth_sessions", "user_id"),
+    ("activation_challenges", "user_id"),
+    ("password_reset_otps", "user_id"),
+    ("app_installations", "user_id"),
+    ("user_preferences", "user_id"),
+})
+
+
+def _account_deletion_review(db: Session, actor: User, target: User):
+    reasons = []
+    if target.id == actor.id:
+        reasons.append("Votre propre compte ne peut pas être supprimé.")
+    if target.status not in {"pending", "rejected", "inactive", "suspended"}:
+        reasons.append("Ce compte est intégré ou actif : utilisez la suspension, puis vérifiez ses données.")
+    linked_roles = get_user_role_names(db, target.id)
+    if linked_roles:
+        reasons.append("Des rôles Enactus sont attribués : " + ", ".join(sorted(linked_roles)))
+    # Une candidature reste indépendante du compte et ne doit jamais être effacée.
+    application_count = db.execute(text(
+        "SELECT COUNT(*) FROM applications "
+        "WHERE lower(email)=:email OR converted_user_id=:id"
+    ), {"email": target.email.strip().casefold(), "id": target.id}).scalar_one()
+    if application_count:
+        reasons.append(f"{application_count} candidature(s) associée(s) doivent être préservées.")
+
+    # Discover all database foreign keys, including those added by future modules.
+    # Nothing with an unknown dependency may be silently cascade-deleted.
+    foreign_keys = db.execute(text("""
+        SELECT c.conrelid::regclass::text, att.attname
+        FROM pg_constraint c
+        JOIN pg_attribute att ON att.attrelid=c.conrelid
+                            AND att.attnum=c.conkey[1]
+        WHERE c.contype='f' AND c.confrelid='users'::regclass
+          AND cardinality(c.conkey)=1
+    """)).all()
+    for table_name, column_name in foreign_keys:
+        name = table_name.rsplit(".", 1)[-1].strip('"')
+        column = column_name.strip('"')
+        if not name.replace("_", "").isalnum() or not column.replace("_", "").isalnum():
+            raise HTTPException(500, "Impossible de vérifier les dépendances du compte.")
+        if (name, column) in _EPHEMERAL_ACCOUNT_LINKS:
+            continue
+        count = db.execute(text(
+            f'SELECT COUNT(*) FROM "{name}" WHERE "{column}"=:id'
+        ), {"id": target.id}).scalar_one()
+        if count:
+            reasons.append(f"{count} élément(s) conservé(s) dans {name} ({column}).")
+    return reasons
+
+
+@router.get("/{user_id}/deletion-impact")
+def preview_account_deletion(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    current_user, target = lock_account_management(
+        db, current_user.id, user_id, allowed_roles={ADMIN_ROLE},
+    )
+    reasons = _account_deletion_review(db, current_user, target)
+    return {
+        "user_id": str(target.id), "email": target.email,
+        "name": (target.first_name + " " + target.last_name).strip(),
+        "can_delete": not reasons,
+        "blockers": reasons,
+        "permanent": True,
+    }
+
+
+@router.post("/{user_id}/delete-account")
+def permanently_delete_account(
+    user_id: str,
+    payload: _AccountDeletionConfirmation,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_team_leader),
+):
+    current_user, target = lock_account_management(
+        db, current_user.id, user_id, allowed_roles={ADMIN_ROLE},
+    )
+    if payload.confirm_email.strip().casefold() != target.email.strip().casefold():
+        raise HTTPException(422, "L'adresse de confirmation ne correspond pas au compte.")
+    reasons = _account_deletion_review(db, current_user, target)
+    if reasons:
+        raise HTTPException(409, {
+            "message": "Suppression bloquée pour préserver les données liées au compte.",
+            "blockers": reasons,
+        })
+    old_id, old_email = target.id, target.email
+    # Erase only the target account's operational messages. All other linked
+    # objects have been rejected by the dependency inventory above.
+    db.query(EmailDelivery).filter(EmailDelivery.user_id == old_id).delete(
+        synchronize_session=False,
+    )
+    deleted = db.query(User).filter(User.id == old_id).delete(
+        synchronize_session=False,
+    )
+    if deleted != 1:
+        raise HTTPException(409, "Le compte a changé pendant la suppression.")
+    create_audit_log(
+        db=db, action="suppression_definitive_compte",
+        user_id=current_user.id, entity_type="user", entity_id=old_id,
+        old_value={"email": old_email, "status": target.status},
+        new_value={"deleted": True}, ip_address=get_client_ip(request),
+    )
+    db.commit()
+    return {"deleted": True, "user_id": str(old_id), "permanent": True}
 
 
 @router.get("/{user_id}", response_model=UserWithRolesRead)

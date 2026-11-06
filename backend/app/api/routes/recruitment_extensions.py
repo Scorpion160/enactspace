@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_recruitment_access
 from app.core.time import utc_now
 from app.db.database import get_db
-from app.models.recruitment import Application, ApplicationPersonality, RecruitmentCampaign, RecruitmentJuryMember
+from app.models.recruitment import (
+    Application, ApplicationPersonality, RecruitmentCampaign, RecruitmentJuryMember,
+    RecruitmentViewerAccess,
+)
 from app.models.user import User
 from app.schemas.recruitment import ApplicationTrackingRequest
 from app.services.audit_service import create_audit_log
@@ -61,7 +64,7 @@ def member_payload(member, user):
 
 
 def assessment_status(row):
-    return "submitted" if row.submitted_at else "declined" if row.declined_at else "invited"
+    return "submitted" if row.submitted_at else "invited"
 
 
 def assessment_payload(row, *, candidate=False):
@@ -76,6 +79,21 @@ def assessment_payload(row, *, candidate=False):
     if row.submitted_at and not candidate:
         result["discussion_guide"] = row.instrument_snapshot["scenarios"]
     return result
+
+
+def internal_assessment_payload(db, user, application, row):
+    from app.services.recruitment_selection import (
+        campaign_for_application, identity_is_visible, redact_candidate_text, uses_blind_selection,
+    )
+    data = assessment_payload(row)
+    campaign = campaign_for_application(db, application)
+    if uses_blind_selection(campaign, application) and not identity_is_visible(db, user, campaign):
+        if "scenario_answers" in data:
+            data["scenario_answers"] = {
+                key: redact_candidate_text(value, application)
+                for key, value in data["scenario_answers"].items()
+            }
+    return data
 
 
 def public_attempt(db, payload, *, lock=False):
@@ -100,7 +118,7 @@ def editable(application, row):
         raise HTTPException(409, "Cette candidature est clôturée. Contacte l’équipe pour toute question.")
     if row.due_at and utc_now() > row.due_at:
         raise HTTPException(409, "La date prévue est passée. Contacte l’équipe pour convenir d’une suite.")
-    if row.submitted_at or row.declined_at:
+    if row.submitted_at:
         raise HTTPException(409, "Ce questionnaire est déjà terminé.")
 
 
@@ -109,6 +127,7 @@ def save_answers(row, payload, *, complete):
         raise HTTPException(409, "Une autre version de tes réponses existe. Recharge le questionnaire avant de continuer.")
     if not payload.consent:
         raise HTTPException(422, "Prends connaissance de l’utilisation des réponses avant de continuer.")
+    row.declined_at = None
     try:
         validate_answers(row.instrument_snapshot, payload.answers, payload.scenario_answers, complete=complete)
     except ValueError as error:
@@ -123,7 +142,33 @@ def save_answers(row, payload, *, complete):
         row.submitted_at = utc_now()
 
 
+def invite_required_questionnaire(db, application, actor):
+    """Prepare each shortlisted candidate's required questionnaire once."""
+    if db.get(ApplicationPersonality, application.id) is not None:
+        return
+    snapshot = instrument()
+    db.add(ApplicationPersonality(application_id=application.id,
+        instrument_version=snapshot["version"], instrument_snapshot=snapshot, invited_by=actor.id))
+    from app.services.recruitment_mail_copy import application_mail
+    subject, body = application_mail("questionnaire", application,
+        details="Merci de le compléter avant ton entretien. L’équipe précisera la date limite dans ton suivi.")
+    enqueue_email_delivery(db, recipient_email=application.email, subject=subject, text_body=body,
+        dedupe_key=f"personality-invite:{application.id}:open")
+    create_audit_log(db, "invitation_questionnaire_candidature", actor.id, "application", application.id,
+        new_value={"version": snapshot["version"], "required": True})
+
+
+def require_completed_questionnaire(db, application):
+    row = db.get(ApplicationPersonality, application.id)
+    if row is None or row.submitted_at is None:
+        raise HTTPException(409, "Le questionnaire obligatoire doit être complété et confirmé avant une admission ou une mise en liste d’attente.")
+
+
 def register_recruitment_extensions(router):
+    from app.services.recruitment_meetings import register_recruitment_meetings
+    register_recruitment_meetings(router)
+    from app.services.recruitment_selection import register_recruitment_selection
+    register_recruitment_selection(router)
     from app.services.recruitment_teams import campaign_teams, register_jury_teams
     register_jury_teams(router)
     @router.get("/access")
@@ -167,6 +212,14 @@ def register_recruitment_extensions(router):
         row.updated_at = utc_now()
         create_audit_log(db, "nomination_jury_recrutement", user.id, "recruitment_campaign", campaign_id,
                          new_value={"juror_id": str(selected.id)})
+        from app.services.recruitment_selection import distribute_assignments, uses_blind_selection
+        campaign = db.get(RecruitmentCampaign, campaign_id)
+        if uses_blind_selection(campaign) and not campaign.screening_published_at:
+            db.flush()
+            allocation = distribute_assignments(db, campaign, user)
+            create_audit_log(db, "attribution_auto_dossiers_recrutement", user.id, "recruitment_campaign", campaign_id,
+                             new_value={"source": "jury_appointment", "created": allocation["created"],
+                                        "unfilled": allocation["unfilled"]})
         db.commit()
         return member_payload(row, selected)
 
@@ -186,12 +239,112 @@ def register_recruitment_extensions(router):
         return {"ok": True, "interviews_to_reassign": [str(app.id) for app in affected], "history_preserved": True,
                 "retains_staff_access": is_recruitment_staff(db, db.get(User, row.user_id))}
 
+    @router.get("/campaigns/{campaign_id}/viewers")
+    def list_campaign_readers(campaign_id: UUID,
+                             db: Session = Depends(get_db),
+                             user: User = Depends(require_recruitment_access)):
+        jury_manager(db, user, campaign_id)
+        rows = db.query(RecruitmentViewerAccess, User).join(
+            User, User.id == RecruitmentViewerAccess.user_id
+        ).filter(RecruitmentViewerAccess.campaign_id == campaign_id).order_by(
+            User.last_name, User.first_name, User.id,
+        ).all()
+        return {"can_manage": True, "members": [{
+            "id": str(row.id), "user_id": str(member.id),
+            "name": f"{member.first_name} {member.last_name}".strip(),
+            "email": member.email, "status": member.status,
+            "active": bool(row.is_active and eligible_juror(member)),
+            "appointed": bool(row.is_active),
+            "revoked_at": row.revoked_at,
+        } for row, member in rows]}
+
+    @router.get("/campaigns/{campaign_id}/viewers/eligible")
+    def eligible_campaign_readers(
+        campaign_id: UUID, search: str = Query(default="", max_length=100),
+        db: Session = Depends(get_db),
+        user: User = Depends(require_recruitment_access),
+    ):
+        jury_manager(db, user, campaign_id)
+        query = db.query(User).filter(
+            User.is_active.is_(True), User.email_verified.is_(True),
+            User.status.in_({"active", "alumni"}),
+        )
+        if search.strip():
+            term = "%" + search.strip() + "%"
+            query = query.filter(or_(
+                User.first_name.ilike(term), User.last_name.ilike(term),
+                User.email.ilike(term),
+            ))
+        return [{
+            "id": str(row.id), "name": f"{row.first_name} {row.last_name}".strip(),
+            "email": row.email, "status": row.status,
+        } for row in query.order_by(User.last_name, User.first_name, User.id).limit(100)]
+
+    @router.post("/campaigns/{campaign_id}/viewers")
+    def grant_campaign_reader(
+        campaign_id: UUID, payload: JuryAppointment,
+        db: Session = Depends(get_db),
+        user: User = Depends(require_recruitment_access),
+    ):
+        jury_manager(db, user, campaign_id)
+        target = lock_row(db, User, payload.user_id)
+        if not eligible_juror(target):
+            raise HTTPException(422, "Choisis un enacteur ou un alumni au compte vérifié et actif.")
+        row = db.query(RecruitmentViewerAccess).filter_by(
+            campaign_id=campaign_id, user_id=target.id,
+        ).with_for_update().first()
+        if row is not None and row.is_active:
+            return {"id": str(row.id), "user_id": str(target.id),
+                    "active": True, "already_granted": True}
+        if row is None:
+            row = RecruitmentViewerAccess(campaign_id=campaign_id, user_id=target.id)
+            db.add(row)
+        row.is_active = True
+        row.granted_by = user.id
+        row.revoked_by = None
+        row.revoked_at = None
+        row.updated_at = utc_now()
+        db.flush()
+        create_audit_log(db, "acces_lecture_recrutement_accorde", user.id,
+                         "recruitment_campaign", campaign_id,
+                         new_value={"reader_id": str(target.id), "read_only": True})
+        db.commit()
+        return {"id": str(row.id), "user_id": str(target.id),
+                "active": True, "already_granted": False}
+
+    @router.delete("/campaigns/{campaign_id}/viewers/{grant_id}")
+    def revoke_campaign_reader(
+        campaign_id: UUID, grant_id: UUID,
+        db: Session = Depends(get_db),
+        user: User = Depends(require_recruitment_access),
+    ):
+        jury_manager(db, user, campaign_id)
+        row = db.query(RecruitmentViewerAccess).filter_by(
+            id=grant_id, campaign_id=campaign_id,
+        ).with_for_update().first()
+        if row is None:
+            raise HTTPException(404, "Accès temporaire introuvable.")
+        if row.is_active:
+            row.is_active = False
+            row.revoked_by = user.id
+            row.revoked_at = utc_now()
+            row.updated_at = utc_now()
+            create_audit_log(db, "acces_lecture_recrutement_retire", user.id,
+                             "recruitment_campaign", campaign_id,
+                             new_value={"reader_id": str(row.user_id)})
+        db.commit()
+        return {"ok": True, "revoked": True, "history_preserved": True}
+
     @router.post("/applications/{application_id}/personality/invite")
     def invite(application_id: UUID, payload: PersonalityInvitation,
                db: Session = Depends(get_db), user: User = Depends(require_recruitment_access)):
         from app.api.routes.recruitment import lock_review_application, normalize_application_status
         require_staff(db, user)
         app = lock_review_application(db, application_id)
+        from app.services.recruitment_selection import campaign_for_application, review_stage, uses_blind_selection
+        campaign = campaign_for_application(db, app)
+        if uses_blind_selection(campaign, app) and (review_stage(campaign, app) == "screening" or app.screening_decision != "shortlisted"):
+            raise HTTPException(409, "Publie d’abord la présélection du dossier avant l’invitation à l’entretien.")
         if normalize_application_status(app.status) not in {"under_review", "interview_scheduled", "waiting_list"}:
             raise HTTPException(409, "Passe d’abord le dossier à l’étape d’étude ou d’entretien.")
         due = to_naive_utc(payload.due_at) if payload.due_at else None
@@ -204,34 +357,35 @@ def register_recruitment_extensions(router):
                 instrument_snapshot=snapshot, invited_by=user.id, due_at=due)
             db.add(row)
             db.flush()
-        elif row.submitted_at or row.declined_at:
-            return assessment_payload(row)
+        elif row.submitted_at:
+            return internal_assessment_payload(db, user, app, row)
         elif row.due_at == due:
-            return assessment_payload(row)
+            return internal_assessment_payload(db, user, app, row)
         else:
             row.due_at, row.updated_at = due, utc_now()
         # Code/email remain in the tracking form body, never in the URL.
         deadline = due.strftime("%d/%m/%Y à %H:%M (heure de Dakar)") if due else "La date sera convenue avec l’équipe."
-        enqueue_email_delivery(db, recipient_email=app.email,
-            subject="Préparer notre échange avec Enactus ESP",
-            text_body=(f"Bonjour {app.first_name},\n\nNous te proposons un questionnaire pour préparer ton entretien. "
-                "Tu peux enregistrer tes réponses pour les reprendre plus tard, ou choisir d’en parler pendant l’entretien.\n\n"
-                f"Échéance : {deadline}\nCode de suivi : {app.tracking_code or app.id}\n"
-                f"Retrouver le questionnaire : {app_link('application-tracking')}\n\nL’équipe Enactus ESP"),
+        from app.services.recruitment_mail_copy import application_mail
+        subject, body = application_mail("questionnaire", app, details="Échéance : " + deadline)
+        enqueue_email_delivery(db, recipient_email=app.email, subject=subject, text_body=body,
             dedupe_key=f"personality-invite:{app.id}:{due.isoformat() if due else 'open'}")
         create_audit_log(db, "invitation_questionnaire_candidature", user.id, "application", app.id,
                          new_value={"version": row.instrument_version, "due_at": due.isoformat() if due else None})
         db.commit()
-        return assessment_payload(row)
+        return internal_assessment_payload(db, user, app, row)
 
     @router.get("/applications/{application_id}/personality")
     def read_internal(application_id: UUID, db: Session = Depends(get_db), user: User = Depends(require_recruitment_access)):
         app = db.get(Application, application_id)
         if app is None:
             raise HTTPException(404, "Candidature introuvable")
-        require_campaign_access(db, user, app.campaign_id)
+        from app.services.recruitment_selection import require_application_access, campaign_for_application, uses_blind_selection
+        require_application_access(db, user, app)
+        campaign = campaign_for_application(db, app)
+        if uses_blind_selection(campaign, app) and not campaign.screening_published_at:
+            return {"status": "not_invited"}
         row = db.get(ApplicationPersonality, app.id)
-        return assessment_payload(row) if row else {"status": "not_invited"}
+        return internal_assessment_payload(db, user, app, row) if row else {"status": "not_invited"}
 
     @router.post("/personality/load")
     def load_public(payload: ApplicationTrackingRequest, db: Session = Depends(get_db)):
@@ -259,11 +413,6 @@ def register_recruitment_extensions(router):
 
     @router.post("/personality/decline")
     def decline_public(payload: ApplicationTrackingRequest, db: Session = Depends(get_db)):
-        app, row = public_attempt(db, payload, lock=True)
-        if row.declined_at or row.submitted_at:
-            return assessment_payload(row, candidate=True)
-        editable(app, row)
-        row.answers, row.scenario_answers, row.results = {}, {}, None
-        row.declined_at, row.updated_at, row.revision = utc_now(), utc_now(), row.revision + 1
-        db.commit()
-        return assessment_payload(row, candidate=True)
+        public_attempt(db, payload)
+        # Reject older clients too, without erasing a candidate's draft.
+        raise HTTPException(422, "Ce questionnaire est obligatoire. Réponds à toutes les questions puis confirme leur envoi depuis ton suivi.")
