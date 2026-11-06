@@ -73,6 +73,7 @@ void main() {
         'records/:kind/:id',
         '/finance',
         '/recruitment',
+        'dossiers',
         '/documents',
         'reglement-interieur',
         ':documentId',
