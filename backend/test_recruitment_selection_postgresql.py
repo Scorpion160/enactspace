@@ -47,7 +47,9 @@ class RecruitmentSelectionPostgreSQLTests(selection_fixture.RecruitmentSelection
             self.admin.dispose()
 
     def endpoint(self, suffix):
-        return next(route.endpoint for route in self.client.app.routes
+        # Included routers may be represented lazily by FastAPI on the app.
+        # Resolve against the declaring router to exercise the actual handler.
+        return next(route.endpoint for route in selection_fixture.recruitment_routes.router.routes
                     if getattr(route, 'path', '').endswith(suffix))
 
     def test_parallel_assignment_requests_preserve_distinct_balanced_allocations(self):
