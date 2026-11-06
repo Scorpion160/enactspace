@@ -211,13 +211,14 @@ def apply_application_status(application: Application, value: str) -> bool:
     return True
 
 
-def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool = False) -> RecruitmentCampaign:
+def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool = False, exclusive_lock: bool = False) -> RecruitmentCampaign:
     query = db.query(RecruitmentCampaign).filter(
         RecruitmentCampaign.id == campaign_id
     )
     if submission_lock:
-        # Shared locks allow parallel submissions and serialize campaign edits/closure.
-        query = query.populate_existing().with_for_update(read=True)
+        # Automatic allocation needs the same exclusive campaign lock as jury edits.
+        # Read-only submission checks can retain the shared lock.
+        query = query.populate_existing().with_for_update(read=not exclusive_lock)
     campaign = query.first()
 
     if not campaign:
@@ -559,7 +560,7 @@ def submit_application(
 
 
 def create_application(payload, db, attachments=None, created_files=None):
-    campaign = get_campaign_or_404(db, str(payload.campaign_id), submission_lock=True)
+    campaign = get_campaign_or_404(db, str(payload.campaign_id), submission_lock=True, exclusive_lock=True)
 
     if uses_blind_selection(campaign) and campaign.screening_published_at:
         raise HTTPException(409, "La présélection de cette campagne est déjà publiée.")
@@ -695,6 +696,13 @@ def create_application(payload, db, attachments=None, created_files=None):
             created_files.append(stored)
         setattr(application, field, f"/api/files/{stored.id}/download")
     ensure_tracking_code(db, application)
+    if uses_blind_selection(campaign):
+        allocation = distribute_assignments(db, campaign)
+        create_audit_log(db, "attribution_auto_dossiers_recrutement", entity_type="recruitment_campaign",
+                         entity_id=campaign.id, new_value={
+                             "source": "new_application", "created": allocation["created"],
+                             "unfilled": allocation["unfilled"],
+                         })
     notify_recruitment_responsibles(db, application, campaign)
     enqueue_email_delivery(
         db,

@@ -10,12 +10,12 @@ Dans le panneau de sélection de la campagne concernée, ouvrir le calendrier, c
 | --- | --- |
 | Diffusion et ouverture du formulaire | 6 novembre 2026 |
 | Clôture des dépôts | 9 novembre 2026 à la fin de la journée |
-| Étude des dossiers | du 9 au 14 novembre 2026 |
+| Étude des dossiers | dès les premières candidatures, puis finalisation jusqu’au 14 novembre 2026 |
 | Première annonce groupée | 15 novembre 2026, proposition à confirmer avant l’enregistrement |
 | Entretiens | du 16 au 21 novembre 2026 |
 | Résultats finaux | 24 novembre 2026 |
 
-Le 15 est proposé pour informer les dossiers retenus et non retenus ensemble après le tri et avant les entretiens. Les dépôts restent possibles pendant toute la journée du 9 ; leur fermeture est effective le 10 à 00 h, heure de Dakar. Le début du tri le 9 peut donc chevaucher les derniers dépôts.
+Le 15 est proposé pour informer les dossiers retenus et non retenus ensemble après le tri et avant les entretiens. Les dépôts restent possibles pendant toute la journée du 9 ; leur fermeture est effective le 10 à 00 h, heure de Dakar. L’étude et les évaluations peuvent commencer dès le premier dépôt, sans attendre le 9 ni la clôture. Le modèle prévoit désormais le début de l’étude dès l’ouverture, le 6. Les dates d’étude restent indicatives pour l’organisation et ne bloquent pas une évaluation anticipée ; aucun calendrier déjà enregistré n’est remplacé automatiquement.
 
 Les responsables habilités peuvent modifier toutes les dates à tout moment, y compris après la présélection et les résultats finaux. Le journal conserve l’auteur, la date, l’ancien calendrier et le nouveau. Le calendrier actualisé est visible dans le suivi ; aucun mail n’est déclenché par cette modification. Prévenir les candidats d’un report reste donc une communication à organiser.
 
@@ -33,7 +33,7 @@ Le suivi comprend réception, étude, résultat du dossier, entretien et décisi
 
 1. Nommer les jurés actifs de la campagne.
 2. Sélectionner la campagne dans l’espace recrutement et ouvrir le panneau de présélection.
-3. Répartir les dossiers : deux avis indépendants par défaut, réglables de deux à cinq. La répartition aléatoire équilibre la charge et une relance complète seulement les attributions manquantes.
+3. Dès chaque nouveau dépôt, les dossiers sont attribués automatiquement aux jurés disponibles : deux avis indépendants par défaut, réglables de deux à cinq. Les arrivées et les affectations sont sérialisées par campagne pour conserver l’équilibre et éviter les doublons. Les attributions automatiques sont journalisées. Si le jury est encore incomplet, le dépôt est conservé et les nominations suivantes complètent les attributions manquantes. Le bouton de répartition reste disponible pour compléter les besoins, sans effacer les notes et attributions existantes.
 4. Chaque juré utilise la grille commune sur ses dossiers. Un écart d’au moins 20 points sur 100 déclenche un avis supplémentaire ; ce seuil est réglable. S’il manque un juré disponible, compléter le jury puis relancer la répartition.
 5. Un juré qui reconnaît une personne peut demander un autre évaluateur. Son attribution et son éventuelle note sont écartées du calcul, avec conservation de la trace d’audit.
 6. Préparer une décision par dossier, puis clôturer les dépôts avant de publier la présélection.

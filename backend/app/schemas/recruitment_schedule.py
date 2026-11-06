@@ -27,7 +27,7 @@ class RecruitmentSchedule(BaseModel):
 
 NOVEMBER_2026_SCHEDULE = {
     "applications_open": "2026-11-06", "applications_close": "2026-11-09",
-    "screening_start": "2026-11-09", "screening_end": "2026-11-14",
+    "screening_start": "2026-11-06", "screening_end": "2026-11-14",
     "screening_results": "2026-11-15",
     "interviews_start": "2026-11-16", "interviews_end": "2026-11-21",
     "final_results": "2026-11-24",

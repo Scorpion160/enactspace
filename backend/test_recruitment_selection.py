@@ -98,6 +98,56 @@ class RecruitmentSelectionTests(TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_new_dossiers_are_allocated_and_reviewed_while_submissions_remain_open(self):
+        campaign, _, _ = self.prepare(count=0)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        body = self.application_payload(campaign)
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 6, 10)):
+            first = self.post("/applications", body)
+            first_id = UUID(first["id"])
+            original = {row.reviewer_id for row in self.db.query(ApplicationScreeningAssignment).filter_by(application_id=first_id)}
+            self.assertEqual(len(original), 2)
+            self.assertTrue(all(row.assigned_by is None for row in self.db.query(ApplicationScreeningAssignment)))
+            review = self.rate(first, reviewer=next(iter(original)))
+            self.as_user("sg")
+            self.post(f"/applications/{first_id}/selection-decision", {"stage": "screening", "decision": "shortlisted"})
+            report = self.report(campaign)
+            with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 6, 10)):
+                rejected = self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "screening", "revision": report["revision"]}, 409)
+                self.assertIn("Clôture", rejected["detail"])
+            response = self.client.post("/api/recruitment/applications/with-files",
+                data={"payload": json.dumps(dict(body, email="later-arrival@example.org"))},
+                files={"cv": ("cv.pdf", fixture.PDF)})
+            self.assertEqual(response.status_code, 200, response.text)
+            later = response.json()
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).filter_by(application_id=UUID(later["id"])).count(), 2)
+        self.assertEqual({row.reviewer_id for row in self.db.query(ApplicationScreeningAssignment).filter_by(application_id=first_id)}, original)
+        self.assertEqual(str(self.db.query(ApplicationReview).one().id), review["id"])
+        loads = self.assign(campaign)["loads"]
+        self.assertEqual(sorted(row["assigned_count"] for row in loads), [1, 1, 2])
+        self.assertEqual(self.client.get(later["cv_url"]).status_code, 403)
+        tracking = self.post("/applications/track", {"application_id": first["tracking_code"], "email": first["email"]})
+        self.assertEqual(tracking["status"], "under_review")
+        self.assertIsNone(tracking["screening_result"])
+        self.db.refresh(campaign)
+        self.assertIsNone(campaign.screening_published_at)
+        self.assertEqual(self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).count(), 0)
+
+    def test_late_jury_appointments_fill_waiting_dossiers_without_blocking_new_submissions(self):
+        campaign, applications, _ = self.prepare(jurors=0)
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).count(), 0)
+        self.post(f"/campaigns/{campaign.id}/jury", {"user_id": str(self.users["a"].id)})
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).count(), 1)
+        later = self.post("/applications", dict(self.application_payload(campaign), email="while-jury-incomplete@example.org"))
+        self.assertEqual(self.db.query(Application).count(), 2)
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).count(), 2)
+        self.post(f"/campaigns/{campaign.id}/jury", {"user_id": str(self.users["b"].id)})
+        for application in (applications[0], later):
+            assignments = self.db.query(ApplicationScreeningAssignment).filter_by(application_id=UUID(application["id"])).all()
+            self.assertEqual({row.reviewer_id for row in assignments}, {self.users["a"].id, self.users["b"].id})
+        self.post(f"/campaigns/{campaign.id}/jury", {"user_id": str(self.users["b"].id)})
+        self.assertEqual(self.db.query(ApplicationScreeningAssignment).count(), 4)
+
     def test_planning_controls_the_submission_window_and_exposes_the_public_dates(self):
         campaign, _, members = self.prepare(count=0)
         self.acting = self.db.get(User, members[0].user_id)

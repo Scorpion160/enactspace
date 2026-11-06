@@ -184,6 +184,14 @@ def register_recruitment_extensions(router):
         row.updated_at = utc_now()
         create_audit_log(db, "nomination_jury_recrutement", user.id, "recruitment_campaign", campaign_id,
                          new_value={"juror_id": str(selected.id)})
+        from app.services.recruitment_selection import distribute_assignments, uses_blind_selection
+        campaign = db.get(RecruitmentCampaign, campaign_id)
+        if uses_blind_selection(campaign) and not campaign.screening_published_at:
+            db.flush()
+            allocation = distribute_assignments(db, campaign, user)
+            create_audit_log(db, "attribution_auto_dossiers_recrutement", user.id, "recruitment_campaign", campaign_id,
+                             new_value={"source": "jury_appointment", "created": allocation["created"],
+                                        "unfilled": allocation["unfilled"]})
         db.commit()
         return member_payload(row, selected)
 

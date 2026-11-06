@@ -185,7 +185,7 @@ def required_reviews(campaign, summary):
     return minimum + (1 if spread is not None and spread >= (campaign.screening_disagreement_threshold or 20) else 0)
 
 
-def distribute_assignments(db, campaign, actor):
+def distribute_assignments(db, campaign, actor=None):
     """Top up missing assignments, keeping reviews and existing appointments."""
     if campaign.screening_published_at:
         raise HTTPException(409, "La présélection est déjà publiée.")
@@ -217,7 +217,7 @@ def distribute_assignments(db, campaign, actor):
     for row in reviews:
         if row.reviewer_id in active_ids and row.reviewer_id not in excluded.get(row.application_id, set()):
             new = ApplicationScreeningAssignment(
-                application_id=row.application_id, reviewer_id=row.reviewer_id, assigned_by=actor.id,
+                application_id=row.application_id, reviewer_id=row.reviewer_id, assigned_by=actor.id if actor else None,
             )
             db.add(new)
             excluded.setdefault(row.application_id, set()).add(row.reviewer_id)
@@ -237,7 +237,7 @@ def distribute_assignments(db, campaign, actor):
         candidates.sort(key=lambda user_id: loads[user_id])
         for user_id in candidates[:needed]:
             db.add(ApplicationScreeningAssignment(
-                application_id=application.id, reviewer_id=user_id, assigned_by=actor.id,
+                application_id=application.id, reviewer_id=user_id, assigned_by=actor.id if actor else None,
             ))
             loads[user_id] += 1
             created += 1

@@ -138,6 +138,8 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           ),
           const SizedBox(height: 14),
           const Text('Les décisions préparées restent internes jusqu’à la publication du lot.'),
+          const SizedBox(height: 8),
+          const Text('L’étude peut commencer dès les premiers dépôts. Les nouveaux dossiers sont attribués automatiquement aux jurés disponibles, sans attendre la clôture. Le bouton de répartition permet de compléter les attributions si nécessaire.'),
           const SizedBox(height: 12),
           if (report == null && _error == null) const LinearProgressIndicator(),
           if (screening && !completed) ...[

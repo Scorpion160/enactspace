@@ -14,6 +14,7 @@ from test_recruitment_jury_postgresql import test_url
 from app.core.config import settings
 from app.models.email_delivery import EmailDelivery
 from app.models.recruitment import ApplicationScreeningAssignment
+from app.schemas.recruitment import ApplicationCreate
 from app.models.user import User
 from app.services.recruitment_selection import AssignmentSettings, SelectionPublication
 
@@ -68,6 +69,26 @@ class RecruitmentSelectionPostgreSQLTests(selection_fixture.RecruitmentSelection
             results = list(executor.map(lambda _: run(), range(2)))
         self.assertEqual(sorted(result['created'] for result in results), [0, 6])
         self.assertEqual(self.db.query(ApplicationScreeningAssignment).count(), 6)
+
+    def test_parallel_new_submissions_allocate_distinct_balanced_reviews_immediately(self):
+        campaign, _, _ = self.prepare(count=0)
+        body = self.application_payload(campaign)
+        barrier = Barrier(2)
+
+        def submit(index):
+            payload = ApplicationCreate.model_validate(dict(body, email=f"concurrent-arrival-{index}@example.org"))
+            with Session(self.engine) as db:
+                barrier.wait(10)
+                return selection_fixture.recruitment_routes.create_application(payload, db)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(submit, range(2)))
+        assignments = self.db.query(ApplicationScreeningAssignment).all()
+        self.assertEqual(len(assignments), 4)
+        for application in results:
+            self.assertEqual(len({row.reviewer_id for row in assignments if str(row.application_id) == str(application['id'])}), 2)
+        loads = self.assign(campaign)['loads']
+        self.assertEqual(sorted(row['assigned_count'] for row in loads), [1, 1, 2])
 
     def test_parallel_publications_create_one_result_and_one_mail_per_candidate(self):
         campaign, applications, _ = self.prepare(count=2)
