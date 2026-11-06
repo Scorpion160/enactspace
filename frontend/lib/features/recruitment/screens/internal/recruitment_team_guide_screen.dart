@@ -27,9 +27,13 @@ class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen>
       body: FutureBuilder<Map<String, dynamic>>(
         future: _guide,
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Padding(padding: EdgeInsets.all(24),
-            child: Text('Le guide n’a pas pu être ouvert. Ferme cette page puis réessaie.')));
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError) {
+            return const Center(child: Padding(padding: EdgeInsets.all(24),
+              child: Text('Le guide n’a pas pu être ouvert. Ferme cette page puis réessaie.')));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final guide = snapshot.data!;
           final sections = (guide['sections'] as List).cast<Map>().where(_matches).toList();
           final mails = (guide['mails'] as List).cast<Map>().where(_matches).toList();
