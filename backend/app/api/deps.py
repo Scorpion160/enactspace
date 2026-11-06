@@ -247,10 +247,10 @@ def require_finance_or_admin(
 
 
 def can_access_recruitment(db: Session, current_user: User) -> bool:
-    from app.services.recruitment_access import eligible_juror, is_recruitment_staff, assigned_campaign_ids
+    from app.services.recruitment_access import eligible_juror, is_recruitment_staff, is_enachef, assigned_campaign_ids
     if not eligible_juror(current_user):
         return False
-    return is_recruitment_staff(db, current_user) or db.execute(
+    return is_recruitment_staff(db, current_user) or is_enachef(db, current_user) or db.execute(
         assigned_campaign_ids(db, current_user).limit(1)).first() is not None
 
 

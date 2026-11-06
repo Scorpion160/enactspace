@@ -142,6 +142,33 @@ class MembersService {
     return _postMemberAction(userId, 'reactivate');
   }
 
+  Future<Map<String, dynamic>> previewAccountDeletion(String userId) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    final result = await _apiClient.get(
+      '/users/$userId/deletion-impact',
+      token: token,
+    );
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  Future<void> permanentlyDeleteAccount({
+    required String userId,
+    required String confirmEmail,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    await _apiClient.postJson(
+      '/users/$userId/delete-account',
+      token: token,
+      data: {'confirm_email': confirmEmail},
+    );
+  }
+
   Future<Map<String, dynamic>> previewAlumni(String memberId) async {
     final token = await _authService.getToken();
     final result = await _apiClient.get(

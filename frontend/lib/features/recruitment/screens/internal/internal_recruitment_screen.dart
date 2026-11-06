@@ -134,7 +134,19 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     String sortKey(ApplicationModel row) => hideNames
         ? (row.trackingCode ?? row.anonymousCode)
         : '${row.lastName} ${row.firstName}'.toLowerCase();
+    final evaluator = _access['can_review_any'] == true;
     result.sort((a, b) {
+      if (evaluator) {
+        // Prioritize candidates missing assessments (0, 1, 2 before 3+).
+        final countComparison = a.screeningReviewCount.compareTo(
+          b.screeningReviewCount,
+        );
+        if (countComparison != 0) return countComparison;
+        // For identical totals, show unreviewed candidates first.
+        final ownA = a.myReview != null ? 1 : 0;
+        final ownB = b.myReview != null ? 1 : 0;
+        if (ownA != ownB) return ownA.compareTo(ownB);
+      }
       final comparison = sortKey(a).compareTo(sortKey(b));
       return comparison == 0 ? a.id.compareTo(b.id) : comparison;
     });

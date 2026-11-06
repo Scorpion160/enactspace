@@ -50,6 +50,7 @@ from app.models.recruitment import (
     RecruitmentCampaign,
     Application,
     ApplicationReview,
+    RecruitmentViewerAccess,
 )
 from app.models.alumni import AlumniProfile, Mentorship
 from app.models.notification import Notification

@@ -6,6 +6,7 @@ import '../../models/recruitment_campaign_model.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
 import '../../widgets/internal/jury_teams_section.dart';
+import '../../widgets/internal/recruitment_viewers_section.dart';
 
 class RecruitmentJuryScreen extends StatefulWidget {
   final ValueChanged<RecruitmentSection>? onSectionSelected;
@@ -205,7 +206,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
               const RecruitmentPageHeading(
                 title: 'Le jury de la campagne',
                 subtitle:
-                    'Des générations qui se rencontrent : enacteurs et alumni sélectionnés évaluent les dossiers. Les responsables organisent les équipes et les décisions.',
+                    'Chaque juré peut évaluer tous les dossiers (minimum 3 avis par candidat). EnacChef suit les candidatures. Les accès temporaires sont gérés séparément.',
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
@@ -440,6 +441,14 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                   );
                 },
               ),
+              if (canManage && _campaign != null) ...[
+                const SizedBox(height: 20),
+                RecruitmentViewersSection(
+                  key: ValueKey('readers-$_campaign'),
+                  campaignId: _campaign!,
+                  tools: widget.tools,
+                ),
+              ],
             ],
           ),
         ),

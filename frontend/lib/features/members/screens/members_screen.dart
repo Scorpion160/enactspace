@@ -234,6 +234,131 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _deleteMemberAccount(MemberModel member) async {
+    if (_userExperience?.isAdmin != true || member.id == _userExperience?.id) {
+      return;
+    }
+    Map<String, dynamic> review;
+    try {
+      review = await _membersService.previewAccountDeletion(member.id);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Vérification impossible : ${error.toString().replaceAll('Exception: ', '')}',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    if (review['can_delete'] != true) {
+      final reasons = (review['blockers'] as List? ?? const [])
+          .map((reason) => reason.toString())
+          .toList();
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Suppression impossible'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Text(
+                'Ce compte possède des données à préserver. '
+                'Vous pouvez le suspendre ou régulariser les éléments '
+                'indiqués avant sa suppression.\n\n'
+                '${reasons.map((reason) => '• $reason').join('\n')}',
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final controller = TextEditingController();
+    final confirmation = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Supprimer définitivement le compte ?'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 510),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Compte : ${member.displayName}'),
+                  SelectableText(member.email),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Cette suppression est irréversible. Elle ne doit '
+                    'être utilisée que pour les comptes créés par erreur. '
+                    'Les comptes ayant des données importantes sont bloqués.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: "Recopiez l'adresse e-mail pour confirmer",
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton.icon(
+              onPressed:
+                  controller.text.trim().toLowerCase() ==
+                      member.email.toLowerCase()
+                  ? () => Navigator.pop(dialogContext, true)
+                  : null,
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: const Text('Supprimer définitivement'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (confirmation != true || !mounted) return;
+    try {
+      await _membersService.permanentlyDeleteAccount(
+        userId: member.id,
+        confirmEmail: member.email,
+      );
+      await _loadMembers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Compte de ${member.displayName} supprimé.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Suppression refusée : ${error.toString().replaceAll('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _openAssignRoleDialog(MemberModel member) async {
     final updated = await showDialog<bool>(
       context: context,
@@ -558,10 +683,12 @@ class _MembersScreenState extends State<MembersScreen> {
                     canManageMembers: canManageMembers,
                     canReviewJoinRequests: canReviewJoinRequests,
                     canManageLifecycle: canManageLifecycle,
+                    canDeleteAccounts: _userExperience?.isAdmin == true,
                     currentUserId: _userExperience?.id,
                     onApprove: _approveMember,
                     onReject: _rejectMember,
                     onManageLifecycle: _openLifecycleDialog,
+                    onDelete: _deleteMemberAccount,
                     onAssignRole: _openAssignRoleDialog,
                     onEdit: _openEditMemberDialog,
                     onAssignDepartment: _openAssignDepartmentDialog,
@@ -800,10 +927,12 @@ class _MembersList extends StatelessWidget {
   final bool canManageMembers;
   final bool canReviewJoinRequests;
   final bool canManageLifecycle;
+  final bool canDeleteAccounts;
   final String? currentUserId;
   final ValueChanged<MemberModel> onApprove;
   final ValueChanged<MemberModel> onReject;
   final ValueChanged<MemberModel> onManageLifecycle;
+  final ValueChanged<MemberModel> onDelete;
   final ValueChanged<MemberModel> onAssignRole;
   final ValueChanged<MemberModel> onEdit;
   final ValueChanged<MemberModel> onAssignDepartment;
@@ -814,10 +943,12 @@ class _MembersList extends StatelessWidget {
     required this.canManageMembers,
     required this.canReviewJoinRequests,
     required this.canManageLifecycle,
+    required this.canDeleteAccounts,
     required this.currentUserId,
     required this.onApprove,
     required this.onReject,
     required this.onManageLifecycle,
+    required this.onDelete,
     required this.onAssignRole,
     required this.onEdit,
     required this.onAssignDepartment,
@@ -994,6 +1125,13 @@ class _MembersList extends StatelessWidget {
                                 icon: Icon(Icons.manage_accounts_outlined),
                                 tooltip: 'Gérer le compte',
                               ),
+                            if (canDeleteAccounts && member.id != currentUserId)
+                              IconButton(
+                                onPressed: () => onDelete(member),
+                                icon: const Icon(Icons.delete_forever_outlined),
+                                color: Theme.of(context).colorScheme.error,
+                                tooltip: 'Supprimer définitivement le compte',
+                              ),
                           ],
                         ),
                       ),
@@ -1042,6 +1180,9 @@ class _MembersList extends StatelessWidget {
                       ? () => onReject(member)
                       : null,
                   onManageLifecycle: () => onManageLifecycle(member),
+                  canDeleteAccount:
+                      canDeleteAccounts && member.id != currentUserId,
+                  onDelete: () => onDelete(member),
                   onAssignRole: () => onAssignRole(member),
                   onEdit: onEdit,
                   onAssignDepartment: () => onAssignDepartment(member),
@@ -1223,10 +1364,12 @@ class _MemberCard extends StatelessWidget {
   final bool canManageMembers;
   final bool canReviewJoinRequests;
   final bool canManageLifecycle;
+  final bool canDeleteAccount;
   final VoidCallback onDetails;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
   final VoidCallback onManageLifecycle;
+  final VoidCallback onDelete;
   final VoidCallback onAssignRole;
   final ValueChanged<MemberModel> onEdit;
   final VoidCallback onAssignDepartment;
@@ -1237,10 +1380,12 @@ class _MemberCard extends StatelessWidget {
     required this.canManageMembers,
     required this.canReviewJoinRequests,
     required this.canManageLifecycle,
+    required this.canDeleteAccount,
     required this.onDetails,
     required this.onApprove,
     required this.onReject,
     required this.onManageLifecycle,
+    required this.onDelete,
     required this.onAssignRole,
     required this.onEdit,
     required this.onAssignDepartment,
@@ -1309,6 +1454,9 @@ class _MemberCard extends StatelessWidget {
                         case _MemberAction.manageLifecycle:
                           onManageLifecycle();
                           break;
+                        case _MemberAction.deleteAccount:
+                          onDelete();
+                          break;
                       }
                     },
                     itemBuilder: (context) => [
@@ -1370,6 +1518,17 @@ class _MemberCard extends StatelessWidget {
                           child: ListTile(
                             leading: Icon(Icons.manage_accounts_outlined),
                             title: Text('Gérer le compte'),
+                          ),
+                        ),
+                      if (canDeleteAccount)
+                        const PopupMenuItem(
+                          value: _MemberAction.deleteAccount,
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.delete_forever_outlined,
+                              color: Colors.red,
+                            ),
+                            title: Text('Supprimer le compte'),
                           ),
                         ),
                     ],
@@ -1451,6 +1610,13 @@ class _MemberCard extends StatelessWidget {
                       icon: Icon(Icons.manage_accounts_outlined),
                       tooltip: 'Gérer le compte',
                     ),
+                  if (canDeleteAccount)
+                    IconButton(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_forever_outlined),
+                      color: Theme.of(context).colorScheme.error,
+                      tooltip: 'Supprimer définitivement le compte',
+                    ),
                 ],
               ),
             ],
@@ -1491,6 +1657,7 @@ enum _MemberAction {
   approve,
   reject,
   manageLifecycle,
+  deleteAccount,
 }
 
 enum _LifecycleChoice { makeAlumni, suspend, reactivate }

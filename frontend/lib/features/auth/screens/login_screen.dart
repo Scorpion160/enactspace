@@ -7,6 +7,8 @@ import '../../../core/academic/esp_academic_catalog.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/biometric_authenticator.dart';
 import '../../../core/auth/login_preferences.dart';
+import '../../../core/api/api_client.dart';
+import '../../recruitment/services/recruitment_service.dart';
 import '../../../core/brand/enact_brand_lockup.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
@@ -14,12 +16,15 @@ import '../../../shared/ui/app_components.dart';
 class LoginScreen extends StatefulWidget {
   final AuthService? authService;
   final BiometricAuthenticator? biometrics;
-  final String afterSignInPath;
+
+  /// Destination validated by the router for authenticated email links.
+  final String? afterSignInPath;
+
   const LoginScreen({
     super.key,
     this.authService,
     this.biometrics,
-    this.afterSignInPath = '/dashboard',
+    this.afterSignInPath,
   });
 
   @override
@@ -81,7 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!authenticated) {
         if (mounted) {
           setState(
-            () => _error = 'Déverrouillage annulé. Réessaie avec la biométrie ou utilise ton mot de passe.',
+            () => _error =
+                'Déverrouillage annulé. Réessaie avec la biométrie ou utilise ton mot de passe.',
           );
         }
         return;
@@ -89,17 +95,19 @@ class _LoginScreenState extends State<LoginScreen> {
       final restored = await _authService.restoreSession();
       if (!mounted) return;
       if (restored) {
-        context.go(widget.afterSignInPath);
+        context.go(widget.afterSignInPath ?? '/dashboard');
       } else {
         setState(() {
           _biometricAvailable = false;
-          _error = 'La session sécurisée a expiré. Connecte-toi une fois avec ton mot de passe.';
+          _error =
+              'La session sécurisée a expiré. Connecte-toi une fois avec ton mot de passe.';
         });
       }
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error = 'Authentification biométrique indisponible. Utilise ton mot de passe.',
+          () => _error =
+              'Authentification biométrique indisponible. Utilise ton mot de passe.',
         );
       }
     } finally {
@@ -129,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await LoginPreferences.rememberIdentifier(identifier);
 
       if (!mounted) return;
-      context.go(widget.afterSignInPath);
+      context.go(widget.afterSignInPath ?? '/dashboard');
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
@@ -293,8 +301,70 @@ class _LoginPanel extends StatelessWidget {
     showDialog(context: context, builder: (_) => const _ForgotPasswordDialog());
   }
 
-  void _showJoinRequestSheet(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showJoinRequestSheet(BuildContext context) async {
+    // Read the official campaign timeline, rather than relying on a hardcoded
+    // recruitment date in the app. If offline, keep the safe guidance visible.
+    var recruitmentOpen = true;
+    try {
+      final campaigns = await RecruitmentService(
+        apiClient: ApiClient(requestTimeout: const Duration(seconds: 8)),
+      ).getPublicCampaigns();
+      recruitmentOpen = campaigns.any(
+        (campaign) => campaign.isOpenAt(campaign.currentTime),
+      );
+    } catch (_) {
+      // A network failure must not send a potential candidate straight into
+      // the membership-account request flow during an ongoing campaign.
+      recruitmentOpen = true;
+    }
+
+    if (!context.mounted) return;
+    if (recruitmentOpen) {
+      final intent = await showDialog<_RegistrationIntent>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Que souhaitez-vous faire ?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Pour rejoindre Enactus ESP en tant que nouveau candidat, '
+                "vous n’avez pas besoin de créer un compte. "
+                'Choisissez votre situation avant de continuer.',
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, _RegistrationIntent.apply),
+                icon: const Icon(Icons.how_to_reg_outlined),
+                label: const Text('Je souhaite postuler à Enactus ESP'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, _RegistrationIntent.member),
+                icon: const Icon(Icons.person_outline_rounded),
+                label: const Text('Je suis déjà enacteur ou alumni'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Annuler'),
+            ),
+          ],
+        ),
+      );
+      if (!context.mounted || intent == null) return;
+      if (intent == _RegistrationIntent.apply) {
+        context.go('/recruitment/apply');
+        return;
+      }
+    }
+    if (!context.mounted) return;
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -736,6 +806,8 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   }
 }
 
+enum _RegistrationIntent { apply, member }
+
 class _JoinEnactusSheet extends StatefulWidget {
   const _JoinEnactusSheet();
 
@@ -792,7 +864,8 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
     ];
     if (requiredFields.any((value) => value.isEmpty)) {
       setState(
-        () => _error = 'Prénom, nom, nom d’utilisateur, genre, email, téléphone, département et niveau sont obligatoires.',
+        () => _error =
+            'Prénom, nom, nom d’utilisateur, genre, email, téléphone, département et niveau sont obligatoires.',
       );
       return;
     }
@@ -803,7 +876,8 @@ class _JoinEnactusSheetState extends State<_JoinEnactusSheet> {
           _joinYearController.text.trim(),
         ].any((value) => value.isEmpty)) {
       setState(
-        () => _error = 'Pour un Alumni, département, année d’entrée et année d’arrivée dans Enactus ESP sont obligatoires.',
+        () => _error =
+            'Pour un Alumni, département, année d’entrée et année d’arrivée dans Enactus ESP sont obligatoires.',
       );
       return;
     }
@@ -1192,22 +1266,26 @@ class _BeginnerGuideDialog extends StatelessWidget {
       _GuideItem(
         icon: Icons.dynamic_feed_rounded,
         title: 'Fil d’actualité',
-        body: 'Suis les annonces officielles, réactions, commentaires et posts épinglés.',
+        body:
+            'Suis les annonces officielles, réactions, commentaires et posts épinglés.',
       ),
       _GuideItem(
         icon: Icons.chat_bubble_rounded,
         title: 'Chat interne',
-        body: 'Discute en privé, par pôle, projet ou groupe avec médias et messages importants.',
+        body:
+            'Discute en privé, par pôle, projet ou groupe avec médias et messages importants.',
       ),
       _GuideItem(
         icon: Icons.assignment_turned_in_rounded,
         title: 'Travail d’équipe',
-        body: 'Retrouve tâches, présences, documents, projets, événements et objectifs.',
+        body:
+            'Retrouve tâches, présences, documents, projets, événements et objectifs.',
       ),
       _GuideItem(
         icon: Icons.privacy_tip_rounded,
         title: 'Accès adapté',
-        body: 'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
+        body:
+            'L’interface change selon ton rôle: Enacteur, Alumni, EnacChef, Financier ou Admin.',
       ),
     ];
 
@@ -1285,8 +1363,9 @@ class _PublicDialogTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleLarge
-          ?.copyWith(fontWeight: FontWeight.w900),
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
     );
   }
 }

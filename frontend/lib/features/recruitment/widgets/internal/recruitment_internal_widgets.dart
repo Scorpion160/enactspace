@@ -500,7 +500,7 @@ class _ApplicationRow extends StatelessWidget {
                 '${application.department ?? 'Département non renseigné'} · ${application.studyLevel ?? 'Niveau non renseigné'}',
               ),
               Text(
-                'Évaluation : ${application.scoreLabel} · $documents/3 documents',
+                'Avis : ${application.screeningReviewCount}/3 minimum · $documents/3 documents',
               ),
               Align(
                 alignment: Alignment.centerRight,
@@ -531,8 +531,9 @@ class _ApplicationRow extends StatelessWidget {
               child: InternalStatusBadge(status: application.status),
             ),
             evaluation: Semantics(
-              label: 'Évaluation officielle ${application.scoreLabel}',
-              child: Text(application.scoreLabel),
+              label:
+                  '${application.screeningReviewCount} évaluations sur 3 minimum',
+              child: Text('${application.screeningReviewCount}/3 avis'),
             ),
             documents: Semantics(
               label: '$documents documents',
