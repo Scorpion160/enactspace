@@ -230,6 +230,8 @@ def get_campaign_or_404(db: Session, campaign_id: str, *, submission_lock: bool 
 
 
 def campaign_is_open(campaign: RecruitmentCampaign) -> bool:
+    if uses_blind_selection(campaign) and campaign.screening_published_at:
+        return False
     today = utc_now().date()
     return (
         campaign.is_active
@@ -432,7 +434,7 @@ def public_campaign_timeline(db: Session = Depends(get_db)):
          "questionnaire_version": questionnaire_version(effective_questions(row.application_questions)),
          "opens_at": datetime.combine(row.start_date, datetime.min.time()).isoformat() + "Z" if row.start_date else None,
          "closes_at": datetime.combine(row.end_date + timedelta(days=1), datetime.min.time()).isoformat() + "Z" if row.end_date else None}
-        for row in campaigns]}
+        for row in campaigns if not (uses_blind_selection(row) and row.screening_published_at)]}
 
 
 @router.get("/campaigns/{campaign_id}", response_model=RecruitmentCampaignRead)
@@ -505,7 +507,7 @@ def update_campaign(
         if payload.is_active and campaign.selection_policy_version is None:
             campaign.selection_policy_version = POLICY_VERSION
 
-    if uses_blind_selection(campaign) and campaign.screening_published_at and campaign_is_open(campaign):
+    if uses_blind_selection(campaign) and campaign.screening_published_at and payload.is_active is True:
         raise HTTPException(409, "Une campagne ayant publié sa présélection ne peut plus recevoir de nouveaux dossiers.")
     campaign.updated_at = utc_now()
 

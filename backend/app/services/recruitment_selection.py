@@ -385,14 +385,16 @@ def register_recruitment_selection(router):
     @router.post("/campaigns/{campaign_id}/selection/planning")
     def save_planning(campaign_id: UUID, payload: RecruitmentSchedule, db=Depends(get_db), user=Depends(require_recruitment_access)):
         campaign = _manager_campaign(db, user, campaign_id)
-        if campaign.screening_published_at or campaign.final_published_at:
-            raise HTTPException(409, "Le calendrier est figé après la publication de la présélection.")
+        previous = campaign.selection_schedule or {
+            "applications_open": campaign.start_date.isoformat() if campaign.start_date else None,
+            "applications_close": campaign.end_date.isoformat() if campaign.end_date else None,
+        }
         campaign.start_date = payload.applications_open
         campaign.end_date = payload.applications_close
         campaign.selection_schedule = payload.model_dump(mode="json")
         campaign.updated_at = utc_now()
         create_audit_log(db, "planning_recrutement", user.id, "recruitment_campaign", campaign.id,
-                         new_value=campaign.selection_schedule)
+                         old_value=previous, new_value=campaign.selection_schedule)
         db.commit()
         return selection_overview(db, campaign)
 

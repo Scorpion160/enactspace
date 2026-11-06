@@ -17,7 +17,11 @@ Dans le panneau de sélection de la campagne concernée, ouvrir le calendrier, c
 
 Le 15 est proposé pour informer les dossiers retenus et non retenus ensemble après le tri et avant les entretiens. Les dépôts restent possibles pendant toute la journée du 9 ; leur fermeture est effective le 10 à 00 h, heure de Dakar. Le début du tri le 9 peut donc chevaucher les derniers dépôts.
 
-Le serveur empêche la publication avant la date annoncée et refuse un entretien hors de la période enregistrée. Les dates de publication ouvrent la possibilité de publier : elles ne déclenchent aucun envoi automatique. Les responsables doivent encore vérifier les évaluations et toutes les décisions, puis publier le lot. Le calendrier est figé après la présélection pour conserver les dates communiquées.
+Les responsables habilités peuvent modifier toutes les dates à tout moment, y compris après la présélection et les résultats finaux. Le journal conserve l’auteur, la date, l’ancien calendrier et le nouveau. Le calendrier actualisé est visible dans le suivi ; aucun mail n’est déclenché par cette modification. Prévenir les candidats d’un report reste donc une communication à organiser.
+
+Le serveur empêche la publication avant la nouvelle date annoncée et refuse une nouvelle programmation d’entretien hors de la période enregistrée. Les dates de publication ouvrent la possibilité de publier : elles ne déclenchent aucun envoi automatique. Les responsables doivent encore vérifier les évaluations et toutes les décisions, puis publier le lot.
+
+Un changement de planning conserve les résultats et leurs dates réelles de publication, sans relancer leurs mails ni masquer une décision déjà communiquée. Une campagne ayant publié sa présélection ne reçoit plus de nouveaux dossiers, même si les dates de dépôt sont modifiées. Les rendez-vous existants restent fixés à leur horaire ; leur reprogrammation se fait séparément et déclenche la notification habituelle au candidat.
 
 ## Parcours candidat
 

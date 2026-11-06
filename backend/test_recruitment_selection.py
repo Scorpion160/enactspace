@@ -10,6 +10,7 @@ from test_recruitment_rubric import assessment
 from app.core.config import settings
 from app.core.time import utc_now
 from app.models.email_delivery import EmailDelivery
+from app.models.audit import AuditLog
 from app.models.notification import Notification
 from app.models.recruitment import (
     Application, ApplicationInterviewJuror, ApplicationReview,
@@ -146,7 +147,55 @@ class RecruitmentSelectionTests(TestCase):
         self.assertIn("Code de suivi : " + application.tracking_code, delivery.text_body)
         tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
         self.assertEqual(tracking["selection_schedule"], NOVEMBER_PLAN)
-        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN, 409)
+        self.post(f"/campaigns/{campaign.id}/selection/planning", dict(NOVEMBER_PLAN, final_results="2026-11-30"))
+        tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
+        self.assertEqual(tracking["status"], "rejected")
+        self.assertEqual(tracking["selection_schedule"]["final_results"], "2026-11-30")
+
+    def test_calendar_remains_editable_after_screening_without_reopening_or_moving_appointments(self):
+        campaign, applications, _ = self.prepare()
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        self.db.refresh(campaign)
+        published_at = datetime(2026, 11, 15)
+        campaign.screening_published_at = published_at
+        campaign.identities_revealed_at = published_at
+        application = self.db.get(Application, UUID(applications[0]["id"]))
+        application.screening_decision = "shortlisted"
+        application.status = "interview_scheduled"
+        application.interview_at = datetime(2026, 11, 16, 10)
+        application.interview_end_at = datetime(2026, 11, 16, 10, 20)
+        self.db.commit()
+        previous_revision = self.report(campaign)["revision"]
+        revised = dict(NOVEMBER_PLAN, applications_close="2026-11-20", screening_end="2026-11-21",
+                       screening_results="2026-11-22", interviews_start="2026-11-23",
+                       interviews_end="2026-11-27", final_results="2026-11-30")
+        report = self.post(f"/campaigns/{campaign.id}/selection/planning", revised)
+        self.assertEqual(report["selection_schedule"], revised)
+        self.assertNotEqual(report["revision"], previous_revision)
+        with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 24)):
+            self.assertFalse(self.report(campaign)["can_publish_on_date"])
+        self.db.refresh(campaign)
+        self.db.refresh(application)
+        self.assertEqual(campaign.screening_published_at, published_at)
+        self.assertEqual(campaign.identities_revealed_at, published_at)
+        self.assertEqual(application.interview_at, datetime(2026, 11, 16, 10))
+        self.assertEqual(application.interview_end_at, datetime(2026, 11, 16, 10, 20))
+        self.assertEqual(application.status, "interview_scheduled")
+        for path in ("/api/recruitment/campaigns/public", "/api/recruitment/campaigns/timeline"):
+            result = self.client.get(path)
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertNotIn(str(campaign.id), result.text)
+        self.post("/applications", dict(self.application_payload(campaign), email="new-candidate@example.org"), 409)
+        tracking = self.post("/applications/track", {
+            "application_id": applications[0]["tracking_code"], "email": applications[0]["email"],
+        })
+        self.assertEqual(tracking["selection_schedule"], revised)
+        self.assertEqual(tracking["status"], "interview_scheduled")
+        self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+        audit = self.db.query(AuditLog).filter_by(action="planning_recrutement", entity_id=campaign.id).order_by(AuditLog.created_at.desc()).first()
+        self.assertEqual(audit.user_id, self.users["sg"].id)
+        self.assertEqual(audit.old_value, NOVEMBER_PLAN)
+        self.assertEqual(audit.new_value, revised)
 
     def test_interviews_stay_in_the_announced_window_and_final_results_wait_until_november_24(self):
         campaign, applications, members = self.prepare()
@@ -177,6 +226,18 @@ class RecruitmentSelectionTests(TestCase):
             self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]})
         self.db.refresh(application)
         self.assertEqual(application.status, "accepted")
+        self.db.refresh(campaign)
+        published_at = campaign.final_published_at
+        mail_count = self.db.query(EmailDelivery).count()
+        report = self.post(f"/campaigns/{campaign.id}/selection/planning", dict(NOVEMBER_PLAN, final_results="2026-12-01"))
+        self.db.refresh(campaign)
+        self.assertEqual(campaign.final_published_at, published_at)
+        repeated = self.post(f"/campaigns/{campaign.id}/selection/publish", {"stage": "interview", "revision": report["revision"]})
+        self.assertTrue(repeated["already_published"])
+        self.assertEqual(self.db.query(EmailDelivery).count(), mail_count)
+        tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
+        self.assertEqual(tracking["status"], "accepted")
+        self.assertEqual(tracking["selection_schedule"]["final_results"], "2026-12-01")
 
     def test_new_campaign_uses_the_blind_policy(self):
         self.as_user("sg")

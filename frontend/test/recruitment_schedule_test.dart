@@ -11,6 +11,29 @@ const plan = RecruitmentScheduleModel({
 });
 
 void main() {
+  testWidgets('an existing calendar can be revised without replacing the other dates', (tester) async {
+    RecruitmentScheduleModel? saved;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: RecruitmentScheduleEditor(
+        schedule: plan, enabled: true, onSave: (value) async { saved = value; },
+      ),
+    ))));
+    await tester.tap(find.text('Calendrier de la campagne'));
+    await tester.pumpAndSettle();
+    final finalResult = find.byKey(const Key('schedule-final_results'));
+    await tester.ensureVisible(finalResult);
+    await tester.enterText(finalResult, '30/11/2026');
+    final save = find.byKey(const Key('save-recruitment-schedule'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(saved?.dates['final_results'], '2026-11-30');
+    expect(saved?.dates['screening_results'], '2026-11-15');
+    expect(saved?.dates['applications_close'], '2026-11-09');
+    expect(find.textContaining('Modifier le calendrier n’envoie pas de mail.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the team can load the November plan and correct invalid dates before saving', (tester) async {
     RecruitmentScheduleModel? saved;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(

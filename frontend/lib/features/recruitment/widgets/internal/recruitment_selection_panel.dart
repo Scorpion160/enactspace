@@ -133,7 +133,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           RecruitmentScheduleEditor(
             schedule: RecruitmentScheduleModel.fromJson(report?['selection_schedule']),
             template: RecruitmentScheduleModel.fromJson(report?['schedule_template']),
-            enabled: !_busy && report != null && report['screening_published_at'] == null,
+            enabled: !_busy && report != null,
             onSave: (value) => _act('planning', value.dates),
           ),
           const SizedBox(height: 14),

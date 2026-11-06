@@ -130,7 +130,7 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
             icon: const Icon(Icons.event_available_outlined),
             label: const Text('Charger le planning de novembre 2026'),
           ),
-          const Text('Le résultat du premier filtre est proposé le 15 novembre, entre le tri et les entretiens. Tu peux ajuster les dates avant l’enregistrement.'),
+          const Text('Le résultat du premier filtre est proposé le 15 novembre, entre le tri et les entretiens. Toutes les dates restent modifiables pendant la campagne.'),
           const SizedBox(height: 16),
         ],
         Form(key: _form, child: LayoutBuilder(builder: (context, constraints) {
@@ -161,7 +161,9 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
           child: const Text('Enregistrer le calendrier'),
         ),
         const SizedBox(height: 8),
-        const Text('Après activation de la campagne, les dépôts suivent ces dates à l’heure de Dakar. La publication des résultats reste une action de l’équipe, après les évaluations et à partir de la date annoncée.'),
+        const Text('Avant la présélection, les dépôts suivent ces dates à l’heure de Dakar après activation de la campagne. La publication des résultats reste une action de l’équipe, après les évaluations et à partir de la date annoncée.'),
+        const SizedBox(height: 8),
+        const Text('Tu peux ajuster le calendrier à tout moment. Les changements sont conservés dans l’historique et visibles dans le suivi. Les résultats déjà publiés et les rendez-vous déjà fixés restent inchangés. Reprogramme les entretiens séparément si nécessaire. Modifier le calendrier n’envoie pas de mail.'),
         if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
       ],
     );
