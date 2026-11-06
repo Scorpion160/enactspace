@@ -73,7 +73,7 @@ class _RecruitmentStatisticsScreenState extends State<RecruitmentStatisticsScree
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(recruitmentMessage(_error, fallback: 'Les chiffres n’ont pas pu être chargés. Réessaie dans un instant.'),
+              child: Text(recruitmentMessage(_error!, fallback: 'Les chiffres n’ont pas pu être chargés. Réessaie dans un instant.'),
                 style: TextStyle(color: colors.error)),
             ),
           if (campaigns.isNotEmpty) ...[
