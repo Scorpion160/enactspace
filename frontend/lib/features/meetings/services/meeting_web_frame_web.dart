@@ -13,6 +13,7 @@ external JSPromise<JSAny?> _enactMeetCreate(
   JSString id,
   JSString serverUrl,
   JSString optionsJson,
+  web.HTMLElement host,
 );
 
 @JS('enactMeetDispose')
@@ -44,8 +45,10 @@ class MeetingWebFrame extends StatefulWidget {
 class _MeetingWebFrameState extends State<MeetingWebFrame> {
   late final String _viewType;
   late final String _containerId;
+  late final web.HTMLDivElement _host;
   Timer? _eventTimer;
   bool _leftEmitted = false;
+  bool _started = false;
 
   @override
   void initState() {
@@ -54,9 +57,6 @@ class _MeetingWebFrameState extends State<MeetingWebFrame> {
     _viewType = 'enactmeet-view-$suffix';
     _containerId = 'enactmeet-host-$suffix';
     _registerHost();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_start());
-    });
   }
 
   void _registerHost() {
@@ -65,6 +65,7 @@ class _MeetingWebFrameState extends State<MeetingWebFrame> {
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.overflow = 'hidden';
+    _host = host;
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
       (int viewId) => host,
@@ -72,6 +73,8 @@ class _MeetingWebFrameState extends State<MeetingWebFrame> {
   }
 
   Future<void> _start() async {
+    if (!mounted || _started) return;
+    _started = true;
     final payload = jsonEncode({
       'roomName': widget.join.roomKey,
       'jwt': widget.join.jwt,
@@ -88,13 +91,15 @@ class _MeetingWebFrameState extends State<MeetingWebFrame> {
         _containerId.toJS,
         widget.join.serverUrl.toJS,
         payload.toJS,
+        _host,
       ).toDart;
+      if (!mounted) return;
       _eventTimer = Timer.periodic(
         const Duration(milliseconds: 400),
         (_) => _pollEvents(),
       );
     } catch (error) {
-      widget.onError?.call(_cleanError(error));
+      if (mounted) widget.onError?.call(_cleanError(error));
     }
   }
 
@@ -147,7 +152,10 @@ class _MeetingWebFrameState extends State<MeetingWebFrame> {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: HtmlElementView(viewType: _viewType),
+      child: HtmlElementView(
+        viewType: _viewType,
+        onPlatformViewCreated: (_) => unawaited(_start()),
+      ),
     );
   }
 }
