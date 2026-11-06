@@ -29,6 +29,7 @@ POLICIES={
  "/api/recruitment/applications":("application",60,60,4,900),
  "/api/recruitment/applications/with-files":("application",60,60,4,900),
  "/api/recruitment/applications/track":("tracking",60,60,30,900),
+ "/api/recruitment/applications/interview/join":("interview_join",60,60,30,900),
 }
 
 def counter_key(scope,kind,identifier):

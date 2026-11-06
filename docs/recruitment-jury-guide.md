@@ -72,7 +72,7 @@ Les autres candidats ne reçoivent pas le lien de cette salle. Une modification 
 
 ## 12. Préparer et conduire l’échange
 
-Un questionnaire complémentaire peut être proposé après la présélection. Le candidat peut reprendre ses réponses plus tard ou choisir d’en parler pendant l’entretien. Le refus de ce questionnaire ne déclenche pas de rejet automatique.
+Le questionnaire de personnalité est obligatoire pour chaque candidat présélectionné. Il est ouvert dans son suivi lors de la publication de la présélection. Le candidat peut enregistrer un brouillon et reprendre ses réponses plus tard ; il doit répondre à toutes les affirmations et mises en situation, puis confirmer leur envoi avant l’entretien. Le report à une discussion orale n’est pas proposé. Un ancien choix de report n’empêche pas de reprendre le questionnaire. Une admission ou une mise en liste d’attente reste bloquée tant que les réponses ne sont pas confirmées. Un dossier incomplet ne reçoit pas de rejet automatique : l’équipe contacte le candidat et statue avant la publication commune des résultats.
 
 Conservez des questions principales et une durée comparables. Les relances servent à préciser un exemple. Chaque juré affecté renseigne ensuite sa grille d’entretien ; les notes de dossier et d’entretien sont conservées séparément.
 

@@ -83,7 +83,7 @@
     {
       "title": "Préparer et conduire l’échange",
       "paragraphs": [
-        "Un questionnaire complémentaire peut être proposé après la présélection. Le candidat peut reprendre ses réponses plus tard ou choisir d’en parler pendant l’entretien. Le refus de ce questionnaire ne déclenche pas de rejet automatique.",
+        "Le questionnaire de personnalité est obligatoire pour chaque candidat présélectionné. Il est ouvert dans son suivi lors de la publication de la présélection. Le candidat peut enregistrer un brouillon et reprendre ses réponses plus tard ; il doit répondre à toutes les affirmations et mises en situation, puis confirmer leur envoi avant l’entretien. Le report à une discussion orale n’est pas proposé. Un ancien choix de report n’empêche pas de reprendre le questionnaire. Une admission ou une mise en liste d’attente reste bloquée tant que les réponses ne sont pas confirmées. Un dossier incomplet ne reçoit pas de rejet automatique : l’équipe contacte le candidat et statue avant la publication commune des résultats.",
         "Conservez des questions principales et une durée comparables. Les relances servent à préciser un exemple. Chaque juré affecté renseigne ensuite sa grille d’entretien ; les notes de dossier et d’entretien sont conservées séparément."
       ]
     },
@@ -157,7 +157,7 @@
       "kind": "questionnaire",
       "title": "Questionnaire de préparation",
       "subject": "Préparons ton entretien avec Enactus ESP",
-      "body": "Bonjour [Prénom],\n\nPour préparer notre échange, nous te proposons quelques questions sur ta façon de travailler et de participer à une équipe.\n\nTu peux enregistrer tes réponses et les reprendre plus tard. Si tu préfères en parler directement pendant l’entretien, tu peux aussi le signaler depuis ton suivi.\n\n[Date limite du questionnaire]\nLe questionnaire est accessible depuis le suivi de ta candidature.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
+      "body": "Bonjour [Prénom],\n\nPour préparer notre échange, merci de répondre au questionnaire sur ta façon de travailler et de participer à une équipe. Cette étape est obligatoire pour poursuivre la sélection.\n\nTu peux enregistrer tes réponses et les reprendre plus tard. Pense à répondre à toutes les questions, puis à confirmer leur envoi avant ton entretien.\n\n[Date limite du questionnaire]\nLe questionnaire est accessible depuis le suivi de ta candidature.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
     },
     {
       "kind": "accepted",

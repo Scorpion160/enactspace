@@ -114,9 +114,9 @@ L’équipe Enactus ESP
 
 Bonjour [Prénom],
 
-Pour préparer notre échange, nous te proposons quelques questions sur ta façon de travailler et de participer à une équipe.
+Pour préparer notre échange, merci de répondre au questionnaire sur ta façon de travailler et de participer à une équipe. Cette étape est obligatoire pour poursuivre la sélection.
 
-Tu peux enregistrer tes réponses et les reprendre plus tard. Si tu préfères en parler directement pendant l’entretien, tu peux aussi le signaler depuis ton suivi.
+Tu peux enregistrer tes réponses et les reprendre plus tard. Pense à répondre à toutes les questions, puis à confirmer leur envoi avant ton entretien.
 
 [Date limite du questionnaire]
 Le questionnaire est accessible depuis le suivi de ta candidature.

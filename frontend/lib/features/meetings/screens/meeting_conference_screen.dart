@@ -218,7 +218,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null && _join == null) {
+    if (_error != null) {
       return _FailureState(
         message: _error!,
         onBack: () => context.go(_returnPath),

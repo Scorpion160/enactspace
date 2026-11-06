@@ -259,6 +259,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        expect(find.text('Je préfère en parler en entretien'), findsNothing);
         await _tap(tester, _firstAnswer);
         expect(tester.widget<ChoiceChip>(_firstAnswer).selected, isTrue);
         expect(tester.takeException(), isNull);

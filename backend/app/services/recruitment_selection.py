@@ -425,6 +425,9 @@ def register_recruitment_selection(router):
         else:
             if application.status != "interview_scheduled" or application.interview_at is None or application.interview_at > utc_now():
                 raise HTTPException(409, "Programme et réalise l’entretien avant de préparer la décision finale.")
+            if payload.decision in {"accepted", "waiting_list"}:
+                from app.api.routes.recruitment_extensions import require_completed_questionnaire
+                require_completed_questionnaire(db, application)
             application.pending_final_decision = payload.decision
         application.updated_at = utc_now()
         create_audit_log(db, "preparation_selection_recrutement", user.id, "application", application.id,
@@ -467,7 +470,13 @@ def register_recruitment_selection(router):
         for application in applications:
             if payload.stage == "screening":
                 application.status = "under_review" if application.screening_decision == "shortlisted" else "rejected"
+                if application.screening_decision == "shortlisted":
+                    from app.api.routes.recruitment_extensions import invite_required_questionnaire
+                    invite_required_questionnaire(db, application, user)
             else:
+                if application.pending_final_decision in {"accepted", "waiting_list"}:
+                    from app.api.routes.recruitment_extensions import require_completed_questionnaire
+                    require_completed_questionnaire(db, application)
                 application.status = application.pending_final_decision
             application.updated_at = published_at
             _enqueue_result(db, application, campaign, payload.stage, published_at)

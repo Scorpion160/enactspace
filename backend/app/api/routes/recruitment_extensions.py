@@ -61,7 +61,7 @@ def member_payload(member, user):
 
 
 def assessment_status(row):
-    return "submitted" if row.submitted_at else "declined" if row.declined_at else "invited"
+    return "submitted" if row.submitted_at else "invited"
 
 
 def assessment_payload(row, *, candidate=False):
@@ -115,7 +115,7 @@ def editable(application, row):
         raise HTTPException(409, "Cette candidature est clôturée. Contacte l’équipe pour toute question.")
     if row.due_at and utc_now() > row.due_at:
         raise HTTPException(409, "La date prévue est passée. Contacte l’équipe pour convenir d’une suite.")
-    if row.submitted_at or row.declined_at:
+    if row.submitted_at:
         raise HTTPException(409, "Ce questionnaire est déjà terminé.")
 
 
@@ -124,6 +124,7 @@ def save_answers(row, payload, *, complete):
         raise HTTPException(409, "Une autre version de tes réponses existe. Recharge le questionnaire avant de continuer.")
     if not payload.consent:
         raise HTTPException(422, "Prends connaissance de l’utilisation des réponses avant de continuer.")
+    row.declined_at = None
     try:
         validate_answers(row.instrument_snapshot, payload.answers, payload.scenario_answers, complete=complete)
     except ValueError as error:
@@ -136,6 +137,28 @@ def save_answers(row, payload, *, complete):
     if complete:
         row.results = score(row.instrument_snapshot, row.answers)
         row.submitted_at = utc_now()
+
+
+def invite_required_questionnaire(db, application, actor):
+    """Prepare each shortlisted candidate's required questionnaire once."""
+    if db.get(ApplicationPersonality, application.id) is not None:
+        return
+    snapshot = instrument()
+    db.add(ApplicationPersonality(application_id=application.id,
+        instrument_version=snapshot["version"], instrument_snapshot=snapshot, invited_by=actor.id))
+    from app.services.recruitment_mail_copy import application_mail
+    subject, body = application_mail("questionnaire", application,
+        details="Merci de le compléter avant ton entretien. L’équipe précisera la date limite dans ton suivi.")
+    enqueue_email_delivery(db, recipient_email=application.email, subject=subject, text_body=body,
+        dedupe_key=f"personality-invite:{application.id}:open")
+    create_audit_log(db, "invitation_questionnaire_candidature", actor.id, "application", application.id,
+        new_value={"version": snapshot["version"], "required": True})
+
+
+def require_completed_questionnaire(db, application):
+    row = db.get(ApplicationPersonality, application.id)
+    if row is None or row.submitted_at is None:
+        raise HTTPException(409, "Le questionnaire obligatoire doit être complété et confirmé avant une admission ou une mise en liste d’attente.")
 
 
 def register_recruitment_extensions(router):
@@ -235,7 +258,7 @@ def register_recruitment_extensions(router):
                 instrument_snapshot=snapshot, invited_by=user.id, due_at=due)
             db.add(row)
             db.flush()
-        elif row.submitted_at or row.declined_at:
+        elif row.submitted_at:
             return internal_assessment_payload(db, user, app, row)
         elif row.due_at == due:
             return internal_assessment_payload(db, user, app, row)
@@ -291,11 +314,6 @@ def register_recruitment_extensions(router):
 
     @router.post("/personality/decline")
     def decline_public(payload: ApplicationTrackingRequest, db: Session = Depends(get_db)):
-        app, row = public_attempt(db, payload, lock=True)
-        if row.declined_at or row.submitted_at:
-            return assessment_payload(row, candidate=True)
-        editable(app, row)
-        row.answers, row.scenario_answers, row.results = {}, {}, None
-        row.declined_at, row.updated_at, row.revision = utc_now(), utc_now(), row.revision + 1
-        db.commit()
-        return assessment_payload(row, candidate=True)
+        public_attempt(db, payload)
+        # Reject older clients too, without erasing a candidate's draft.
+        raise HTTPException(422, "Ce questionnaire est obligatoire. Réponds à toutes les questions puis confirme leur envoi depuis ton suivi.")

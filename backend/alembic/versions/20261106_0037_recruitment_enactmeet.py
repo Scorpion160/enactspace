@@ -22,5 +22,12 @@ def upgrade():
 
 def downgrade():
     op.drop_index('ix_applications_interview_meeting_id', table_name='applications')
-    with op.batch_alter_table("applications") as batch:
+    # Fresh bootstraps use the model's unnamed FK. Name it during reflection
+    # so the constraint is removed together with its column on SQLite as well.
+    convention = {"fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s"}
+    foreign_keys = sa.inspect(op.get_bind()).get_foreign_keys("applications")
+    with op.batch_alter_table("applications", naming_convention=convention) as batch:
+        for constraint in foreign_keys:
+            if constraint.get("constrained_columns") == ["interview_meeting_id"]:
+                batch.drop_constraint(constraint.get("name") or "fk_applications_interview_meeting_id_meetings", type_="foreignkey")
         batch.drop_column("interview_meeting_id")

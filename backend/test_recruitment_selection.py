@@ -42,6 +42,17 @@ class RecruitmentSelectionTests(TestCase):
     campaign = fixture.AttachmentLifecycleTests.campaign
     application_payload = fixture.AttachmentLifecycleTests.application_payload
 
+    def complete_personality(self, application):
+        from app.api.routes.recruitment_extensions import invite_required_questionnaire
+        from app.models.recruitment import ApplicationPersonality
+        invite_required_questionnaire(self.db, application, self.users["sg"])
+        row = self.db.get(ApplicationPersonality, application.id)
+        self.db.flush()
+        if row is None:
+            row = self.db.get(ApplicationPersonality, application.id)
+        row.submitted_at = utc_now()
+        self.db.commit()
+
     def post(self, path, body=None, code=200):
         response = self.client.post("/api/recruitment" + path, json=body or {})
         self.assertEqual(response.status_code, code, response.text)
@@ -265,6 +276,7 @@ class RecruitmentSelectionTests(TestCase):
         for member in members[:2]:
             self.rate(applications[0], reviewer=member.user_id)
         self.as_user("sg")
+        self.complete_personality(application)
         with patch.object(selection_service, "utc_now", return_value=datetime(2026, 11, 23)):
             self.post(f"/applications/{application.id}/selection-decision", {"stage": "interview", "decision": "accepted"})
             report = self.report(campaign)
@@ -466,6 +478,8 @@ class RecruitmentSelectionTests(TestCase):
         self.assertFalse(detail.json()['is_anonymized'])
         self.assertEqual(detail.json()['email'], body['email'])
         self.assertEqual(detail.json()['study_level'], body['study_level'])
+        self.assertNotEqual(detail.json()['tracking_code'], application['tracking_code'])
+        self.assertNotIn(application['tracking_code'], detail.text)
         self.assertEqual(self.client.get(application['cv_url']).content, fixture.PDF)
         listing = self.client.get('/api/recruitment/applications').json()
         self.assertIn(application['id'], [item['id'] for item in listing])
@@ -565,6 +579,9 @@ class RecruitmentSelectionTests(TestCase):
         self.assertTrue(again["already_published"])
         deliveries = self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).all()
         self.assertEqual(len(deliveries), 2)
+        from app.models.recruitment import ApplicationPersonality
+        self.assertEqual(self.db.query(ApplicationPersonality).count(), 1)
+        self.assertEqual(self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("personality-invite:%")).count(), 1)
         self.assertEqual(len({delivery.next_attempt_at for delivery in deliveries}), 1)
         for application, outcome in zip(applications, ("shortlisted", "not_shortlisted")):
             tracking = self.post("/applications/track", {"application_id": application["tracking_code"], "email": application["email"]})
@@ -675,6 +692,8 @@ class RecruitmentSelectionTests(TestCase):
             self.rate(applications[0], reviewer=member.user_id)
         self.assertEqual(self.db.query(ApplicationReview).filter_by(application_id=application.id).count(), 4)
         self.as_user("sg")
+        self.post(f"/applications/{application.id}/selection-decision", {"stage": "interview", "decision": "accepted"}, 409)
+        self.complete_personality(application)
         self.post(f"/applications/{application.id}/selection-decision", {"stage": "interview", "decision": "accepted"})
         tracked = self.post("/applications/track", {"application_id": applications[0]["tracking_code"], "email": applications[0]["email"]})
         self.assertEqual(tracked["status"], "interview_scheduled")

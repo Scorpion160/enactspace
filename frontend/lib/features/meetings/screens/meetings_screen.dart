@@ -253,13 +253,15 @@ class _MeetHero extends StatelessWidget {
                 children: [
                   Icon(Icons.video_call_rounded, color: colors.secondary),
                   const SizedBox(width: 8),
-                  const Text(
+                  const Flexible(child: Text(
                     'ENACTMEET',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white70,
                       fontWeight: FontWeight.w900,
                     ),
-                  ),
+                  )),
                 ],
               ),
               const SizedBox(height: 14),

@@ -85,6 +85,20 @@ def upgrade():
 
 def downgrade():
     existing = _tables()
+    # The live-model baseline can also bootstrap later recruitment columns
+    # while stopping at an older revision. Remove their FK before its target.
+    if "applications" in existing:
+        inspector = sa.inspect(op.get_bind())
+        if "interview_meeting_id" in {column["name"] for column in inspector.get_columns("applications")}:
+            indexes = {index["name"] for index in inspector.get_indexes("applications")}
+            if "ix_applications_interview_meeting_id" in indexes:
+                op.drop_index("ix_applications_interview_meeting_id", table_name="applications")
+            convention = {"fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s"}
+            with op.batch_alter_table("applications", naming_convention=convention) as batch:
+                for constraint in inspector.get_foreign_keys("applications"):
+                    if constraint.get("constrained_columns") == ["interview_meeting_id"]:
+                        batch.drop_constraint(constraint.get("name") or "fk_applications_interview_meeting_id_meetings", type_="foreignkey")
+                batch.drop_column("interview_meeting_id")
     if "meeting_members" in existing:
         op.drop_table("meeting_members")
     existing = _tables()

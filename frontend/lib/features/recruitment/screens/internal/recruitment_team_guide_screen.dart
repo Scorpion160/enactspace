@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class RecruitmentTeamGuideScreen extends StatefulWidget {
-  const RecruitmentTeamGuideScreen({super.key});
+  final Map<String, dynamic>? content;
+  const RecruitmentTeamGuideScreen({super.key, this.content});
   @override
   State<RecruitmentTeamGuideScreen> createState() => _RecruitmentTeamGuideScreenState();
 }
 
 class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen> {
-  late final Future<Map<String, dynamic>> _guide = rootBundle
+  late final Future<Map<String, dynamic>> _guide = widget.content != null
+      ? Future.value(widget.content!) : rootBundle
       .loadString('assets/documents/recruitment_team_guide.json')
       .then((value) => Map<String, dynamic>.from(jsonDecode(value) as Map));
   String _query = '';

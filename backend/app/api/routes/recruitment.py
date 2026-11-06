@@ -979,6 +979,10 @@ def application_payload(
         data["history"] = application_history(db, application)
     data["status"] = normalize_application_status(application.status)
     data["tracking_code"] = application.tracking_code or str(application.id)
+    if current_user is not None and uses_blind_selection(campaign, application):
+        # The personal tracking code also opens the candidate questionnaire
+        # and guest interview. It is never a credential for internal jurors.
+        data["tracking_code"] = anonymous_code(application)
     data["is_anonymized"] = anonymized
     data["anonymous_code"] = anonymous_code(application)
     data["can_convert"] = bool(current_user) and not anonymized and permission_data.get("can_convert", False)
@@ -994,7 +998,7 @@ def application_payload(
             data["interview_needs_reassignment"] = (any(not row["active"] for row in data["interview_jurors"])
                 or bool(data["interview_team"] and data["interview_team"]["needs_update"]))
             attempt = db.get(ApplicationPersonality, application.id)
-            data["personality_status"] = ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None
+            data["personality_status"] = ("submitted" if attempt.submitted_at else "invited") if attempt else None
     if anonymized:
         code = str(application.id).replace("-", "")[:12]
         data.update(
@@ -1109,7 +1113,7 @@ def track_application(
         ),
         "final_result": final_result,
         "account_created": application.converted_user_id is not None,
-        "personality_status": ("submitted" if attempt.submitted_at else "declined" if attempt.declined_at else "invited") if attempt else None,
+        "personality_status": ("submitted" if attempt.submitted_at else "invited") if attempt else None,
         "personality_due_at": attempt.due_at if attempt else None,
     }
 

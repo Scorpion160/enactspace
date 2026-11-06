@@ -47,14 +47,15 @@ void main() {
   testWidgets('unavailable invitation lists do not prevent creating a meeting', (tester) async {
     final service = _Meetings();
     final router = GoRouter(initialLocation: '/meetings', routes: [
-      GoRoute(path: '/meetings', builder: (_, state) => MeetingsScreen(
+      GoRoute(path: '/meetings', builder: (_, state) => Scaffold(body: MeetingsScreen(
         service: service, authService: _Auth(), membersService: _Members(),
-        polesService: _Poles(), projectsService: _Projects())),
+        polesService: _Poles(), projectsService: _Projects()))),
       GoRoute(path: '/meetings/:id', builder: (_, state) => const Scaffold(body: Text('Réunion créée'))),
     ]);
     addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Nouvelle réunion'));
     await tester.tap(find.text('Nouvelle réunion'));
     await tester.pumpAndSettle();
     expect(find.text('Nouvelle réunion EnactMeet'), findsOneWidget);

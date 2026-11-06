@@ -135,17 +135,14 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                                         _tracking!.personalityStatus ==
                                                 'submitted'
                                             ? 'Tes réponses ont été partagées avec le jury. Tu peux retrouver ta synthèse.'
-                                            : _tracking!.personalityStatus ==
-                                                  'declined'
-                                            ? 'Tu as choisi d’en parler pendant l’entretien.'
-                                            : 'L’équipe te propose un questionnaire pour mieux préparer l’entretien.',
+                                            : 'Le questionnaire est obligatoire. Réponds à toutes les questions puis confirme leur envoi pour poursuivre la sélection.',
                                       ),
                                       const SizedBox(height: 12),
                                       FilledButton.icon(
                                         icon: const Icon(Icons.forum_outlined),
                                         label: Text(
-                                          _tracking!.personalityStatus ==
-                                                  'invited'
+                                          _tracking!.personalityStatus !=
+                                                  'submitted'
                                               ? 'Ouvrir mon questionnaire'
                                               : 'Consulter ma réponse',
                                         ),

@@ -373,13 +373,6 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(padding, 20, padding, 28),
         children: [
-          Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(
-            key: const Key('recruitment-team-guide'),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const RecruitmentTeamGuideScreen())),
-            icon: const Icon(Icons.menu_book_outlined), label: const Text('Guide équipe'),
-          )),
-          const SizedBox(height: 12),
           RecruitmentWorkspaceNav(
             selected: _section,
             onSelected: _openSection,
@@ -397,13 +390,18 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               onToggleFilters: () =>
                   setState(() => _filtersExpanded = !_filtersExpanded),
               onManageCampaigns: _openCampaignManagement,
+              onOpenGuide: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const RecruitmentTeamGuideScreen())),
               canManageCampaigns: _access['can_manage_campaigns'] != false,
             ),
           if (_section == RecruitmentSection.interviews)
-            const RecruitmentPageHeading(
+            RecruitmentPageHeading(
               title: 'Les entretiens',
               subtitle:
                   'Les créneaux confirmés et les dossiers à replanifier, par campagne.',
+              actions: [IconButton(tooltip: 'Guide équipe', icon: const Icon(Icons.menu_book_outlined),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const RecruitmentTeamGuideScreen())))],
             ),
           const SizedBox(height: 18),
           if (!_loading && _error == null)
