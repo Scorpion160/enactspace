@@ -172,5 +172,6 @@
     const output = document.getElementById('enactmeet-test-results');
     output.dataset.state = passed ? 'passed' : 'failed';
     output.textContent = JSON.stringify({passed, results});
+    await fetch('/results', {method:'POST', headers:{'Content-Type':'application/json'}, body:output.textContent});
   })();
 </script></body></html>
