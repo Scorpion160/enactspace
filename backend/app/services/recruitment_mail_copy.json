@@ -1,11 +1,11 @@
 {
   "submitted": {
     "subject": "Ta candidature à Enactus ESP a bien été reçue",
-    "body": "Bonjour {first_name},\n\nNous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.\n\nTu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates du recrutement sont indiquées dans ton suivi."
+    "body": "Bonjour {first_name},\n\nNous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.\n\nTu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates de dépôt sont indiquées dans ton suivi."
   },
   "under_review": {
     "subject": "Ton dossier est en cours d’étude",
-    "body": "Bonjour {first_name},\n\nL’équipe recrutement a commencé l’étude de ton dossier.\n\nLe résultat de la présélection sera annoncé à la date indiquée dans ton suivi. Tu y retrouveras aussi les dates à jour si le calendrier est modifié."
+    "body": "Bonjour {first_name},\n\nL’équipe recrutement a commencé l’étude de ton dossier.\n\nLe résultat de la présélection te sera communiqué dans ton suivi et par mail."
   },
   "screening_shortlisted": {
     "subject": "Ton dossier est retenu pour un entretien",

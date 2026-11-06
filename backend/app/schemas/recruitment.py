@@ -140,9 +140,15 @@ def validate_question_list(values):
     return values
 
 
+class RecruitmentPublicSchedule(BaseModel):
+    """Candidate-facing deposit window; the selection calendar stays internal."""
+    applications_open: Optional[date] = None
+    applications_close: Optional[date] = None
+
+
 class RecruitmentCampaignPublicRead(BaseModel):
     eligibility_required: bool = False
-    selection_schedule: Optional[RecruitmentSchedule] = None
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -165,6 +171,10 @@ class RecruitmentCampaignPublicRead(BaseModel):
         else:
             value = dict(value)
         value['eligibility_required'] = eligibility_required
+        value['selection_schedule'] = {
+            'applications_open': value.get('start_date'),
+            'applications_close': value.get('end_date'),
+        }
         questions = value.get('application_questions')
         value['application_questions'] = effective_questions(questions)
         value['questionnaire_version'] = questionnaire_version(questions)
@@ -458,7 +468,7 @@ class ApplicationTrackingRequest(BaseModel):
 
 class ApplicationTrackingRead(BaseModel):
     enactmeet_available: bool = False
-    selection_schedule: Optional[RecruitmentSchedule] = None
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     application_id: UUID
     tracking_code: str
     campaign_title: str

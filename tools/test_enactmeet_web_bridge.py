@@ -22,6 +22,7 @@ def main():
     fixture = (repo / 'tools/fixtures/enactmeet_bridge_browser.html').read_text(encoding='utf-8')
     done = threading.Event()
     reports = []
+    progress = []
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -41,13 +42,15 @@ def main():
 
         def do_POST(self):
             length = int(self.headers.get('Content-Length', 0))
-            if self.path != '/results' or not 0 < length < 65536:
+            if self.path not in {'/results', '/progress'} or not 0 < length < 65536:
                 self.send_error(400)
                 return
-            reports.append(json.loads(self.rfile.read(length)))
+            value = json.loads(self.rfile.read(length))
+            (reports if self.path == '/results' else progress).append(value)
             self.send_response(204)
             self.end_headers()
-            done.set()
+            if self.path == '/results':
+                done.set()
 
         def log_message(self, *args):
             pass
@@ -60,6 +63,10 @@ def main():
         profile = root / 'profile'
         profile.mkdir()
         if args.engine == 'firefox':
+            (profile / 'user.js').write_text(
+                'user_pref("browser.aboutwelcome.enabled", false);\n'
+                'user_pref("dom.min_background_timeout_value", 0);\n'
+                'user_pref("dom.timeout.enable_budget_timer_throttling", false);\n', encoding='utf-8')
             command = [browser, '--headless', '--no-remote', '--new-instance', '--profile', str(profile), url]
         else:
             command = [browser, '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -69,7 +76,7 @@ def main():
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             finished = done.wait(45)
-            report = reports[-1] if finished and reports else {'passed': False, 'reason': 'Browser fixture did not finish'}
+            report = reports[-1] if finished and reports else {'passed': False, 'reason': 'Browser fixture did not finish', 'progress': progress}
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return 0 if report['passed'] else 1
         finally:

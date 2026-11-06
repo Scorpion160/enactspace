@@ -12,7 +12,7 @@ Bonjour [Prénom],
 
 Nous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.
 
-Tu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates du recrutement sont indiquées dans ton suivi.
+Tu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates de dépôt sont indiquées dans ton suivi.
 
 Code de suivi : [Code de suivi]
 Suivre ma candidature : [Lien vers le suivi]
@@ -29,7 +29,7 @@ Bonjour [Prénom],
 
 L’équipe recrutement a commencé l’étude de ton dossier.
 
-Le résultat de la présélection sera annoncé à la date indiquée dans ton suivi. Tu y retrouveras aussi les dates à jour si le calendrier est modifié.
+Le résultat de la présélection te sera communiqué dans ton suivi et par mail.
 
 Code de suivi : [Code de suivi]
 Suivre ma candidature : [Lien vers le suivi]

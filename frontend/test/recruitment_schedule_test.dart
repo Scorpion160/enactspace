@@ -91,10 +91,24 @@ void main() {
         ))),
       ));
       await tester.pump();
-      expect(find.textContaining('15/11/2026', findRichText: true), findsOneWidget);
-      expect(find.textContaining('24/11/2026', findRichText: true), findsOneWidget);
+      expect(find.textContaining('06/11/2026', findRichText: true), findsOneWidget);
+      expect(find.textContaining('09/11/2026', findRichText: true), findsOneWidget);
+      expect(find.textContaining('15/11/2026', findRichText: true), findsNothing);
+      expect(find.textContaining('24/11/2026', findRichText: true), findsNothing);
+      expect(find.textContaining('Étude des dossiers', findRichText: true), findsNothing);
+      expect(find.textContaining('Les résultats de chaque sélection'), findsNothing);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('the internal read-only calendar retains the full planning', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: RecruitmentScheduleEditor(schedule: plan, enabled: false, onSave: (_) async {}),
+    )))));
+    await tester.pump();
+    expect(find.textContaining('15/11/2026', findRichText: true), findsOneWidget);
+    expect(find.textContaining('24/11/2026', findRichText: true), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the calendar editor remains usable on a narrow screen at 200 percent', (tester) async {

@@ -90,6 +90,8 @@ Le nouveau membre reçoit les informations de première connexion, choisit son m
 
 ## 15. Ajuster les dates et suivre les envois
 
+Le planning complet est réservé à l’équipe de recrutement. Les candidats voient uniquement les dates d’ouverture et de clôture des dépôts. Leur rendez-vous personnel leur est communiqué lors de la convocation à l’entretien.
+
 Les responsables habilités peuvent modifier les dates à tout moment. Les anciennes et nouvelles dates sont conservées avec l’auteur du changement. Un report ne retire pas un résultat déjà communiqué et ne rouvre pas les dépôts après la présélection.
 
 Modifier le calendrier ne déplace pas les rendez-vous individuels et n’envoie pas de mail. Prévenez les candidats concernés d’un report et reprogrammez leurs entretiens si nécessaire. Le bilan permet de suivre les mails envoyés, les nouvelles tentatives et les échecs.

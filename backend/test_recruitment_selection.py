@@ -30,6 +30,8 @@ NOVEMBER_PLAN = {
 }
 
 
+PUBLIC_PLAN = {key: NOVEMBER_PLAN[key] for key in ("applications_open", "applications_close")}
+
 class RecruitmentSelectionTests(TestCase):
     def setUp(self):
         fixture.AttachmentLifecycleTests.setUp(self)
@@ -173,7 +175,7 @@ class RecruitmentSelectionTests(TestCase):
         with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 5, 12)):
             self.post("/applications", body, 400)
             timeline = self.client.get("/api/recruitment/campaigns/timeline").json()["campaigns"][0]
-            self.assertEqual(timeline["selection_schedule"], NOVEMBER_PLAN)
+            self.assertEqual(timeline["selection_schedule"], PUBLIC_PLAN)
             self.assertEqual(timeline["closes_at"], "2026-11-10T00:00:00Z")
         with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 6)):
             self.post("/applications", body)
@@ -207,11 +209,12 @@ class RecruitmentSelectionTests(TestCase):
         delivery = self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).one()
         self.assertIn("Code de suivi : " + application.tracking_code, delivery.text_body)
         tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
-        self.assertEqual(tracking["selection_schedule"], NOVEMBER_PLAN)
+        self.assertEqual(tracking["selection_schedule"], PUBLIC_PLAN)
         self.post(f"/campaigns/{campaign.id}/selection/planning", dict(NOVEMBER_PLAN, final_results="2026-11-30"))
         tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
         self.assertEqual(tracking["status"], "rejected")
-        self.assertEqual(tracking["selection_schedule"]["final_results"], "2026-11-30")
+        self.assertNotIn("final_results", tracking["selection_schedule"])
+        self.assertEqual(self.report(campaign)["selection_schedule"]["final_results"], "2026-11-30")
 
     def test_calendar_remains_editable_after_screening_without_reopening_or_moving_appointments(self):
         campaign, applications, _ = self.prepare()
@@ -250,7 +253,7 @@ class RecruitmentSelectionTests(TestCase):
         tracking = self.post("/applications/track", {
             "application_id": applications[0]["tracking_code"], "email": applications[0]["email"],
         })
-        self.assertEqual(tracking["selection_schedule"], revised)
+        self.assertEqual(tracking["selection_schedule"], {key: revised[key] for key in PUBLIC_PLAN})
         self.assertEqual(tracking["status"], "interview_scheduled")
         self.assertEqual(self.db.query(EmailDelivery).count(), 0)
         audit = self.db.query(AuditLog).filter_by(action="planning_recrutement", entity_id=campaign.id).order_by(AuditLog.created_at.desc()).first()
@@ -299,7 +302,26 @@ class RecruitmentSelectionTests(TestCase):
         self.assertEqual(self.db.query(EmailDelivery).count(), mail_count)
         tracking = self.post("/applications/track", {"application_id": application.tracking_code, "email": application.email})
         self.assertEqual(tracking["status"], "accepted")
-        self.assertEqual(tracking["selection_schedule"]["final_results"], "2026-12-01")
+        self.assertNotIn("final_results", tracking["selection_schedule"])
+        self.assertEqual(self.report(campaign)["selection_schedule"]["final_results"], "2026-12-01")
+
+    def test_candidates_cannot_read_internal_calendar_dates_from_public_endpoints(self):
+        campaign, applications, _ = self.prepare()
+        self.post(f"/campaigns/{campaign.id}/selection/planning", NOVEMBER_PLAN)
+        self.assertEqual(self.report(campaign)["selection_schedule"], NOVEMBER_PLAN)
+        with patch.object(recruitment_routes, "utc_now", return_value=datetime(2026, 11, 6, 12)):
+            timeline = self.client.get("/api/recruitment/campaigns/timeline")
+            public = self.client.get("/api/recruitment/campaigns/public")
+            tracking = self.post("/applications/track", {
+                "application_id": applications[0]["tracking_code"], "email": applications[0]["email"],
+            })
+        self.assertEqual(timeline.status_code, 200, timeline.text)
+        self.assertEqual(public.status_code, 200, public.text)
+        self.assertEqual(timeline.json()["campaigns"][0]["selection_schedule"], PUBLIC_PLAN)
+        self.assertEqual(tracking["selection_schedule"], PUBLIC_PLAN)
+        serialized = timeline.text + public.text + json.dumps(tracking)
+        for key in set(NOVEMBER_PLAN) - set(PUBLIC_PLAN):
+            self.assertNotIn(key, serialized)
 
     def test_new_campaign_uses_the_blind_policy(self):
         self.as_user("sg")

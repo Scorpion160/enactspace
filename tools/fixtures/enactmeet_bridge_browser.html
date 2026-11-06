@@ -165,6 +165,7 @@
   (async () => {
     const results = [];
     for (const [name, test] of cases) {
+      await fetch('/progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, completed:results.length})});
       try { await test(); results.push({name, passed:true}); }
       catch (error) { results.push({name, passed:false, error:error.message}); break; }
     }

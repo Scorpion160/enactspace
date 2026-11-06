@@ -418,6 +418,10 @@ def list_public_active_campaigns(
     return [campaign for campaign in campaigns if campaign_is_open(campaign)]
 
 
+def public_deposit_dates(campaign: RecruitmentCampaign) -> dict:
+    return {"applications_open": campaign.start_date, "applications_close": campaign.end_date}
+
+
 @router.get("/campaigns/timeline")
 def public_campaign_timeline(db: Session = Depends(get_db)):
     # Dakar is UTC year-round. End dates are inclusive, with closure at midnight
@@ -431,7 +435,7 @@ def public_campaign_timeline(db: Session = Depends(get_db)):
         {"id": str(row.id), "title": row.title, "description": row.description,
          "start_date": row.start_date, "end_date": row.end_date, "is_active": True,
          "eligibility_required": uses_blind_selection(row),
-         "selection_schedule": row.selection_schedule,
+         "selection_schedule": public_deposit_dates(row),
          "application_questions": effective_questions(row.application_questions),
          "questionnaire_version": questionnaire_version(effective_questions(row.application_questions)),
          "opens_at": datetime.combine(row.start_date, datetime.min.time()).isoformat() + "Z" if row.start_date else None,
@@ -1096,7 +1100,7 @@ def track_application(
         "project_interest": application.project_interest,
         "status": normalized_status,
         "screening_result": screening_result,
-        "selection_schedule": campaign.selection_schedule,
+        "selection_schedule": public_deposit_dates(campaign),
         "enactmeet_available": bool(application.interview_meeting_id and normalized_status == "interview_scheduled"),
         "result_published_at": published_at,
         "submitted_at": application.created_at,

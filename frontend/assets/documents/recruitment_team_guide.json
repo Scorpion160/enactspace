@@ -104,6 +104,7 @@
     {
       "title": "Ajuster les dates et suivre les envois",
       "paragraphs": [
+        "Le planning complet est réservé à l’équipe de recrutement. Les candidats voient uniquement les dates d’ouverture et de clôture des dépôts. Leur rendez-vous personnel leur est communiqué lors de la convocation à l’entretien.",
         "Les responsables habilités peuvent modifier les dates à tout moment. Les anciennes et nouvelles dates sont conservées avec l’auteur du changement. Un report ne retire pas un résultat déjà communiqué et ne rouvre pas les dépôts après la présélection.",
         "Modifier le calendrier ne déplace pas les rendez-vous individuels et n’envoie pas de mail. Prévenez les candidats concernés d’un report et reprogrammez leurs entretiens si nécessaire. Le bilan permet de suivre les mails envoyés, les nouvelles tentatives et les échecs."
       ]
@@ -121,13 +122,13 @@
       "kind": "submitted",
       "title": "Dépôt reçu",
       "subject": "Ta candidature à Enactus ESP a bien été reçue",
-      "body": "Bonjour [Prénom],\n\nNous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.\n\nTu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates du recrutement sont indiquées dans ton suivi.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
+      "body": "Bonjour [Prénom],\n\nNous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.\n\nTu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates de dépôt sont indiquées dans ton suivi.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
     },
     {
       "kind": "under_review",
       "title": "Dossier en cours d’étude",
       "subject": "Ton dossier est en cours d’étude",
-      "body": "Bonjour [Prénom],\n\nL’équipe recrutement a commencé l’étude de ton dossier.\n\nLe résultat de la présélection sera annoncé à la date indiquée dans ton suivi. Tu y retrouveras aussi les dates à jour si le calendrier est modifié.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
+      "body": "Bonjour [Prénom],\n\nL’équipe recrutement a commencé l’étude de ton dossier.\n\nLe résultat de la présélection te sera communiqué dans ton suivi et par mail.\n\nCode de suivi : [Code de suivi]\nSuivre ma candidature : [Lien vers le suivi]\n\nL’équipe Enactus ESP"
     },
     {
       "kind": "screening_shortlisted",
