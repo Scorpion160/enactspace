@@ -4,6 +4,7 @@ import '../../widgets/internal/recruitment_interview_board.dart';
 import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import 'recruitment_jury_screen.dart';
+import 'recruitment_team_guide_screen.dart';
 import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
@@ -372,6 +373,13 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(padding, 20, padding, 28),
         children: [
+          Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(
+            key: const Key('recruitment-team-guide'),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const RecruitmentTeamGuideScreen())),
+            icon: const Icon(Icons.menu_book_outlined), label: const Text('Guide équipe'),
+          )),
+          const SizedBox(height: 12),
           RecruitmentWorkspaceNav(
             selected: _section,
             onSelected: _openSection,

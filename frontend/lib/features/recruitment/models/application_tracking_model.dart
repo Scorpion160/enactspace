@@ -24,6 +24,7 @@ class ApplicationTrackingModel {
   final String? personalityStatus;
   final DateTime? personalityDueAt;
   final String? screeningResult;
+  final bool enactmeetAvailable;
   final RecruitmentScheduleModel? selectionSchedule;
 
   const ApplicationTrackingModel({
@@ -48,12 +49,14 @@ class ApplicationTrackingModel {
     this.personalityStatus,
     this.personalityDueAt,
     this.screeningResult,
+    this.enactmeetAvailable = false,
     this.selectionSchedule,
   });
 
   factory ApplicationTrackingModel.fromJson(Map<String, dynamic> json) {
     return ApplicationTrackingModel(
       screeningResult: json['screening_result']?.toString(),
+      enactmeetAvailable: json['enactmeet_available'] == true,
       selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
       applicationId: json['application_id']?.toString() ?? '',
       trackingCode: json['tracking_code']?.toString() ?? '',

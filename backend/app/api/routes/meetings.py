@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, timezone
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -75,6 +75,16 @@ def _scope_member(db: Session, meeting: Meeting, user_id) -> bool:
 
 
 def _can_access(db: Session, meeting: Meeting, user: User) -> bool:
+    from app.models.recruitment import Application, ApplicationInterviewJuror, RecruitmentJuryMember
+    from app.services.recruitment_access import can_manage_jury, eligible_juror
+    application = db.query(Application).filter(Application.interview_meeting_id == meeting.id).first()
+    if application is not None:
+        if can_manage_jury(db, user):
+            return True
+        return eligible_juror(user) and db.query(ApplicationInterviewJuror.application_id).join(
+            RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
+        ).filter(ApplicationInterviewJuror.application_id == application.id,
+                 RecruitmentJuryMember.user_id == user.id, RecruitmentJuryMember.is_active.is_(True)).first() is not None
     if meeting.created_by == user.id:
         return True
     if user_has_any_role(db, user.id, GLOBAL_MANAGEMENT_ROLES):
@@ -85,6 +95,8 @@ def _can_access(db: Session, meeting: Meeting, user: User) -> bool:
 
 
 def _can_manage(db: Session, meeting: Meeting, user: User) -> bool:
+    if not _can_access(db, meeting, user):
+        return False
     if meeting.created_by == user.id:
         return True
     member = _member(db, meeting, user.id)
@@ -155,7 +167,7 @@ def _display_name(user: User) -> str:
     return value or user.email
 
 
-def _make_jitsi_token(meeting: Meeting, user: User, *, moderator: bool) -> str | None:
+def _make_jitsi_token(meeting: Meeting, user: User, *, moderator: bool, expires_at=None) -> str | None:
     if not settings.MEET_JWT_APP_ID or not settings.MEET_JWT_SECRET:
         if settings.MEET_REQUIRE_JWT:
             raise HTTPException(
@@ -170,8 +182,8 @@ def _make_jitsi_token(meeting: Meeting, user: User, *, moderator: bool) -> str |
         "iss": settings.MEET_JWT_APP_ID,
         "sub": subject,
         "room": meeting.room_key,
-        "nbf": int((now - timedelta(seconds=15)).timestamp()),
-        "exp": int((now + timedelta(minutes=settings.MEET_JWT_TTL_MINUTES)).timestamp()),
+        "nbf": int((now - timedelta(seconds=15)).replace(tzinfo=timezone.utc).timestamp()),
+        "exp": int(min(now + timedelta(minutes=settings.MEET_JWT_TTL_MINUTES), expires_at or now + timedelta(minutes=settings.MEET_JWT_TTL_MINUTES)).replace(tzinfo=timezone.utc).timestamp()),
         "context": {
             "user": {
                 "id": str(user.id),
@@ -179,6 +191,7 @@ def _make_jitsi_token(meeting: Meeting, user: User, *, moderator: bool) -> str |
                 "email": user.email,
                 "avatar": user.photo_url or "",
                 "moderator": moderator,
+                "affiliation": "owner" if moderator else "member",
             },
             "features": {
                 "recording": bool(meeting.recording_enabled),

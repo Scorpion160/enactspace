@@ -139,6 +139,8 @@ def save_answers(row, payload, *, complete):
 
 
 def register_recruitment_extensions(router):
+    from app.services.recruitment_meetings import register_recruitment_meetings
+    register_recruitment_meetings(router)
     from app.services.recruitment_selection import register_recruitment_selection
     register_recruitment_selection(router)
     from app.services.recruitment_teams import campaign_teams, register_jury_teams
@@ -241,12 +243,9 @@ def register_recruitment_extensions(router):
             row.due_at, row.updated_at = due, utc_now()
         # Code/email remain in the tracking form body, never in the URL.
         deadline = due.strftime("%d/%m/%Y à %H:%M (heure de Dakar)") if due else "La date sera convenue avec l’équipe."
-        enqueue_email_delivery(db, recipient_email=app.email,
-            subject="Préparer notre échange avec Enactus ESP",
-            text_body=(f"Bonjour {app.first_name},\n\nNous te proposons un questionnaire pour préparer ton entretien. "
-                "Tu peux enregistrer tes réponses pour les reprendre plus tard, ou choisir d’en parler pendant l’entretien.\n\n"
-                f"Échéance : {deadline}\nCode de suivi : {app.tracking_code or app.id}\n"
-                f"Retrouver le questionnaire : {app_link('application-tracking')}\n\nL’équipe Enactus ESP"),
+        from app.services.recruitment_mail_copy import application_mail
+        subject, body = application_mail("questionnaire", app, details="Échéance : " + deadline)
+        enqueue_email_delivery(db, recipient_email=app.email, subject=subject, text_body=body,
             dedupe_key=f"personality-invite:{app.id}:{due.isoformat() if due else 'open'}")
         create_audit_log(db, "invitation_questionnaire_candidature", user.id, "application", app.id,
                          new_value={"version": row.instrument_version, "due_at": due.isoformat() if due else None})

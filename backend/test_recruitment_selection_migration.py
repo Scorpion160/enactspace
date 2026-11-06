@@ -31,7 +31,7 @@ class RecruitmentSelectionMigrationTests(TestCase):
             self.assertIn("selection_policy_version", {column["name"] for column in inspector.get_columns("recruitment_campaigns")})
             self.assertIn("stage", {column["name"] for column in inspector.get_columns("application_reviews")})
             with engine.connect() as connection:
-                self.assertEqual(connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(), "20261105_0036")
+                self.assertEqual(connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(), "20261106_0037")
 
     def test_previous_revision_upgrade_and_downgrade_are_reversible_without_reviews(self):
         with TemporaryDirectory() as directory:

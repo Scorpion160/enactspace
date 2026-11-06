@@ -324,6 +324,7 @@ class ApplicationUpdate(BaseModel):
 
 
 class ApplicationInterviewSchedule(BaseModel):
+    use_enactmeet: bool = False
     interview_at: datetime
     interview_end_at: Optional[datetime] = None
     interview_mode: Optional[Literal["in_person", "online", "hybrid"]] = None
@@ -351,7 +352,9 @@ class ApplicationInterviewSchedule(BaseModel):
     def validate_schedule(self):
         if self.interview_mode in {"in_person", "hybrid"} and not (self.interview_location or "").strip():
             raise ValueError("Précise le lieu de l’entretien.")
-        if self.interview_mode in {"online", "hybrid"} and not self.interview_link:
+        if self.use_enactmeet and self.interview_mode not in {"online", "hybrid"}:
+            raise ValueError("Choisis un entretien en ligne ou mixte pour EnactMeet.")
+        if self.interview_mode in {"online", "hybrid"} and not self.interview_link and not self.use_enactmeet:
             raise ValueError("Précise le lien de l’entretien.")
         if self.interview_end_at is not None:
             from app.services.operational_integrity import to_naive_utc
@@ -424,6 +427,7 @@ class ApplicationRead(BaseModel):
     interview_at: Optional[datetime]
     interview_location: Optional[str]
     interview_link: Optional[str]
+    interview_meeting_id: Optional[UUID] = None
     interview_jury: Optional[str]
     interview_note: Optional[str]
     cv_url: Optional[str]
@@ -453,6 +457,7 @@ class ApplicationTrackingRequest(BaseModel):
 
 
 class ApplicationTrackingRead(BaseModel):
+    enactmeet_available: bool = False
     selection_schedule: Optional[RecruitmentSchedule] = None
     application_id: UUID
     tracking_code: str

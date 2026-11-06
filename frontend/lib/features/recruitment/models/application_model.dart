@@ -41,6 +41,7 @@ class ApplicationModel {
   final DateTime? interviewAt;
   final String? interviewLocation;
   final String? interviewLink;
+  final String? interviewMeetingId;
   final String? interviewJury;
   final String? interviewNote;
   final String? cvUrl;
@@ -106,6 +107,7 @@ class ApplicationModel {
     this.interviewAt,
     this.interviewLocation,
     this.interviewLink,
+    this.interviewMeetingId,
     this.interviewJury,
     this.interviewNote,
     this.cvUrl,
@@ -198,6 +200,7 @@ class ApplicationModel {
       interviewAt: _utcDate(json['interview_at']),
       interviewLocation: json['interview_location']?.toString(),
       interviewLink: json['interview_link']?.toString(),
+      interviewMeetingId: json['interview_meeting_id']?.toString(),
       interviewJury: json['interview_jury']?.toString(),
       interviewNote: json['interview_note']?.toString(),
       cvUrl: json['cv_url']?.toString(),

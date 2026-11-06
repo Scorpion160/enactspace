@@ -142,7 +142,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261105_0036 (head)"
+          test "$output" = "20261106_0037 (head)"
 
       - name: Verify host-only backup encryption integrity
         run: python -m unittest ops_checks.backup_integrity_checks -v

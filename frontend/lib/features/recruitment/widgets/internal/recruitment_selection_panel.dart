@@ -76,7 +76,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
         _feedback = action == 'assign'
             ? '${result['created']} attribution(s) ajoutée(s). ${result['unfilled']} attribution(s) restent à pourvoir.'
             : action == 'reveal'
-                ? 'L’identité est accessible aux responsables habilités.'
+                ? 'Les identités et les documents sont accessibles au jury de cette campagne.'
                 : action == 'planning'
                     ? 'Le calendrier de la campagne a été enregistré.'
                     : 'Les résultats ont été publiés et les mails ont été préparés pour tout le lot.';
@@ -190,7 +190,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             OutlinedButton.icon(
               onPressed: _busy ? null : () => _act('reveal', {}),
               icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Lever l’anonymat pour les responsables habilités'),
+              label: const Text('Dévoiler les identités au jury de la campagne'),
             ),
           if (_feedback != null)
             Padding(padding: const EdgeInsets.only(top: 12), child: Text(_feedback!)),

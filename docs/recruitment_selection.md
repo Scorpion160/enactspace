@@ -48,7 +48,7 @@ Les informations du candidat restent en lecture seule pendant l’anonymat. Chaq
 
 Les métadonnées, téléchargements et aperçus des pièces jointes stockées par EnactSpace sont interdits pendant l’anonymat, y compris aux administrateurs. Les nouveaux dépôts anonymes exigent des fichiers envoyés dans EnactSpace, et refusent les simples liens de documents.
 
-Après publication de la présélection, seuls administrateur, Team Leader, secrétaire générale et chef/adjoint du pôle Veille peuvent activer la levée d’anonymat. L’identité et les documents deviennent alors accessibles à ces responsables ; les autres jurés gardent une vue anonyme. L’action est journalisée.
+Après publication de la présélection, seuls administrateur, Team Leader, secrétaire générale et chef/adjoint du pôle Veille peuvent activer la levée d’anonymat. L’identité et les documents deviennent alors accessibles aux membres actifs du jury de cette campagne et aux responsables habilités. Les autres membres de l’équipe ne reçoivent pas cet accès. L’action est journalisée.
 
 Pour d’anciens documents déjà hébergés sur un service externe, masquer leur lien dans EnactSpace ne révoque pas un accès indépendant à ce service. Leur propriétaire doit les rendre privés ou les remplacer par des fichiers privés avant de garantir leur confidentialité hors d’EnactSpace.
 

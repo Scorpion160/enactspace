@@ -331,6 +331,7 @@ def notify_recruitment_responsibles(
 def notify_application_status(
     db: Session,
     application: Application,
+    *, interview_updated: bool = False,
 ) -> None:
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     if uses_blind_selection(campaign, application) and (
@@ -338,7 +339,7 @@ def notify_application_status(
         or (application.status == "interview_scheduled" and not campaign.screening_published_at)
     ):
         return
-    enqueue_candidate_update(db, application)
+    enqueue_candidate_update(db, application, interview_updated=interview_updated)
     if not application.converted_user_id:
         return
 
@@ -704,17 +705,10 @@ def create_application(payload, db, attachments=None, created_files=None):
                              "unfilled": allocation["unfilled"],
                          })
     notify_recruitment_responsibles(db, application, campaign)
+    from app.services.recruitment_mail_copy import application_mail
+    subject, body = application_mail("submitted", application)
     enqueue_email_delivery(
-        db,
-        recipient_email=application.email,
-        subject=f"EnactSpace - Candidature {campaign.title}",
-        text_body=(
-            f"Bonjour {application.first_name},\n\n"
-            "Votre candidature à Enactus ESP a bien été reçue.\n"
-            f"Code de suivi : {application.tracking_code}\n\n"
-            "Conservez ce code pour suivre l'avancement de votre candidature.\n"
-            f"Suivre ma candidature : {app_link('application-tracking')}"
-        ),
+        db, recipient_email=application.email, subject=subject, text_body=body,
         dedupe_key=f"recruitment-submission:{application.id}",
     )
     db.commit()
@@ -1017,6 +1011,7 @@ def application_payload(
                 "project_interest": None,
                 "interview_location": None,
                 "interview_link": None,
+                "interview_meeting_id": None,
                 "interview_jury": None,
                 "interview_note": None,
                 "converted_user_id": None,
@@ -1098,6 +1093,7 @@ def track_application(
         "status": normalized_status,
         "screening_result": screening_result,
         "selection_schedule": campaign.selection_schedule,
+        "enactmeet_available": bool(application.interview_meeting_id and normalized_status == "interview_scheduled"),
         "result_published_at": published_at,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
@@ -1138,12 +1134,18 @@ def list_applications(
     from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
     query = db.query(Application)
     if not can_manage_jury(db, current_user):
+        revealed_campaigns = db.query(RecruitmentCampaign.id).filter(
+            RecruitmentCampaign.screening_published_at.is_not(None),
+            RecruitmentCampaign.identities_revealed_at.is_not(None),
+            RecruitmentCampaign.id.in_(assigned_campaign_ids(db, current_user)),
+        )
         interview_ids = db.query(ApplicationInterviewJuror.application_id).join(
             RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
         ).filter(RecruitmentJuryMember.user_id == current_user.id, RecruitmentJuryMember.is_active.is_(True))
         legacy_campaigns = db.query(RecruitmentCampaign.id).filter(RecruitmentCampaign.selection_policy_version.is_(None))
         query = query.filter(or_(Application.legacy_result_published.is_(True), Application.campaign_id.in_(legacy_campaigns),
-                                Application.id.in_(assignment_ids(db, current_user)), Application.id.in_(interview_ids)))
+                                Application.id.in_(assignment_ids(db, current_user)), Application.id.in_(interview_ids),
+                                Application.campaign_id.in_(revealed_campaigns)))
     if not is_recruitment_staff(db, current_user):
         query = query.filter(Application.campaign_id.in_(assigned_campaign_ids(db, current_user)))
 
@@ -1336,6 +1338,8 @@ def schedule_application_interview(
         for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link", "interview_jury", "interview_note")
     }
     assign_interview(db, application, payload)
+    from app.services.recruitment_meetings import sync_interview_meeting
+    sync_interview_meeting(db, application, payload, current_user)
     old_status = normalize_application_status(application.status)
     changed = apply_application_status(application, "interview_scheduled")
 
@@ -1368,7 +1372,7 @@ def schedule_application_interview(
             for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link")
         )
         if public_interview_changed:
-            notify_application_status(db, application)
+            notify_application_status(db, application, interview_updated=True)
         create_audit_log(
             db=db, action="programmation_entretien_candidature", user_id=current_user.id,
             entity_type="application", entity_id=application.id,

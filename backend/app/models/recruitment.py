@@ -107,6 +107,9 @@ class Application(Base):
     interview_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     interview_location: Mapped[str | None] = mapped_column(String(180), nullable=True)
     interview_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     interview_jury: Mapped[str | None] = mapped_column(Text, nullable=True)
     interview_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

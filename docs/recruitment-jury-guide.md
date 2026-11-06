@@ -1,45 +1,101 @@
-# Recruter pour contribuer à Enactus ESP
+# Le guide de l’équipe de recrutement
 
-Cette grille interne rend les appréciations explicites et comparables. Elle ne prédit pas la réussite d’une personne et n’automatise aucune admission. Les anciens questionnaires ont aidé à préciser les questions utiles ; leurs notes ne constituent pas une méthode de référence. Version : enactus-esp-2026-v1.
+Retrouve ici le déroulement de la campagne et les actions à réaliser à chaque étape. Les dates peuvent être ajustées ; les règles d’évaluation et de confidentialité restent les mêmes pour tous les dossiers.
 
-## Cinq critères de même poids
+## 1. Préparer la campagne
 
-Chaque critère est apprécié de 0 à 4 à partir des repères affichés dans l’application. Une observation concrète est obligatoire. Une réponse absente ou ambiguë doit être précisée avant de noter : absence d’information ne signifie pas zéro.
+Fixez les places recherchées, les questions du formulaire et les dates. Nommez les jurés avant la diffusion du formulaire pour répartir la charge dès les premières arrivées.
 
-| Critère | Ce que le jury cherche | Question commune pour préciser |
-|---|---|---|
-| Motivation et mission sociale | Une envie de contribuer à une action utile et d’apprendre avec l’équipe | Quelle contribution aimerais-tu apporter, et qu’aimerais-tu apprendre avec nous ? |
-| Écoute et compréhension d’un besoin | Le contexte, les personnes et les hypothèses à vérifier | Qui rencontrerais-tu pour comprendre le problème, et quelles questions leur poserais-tu ? |
-| Initiative et capacité à apprendre | Une première action réaliste, des retours et un apprentissage | Raconte un essai qui n’a pas fonctionné comme prévu. Qu’as-tu changé ensuite ? |
-| Coopération et responsabilité | Une contribution, de l’écoute et une façon constructive de traiter les blocages | Une tâche prend du retard et deux personnes sont en désaccord. Comment réagirais-tu ? |
-| Engagement réaliste et fiabilité | Une organisation compatible avec les études et des alertes en cas de difficulté | Quels créneaux peux-tu réellement tenir, et comment nous préviendrais-tu si un engagement devient impossible ? |
+Les administrateurs, le Team Leader, la secrétaire générale, le chef du pôle Veille et son adjoint pilotent les opérations de sélection. Un juré est nommé pour une campagne précise ; cette nomination ne lui donne pas un rôle de responsable.
 
-Un exemple familial, scolaire ou personnel est recevable. Un poste dans une association, une aisance à l’oral ou une expérience prestigieuse ne donnent pas de points supplémentaires. Le jury n’évalue pas l’apparence, le genre, les notes scolaires, le département, le niveau d’études ou la longueur des réponses. Les contraintes de déplacement peuvent conduire à envisager d’autres contributions.
+## 2. Présenter les conditions de candidature
 
-## Calcul transparent
+Le candidat vérifie son éligibilité avant de remplir ses informations personnelles. DIC3, DESCAF3, Master2 et DIT2 sont exclus, ainsi que l’appartenance à trois clubs ou structures étudiantes ou plus. Le nombre de structures reste une déclaration du candidat.
 
-Pour un avis complet : indice sur 100 = somme des cinq niveaux / 20 × 100. Chaque critère contribue à hauteur de 20 points. Cinq niveaux 3 donnent 75/100.
+Le formulaire contrôle de nouveau ces conditions au dépôt. Les documents sont facultatifs. Le candidat relit ses réponses avant l’envoi et conserve son code de suivi.
 
-L’indice du dossier est la moyenne des avis complets des évaluateurs distincts. Modifier son avis remplace l’appréciation précédente et ne donne pas une voix supplémentaire. Les notes antérieures sont conservées et identifiées séparément ; elles ne sont pas ajoutées à cet indice. La grille d’une campagne est fixée dès le premier avis structuré.
+## 3. Étudier les dossiers au fil des arrivées
 
-Le dossier affiche le nombre d’avis et l’écart entre leurs indices. À partir de 20 points d’écart, l’application invite le jury à discuter ses observations. Ce repère interne n’est ni un seuil d’admission ni une preuve de désaccord significatif.
+Il n’est pas nécessaire d’attendre la clôture pour commencer. Dès leur réception, les dossiers sont attribués aux jurés disponibles. Si le jury est incomplet, les dépôts restent enregistrés et les nominations suivantes complètent les attributions.
 
-## Déroulement conseillé
+Deux avis sont demandés par dossier par défaut. La répartition aléatoire équilibre les nouvelles attributions. Le bouton de répartition permet de compléter les besoins sans effacer le travail déjà fait. Avec 500 dossiers et 20 jurés disponibles dès le départ, deux avis représentent environ 50 dossiers par juré.
 
-1. Avant l’ouverture, définir les places, les conditions d’éligibilité, le calendrier et les besoins réels de contribution. Relire les questions configurables et conserver la même grille pour la campagne.
-2. Faire une calibration sur des situations fictives, puis discuter les repères de chaque niveau. Ne pas utiliser les anciens candidats comme classement d’entraînement.
-3. Faire relire chaque dossier par deux personnes, avec des observations indépendantes avant la discussion collective. L’application permet plusieurs avis mais n’impose pas deux évaluateurs et n’attribue pas automatiquement les dossiers.
-4. Employer les mêmes questions principales et la même durée d’entretien. Les relances précisent un exemple. Déclarer une proximité personnelle avec un candidat et confier l’évaluation à une autre personne.
-5. Examiner les écarts critère par critère. Demander une précision comparable en cas d’information insuffisante. En cas d’égalité, revenir aux contributions documentées et aux besoins annoncés, sans changer les critères après lecture des dossiers.
-6. Décider collectivement des admissions et de la liste d’attente dans la limite des places. Aucun indice ne déclenche automatiquement une admission ou un refus. Décisions, évaluations et transitions restent des actions humaines.
-7. Après l’intégration, recueillir un retour sur les questions et le parcours. Réviser une future grille pour une nouvelle campagne en conservant la version des évaluations passées.
+## 4. Ouvrir et évaluer ses dossiers
 
-## Confidentialité
+Pendant la présélection, chaque juré retrouve ses dossiers attribués sous un code anonyme. Les noms, coordonnées, informations permettant l’identification et pièces jointes restent masqués, y compris pour les responsables.
 
-Les observations concernent les critères et restent factuelles. Les anciens fichiers ont été examinés sous forme agrégée : aucun nom, réponse individuelle ou classement historique n’a été importé. Les accès internes restent soumis aux autorisations du recrutement ; l’affichage anonymisé masque les informations personnelles et les réponses libres.
+Évaluez les cinq critères de la grille : motivation et mission sociale, compréhension d’un besoin, initiative et apprentissage, coopération et responsabilité, engagement réaliste et fiabilité. Pour chaque note de 0 à 4, ajoutez une observation tirée des réponses. Un exemple personnel, scolaire ou familial est recevable.
 
-Repères méthodologiques : mission et apprentissage collectif d’Enactus (https://enactus.org/what-we-do/), entretiens structurés et critères communs de l’OPM (https://www.opm.gov/frequently-asked-questions/assessment-policy-faq/structured-interviews/). Adaptation interne à Enactus ESP, pas procédure officielle de recrutement d’Enactus.
+## 5. Comparer les avis avec les mêmes repères
 
-## Renseigner son avis dans EnactSpace
+Le total sur 20 est ramené sur 100. L’indice du dossier correspond à la moyenne des avis complets. Il ne décide pas à lui seul d’une admission ou d’un refus.
 
-Ouvrir Recrutement, choisir Ouvrir le dossier, puis rejoindre la section Évaluations. Évaluer ouvre les cinq critères ; Modifier mon avis recharge ses propres niveaux et observations. Renseigner un exemple pour chaque niveau, choisir son avis et enregistrer. La fiche et la liste actualisent l’indice ; le statut reste inchangé. Annuler ou utiliser Retour ferme le brouillon sans enregistrer. En cas d’erreur, le brouillon reste ouvert pour permettre une nouvelle tentative.
+Un juré ordinaire enregistre son avis avant de consulter les notes de ses collègues. Ses propres observations restent accessibles ; celles d’autrui sont masquées pendant l’anonymat. Un écart d’au moins 20 points sur 100 exige un avis supplémentaire avec le réglage initial. Le nombre d’avis et ce seuil peuvent être ajustés par les responsables.
+
+## 6. Signaler une proximité ou un empêchement
+
+Si vous reconnaissez le candidat, avez un conflit d’intérêts ou ne pouvez pas traiter le dossier, utilisez la demande de remplacement. Ne saisissez pas son nom dans une observation pour signaler le problème.
+
+L’attribution est retirée du calcul et un autre juré est recherché. S’il manque des personnes disponibles, les responsables doivent compléter le jury. Une note ne doit pas être inventée pour faire disparaître une attribution en attente.
+
+## 7. Préparer la présélection
+
+Les responsables préparent une décision pour chaque dossier : retenu pour un entretien ou non retenu. Ces décisions restent internes tant que le lot n’est pas publié.
+
+Avant l’annonce, relisez les dossiers et les écarts, vérifiez que les avis requis sont présents et que chaque dossier possède sa décision. La publication exige la clôture des dépôts et le respect de la date annoncée. Un responsable habilité peut confirmer la publication ; organisez la validation collective avant ce clic.
+
+## 8. Informer tous les candidats du premier résultat
+
+Les résultats du premier filtre sont publiés ensemble dans le suivi. Les mails des dossiers retenus et non retenus sont préparés dans le même lot. Leur arrivée dans les boîtes de réception peut varier selon les messageries.
+
+Le parcours d’un candidat non retenu s’arrête au résultat du dossier. Un candidat présélectionné attend ensuite sa convocation. Ne le convoquez pas avant la publication de la présélection et ne communiquez pas de résultat en privé avant l’annonce.
+
+## 9. Dévoiler les dossiers au jury
+
+Après la publication de la présélection, un administrateur, le Team Leader, la secrétaire générale, le chef du pôle Veille ou son adjoint peut déclencher la levée d’anonymat.
+
+Les noms, coordonnées, réponses et documents deviennent alors accessibles aux membres actifs du jury de cette campagne et aux responsables habilités. La levée concerne la campagne entière. Un membre du pôle Veille qui n’est ni responsable habilité ni juré nommé ne reçoit pas cet accès. Les droits de notation restent limités aux dossiers attribués.
+
+## 10. Organiser les entretiens
+
+Choisissez un créneau, une durée, le format et le jury. Les entretiens peuvent avoir lieu sur place, en ligne ou en format mixte. Les conflits de créneaux entre jurés sont signalés.
+
+Pour un entretien en ligne ou mixte, activez Utiliser EnactMeet si le service est disponible, ou indiquez un autre lien de visioconférence. La convocation présente au candidat la date, l’heure de Dakar et les modalités utiles. Une reprogrammation prépare un mail avec les nouvelles informations.
+
+## 11. Accueillir le candidat sur EnactMeet
+
+Chaque candidat dispose de sa propre salle d’entretien. Les jurés affectés à cet entretien la retrouvent dans EnactMeet et ouvrent la salle avant l’arrivée du candidat.
+
+Le candidat ouvre son suivi avec son code et son adresse e-mail, puis choisit Rejoindre mon entretien. Aucun compte membre n’est nécessaire. L’accès s’ouvre quinze minutes avant le rendez-vous, une fois le jury connecté, et se ferme quinze minutes après la fin prévue.
+
+Les autres candidats ne reçoivent pas le lien de cette salle. Une modification du créneau ou du jury renouvelle la salle. En cas de problème de connexion, contactez le candidat pour convenir de la suite ; ne transformez pas une difficulté technique en appréciation sur sa motivation.
+
+## 12. Préparer et conduire l’échange
+
+Un questionnaire complémentaire peut être proposé après la présélection. Le candidat peut reprendre ses réponses plus tard ou choisir d’en parler pendant l’entretien. Le refus de ce questionnaire ne déclenche pas de rejet automatique.
+
+Conservez des questions principales et une durée comparables. Les relances servent à préciser un exemple. Chaque juré affecté renseigne ensuite sa grille d’entretien ; les notes de dossier et d’entretien sont conservées séparément.
+
+## 13. Préparer et publier les résultats finaux
+
+Les responsables préparent une admission, un refus ou une liste d’attente pour chaque candidat présélectionné. Les décisions restent internes jusqu’à l’annonce finale.
+
+Vérifiez les entretiens, les avis requis et les décisions avant de publier. Un rendez-vous encore dans le futur bloque la publication. Les résultats et leurs mails sont préparés ensemble pour ce deuxième lot. Les candidats refusés au premier filtre ne reçoivent pas un nouveau verdict.
+
+## 14. Accueillir les personnes admises
+
+Après une admission finale publiée, l’administrateur, le Team Leader ou la secrétaire générale peut créer ou associer le compte membre. La création du compte est distincte du mail d’admission.
+
+Le nouveau membre reçoit les informations de première connexion, choisit son mot de passe et complète son profil. Une liste d’attente n’est pas une admission ; le repêchage n’est pas automatique. Un empêchement à l’entretien se traite actuellement par reprogrammation.
+
+## 15. Ajuster les dates et suivre les envois
+
+Les responsables habilités peuvent modifier les dates à tout moment. Les anciennes et nouvelles dates sont conservées avec l’auteur du changement. Un report ne retire pas un résultat déjà communiqué et ne rouvre pas les dépôts après la présélection.
+
+Modifier le calendrier ne déplace pas les rendez-vous individuels et n’envoie pas de mail. Prévenez les candidats concernés d’un report et reprogrammez leurs entretiens si nécessaire. Le bilan permet de suivre les mails envoyés, les nouvelles tentatives et les échecs.
+
+## 16. Garder les échanges dans le cadre du recrutement
+
+Les dossiers et les observations restent dans l’espace de la campagne. Ne diffusez pas de captures, de classements nominatifs ou de pièces jointes hors du jury.
+
+Dans les messages aux candidats, distinguez le refus de présélection du refus après entretien. Remerciez la personne pour sa candidature et donnez une réponse claire, sans la comparer aux autres candidats.

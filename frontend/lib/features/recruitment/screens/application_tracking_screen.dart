@@ -4,6 +4,7 @@ import 'public/personality_questionnaire_screen.dart';
 
 import 'package:flutter/material.dart';
 import '../widgets/recruitment_schedule.dart';
+import '../widgets/public/candidate_interview_button.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -109,6 +110,8 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           TrackingResultView(tracking: _tracking!),
+                          if (_tracking!.enactmeetAvailable)
+                            CandidateInterviewButton(code: _tracking!.trackingCode, email: _tracking!.email),
                           if (_tracking!.personalityStatus != null &&
                               (widget.personalityGateway != null ||
                                   _gateway is RecruitmentPublicGateway))

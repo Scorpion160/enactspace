@@ -13,12 +13,14 @@ class MeetingConferenceScreen extends StatefulWidget {
   final String meetingId;
   final String? title;
   final MeetingsService? service;
+  final MeetingJoinModel? guestJoin;
 
   const MeetingConferenceScreen({
     super.key,
     required this.meetingId,
     this.title,
     this.service,
+    this.guestJoin,
   });
 
   @override
@@ -35,6 +37,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
   bool _nativeClosed = false;
   bool _enteredReported = false;
   bool _leaveReported = false;
+  String get _returnPath => widget.guestJoin == null ? '/meetings/${widget.meetingId}' : '/application-tracking';
 
   @override
   void initState() {
@@ -45,7 +48,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
 
   Future<void> _prepare() async {
     try {
-      final join = await _service.joinMeeting(widget.meetingId);
+      final join = widget.guestJoin ?? await _service.joinMeeting(widget.meetingId);
       if (!mounted) return;
       setState(() {
         _join = join;
@@ -164,6 +167,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
   }
 
   Future<void> _reportEntered() async {
+    if (widget.guestJoin != null) return;
     if (_enteredReported) return;
     _enteredReported = true;
     try {
@@ -174,6 +178,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
   }
 
   Future<void> _reportLeave() async {
+    if (widget.guestJoin != null) return;
     if (_leaveReported || !_enteredReported) return;
     _leaveReported = true;
     try {
@@ -189,7 +194,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/meetings/${widget.meetingId}');
+      context.go(_returnPath);
     }
   }
 
@@ -216,7 +221,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
     if (_error != null && _join == null) {
       return _FailureState(
         message: _error!,
-        onBack: () => context.go('/meetings/${widget.meetingId}'),
+        onBack: () => context.go(_returnPath),
       );
     }
 
@@ -283,7 +288,7 @@ class _MeetingConferenceScreenState extends State<MeetingConferenceScreen> {
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: () => context.go('/meetings/${widget.meetingId}'),
+                onPressed: () => context.go(_returnPath),
                 icon: const Icon(Icons.arrow_back_rounded),
                 label: const Text('Retour à la réunion'),
               ),

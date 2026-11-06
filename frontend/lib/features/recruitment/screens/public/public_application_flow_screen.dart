@@ -716,7 +716,7 @@ class _PublicApplicationFlowScreenState
       Text(
         widget.demoMode
             ? 'Le document restera dans cette démonstration.'
-            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent masquées pendant la présélection. Les responsables habilités pourront les consulter après le premier filtre et la levée d’anonymat.',
+            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent masquées pendant la présélection. Après le premier filtre et la levée d’anonymat, le jury de la campagne pourra les consulter.',
         style: const TextStyle(height: 1.5),
       ),
     ],

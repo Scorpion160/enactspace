@@ -40,11 +40,15 @@ def campaign_for_application(db, application):
 
 
 def identity_is_visible(db, user, campaign):
-    if not can_manage_jury(db, user):
+    if uses_blind_selection(campaign) and not (campaign.screening_published_at and campaign.identities_revealed_at):
         return False
-    return not uses_blind_selection(campaign) or bool(
-        campaign.screening_published_at and campaign.identities_revealed_at
-    )
+    if can_manage_jury(db, user):
+        return True
+    return eligible_juror(user) and db.query(RecruitmentJuryMember.id).filter(
+        RecruitmentJuryMember.campaign_id == campaign.id,
+        RecruitmentJuryMember.user_id == user.id,
+        RecruitmentJuryMember.is_active.is_(True),
+    ).first() is not None
 
 
 def review_stage(campaign, application=None):
@@ -82,7 +86,7 @@ def is_assigned(db, user, application):
 def require_application_access(db, user, application):
     require_campaign_access(db, user, application.campaign_id)
     campaign = campaign_for_application(db, application)
-    if not uses_blind_selection(campaign, application) or can_manage_jury(db, user):
+    if not uses_blind_selection(campaign, application) or can_manage_jury(db, user) or identity_is_visible(db, user, campaign):
         return
     if review_stage(campaign, application) == "screening" and is_assigned(db, user, application):
         return
@@ -353,26 +357,13 @@ def selection_overview(db, campaign):
 def _enqueue_result(db, application, campaign, stage, published_at):
     from app.api.routes.recruitment import ensure_tracking_code
     from app.services.email_delivery_service import enqueue_email_delivery
-    from app.services.email_templates import app_link
-    if stage == "screening":
-        retained = application.screening_decision == "shortlisted"
-        message = (
-            "Ton dossier est retenu pour un entretien. Cette étape nous permettra d’échanger sur tes motivations et tes disponibilités."
-            if retained else
-            "Merci pour le temps consacré à ton dossier. À l’issue de cette présélection, nous ne poursuivrons pas ta candidature pour cette campagne. Ce résultat porte sur cette sélection et les places disponibles. Il ne résume pas tes capacités ni tes possibilités de t’engager."
-        )
-        title = "Le résultat de la présélection Enactus ESP"
-    else:
-        message = {
-            "accepted": "Ta candidature est retenue après les entretiens. L’équipe va te communiquer les prochaines étapes de ton intégration.",
-            "rejected": "Merci pour ton dossier et pour notre échange. À l’issue des entretiens, nous ne pouvons pas te proposer de place pour cette campagne. Nous te souhaitons une belle continuation dans tes projets et tes engagements.",
-            "waiting_list": "Après les entretiens, ta candidature est placée en liste d’attente. L’équipe te contactera si une place se libère.",
-        }[application.pending_final_decision]
-        title = "Le résultat de ta candidature Enactus ESP"
-    tracking_code = ensure_tracking_code(db, application)
+    from app.services.recruitment_mail_copy import application_mail
+    ensure_tracking_code(db, application)
+    kind = ("screening_shortlisted" if application.screening_decision == "shortlisted" else "screening_not_shortlisted") if stage == "screening" else application.pending_final_decision
+    title, body = application_mail(kind, application)
     delivery = enqueue_email_delivery(
         db, recipient_email=application.email, subject=title,
-        text_body=f"Bonjour {application.first_name},\n\n{message}\n\nCode de suivi : {tracking_code}\nSuivre ma candidature : {app_link('application-tracking')}\n\nL’équipe Enactus ESP",
+        text_body=body,
         dedupe_key=f"recruitment-results:{campaign.id}:{stage}:{application.id}",
     )
     if delivery is None:

@@ -33,10 +33,24 @@
     if (!loaders.has(key)) {
       loaders.set(key, new Promise((resolve, reject) => {
         const script = document.createElement('script');
+        const timeout = setTimeout(() => {
+          loaders.delete(key);
+          script.remove();
+          reject(new Error('Le serveur EnactMeet ne répond pas. Réessaie dans quelques instants.'));
+        }, 20000);
         script.src = new URL('external_api.js', base).toString();
         script.async = true;
-        script.onload = () => resolve(window.JitsiMeetExternalAPI);
-        script.onerror = () => reject(new Error('Impossible de charger Jitsi External API.'));
+        script.onload = () => {
+          clearTimeout(timeout);
+          if (window.JitsiMeetExternalAPI) resolve(window.JitsiMeetExternalAPI);
+          else { loaders.delete(key); reject(new Error('Le serveur EnactMeet n’a pas chargé la visioconférence.')); }
+        };
+        script.onerror = () => {
+          clearTimeout(timeout);
+          loaders.delete(key);
+          script.remove();
+          reject(new Error('La visioconférence n’a pas pu être chargée. Vérifie ta connexion puis réessaie.'));
+        };
         document.head.appendChild(script);
       }));
     }

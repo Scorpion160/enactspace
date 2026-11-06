@@ -53,6 +53,8 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   UserExperience? _user;
   bool _loading = true;
   String? _error;
+  String? _referenceWarning;
+  bool _referencesLoaded = false;
   String _filter = 'active';
 
   @override
@@ -100,19 +102,21 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   }
 
   Future<void> _ensureReferences() async {
-    if (_memberOptions.isNotEmpty ||
-        _poleOptions.isNotEmpty ||
-        _projectOptions.isNotEmpty) {
+    if (_referencesLoaded) {
       return;
     }
+    var failed = false;
+    Future<List<T>> available<T>(Future<List<T>> request) async {
+      try { return await request; } catch (_) { failed = true; return <T>[]; }
+    }
     final values = await Future.wait<dynamic>([
-      _members.getMembers(),
+      available(_members.getMembers()),
       if (_user?.isEnacchef == true)
-        _poles.getPoles()
+        available(_poles.getPoles())
       else
         Future.value(<PoleModel>[]),
       if (_user?.isEnacchef == true)
-        _projects.getProjects()
+        available(_projects.getProjects())
       else
         Future.value(<ProjectModel>[]),
     ]);
@@ -121,6 +125,8 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       _memberOptions = values[0] as List<MemberModel>;
       _poleOptions = values[1] as List<PoleModel>;
       _projectOptions = values[2] as List<ProjectModel>;
+      _referencesLoaded = !failed;
+      _referenceWarning = failed ? 'Certaines listes d’invitation n’ont pas pu être chargées. Tu peux préparer une réunion et inviter les participants plus tard.' : null;
     });
   }
 
@@ -143,6 +149,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         members: _memberOptions,
         poles: _poleOptions,
         projects: _projectOptions,
+        referenceWarning: _referenceWarning,
       ),
     );
     if (created == null || !mounted) return;
@@ -555,6 +562,7 @@ class _EmptyMeetings extends StatelessWidget {
 }
 
 class _CreateMeetingSheet extends StatefulWidget {
+  final String? referenceWarning;
   final MeetingsService service;
   final UserExperience? user;
   final List<MemberModel> members;
@@ -562,6 +570,7 @@ class _CreateMeetingSheet extends StatefulWidget {
   final List<ProjectModel> projects;
 
   const _CreateMeetingSheet({
+    this.referenceWarning,
     required this.service,
     required this.user,
     required this.members,
@@ -633,6 +642,10 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
             ],
           ),
           const SizedBox(height: 14),
+          if (widget.referenceWarning != null) ...[
+            Text(widget.referenceWarning!),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: _title,
             autofocus: true,

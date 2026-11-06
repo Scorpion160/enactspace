@@ -410,6 +410,7 @@ void main() {
         find.widgetWithText(DropdownButtonFormField<String>, 'Format'),
       );
       await _tap(tester, find.text('En ligne').last);
+      await _tap(tester, find.text('Utiliser EnactMeet'));
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Lien de l’entretien *'),
         'https://example.org/meeting',
