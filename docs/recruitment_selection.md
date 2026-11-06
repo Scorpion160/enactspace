@@ -42,7 +42,7 @@ Avec 500 dossiers, 20 jurés et deux avis, la charge initiale est de 50 dossiers
 
 ## Anonymat et documents
 
-Le serveur masque identité, coordonnées, parcours identifiant, code de suivi et liens de documents. Il masque aussi les noms, contacts et liens reconnaissables dans les réponses du candidat. Le formulaire demande de ne pas insérer d’identité dans les réponses libres ; une personne peut néanmoins être reconnaissable par un récit particulier, d’où la possibilité de déport.
+Le serveur masque identité, coordonnées, code de suivi et liens de documents. Le département, le niveau, la promotion et les réponses restent lisibles pour l’évaluation. Il masque uniquement les noms, contacts et liens reconnaissables dans les réponses du candidat. Le formulaire demande de ne pas insérer d’identité dans les réponses libres ; une personne peut néanmoins être reconnaissable par un récit particulier, d’où la possibilité de déport.
 
 Les informations du candidat restent en lecture seule pendant l’anonymat. Chaque juré retrouve ses propres observations telles qu’il les a saisies. Les commentaires et justifications d’autrui restent masqués jusqu’à la levée autorisée d’anonymat ; les notes par critère restent disponibles pour la sélection. Aucune observation saisie par le jury n’est comparée aux noms privés dans une réponse API, afin de ne pas permettre d’en deviner un nom. Les jurés ne peuvent pas réécrire les observations d’autrui pendant l’anonymat. Le déport utilise uniquement des motifs prédéfinis, sans champ permettant d’indiquer un nom.
 

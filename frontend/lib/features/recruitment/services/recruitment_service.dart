@@ -18,6 +18,16 @@ class RecruitmentService {
           apiClient ?? ApiClient(requestTimeout: const Duration(seconds: 90)),
       _authService = authService ?? AuthService();
 
+  Future<Map<String, dynamic>> getStatistics({String? campaignId}) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+    final response = await _apiClient.get(
+      '/recruitment/statistics${campaignId == null ? '' : '?campaign_id=${Uri.encodeQueryComponent(campaignId)}'}',
+      token: token,
+    );
+    return Map<String, dynamic>.from(response as Map);
+  }
+
   Future<List<RecruitmentCampaignModel>> getCampaigns() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

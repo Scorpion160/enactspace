@@ -225,8 +225,10 @@ void main() {
       );
       expect(
         UserExperience.visibleRoutesFor(user(false)),
-        isNot(contains('/recruitment')),
+        contains('/recruitment'),
       );
+      expect(user(false).canViewRecruitment, isFalse);
+      expect(UserExperience.canAccessPath(user(false), '/recruitment/dossiers'), isFalse);
       expect(user(true).canManageMembers, isFalse);
     },
   );

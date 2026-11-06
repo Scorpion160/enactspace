@@ -22,7 +22,7 @@ Deux avis sont demandés par dossier par défaut. La répartition aléatoire éq
 
 ## 4. Ouvrir et évaluer ses dossiers
 
-Pendant la présélection, chaque juré retrouve ses dossiers attribués sous un code anonyme. Les noms, coordonnées, informations permettant l’identification et pièces jointes restent masqués, y compris pour les responsables.
+Pendant la présélection, chaque juré retrouve ses dossiers attribués sous un code anonyme. Le département, le niveau, la promotion et les réponses du candidat restent visibles pour permettre l’évaluation. Les noms, coordonnées et pièces jointes sont masqués, y compris pour les responsables. Si une réponse contient un nom, un contact ou un lien personnel, seul cet élément est masqué.
 
 Évaluez les cinq critères de la grille : motivation et mission sociale, compréhension d’un besoin, initiative et apprentissage, coopération et responsabilité, engagement réaliste et fiabilité. Pour chaque note de 0 à 4, ajoutez une observation tirée des réponses. Un exemple personnel, scolaire ou familial est recevable.
 
@@ -54,7 +54,7 @@ Le parcours d’un candidat non retenu s’arrête au résultat du dossier. Un c
 
 Après la publication de la présélection, un administrateur, le Team Leader, la secrétaire générale, le chef du pôle Veille ou son adjoint peut déclencher la levée d’anonymat.
 
-Les noms, coordonnées, réponses et documents deviennent alors accessibles aux membres actifs du jury de cette campagne et aux responsables habilités. La levée concerne la campagne entière. Un membre du pôle Veille qui n’est ni responsable habilité ni juré nommé ne reçoit pas cet accès. Les droits de notation restent limités aux dossiers attribués.
+Les noms, coordonnées et documents deviennent alors accessibles aux membres actifs du jury de cette campagne et aux responsables habilités. La levée concerne la campagne entière. Un membre du pôle Veille qui n’est ni responsable habilité ni juré nommé ne reçoit pas cet accès. Les droits de notation restent limités aux dossiers attribués.
 
 ## 10. Organiser les entretiens
 
@@ -101,3 +101,7 @@ Modifier le calendrier ne déplace pas les rendez-vous individuels et n’envoie
 Les dossiers et les observations restent dans l’espace de la campagne. Ne diffusez pas de captures, de classements nominatifs ou de pièces jointes hors du jury.
 
 Dans les messages aux candidats, distinguez le refus de présélection du refus après entretien. Remerciez la personne pour sa candidature et donnez une réponse claire, sans la comparer aux autres candidats.
+
+## 17. Consulter la campagne en chiffres
+
+Tous les enacteurs et alumni peuvent ouvrir Recrutement pour consulter les effectifs par département, niveau, année dans le cursus, promotion et canal de découverte d’Enactus ESP. Les chiffres portent sur tous les dossiers reçus pour la campagne choisie et se mettent à jour en actualisant la vue. Ils permettent de repérer les profils peu représentés, sans remplacer la grille d’évaluation. Cette vue ne donne accès ni aux dossiers, ni aux notes, ni aux résultats encore en préparation. Les jurés et responsables retrouvent leur espace avec « Ouvrir les candidatures ».

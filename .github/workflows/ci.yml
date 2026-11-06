@@ -197,7 +197,7 @@ jobs:
       - name: Build release web application
         run: >-
           flutter build web --release --no-pub
-          --build-name=1.0.27 --build-number=30
+          --build-name=1.0.28 --build-number=31
           --dart-define=ENACTSPACE_API_URL=https://api-enactspace.kerunjombor.net
 
       - name: Package verified web release

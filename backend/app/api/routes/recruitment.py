@@ -45,6 +45,8 @@ from app.schemas.recruitment import (
     ConvertApplicationToUserRequest,
 )
 from app.api.deps import (
+    get_current_active_validated_user,
+    can_access_recruitment,
     require_recruitment_access,
     require_sg_or_admin,
     user_has_any_role,
@@ -75,6 +77,26 @@ from app.services.recruitment_access import (
 )
 
 router = APIRouter(prefix="/recruitment", dependencies=[Depends(protect_public_request)], tags=["Recrutement"])
+
+
+@router.get('/statistics')
+def recruitment_statistics(
+    campaign_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    from app.services.recruitment_statistics import campaign_statistics
+    campaigns = db.query(RecruitmentCampaign).order_by(
+        RecruitmentCampaign.is_active.desc(), RecruitmentCampaign.created_at.desc()).all()
+    selected = next((row for row in campaigns if row.id == campaign_id), None) if campaign_id else next(iter(campaigns), None)
+    if campaign_id and selected is None:
+        raise HTTPException(404, 'Campagne introuvable.')
+    return {
+        'campaigns': [{'id': str(row.id), 'title': row.title} for row in campaigns],
+        'campaign_id': str(selected.id) if selected else None,
+        'can_access_applications': can_access_recruitment(db, current_user),
+        **campaign_statistics(db, selected.id if selected else None),
+    }
 
 
 VALID_APPLICATION_STATUSES = {
@@ -1012,35 +1034,26 @@ def application_payload(
                 "email": f"candidate-{code}@example.com",
                 "phone": None,
                 "gender": None,
-                "department": None,
-                "study_level": None,
-                "class_name": None,
-                "preferred_pole": None,
-                "project_interest": None,
                 "interview_location": None,
                 "interview_link": None,
                 "interview_meeting_id": None,
                 "interview_jury": None,
                 "interview_note": None,
                 "converted_user_id": None,
-                "campus_resident": None,
-                "interview_availability": None,
-                "interview_preferences": None,
                 "tracking_code": anonymous_code(application),
                 "cv_url": None,
                 "motivation_letter_url": None,
-                "known_enactus_from": None,
-                "other_clubs": None,
-                "associative_experience": None,
                 "availability": redact_candidate_text(application.availability, application),
                 "public_comment": redact_candidate_text(application.public_comment, application),
                 "questionnaire_answers": [dict(answer, answer=redact_candidate_text(answer.get("answer"), application) or "") for answer in (application.questionnaire_answers or [])],
                 "attachment_url": None,
             }
         )
-        for field in ("motivation", "contribution", "project_ideas", "leadership_profile", "enactus_knowledge"):
+        for field in ("motivation", "contribution", "project_ideas", "leadership_profile", "enactus_knowledge",
+                      "known_enactus_from", "other_clubs", "associative_experience", "preferred_pole",
+                      "project_interest", "interview_availability"):
             data[field] = redact_candidate_text(data.get(field), application)
-        if current_user is None or not uses_blind_selection(campaign, application):
+        if current_user is None:
             data.update(availability=None, public_comment=None, questionnaire_answers=None)
     return data
 

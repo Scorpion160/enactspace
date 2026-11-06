@@ -379,7 +379,7 @@ class _DetailBodyState extends State<_DetailBody> {
         const Padding(
           padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
           child: RecruitmentNotice(
-            'Lecture anonymisée : identité, documents et éléments personnels masqués.',
+            'Noms, coordonnées et documents masqués. Le parcours et les réponses restent visibles.',
             icon: Icons.visibility_off_outlined,
           ),
         ),
@@ -441,8 +441,7 @@ class _DetailBodyState extends State<_DetailBody> {
                       'Département': _value(widget.application.department),
                       'Promotion': _value(widget.application.className),
                       'Niveau': _value(widget.application.studyLevel),
-                      if (!widget.anonymized &&
-                          widget.application.knownEnactusFrom
+                      if (widget.application.knownEnactusFrom
                                   ?.trim()
                                   .isNotEmpty ==
                               true)
@@ -460,23 +459,20 @@ class _DetailBodyState extends State<_DetailBody> {
                             widget.application.projectInterest!,
                       'Disponibilité': _value(widget.application.availability),
                       'Structures étudiantes déclarées': widget.application.otherClubsCount?.toString() ?? 'Non renseigné',
-                      if (!widget.anonymized)
-                        'Résidence au campus':
+                      'Résidence au campus':
                             widget.application.campusResident == null
                             ? 'Non renseignée'
                             : widget.application.campusResident!
                             ? 'Oui'
                             : 'Non',
-                      if (!widget.anonymized &&
-                          widget
+                      if (widget
                                   .application
                                   .interviewAvailability
                                   ?.isNotEmpty ==
                               true)
                         'Disponibilités pour l’entretien':
                             widget.application.interviewAvailability!,
-                      if (!widget.anonymized &&
-                          widget.application.interviewPreferences.isNotEmpty)
+                      if (widget.application.interviewPreferences.isNotEmpty)
                         'Formats souhaités': widget
                             .application
                             .interviewPreferences

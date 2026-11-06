@@ -360,7 +360,8 @@ class RecruitmentSelectionTests(TestCase):
             self.assertIsNone(data["cv_url"])
             self.assertNotIn(body["email"], result.text)
             self.assertIsNone(data["gender"])
-            self.assertIsNone(data["study_level"])
+            self.assertEqual(data["study_level"], body["study_level"])
+            self.assertEqual(data["department"], body["department"])
             for key in ("cv_url", "attachment_url"):
                 url = application[key]
                 for path in (url, url.removesuffix("/download"), url.replace("/download", "/preview")):
@@ -375,6 +376,79 @@ class RecruitmentSelectionTests(TestCase):
         for field in ("cv_url", "motivation_letter_url", "attachment_url"):
             self.post("/applications", dict(body, **{field: "https://example.org/identite.pdf"}), 422)
         self.assertEqual(self.db.query(Application).count(), 0)
+
+    def test_assigned_juror_can_read_academic_profile_and_answers_without_identity(self):
+        campaign, applications, _ = self.prepare()
+        application = self.db.get(Application, UUID(applications[0]['id']))
+        application.class_name = '2025-2026'
+        application.known_enactus_from = 'Réseaux sociaux'
+        application.other_clubs = 'Club de robotique, un projet collectif par mois.'
+        application.associative_experience = 'Organisation d’une collecte de livres.'
+        application.questionnaire_answers = [{'id': 'motivation', 'question': 'Pourquoi nous rejoindre ?',
+            'answer': f'Je veux organiser une collecte. Contact : {application.email}.'}]
+        self.db.commit()
+        self.assign(campaign)
+        assignment = self.db.query(ApplicationScreeningAssignment).filter_by(application_id=application.id).first()
+        self.acting = self.db.get(User, assignment.reviewer_id)
+        response = self.client.get(f'/api/recruitment/applications/{application.id}')
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        for key in ('department', 'study_level', 'class_name', 'known_enactus_from',
+                    'other_clubs', 'associative_experience', 'availability'):
+            self.assertEqual(data[key], getattr(application, key), key)
+        self.assertIn('Je veux organiser une collecte.', data['questionnaire_answers'][0]['answer'])
+        self.assertNotIn(application.email, response.text)
+        self.assertIsNone(data['phone'])
+        self.assertIsNone(data['cv_url'])
+        self.assertTrue(data['is_anonymized'])
+
+    def test_campaign_figures_are_shared_with_members_and_alumni_without_dossier_access(self):
+        campaign, applications, _ = self.prepare(count=3)
+        for index, item in enumerate(applications):
+            application = self.db.get(Application, UUID(item['id']))
+            application.department = ['GE', 'Génie Électrique', 'GM'][index]
+            application.study_level = ['DIC2', 'DUT2', 'DIC1'][index]
+            application.class_name = ['2025-2026', '2025-2026', '2026-2027'][index]
+            application.known_enactus_from = ['Réseaux sociaux', 'Par un membre : Personne Confidentielle', 'Autre : Contact Secret'][index]
+        other = self.campaign()
+        self.post('/applications', dict(self.application_payload(other), email='other-campaign@example.org'))
+        self.db.commit()
+        for actor in ('a', 'b'):
+            self.as_user(actor)
+            if actor == 'b':
+                self.acting.status = 'alumni'
+                self.acting.profile_type = 'alumni'
+                self.db.commit()
+            response = self.client.get('/api/recruitment/statistics', params={'campaign_id': str(campaign.id)})
+            self.assertEqual(response.status_code, 200, response.text)
+            data = response.json()
+            self.assertEqual(data['total'], 3)
+            self.assertFalse(data['can_access_applications'])
+            for rows in data['breakdowns'].values():
+                self.assertEqual(sum(row['count'] for row in rows), 3)
+            departments = {row['label']: row['count'] for row in data['breakdowns']['department']}
+            self.assertEqual(departments['Génie électrique'], 2)
+            self.assertEqual(departments['Génie mécanique'], 1)
+            years = {row['label']: row['count'] for row in data['breakdowns']['study_year']}
+            self.assertEqual(years['2e année'], 2)
+            sources = {row['label']: row['count'] for row in data['breakdowns']['discovery_channel']}
+            self.assertEqual(sources['Réseaux sociaux'], 1)
+            self.assertEqual(sources['Un membre d’Enactus ESP'], 1)
+            for forbidden in ('candidate-', 'example.org', 'tracking_code', 'questionnaire_answers',
+                              'Personne Confidentielle', 'Contact Secret', 'screening_results'):
+                self.assertNotIn(forbidden, response.text)
+            self.assertEqual(self.client.get('/api/recruitment/applications').status_code, 403)
+        from app.api.deps import get_current_active_validated_user
+        self.client.app.dependency_overrides.pop(get_current_active_validated_user, None)
+        self.assertEqual(self.client.get('/api/recruitment/statistics').status_code, 401)
+
+    def test_empty_campaign_figures_are_zero_and_unknown_campaign_is_not_silently_selected(self):
+        campaign, _, _ = self.prepare(count=0)
+        self.as_user('a')
+        data = self.client.get('/api/recruitment/statistics', params={'campaign_id': str(campaign.id)}).json()
+        self.assertEqual(data['total'], 0)
+        self.assertTrue(all(row['percentage'] == 0 for rows in data['breakdowns'].values() for row in rows))
+        self.assertEqual(self.client.get('/api/recruitment/statistics', params={'campaign_id': '00000000-0000-0000-0000-000000000099'}).status_code, 404)
 
     def test_guessing_identity_in_search_or_export_does_not_identify_a_blind_dossier(self):
         campaign, applications, _ = self.prepare()

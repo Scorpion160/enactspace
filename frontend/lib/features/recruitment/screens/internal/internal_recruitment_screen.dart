@@ -5,6 +5,7 @@ import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import 'recruitment_jury_screen.dart';
 import 'recruitment_team_guide_screen.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
@@ -373,6 +374,14 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(padding, 20, padding, 28),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/recruitment'),
+              icon: const Icon(Icons.bar_chart_rounded),
+              label: const Text('La campagne en chiffres'),
+            ),
+          ),
           RecruitmentWorkspaceNav(
             selected: _section,
             onSelected: _openSection,

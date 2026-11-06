@@ -231,7 +231,7 @@ class UserExperience {
         '/academy',
         '/archives',
         '/alumni',
-        if (user.canViewRecruitment) '/recruitment',
+        '/recruitment',
       ];
     }
 
@@ -269,9 +269,8 @@ class UserExperience {
       routes.add('/events');
     }
 
-    if (user.canViewRecruitment) {
-      routes.add('/recruitment');
-    }
+    // The campaign figures are shared with members; dossiers keep their own access checks.
+    routes.add('/recruitment');
 
     if (user.canViewImpact) {
       routes.add('/impact');
@@ -292,6 +291,10 @@ class UserExperience {
     if (user == null) return false;
 
     final normalizedPath = path.split('?').first;
+    if (normalizedPath == '/recruitment/dossiers' ||
+        normalizedPath.startsWith('/recruitment/dossiers/')) {
+      return user.canViewRecruitment;
+    }
     if (normalizedPath == '/help/manage' ||
         normalizedPath.startsWith('/help/manage/')) {
       return user.canManageMembers;
