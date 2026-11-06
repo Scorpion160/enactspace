@@ -45,7 +45,7 @@ class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen>
               onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
             )),
             Expanded(child: TabBarView(children: [
-              ListView(padding: const EdgeInsets.all(16), children: [
+              ListView(key: const PageStorageKey('recruitment-guide-sections-scroll'), padding: const EdgeInsets.all(16), children: [
                 Text(guide['title'].toString(), style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 12),
                 Text(guide['introduction'].toString(), style: const TextStyle(height: 1.55)),
@@ -62,7 +62,7 @@ class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen>
                   ],
                 )),
               ]),
-              ListView(padding: const EdgeInsets.all(16), children: [
+              ListView(key: const PageStorageKey('recruitment-guide-mails-scroll'), padding: const EdgeInsets.all(16), children: [
                 const Text('Les éléments entre crochets sont remplacés par les informations du candidat et de son rendez-vous. Les messages de résultat sont préparés lors de la publication du lot.', style: TextStyle(height: 1.55)),
                 const SizedBox(height: 16),
                 if (mails.isEmpty) const Text('Aucun mail ne correspond à cette recherche.'),

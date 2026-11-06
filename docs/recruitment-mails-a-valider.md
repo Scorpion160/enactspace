@@ -1,4 +1,6 @@
-# Mails du recrutement — textes à valider
+# Mails du recrutement — textes validés
+
+Textes validés par Cheikh le 6 novembre 2026. Le mail du questionnaire précise son caractère obligatoire, conformément à sa dernière consigne.
 
 Les éléments entre crochets seront remplacés par les informations du candidat et de son rendez-vous. Les deux messages de première connexion sont également inclus. La clôture exceptionnelle reste hors du parcours normal de sélection.
 

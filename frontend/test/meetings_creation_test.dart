@@ -62,7 +62,8 @@ void main() {
     expect(find.textContaining('Certaines listes d’invitation'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Titre de la réunion'), 'Réunion de préparation');
     final save = find.text('Créer la réunion');
-    await tester.ensureVisible(save);
+    await tester.scrollUntilVisible(save, 300,
+      scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(service.created, 1);
