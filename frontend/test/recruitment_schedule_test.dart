@@ -104,7 +104,7 @@ void main() {
   testWidgets('the internal read-only calendar retains the full planning', (tester) async {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
       child: RecruitmentScheduleEditor(schedule: plan, enabled: false, onSave: (_) async {}),
-    )))));
+    ))));
     await tester.pump();
     expect(find.textContaining('15/11/2026', findRichText: true), findsOneWidget);
     expect(find.textContaining('24/11/2026', findRichText: true), findsOneWidget);
