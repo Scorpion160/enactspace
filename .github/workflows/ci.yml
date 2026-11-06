@@ -184,6 +184,9 @@ jobs:
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
 
+      - name: Verify recruitment guide and meeting creation
+        run: flutter test --no-pub test/recruitment_team_guide_test.dart test/meetings_creation_test.dart
+
       - name: Run Flutter tests
         run: flutter test --no-pub
 

@@ -628,6 +628,7 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
       ),
       child: ListView(
         shrinkWrap: true,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           Row(
             children: [

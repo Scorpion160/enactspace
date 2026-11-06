@@ -58,6 +58,7 @@ class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen>
                   expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [for (final paragraph in section['paragraphs'] as List)
                     Padding(padding: const EdgeInsets.only(top: 12), child: SelectableText(
+                      key: PageStorageKey('paragraph-${section['title']}-$paragraph'),
                       paragraph.toString(), style: const TextStyle(height: 1.55))),
                   ],
                 )),
@@ -72,7 +73,8 @@ class _RecruitmentTeamGuideScreenState extends State<RecruitmentTeamGuideScreen>
                   subtitle: Text(mail['subject'].toString()),
                   childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
                   expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [SelectableText(mail['body'].toString(), style: const TextStyle(height: 1.55))],
+                  children: [SelectableText(mail['body'].toString(),
+                    key: PageStorageKey('mail-body-${mail['kind']}'), style: const TextStyle(height: 1.55))],
                 )),
               ]),
             ])),

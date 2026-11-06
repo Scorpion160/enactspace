@@ -61,10 +61,14 @@ void main() {
     expect(find.text('Nouvelle réunion EnactMeet'), findsOneWidget);
     expect(find.textContaining('Certaines listes d’invitation'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Titre de la réunion'), 'Réunion de préparation');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     final save = find.text('Créer la réunion');
     await tester.scrollUntilVisible(save, 300,
       scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
-    await tester.tap(save);
+    await Scrollable.ensureVisible(tester.element(save), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(save.hitTestable());
     await tester.pumpAndSettle();
     expect(service.created, 1);
     expect(find.text('Réunion créée'), findsOneWidget);
