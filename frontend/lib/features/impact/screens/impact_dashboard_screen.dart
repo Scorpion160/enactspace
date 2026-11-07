@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/ui/app_components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/heritage_photo.dart';
 import '../../../shared/ui/reading_blocks.dart';
@@ -138,119 +139,16 @@ class _ImpactHeader extends StatelessWidget {
   const _ImpactHeader();
 
   @override
-  Widget build(BuildContext context) {
-    final wide =
-        MediaQuery.sizeOf(context).width >= 1100 &&
-        MediaQuery.textScalerOf(context).scale(1) <= 1.3;
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: wide
-          ? Row(
-              children: [
-                const _HeaderIcon(),
-                SizedBox(width: 18),
-                Expanded(child: _HeaderCopy()),
-                _MethodPill(label: 'People'),
-                SizedBox(width: 8),
-                _MethodPill(label: 'Planet'),
-                SizedBox(width: 8),
-                _MethodPill(label: 'Prosperity'),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _HeaderIcon(),
-                    SizedBox(width: 18),
-                    Expanded(child: _HeaderCopy()),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MethodPill(label: 'People'),
-                    _MethodPill(label: 'Planet'),
-                    _MethodPill(label: 'Prosperity'),
-                  ],
-                ),
-              ],
-            ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Icon(Icons.insights_rounded, color: AppTheme.softBlack, size: 34),
-    );
-  }
-}
-
-class _HeaderCopy extends StatelessWidget {
-  const _HeaderCopy();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'L’impact en action',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        SizedBox(height: 6),
-        Text(
-          'Des rencontres aux solutions durables : découvre ce que nos projets changent et suis les actions qui font avancer Enactus ESP.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
-        ),
-      ],
-    );
-  }
-}
-
-class _MethodPill extends StatelessWidget {
-  final String label;
-
-  const _MethodPill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const AppModuleHeader(
+    title: 'L’impact en action',
+    subtitle: 'Découvrez les projets d’Enactus ESP, leurs résultats et les sources qui les documentent.',
+    icon: Icons.insights_rounded,
+    details: [
+      AppStatusBadge(label: 'People'),
+      AppStatusBadge(label: 'Planet'),
+      AppStatusBadge(label: 'Prosperity'),
+    ],
+  );
 }
 
 class _ImpactContent extends StatelessWidget {

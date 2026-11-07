@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+
+import '../../../shared/ui/app_back_button.dart';
 
 import '../../../shared/attachments/attachment_picker.dart';
 import '../models/task_center_models.dart';
@@ -172,7 +173,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () => context.go('/tasks'),
+                        onPressed: () =>
+                            returnToPreviousPage(context, '/tasks'),
                         icon: const Icon(Icons.arrow_back_rounded),
                         label: const Text('Centre de tâches'),
                       ),

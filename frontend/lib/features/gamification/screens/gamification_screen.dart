@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/auth/user_experience.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_form_dialog.dart';
 import '../../members/models/member_model.dart';
@@ -292,97 +293,26 @@ class _GamificationHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppTheme.softBlack,
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 720;
-
-            final title = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.enactusYellow,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    monthLabel,
-                    style: TextStyle(
-                      color: AppTheme.softBlack,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  personal ? 'Mon parcours' : 'Engagement et reconnaissance',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  personal
-                      ? 'Tes points, badges et progrès au sein de Enactus ESP.'
-                      : 'Badges, points positifs et classements pour valoriser les contributions des Enacteurs.',
-                  style: TextStyle(color: Colors.white70, height: 1.45),
-                ),
-              ],
-            );
-
-            final actions = Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                if (!personal) ...[
-                  OutlinedButton.icon(
-                    onPressed: onManageBadges,
-                    icon: Icon(Icons.workspace_premium_rounded),
-                    label: Text('Gérer les badges'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white24),
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: onAwardPoints,
-                    icon: Icon(Icons.add_reaction_rounded),
-                    label: Text('Attribuer points'),
-                  ),
-                ],
-              ],
-            );
-
-            if (compact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [title, const SizedBox(height: 18), actions],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(child: title),
-                const SizedBox(width: 20),
-                actions,
-              ],
-            );
-          },
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: personal ? 'Mon parcours' : 'Engagement et reconnaissance',
+    subtitle: personal ? 'Retrouvez vos points, vos badges et vos progrès.' : 'Suivez les contributions de l’équipe, les badges et les classements.',
+    icon: Icons.emoji_events_outlined,
+    details: [AppStatusBadge(label: monthLabel, tone: AppStatusTone.info)],
+    actions: [
+      if (!personal) ...[
+        OutlinedButton.icon(
+          onPressed: onManageBadges,
+          icon: const Icon(Icons.workspace_premium_rounded),
+          label: const Text('Gérer les badges'),
         ),
-      ),
-    );
-  }
+        FilledButton.icon(
+          onPressed: onAwardPoints,
+          icon: const Icon(Icons.add_reaction_rounded),
+          label: const Text('Attribuer points'),
+        ),
+      ],
+    ],
+  );
 }
 
 class _GamificationStats extends StatelessWidget {

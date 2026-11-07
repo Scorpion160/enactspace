@@ -294,8 +294,7 @@ class _LoginPanel extends StatelessWidget {
   }
 
   Future<void> _showJoinRequestSheet(BuildContext context) async {
-    // Read the official campaign timeline, rather than relying on a hardcoded
-    // recruitment date in the app. If offline, keep the safe guidance visible.
+    // Use the campaign timeline. Keep the entry choices available offline.
     var recruitmentOpen = true;
     try {
       final campaigns = await RecruitmentService(

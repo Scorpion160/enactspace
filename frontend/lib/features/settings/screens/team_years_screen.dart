@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../shared/ui/app_back_button.dart';
+import '../../../shared/ui/app_components.dart';
 import '../services/team_years_gateway.dart';
 
 class TeamYearsScreen extends StatefulWidget {
@@ -55,9 +57,15 @@ class _TeamYearsScreenState extends State<TeamYearsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text('Ouvrir ${year['name']} ?'),
-        content: const Text(
-          'L’année précédente rejoindra l’historique. Les tâches, les équipes et les projets restent accessibles. Chaque membre sera invité à confirmer son cursus pour la nouvelle année.',
+        content: Text(
+          [
+            '${year['name']} deviendra l’année courante.',
+            if (current != null)
+              '${current['name']} passera dans l’historique. Les dossiers déjà saisis garderont leur année de rattachement et les tâches ouvertes garderont leur suivi.',
+            'Les membres actifs seront invités à confirmer leur cursus.',
+          ].join('\n\n'),
         ),
         actions: [
           TextButton(
@@ -145,13 +153,10 @@ class _TeamYearsScreenState extends State<TeamYearsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Un nouveau chapitre, un historique conservé',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'L’année courante donne un repère aux activités et aux confirmations académiques. Les travaux des années précédentes restent consultables et les tâches ouvertes gardent leur suivi.',
+                  const AppModuleHeader(
+                    title: 'L’année de référence de l’équipe',
+                    subtitle: 'Retrouvez les années passées et préparez la prochaine. Les activités déjà saisies gardent leur rattachement.',
+                    icon: Icons.calendar_month_outlined,
                   ),
                   const SizedBox(height: 16),
                   if (error != null) ...[
@@ -194,13 +199,19 @@ class _TeamYearsScreenState extends State<TeamYearsScreen> {
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                year['is_current'] == true
+                              AppStatusBadge(
+                                label: year['is_current'] == true
                                     ? 'Année courante'
                                     : year['archived'] == true
                                     ? 'Historique'
                                     : 'En préparation',
+                                tone: year['is_current'] == true
+                                    ? AppStatusTone.success
+                                    : year['archived'] == true
+                                    ? AppStatusTone.neutral
+                                    : AppStatusTone.info,
                               ),
+                              const SizedBox(height: 6),
                               const SizedBox(height: 6),
                               Text(
                                 '${_date(year['start_date'])} → ${_date(year['end_date'])}',

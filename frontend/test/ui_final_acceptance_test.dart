@@ -34,7 +34,7 @@ void main() {
     test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
-        r"path:\s*'([^']+)'",
+        r"GoRoute\(\s*path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
       const expectedRoutes = [
@@ -428,7 +428,7 @@ void main() {
       expect(find.byTooltip('Masquer le mot de passe'), findsOneWidget);
     });
 
-    testWidgets('le formulaire de demande de compte conserve ce tooltip', (
+    testWidgets('le parcours membre et alumni conserve ce tooltip', (
       tester,
     ) async {
       await _pumpLogin(tester, const Size(390, 844));
@@ -436,6 +436,10 @@ void main() {
       await tester.ensureVisible(accountAction);
       await tester.pumpAndSettle();
       await tester.tap(accountAction);
+      await tester.pumpAndSettle();
+      final memberAction = find.text('Je suis déjà enacteur ou alumni');
+      expect(memberAction, findsOneWidget);
+      await tester.tap(memberAction);
       await tester.pumpAndSettle();
       final joinSheet = find.byType(DraggableScrollableSheet);
       expect(joinSheet, findsOneWidget);

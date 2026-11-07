@@ -162,78 +162,80 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _initials(profile.displayName);
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Wrap(
-        spacing: 18,
-        runSpacing: 18,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          PhotoPreviewTap(
-            image: _imageProvider(profile.photoUrl),
-            title: profile.displayName,
-            child: CircleAvatar(
-              radius: 38,
-              backgroundColor: AppTheme.enactusYellow,
-              foregroundColor: AppTheme.softBlack,
-              backgroundImage: _imageProvider(profile.photoUrl),
-              child: profile.photoUrl?.trim().isNotEmpty == true
-                  ? null
-                  : Text(
-                      initials,
-                      style: const TextStyle(
-                        fontSize: 23,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-            ),
-          ),
-          SizedBox(
-            width: MediaQuery.sizeOf(context).width < 600
-                ? (MediaQuery.sizeOf(context).width - 92).clamp(180, 480)
-                : 480,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = Theme.of(context);
+    final photo = _imageProvider(profile.photoUrl);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide =
+                constraints.maxWidth >= 620 &&
+                MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+            final identity = Row(
+              spacing: 14,
               children: [
-                Text(
-                  profile.displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
+                PhotoPreviewTap(
+                  image: photo,
+                  title: profile.displayName,
+                  child: CircleAvatar(
+                    radius: constraints.maxWidth < 420 ? 29 : 38,
+                    backgroundColor: AppTheme.enactusYellow,
+                    foregroundColor: AppTheme.softBlack,
+                    backgroundImage: photo,
+                    child: photo == null
+                        ? Text(
+                            _initials(profile.displayName),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          )
+                        : null,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${profile.primaryRoleLabel} · ${profile.statusLabel}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 5,
+                    children: [
+                      Text(
+                        profile.displayName,
+                        style: theme.textTheme.headlineSmall,
+                      ),
+                      Text(
+                        '${profile.primaryRoleLabel} · ${profile.statusLabel}',
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      Text(
+                        profile.email,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  profile.email,
-                  style: const TextStyle(color: Colors.white60),
                 ),
               ],
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded),
-            label: const Text('Modifier mon profil'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.enactusYellow,
-              foregroundColor: AppTheme.softBlack,
-            ),
-          ),
-        ],
+            );
+            final edit = FilledButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_rounded),
+              label: const Text('Modifier mon profil'),
+            );
+            if (wide) {
+              return Row(
+                spacing: 20,
+                children: [
+                  Expanded(child: identity),
+                  edit,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 16,
+              children: [identity, edit],
+            );
+          },
+        ),
       ),
     );
   }

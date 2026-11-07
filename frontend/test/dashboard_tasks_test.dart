@@ -70,6 +70,11 @@ void main() {
       completer.completeError(Exception('summary indisponible'));
       await tester.pumpAndSettle();
       expect(find.text('summary indisponible'), findsOneWidget);
+      expect(
+        find.text('Les alertes sont momentanément indisponibles.'),
+        findsOneWidget,
+      );
+      expect(find.text('Aucune alerte urgente pour le moment.'), findsNothing);
     });
 
     testWidgets('390 px sans overflow', (tester) async {
@@ -226,6 +231,76 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets(
+      'Kanban conserve les filtres et distingue remise et validation',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 950);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final gateway = _TasksMemoryGateway(
+          data: TaskCenterData(
+            tasks: [
+              _task(
+                id: 'draft',
+                title: 'Rapport à préparer',
+                status: 'a_faire',
+              ),
+              _task(id: 'review', title: 'Rapport remis', status: 'termine'),
+              _task(id: 'done', title: 'Rapport validé', status: 'valide'),
+              _task(id: 'cancelled', title: 'Ancien atelier', status: 'annule'),
+            ],
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(home: TasksScreen(gateway: gateway)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('task-lane-À faire')), findsNothing);
+
+        await tester.enterText(
+          find.byKey(const Key('tasks-search')),
+          'rapport',
+        );
+        await tester.tap(find.text('Kanban'));
+        await tester.pumpAndSettle();
+
+        void expectInLane(String title, String task) {
+          expect(
+            find.descendant(
+              of: find.byKey(ValueKey('task-lane-$title')),
+              matching: find.text(task),
+            ),
+            findsOneWidget,
+          );
+        }
+
+        expectInLane('À faire', 'Rapport à préparer');
+        expectInLane('En cours', 'Rapport remis');
+        expectInLane('Terminées', 'Rapport validé');
+        expect(find.text('Ancien atelier'), findsNothing);
+        expect(gateway.views, [TaskCenterView.all]);
+
+        await tester.tap(find.text('Liste'));
+        await tester.pumpAndSettle();
+        expect(find.text('Rapport remis'), findsOneWidget);
+        expect(find.text('Ancien atelier'), findsNothing);
+        expect(gateway.views, [TaskCenterView.all]);
+
+        tester.view.physicalSize = const Size(320, 950);
+        tester.binding.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(
+          tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Kanban'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Kanban'));
+        await tester.pumpAndSettle();
+        expectInLane('En cours', 'Rapport remis');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('erreur assignés reste locale à une tâche', (tester) async {
       final data = _centerData(assigneeFailure: true);
       await tester.pumpWidget(
@@ -375,14 +450,16 @@ DashboardSummaryModel _summary({bool finance = false, int? payments = 2}) =>
     });
 
 TaskModel _task({
+  String id = 't1',
+  String title = 'Préparer atelier',
   String status = 'bloque',
   String priority = 'haute',
   String? dueDate = '2026-08-30T00:00:00Z',
   bool canManage = true,
   bool assigned = true,
 }) => TaskModel(
-  id: 't1',
-  title: 'Préparer atelier',
+  id: id,
+  title: title,
   description: 'Brief équipe',
   priority: priority,
   status: status,
