@@ -63,6 +63,8 @@ class ApiDocumentsGateway implements DocumentsGateway {
   final ProjectsPortfolioGateway _portfolio;
   Future<DocumentReferenceData>? _references;
 
+  bool get usingOfflineCache => _documents.lastLoadUsedOfflineCache;
+
   ApiDocumentsGateway({
     DocumentsService? documentsService,
     PolesService? polesService,

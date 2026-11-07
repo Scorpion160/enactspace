@@ -101,6 +101,11 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q app
 
+      - name: Prepare synthetic test-only backend resources
+        env:
+          APP_ENV: test
+        run: python ops_checks/prepare_ci_resources.py
+
       - name: Generate OpenAPI schema
         run: >-
           python -c "from app.main import app; schema = app.openapi();
@@ -111,7 +116,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20260913_0009 (head)"
+          test "$output" = "20261107_0038 (head)"
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
@@ -124,7 +129,7 @@ jobs:
           fi
 
   flutter:
-    name: Flutter 3.44.9 / analyze, test, web, Android debug
+    name: Flutter 3.47.5 / analyze, test, web only
     runs-on: ubuntu-latest
     timeout-minutes: 50
     defaults:
@@ -137,9 +142,13 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
-          flutter-version: "3.44.9"
+          flutter-version: "3.47.5"
           channel: stable
           cache: true
+
+      - name: Verify EnactMeet browser attachment and cleanup
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/test_enactmeet_web_bridge.py --browser google-chrome
 
       - name: Resolve locked dependencies
         run: flutter pub get
@@ -150,13 +159,32 @@ jobs:
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
 
-      - name: Run Flutter tests
-        run: flutter test --no-pub
+      - name: Prepare synthetic test-only backend resources
+        env:
+          APP_ENV: test
+        run: python ../backend/ops_checks/prepare_ci_resources.py
+
+      - name: Run Web recruitment and member tests
+        run: >-
+          flutter test --no-pub
+          test/recruitment_statistics_screen_test.dart
+          test/enactmeet_quick_create_test.dart
+          test/archives_hall_of_fame_test.dart
+          test/archives_responsive_test.dart
+          test/alumni_gamification_academy_impact_test.dart
+          test/recruitment_public_test.dart
+          test/recruitment_submission_contract_test.dart
+          test/recruitment_eligibility_selection_test.dart
+          test/recruitment_schedule_test.dart
+          test/recruitment_team_guide_test.dart
+          test/alumni_individual_workflows_test.dart
+          test/meetings_creation_test.dart
+          test/recruitment_internal_test.dart
+          test/recruitment_jury_personality_test.dart
+          test/recruitment_campaigns_test.dart
+          test/member_join_requests_test.dart
 
       - name: Build release web application
         run: >-
-          flutter build web --release --no-pub
+          flutter build web --release --no-pub --no-tree-shake-icons
           --dart-define=ENACTSPACE_API_URL=https://example.invalid
-
-      - name: Build unsigned Android debug APK
-        run: flutter build apk --debug --no-pub

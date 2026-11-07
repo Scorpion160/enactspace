@@ -1,96 +1,94 @@
+import '../recruitment_style.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../models/application_status_presentation.dart';
+import '../../../../shared/ui/app_back_button.dart';
 import '../../models/application_tracking_model.dart';
 import '../../models/recruitment_campaign_model.dart';
+import 'recruitment_countdown.dart';
+import '../recruitment_schedule.dart';
 
 class PublicRecruitmentShell extends StatelessWidget {
   final Widget child;
-  final String? backPath;
 
-  const PublicRecruitmentShell({
-    super.key,
-    required this.child,
-    this.backPath = '/login',
-  });
+  const PublicRecruitmentShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              height: 72,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: AppTheme.border)),
-              ),
-              child: Row(
-                children: [
-                  if (backPath != null)
-                    IconButton(
-                      onPressed: () => context.go(backPath!),
-                      tooltip: 'Retour',
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                  Image.asset(
-                    'assets/img/logo_enactus_esp.png',
-                    width: 64,
-                    height: 48,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'EnactSpace',
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        Text(
-                          'L’impact en mouvement',
-                          style: TextStyle(
-                            color: AppTheme.secondaryText,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (MediaQuery.sizeOf(context).width >= 620)
-                    TextButton(
-                      onPressed: () => context.go('/application-tracking'),
-                      child: const Text('Suivre une candidature'),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(child: child),
-          ],
-        ),
+      appBar: AppBar(
+        leading: const AppBackButton(fallbackPath: '/login'),
+        title: const Text('EnactSpace'),
       ),
+      body: SafeArea(child: child),
     );
   }
 }
 
-class CampaignPublicCard extends StatelessWidget {
+class CampaignPublicCard extends StatefulWidget {
   final RecruitmentCampaignModel campaign;
   final VoidCallback onStart;
+  final Key? actionKey;
+  final DateTime Function()? now;
 
   const CampaignPublicCard({
     super.key,
     required this.campaign,
     required this.onStart,
+    this.actionKey,
+    this.now,
   });
 
   @override
+  State<CampaignPublicCard> createState() => _CampaignPublicCardState();
+}
+
+class _CampaignPublicCardState extends State<CampaignPublicCard> {
+  Timer? _timer;
+  late DateTime _anchor;
+  final _elapsed = Stopwatch();
+  RecruitmentCampaignModel get campaign => widget.campaign;
+  @override
+  void initState() {
+    super.initState();
+    _anchor = campaign.currentTime;
+    _elapsed.start();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(CampaignPublicCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.campaign != campaign) {
+      _anchor = campaign.currentTime;
+      _elapsed.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _elapsed.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final now = widget.now?.call() ?? _anchor.add(_elapsed.elapsed);
+    final open = campaign.isOpenAt(now);
+    final upcoming =
+        campaign.isActive &&
+        campaign.openingInstant != null &&
+        now.isBefore(campaign.openingInstant!);
     return Semantics(
       container: true,
       label: 'Campagne ${campaign.title}',
@@ -100,10 +98,16 @@ class CampaignPublicCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'CANDIDATURES OUVERTES',
+              Text(
+                upcoming
+                    ? 'BIENTÔT, À TOI DE JOUER !'
+                    : open
+                    ? 'CANDIDATURES OUVERTES'
+                    : 'CANDIDATURES TERMINÉES',
                 style: TextStyle(
-                  color: AppTheme.success,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.green.shade200
+                      : Colors.green.shade800,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.1,
                   fontSize: 12,
@@ -120,7 +124,7 @@ class CampaignPublicCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   campaign.description!.trim(),
-                  style: const TextStyle(height: 1.55),
+                  style: TextStyle(height: 1.55),
                 ),
               ],
               const SizedBox(height: 18),
@@ -131,31 +135,79 @@ class CampaignPublicCard extends StatelessWidget {
                   _Fact(
                     icon: Icons.date_range_outlined,
                     label: 'Période',
-                    value: campaign.periodLabel,
+                    value: _campaignPeriod(campaign),
                   ),
                   _Fact(
                     icon: Icons.event_available_outlined,
                     label: 'Date limite',
-                    value: campaign.endDate ?? 'À confirmer',
+                    value: _campaignDate(campaign.endDate) ?? 'À confirmer',
                   ),
                 ],
               ),
+              if (campaign.selectionSchedule != null) ...[
+                const SizedBox(height: 18),
+                RecruitmentScheduleCard(schedule: campaign.selectionSchedule!),
+              ],
               const SizedBox(height: 22),
               Semantics(
                 button: true,
                 label: 'Commencer ma candidature pour ${campaign.title}',
                 child: FilledButton.icon(
-                  onPressed: onStart,
+                  key: widget.actionKey,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD34D),
+                    foregroundColor: const Color(0xFF211B0B),
+                  ),
+                  onPressed: open ? widget.onStart : null,
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Commencer ma candidature'),
+                  label: Text(
+                    upcoming
+                        ? 'Bientôt disponible'
+                        : open
+                        ? 'Commencer ma candidature'
+                        : 'Inscriptions clôturées',
+                  ),
                 ),
               ),
+              if (upcoming || (open && campaign.closingInstant != null)) ...[
+                const SizedBox(height: 20),
+                RecruitmentCountdown(campaign: campaign, now: now),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+String? _campaignDate(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) return null;
+  const months = [
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _campaignPeriod(RecruitmentCampaignModel campaign) {
+  final start = _campaignDate(campaign.startDate);
+  final end = _campaignDate(campaign.endDate);
+  if (start == null && end == null) return 'Dates à confirmer';
+  if (start == null) return 'Jusqu’au $end';
+  if (end == null) return 'À partir du $start';
+  return 'Du $start au $end';
 }
 
 class _Fact extends StatelessWidget {
@@ -170,7 +222,7 @@ class _Fact extends StatelessWidget {
     children: [
       Icon(icon, size: 20),
       const SizedBox(width: 8),
-      Text('$label : $value'),
+      Flexible(child: Text('$label : $value', softWrap: true)),
     ],
   );
 }
@@ -187,11 +239,11 @@ class PublicRecruitmentEmptyState extends StatelessWidget {
     actions: [
       FilledButton(
         onPressed: () => context.go('/application-tracking'),
-        child: const Text('Suivre une candidature'),
+        child: Text('Suivre une candidature'),
       ),
       TextButton(
         onPressed: () => context.go('/login'),
-        child: const Text('Retour à la connexion'),
+        child: Text('Retour à la connexion'),
       ),
     ],
   );
@@ -211,7 +263,7 @@ class PublicRecruitmentErrorState extends StatelessWidget {
       FilledButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh_rounded),
-        label: const Text('Réessayer'),
+        label: Text('Réessayer'),
       ),
     ],
   );
@@ -243,15 +295,15 @@ class _PublicState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 10),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 height: 1.5,
-                color: AppTheme.secondaryText,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 22),
@@ -285,22 +337,22 @@ class ApplicationStepHeader extends StatelessWidget {
         children: [
           Text(
             'Étape $currentStep sur $totalSteps',
-            style: const TextStyle(
-              color: AppTheme.secondaryText,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             title,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: progress,
             minHeight: 8,
             borderRadius: BorderRadius.circular(8),
-            backgroundColor: AppTheme.border,
+            backgroundColor: Theme.of(context).colorScheme.outlineVariant,
             color: AppTheme.enactusYellow,
           ),
         ],
@@ -325,8 +377,8 @@ class ApplicationReviewSection extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppTheme.border),
+      color: Theme.of(context).colorScheme.surface,
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
     ),
     child: Column(
@@ -335,18 +387,15 @@ class ApplicationReviewSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+              child: Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
             ),
-            TextButton(onPressed: onEdit, child: const Text('Modifier')),
+            TextButton(onPressed: onEdit, child: Text('Modifier')),
           ],
         ),
         for (final line in lines.where((line) => line.trim().isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(top: 5),
-            child: Text(line, style: const TextStyle(height: 1.4)),
+            child: Text(line, style: TextStyle(height: 1.4)),
           ),
       ],
     ),
@@ -354,11 +403,13 @@ class ApplicationReviewSection extends StatelessWidget {
 }
 
 class ApplicationSuccessView extends StatelessWidget {
+  final bool demoMode;
   final String campaignTitle;
   final String email;
   final String trackingCode;
   const ApplicationSuccessView({
     super.key,
+    this.demoMode = false,
     required this.campaignTitle,
     required this.email,
     required this.trackingCode,
@@ -374,13 +425,21 @@ class ApplicationSuccessView extends StatelessWidget {
           children: [
             const Icon(Icons.mark_email_read_outlined, size: 64),
             const SizedBox(height: 18),
-            const Text(
-              'Candidature envoyée',
+            Text(
+              demoMode ? 'Simulation terminée' : 'Candidature envoyée',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 10),
             Text(campaignTitle, textAlign: TextAlign.center),
+            if (demoMode) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Cette candidature est un exemple. Utilise ce code pour essayer le suivi pendant la visite.',
+                textAlign: TextAlign.center,
+                style: TextStyle(height: 1.5),
+              ),
+            ],
             const SizedBox(height: 24),
             Semantics(
               label: 'Code de suivi $trackingCode',
@@ -395,27 +454,27 @@ class ApplicationSuccessView extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'TON CODE DE SUIVI',
                       style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     SelectableText(
                       trackingCode,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.enactusYellow,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(email, style: const TextStyle(color: Colors.white70)),
+                    Text(email, style: TextStyle(color: Colors.white70)),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Conserve ce code avec ton adresse e-mail. Ils seront demandés pour consulter l’avancement du dossier.',
               textAlign: TextAlign.center,
               style: TextStyle(height: 1.5),
@@ -441,16 +500,16 @@ class ApplicationSuccessView extends StatelessWidget {
                       }
                     },
                     icon: const Icon(Icons.copy_rounded),
-                    label: const Text('Copier le code'),
+                    label: Text('Copier le code'),
                   ),
                 ),
                 FilledButton(
                   onPressed: () => context.go('/application-tracking'),
-                  child: const Text('Suivre ma candidature'),
+                  child: Text('Suivre ma candidature'),
                 ),
                 TextButton(
                   onPressed: () => context.go('/login'),
-                  child: const Text('Retour à la connexion'),
+                  child: Text('Retour à la connexion'),
                 ),
               ],
             ),
@@ -467,27 +526,35 @@ class ApplicationTimeline extends StatelessWidget {
   static const _steps = [
     'Candidature reçue',
     'Étude du dossier',
+    'Résultat du dossier',
     'Entretien',
     'Décision',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final status = ApplicationStatusPresentation.fromStatus(tracking.status);
+    final status = tracking.presentation;
+    final labels = [..._steps];
+    if (tracking.screeningResult == 'shortlisted') labels[2] = 'Dossier retenu';
+    if (tracking.screeningResult == 'not_shortlisted') {
+      labels[2] = 'Dossier non retenu';
+      labels.removeRange(3, labels.length);
+    }
+    final current = tracking.currentStep;
     return Semantics(
       container: true,
       label: 'Chronologie de la candidature, ${status.title}',
       child: Column(
         children: [
-          for (var index = 0; index < _steps.length; index++)
+          for (var index = 0; index < labels.length; index++)
             _TimelineItem(
-              label: _steps[index],
+              label: labels[index],
               complete:
-                  !status.terminalException && index <= status.timelineStep,
-              current: index == status.timelineStep,
-              isLast: index == _steps.length - 1,
+                  index < current || (!status.terminalException && index == current),
+              current: index == current,
+              isLast: index == labels.length - 1,
               exception:
-                  status.terminalException && index == status.timelineStep,
+                  status.terminalException && index == current,
             ),
         ],
       ),
@@ -512,10 +579,12 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = exception
-        ? AppTheme.warning
+        ? (Theme.of(context).brightness == Brightness.dark
+              ? Colors.orange.shade200
+              : Colors.brown.shade800)
         : complete || current
-        ? AppTheme.softBlack
-        : AppTheme.secondaryText;
+        ? Theme.of(context).colorScheme.onSurface
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -535,7 +604,9 @@ class _TimelineItem extends StatelessWidget {
               Container(
                 width: 2,
                 height: 38,
-                color: complete ? AppTheme.enactusYellow : AppTheme.border,
+                color: complete
+                    ? AppTheme.enactusYellow
+                    : Theme.of(context).colorScheme.outlineVariant,
               ),
           ],
         ),

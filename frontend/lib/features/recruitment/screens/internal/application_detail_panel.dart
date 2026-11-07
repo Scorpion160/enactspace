@@ -1,12 +1,22 @@
-import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/recruitment_workspace.dart';
+import '../../widgets/recruitment_style.dart';
+import '../../services/recruitment_campaign_tools.dart';
+import '../../widgets/internal/recruitment_selection_panel.dart';
+import '../../services/recruitment_selection_api.dart';
+import '../../widgets/internal/interview_planning_dialog.dart';
+import '../../widgets/internal/personality_review_card.dart';
+import '../../models/application_history_model.dart';
+import '../../models/application_status_presentation.dart';
+import '../../services/recruitment_message.dart';
 
-import '../../../../core/api/api_client.dart';
-import '../../../../core/theme/app_theme.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../shared/attachments/attachment_picker.dart';
 import '../../models/application_model.dart';
 import '../../models/application_review_model.dart';
 import '../../services/internal_recruitment_gateway.dart';
 import '../../widgets/internal/candidate_actions.dart';
+import '../../widgets/internal/candidate_review_dialog.dart';
 import '../../widgets/internal/candidate_conversion.dart';
 import '../../widgets/internal/recruitment_internal_widgets.dart';
 
@@ -16,6 +26,7 @@ class ApplicationDetailPanel extends StatefulWidget {
   final bool anonymized;
   final InternalRecruitmentGateway gateway;
   final ValueChanged<ApplicationModel>? onApplicationChanged;
+  final VoidCallback? onAssignmentDeclined;
   final VoidCallback onClose;
 
   const ApplicationDetailPanel({
@@ -25,6 +36,7 @@ class ApplicationDetailPanel extends StatefulWidget {
     required this.anonymized,
     required this.gateway,
     this.onApplicationChanged,
+    this.onAssignmentDeclined,
     required this.onClose,
   });
 
@@ -47,7 +59,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   Future<void> _load() async {
     try {
       final results = await Future.wait<dynamic>([
-        widget.gateway.loadApplication(widget.summary.id),
+        widget.gateway.loadApplication(
+          widget.summary.id,
+          anonymized: widget.anonymized,
+        ),
         widget.gateway.loadReviews(widget.summary.id),
       ]);
       if (!mounted) return;
@@ -61,15 +76,20 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     final application = _application;
     return Material(
-      color: AppTheme.background,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         child: Column(
           children: [
             _PanelHeader(
-              title: widget.anonymized
+              title:
+                  (widget.anonymized ||
+                      (_application ?? widget.summary).isAnonymized)
                   ? (_application ?? widget.summary).anonymousCode
                   : (_application ?? widget.summary).fullName,
               status: (_application ?? widget.summary).status,
@@ -81,9 +101,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       child: InternalRecruitmentState(
                         icon: Icons.error_outline_rounded,
                         title: 'Dossier indisponible',
-                        message: _error.toString().replaceAll(
-                          'Exception: ',
-                          '',
+                        message: recruitmentMessage(
+                          _error!,
+                          fallback:
+                              'Impossible de charger ce dossier. Réessaie dans un instant.',
                         ),
                         actionLabel: 'Réessayer',
                         onAction: () {
@@ -98,18 +119,43 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       application: application,
                       reviews: _reviews,
                       campaignTitle: widget.campaignTitle,
-                      anonymized: widget.anonymized,
+                      anonymized: widget.anonymized || application.isAnonymized,
                       actionFeedback: _actionFeedback,
                       gateway: widget.gateway,
+                      onReview: _openReview,
                       onStatusChange: _changeStatus,
                       onInterview: _scheduleInterview,
                       onConversionCompleted: _refreshAfterMutation,
+                      onAssignmentDeclined: () {
+                        widget.onClose();
+                        widget.onAssignmentDeclined?.call();
+                      },
                     ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openReview() async {
+    final application = _application;
+    if (application == null || application.screeningRubric == null) return;
+    final saved = await showRecruitmentDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CandidateReviewDialog(
+        application: application,
+        gateway: widget.gateway,
+      ),
+    );
+    if (saved == true && mounted) {
+      setState(
+        () => _actionFeedback =
+            'Votre avis a été enregistré. Le statut de la candidature reste inchangé.',
+      );
+      await _refreshAfterMutation();
+    }
   }
 
   Future<void> _changeStatus(String status) async {
@@ -155,7 +201,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
   Future<void> _refreshAfterMutation() async {
     try {
       final results = await Future.wait<dynamic>([
-        widget.gateway.loadApplication(widget.summary.id),
+        widget.gateway.loadApplication(
+          widget.summary.id,
+          anonymized: widget.anonymized,
+        ),
         widget.gateway.loadReviews(widget.summary.id),
       ]);
       if (!mounted) return;
@@ -189,55 +238,61 @@ class _PanelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(20, 14, 10, 14),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(bottom: BorderSide(color: AppTheme.border)),
+    padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      border: Border(
+        bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Fiche candidat',
-                style: Theme.of(context).textTheme.labelLarge,
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Fiche candidat',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
+            ),
+            IconButton(
+              onPressed: onClose,
+              tooltip: 'Fermer la fiche candidat',
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
         ),
+        const SizedBox(height: 10),
         InternalStatusBadge(status: status),
-        Semantics(
-          button: true,
-          label: 'Fermer la fiche candidat',
-          child: IconButton(
-            onPressed: onClose,
-            tooltip: 'Fermer',
-            icon: const Icon(Icons.close_rounded),
-          ),
-        ),
       ],
     ),
   );
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends StatefulWidget {
   final ApplicationModel application;
   final List<ApplicationReviewModel> reviews;
   final String campaignTitle;
   final bool anonymized;
   final String? actionFeedback;
   final InternalRecruitmentGateway gateway;
+  final VoidCallback onReview;
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
   final Future<void> Function() onConversionCompleted;
+  final VoidCallback onAssignmentDeclined;
 
   const _DetailBody({
     required this.application,
@@ -246,151 +301,423 @@ class _DetailBody extends StatelessWidget {
     required this.anonymized,
     required this.actionFeedback,
     required this.gateway,
+    required this.onReview,
     required this.onStatusChange,
     required this.onInterview,
     required this.onConversionCompleted,
+    required this.onAssignmentDeclined,
   });
 
   @override
-  Widget build(BuildContext context) => ListView(
-    key: const Key('application-detail-scroll'),
-    padding: const EdgeInsets.all(18),
+  State<_DetailBody> createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends State<_DetailBody> {
+  Future<void> _declineAssignment() async {
+    var reason = 'recognition';
+    final explanation = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Demander un autre évaluateur'),
+          content: DropdownButtonFormField<String>(
+            initialValue: reason,
+            isExpanded: true,
+            itemHeight: null,
+            decoration: const InputDecoration(
+              labelText: 'Motif du déport',
+              helperText: 'Ne communique pas l’identité de la personne.',
+              helperMaxLines: 3,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'recognition', child: Text('Je pense reconnaître la personne')),
+              DropdownMenuItem(value: 'conflict_of_interest', child: Text('Conflit d’intérêts possible')),
+              DropdownMenuItem(value: 'unavailable', child: Text('Indisponibilité')),
+            ],
+            onChanged: (value) => setDialogState(() => reason = value ?? 'recognition'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, reason),
+              child: const Text('Transmettre la demande'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (explanation == null || !mounted) return;
+    try {
+      await RecruitmentSelectionApi().request(
+        'applications/${widget.application.id}/selection/decline',
+        body: {'reason': explanation},
+      );
+      if (mounted) widget.onAssignmentDeclined();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          recruitmentMessage(error, fallback: 'La demande n’a pas pu être enregistrée.'),
+        )));
+      }
+    }
+  }
+
+  late final Map<String, GlobalKey> _anchors = {
+    for (final label in [
+      'Réponses',
+      'Évaluation',
+      'Entretien',
+      'Décision',
+      'Historique',
+    ])
+      label: GlobalKey(),
+  };
+  @override
+  Widget build(BuildContext context) => Column(
     children: [
-      _Section(
-        title: 'Résumé',
-        icon: Icons.badge_outlined,
-        children: [
-          _InfoGrid(
-            values: {
-              'Identité': anonymized
-                  ? application.anonymousCode
-                  : application.fullName,
-              'E-mail': anonymized ? 'Identité masquée' : application.email,
-              'Téléphone': anonymized
-                  ? 'Identité masquée'
-                  : _value(application.phone),
-              'Campagne': campaignTitle,
-              'Statut': application.statusLabel,
-              'Soumise le': _dateTime(application.createdAt),
-              'Département / classe':
-                  '${_value(application.department)} · ${_value(application.className)}',
-              'Niveau': _value(application.studyLevel),
-              'Pôle préféré': _value(application.preferredPole),
-              'Projet': _value(application.projectInterest),
-              'Disponibilité': _value(application.availability),
-              'Indice de présélection': '${application.screeningScore}/100',
-            },
+      if (widget.anonymized)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: RecruitmentNotice(
+            'Noms, coordonnées et documents masqués. Le parcours et les réponses restent visibles.',
+            icon: Icons.visibility_off_outlined,
           ),
-        ],
-      ),
-      _Section(
-        title: 'Réponses',
-        icon: Icons.forum_outlined,
-        children: [
-          _Answer('Motivations', application.motivation),
-          _Answer(
-            'Comment avez-vous connu Enactus ?',
-            application.knownEnactusFrom,
-          ),
-          _Answer('Votre connaissance d’Enactus', application.enactusKnowledge),
-          _Answer('Autres clubs ou associations', application.otherClubs),
-          _Answer('Contribution envisagée', application.contribution),
-          _Answer('Idées de projets', application.projectIdeas),
-          _Answer('Profil de leadership', application.leadershipProfile),
-          _Answer('Expérience associative', application.associativeExperience),
-          _Answer('Commentaire candidat', application.publicComment),
-        ],
-      ),
-      _Section(
-        title: 'Documents',
-        icon: Icons.folder_open_outlined,
-        children: [
-          _DocumentRow(label: 'CV', url: application.cvUrl),
-          _DocumentRow(
-            label: 'Lettre de motivation',
-            url: application.motivationLetterUrl,
-          ),
-          _DocumentRow(
-            label: 'Document complémentaire',
-            url: application.attachmentUrl,
-          ),
-        ],
-      ),
-      _Section(
-        title: 'Évaluations',
-        icon: Icons.rate_review_outlined,
-        children: [
-          if (reviews.isEmpty)
-            const Text('Aucune évaluation officielle enregistrée.')
-          else ...[
-            Semantics(
-              label:
-                  'Moyenne officielle ${_average(reviews).toStringAsFixed(1)} sur 20',
-              child: Text(
-                'Moyenne officielle : ${_average(reviews).toStringAsFixed(1)}/20',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...reviews.map(_ReviewCard.new),
-          ],
-        ],
-      ),
-      if (application.interviewAt != null ||
-          application.interviewLocation?.trim().isNotEmpty == true ||
-          application.interviewNote?.trim().isNotEmpty == true)
-        _Section(
-          title: 'Entretien',
-          icon: Icons.record_voice_over_outlined,
+        ),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
           children: [
-            _InfoGrid(
-              values: {
-                'Date': application.interviewLabel,
-                'Lieu': _value(application.interviewLocation),
-                'Jury': _value(application.interviewJury),
-                'Détails': _value(application.interviewNote),
-              },
-            ),
+            for (final entry in _anchors.entries.where(
+              (e) =>
+                  e.key != 'Décision' ||
+                  widget.application.permissions['can_decide'] != false,
+            ))
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: TextButton(
+                  onPressed: () {
+                    final target = entry.value.currentContext;
+                    if (target != null) {
+                      Scrollable.ensureVisible(
+                        target,
+                        duration: const Duration(milliseconds: 240),
+                        alignment: 0,
+                      );
+                    }
+                  },
+                  child: Text(entry.key),
+                ),
+              ),
           ],
         ),
-      _Section(
-        title: 'Historique',
-        icon: Icons.history_rounded,
-        children: [
-          Text('Dossier soumis · ${_dateTime(application.createdAt)}'),
-          if (application.updatedAt != null)
-            Text('Dernière mise à jour · ${_dateTime(application.updatedAt)}'),
-          const SizedBox(height: 8),
-          const Text(
-            'Le backend ne fournit pas encore de journal de transitions détaillé.',
-            style: TextStyle(color: AppTheme.secondaryText),
-          ),
-        ],
       ),
-      _Section(
-        title: 'Actions sur la candidature',
-        icon: Icons.admin_panel_settings_outlined,
-        children: [
-          CandidateActionsSection(
-            application: application,
-            campaignTitle: campaignTitle,
-            reviewCount: reviews.length,
-            reviewAverage: reviews.isEmpty ? null : _average(reviews),
-            onStatusChange: onStatusChange,
-            onInterview: onInterview,
-            feedback: actionFeedback,
+      Expanded(
+        child: SingleChildScrollView(
+          key: const Key('application-detail-scroll'),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Section(
+                key: _anchors['Réponses'],
+                title: 'Résumé',
+                icon: Icons.badge_outlined,
+                children: [
+                  _InfoGrid(
+                    values: {
+                      'Identité': widget.anonymized
+                          ? widget.application.anonymousCode
+                          : widget.application.fullName,
+                      'E-mail': widget.anonymized
+                          ? 'Identité masquée'
+                          : widget.application.email,
+                      'Téléphone': widget.anonymized
+                          ? 'Identité masquée'
+                          : _value(widget.application.phone),
+                      'Campagne': widget.campaignTitle,
+                      'Statut': widget.application.statusLabel,
+                      'Soumise le': _dateTime(widget.application.createdAt),
+                      'Département': _value(widget.application.department),
+                      'Promotion': _value(widget.application.className),
+                      'Niveau': _value(widget.application.studyLevel),
+                      if (widget.application.knownEnactusFrom
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true)
+                        'Découverte d’Enactus ESP':
+                            widget.application.knownEnactusFrom!,
+                      if (widget.application.preferredPole?.trim().isNotEmpty ==
+                          true)
+                        'Préférence de pôle indiquée auparavant':
+                            widget.application.preferredPole!,
+                      if (widget.application.projectInterest
+                              ?.trim()
+                              .isNotEmpty ==
+                          true)
+                        'Projet évoqué auparavant':
+                            widget.application.projectInterest!,
+                      'Disponibilité': _value(widget.application.availability),
+                      'Structures étudiantes déclarées': widget.application.otherClubsCount?.toString() ?? 'Non renseigné',
+                      'Résidence au campus':
+                            widget.application.campusResident == null
+                            ? 'Non renseignée'
+                            : widget.application.campusResident!
+                            ? 'Oui'
+                            : 'Non',
+                      if (widget
+                                  .application
+                                  .interviewAvailability
+                                  ?.isNotEmpty ==
+                              true)
+                        'Disponibilités pour l’entretien':
+                            widget.application.interviewAvailability!,
+                      if (widget.application.interviewPreferences.isNotEmpty)
+                        'Formats souhaités': widget
+                            .application
+                            .interviewPreferences
+                            .map(
+                              (v) =>
+                                  const {
+                                    'in_person': 'Présentiel',
+                                    'online': 'En ligne',
+                                    'hybrid': 'Mixte',
+                                  }[v] ??
+                                  v,
+                            )
+                            .join(', '),
+                      'Évaluation selon la grille':
+                          widget.application.screeningScore == null
+                          ? 'À réaliser'
+                          : '${widget.application.screeningScore!.toStringAsFixed(1)}/100',
+                      'Avis enregistrés':
+                          '${widget.application.screeningReviewCount}',
+                    },
+                  ),
+                ],
+              ),
+              _Section(
+                title: 'Réponses',
+                icon: Icons.forum_outlined,
+                children: [
+                  if (widget.application.questionnaireAnswers.isNotEmpty) ...[
+                    const Text(
+                      'Questionnaire de candidature',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    for (final q in widget.application.questionnaireAnswers)
+                      _Answer(
+                        q['question']?.toString() ?? '',
+                        q['answer']?.toString(),
+                      ),
+                  ] else ...[
+                    _Answer('Motivations', widget.application.motivation),
+                    _Answer(
+                      'Votre connaissance d’Enactus',
+                      widget.application.enactusKnowledge,
+                    ),
+                    _Answer(
+                      'Autres clubs ou associations',
+                      widget.application.otherClubs,
+                    ),
+                    _Answer(
+                      'Contribution envisagée',
+                      widget.application.contribution,
+                    ),
+                    _Answer(
+                      'Idées de projets',
+                      widget.application.projectIdeas,
+                    ),
+                    _Answer(
+                      'Profil de leadership',
+                      widget.application.leadershipProfile,
+                    ),
+                    _Answer(
+                      'Expérience associative',
+                      widget.application.associativeExperience,
+                    ),
+                    _Answer(
+                      'Commentaire candidat',
+                      widget.application.publicComment,
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                title: 'Documents',
+                icon: Icons.folder_open_outlined,
+                children: [
+                  if (widget.anonymized)
+                    const Text(
+                      'Les pièces jointes sont masquées pendant la lecture anonymisée.',
+                    )
+                  else ...[
+                    _DocumentRow(label: 'CV', url: widget.application.cvUrl),
+                    _DocumentRow(
+                      label: 'Lettre de motivation',
+                      url: widget.application.motivationLetterUrl,
+                    ),
+                    _DocumentRow(
+                      label: 'Document complémentaire',
+                      url: widget.application.attachmentUrl,
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                key: _anchors['Évaluation'],
+                title: 'Évaluations',
+                icon: Icons.rate_review_outlined,
+                children: [
+                  FilledButton.icon(
+                    key: const Key('candidate-review-action'),
+                    onPressed: widget.application.permissions['can_review'] == false || widget.application.screeningRubric == null
+                        ? null
+                        : widget.onReview,
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: Text(
+                      widget.application.myReview == null
+                          ? 'Évaluer'
+                          : 'Modifier mon avis',
+                    ),
+                  ),
+                  if (widget.application.blindSelection &&
+                      widget.application.assessmentStage == 'screening' &&
+                      widget.application.permissions['can_review'] == true)
+                    TextButton.icon(
+                      onPressed: _declineAssignment,
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Demander un autre évaluateur'),
+                    ),
+                  if (widget.application.screeningRubric == null)
+                    const Text(
+                      'Actualisez le dossier pour charger la grille d’évaluation.',
+                    ),
+                  const SizedBox(height: 12),
+                  if (widget.reviews.isEmpty)
+                    Text('Aucune évaluation officielle enregistrée.')
+                  else ...[
+                    Text(
+                      widget.application.screeningScore == null
+                          ? 'La grille reste à renseigner. Les notes antérieures sont conservées ci-dessous.'
+                          : 'Indice du jury : ${widget.application.screeningScore!.toStringAsFixed(1)}/100 · ${widget.application.screeningReviewCount} avis',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (widget.application.screeningSpread != null &&
+                        widget.application.screeningReviewCount > 1)
+                      Text(
+                        'Écart entre les avis : ${widget.application.screeningSpread!.toStringAsFixed(1)} points. Discutez les observations avant de décider.',
+                      ),
+                    const SizedBox(height: 10),
+                    ...widget.reviews.map(
+                      (review) => _ReviewCard(
+                        review,
+                        widget.application.screeningRubric,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                key: _anchors['Entretien'],
+                title: 'Entretien',
+                icon: Icons.record_voice_over_outlined,
+                children: [
+                  _InfoGrid(
+                    values: {
+                      'Date': widget.application.interviewLabel,
+                      'Lieu': _value(widget.application.interviewLocation),
+                      'Jury': _value(widget.application.interviewJury),
+                      if (widget.application.interviewTeam != null)
+                        'Équipe': _value(
+                          widget.application.interviewTeam!['name']?.toString(),
+                        ),
+                      'Détails': _value(widget.application.interviewNote),
+                    },
+                  ),
+                ],
+              ),
+              _Section(
+                key: _anchors['Historique'],
+                title: 'Historique',
+                icon: Icons.history_rounded,
+                children: [
+                  if (widget.application.history.isEmpty)
+                    Text(
+                      'Candidature reçue · ${_dateTime(widget.application.createdAt)}',
+                    )
+                  else
+                    ...widget.application.history.map(_HistoryEntry.new),
+                ],
+              ),
+              if (widget.application.permissions['can_decide'] != false)
+                _Section(
+                  key: _anchors['Décision'],
+                  title: 'Actions sur la candidature',
+                  icon: Icons.admin_panel_settings_outlined,
+                  children: [
+                    if (widget.application.permissions['can_prepare_selection'] == true) ...[
+                      RecruitmentSelectionDecisionCard(
+                        key: ValueKey('${widget.application.id}-${widget.application.assessmentStage}'),
+                        application: widget.application,
+                        onSaved: widget.onConversionCompleted,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    CandidateActionsSection(
+                      application: widget.application,
+                      campaignTitle: widget.campaignTitle,
+                      reviewCount: widget.application.screeningReviewCount,
+                      reviewAverage: widget.application.screeningScore == null
+                          ? null
+                          : widget.application.screeningScore! / 5,
+                      onStatusChange: widget.onStatusChange,
+                      onInterview: widget.onInterview,
+                      onAdvancedInterview:
+                          widget.gateway is CampaignToolsProvider
+                          ? () => showRecruitmentDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => InterviewPlanningDialog(
+                                application: widget.application,
+                                tools: (widget.gateway as CampaignToolsProvider)
+                                    .campaignTools,
+                                onSaved: (_) => widget.onConversionCompleted(),
+                              ),
+                            )
+                          : null,
+                      feedback: widget.actionFeedback,
+                    ),
+                  ],
+                ),
+              if (!widget.anonymized && widget.gateway is CampaignToolsProvider)
+                PersonalityReviewCard(
+                  application: widget.application,
+                  tools:
+                      (widget.gateway as CampaignToolsProvider).campaignTools,
+                ),
+              if (widget.application.interviewNeedsReassignment)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'La composition du jury a changé. Modifie l’entretien pour confirmer une équipe disponible.',
+                    ),
+                  ),
+                ),
+              if (!widget.anonymized && widget.application.status == 'accepted')
+                CandidateIntegrationSection(
+                  application: widget.application,
+                  campaignTitle: widget.campaignTitle,
+                  gateway: widget.gateway,
+                  onCompleted: widget.onConversionCompleted,
+                ),
+            ],
           ),
-        ],
-      ),
-      if (!anonymized && application.status == 'accepted')
-        CandidateIntegrationSection(
-          application: application,
-          campaignTitle: campaignTitle,
-          gateway: gateway,
-          onCompleted: onConversionCompleted,
         ),
+      ),
     ],
   );
 }
@@ -401,6 +728,7 @@ class _Section extends StatelessWidget {
   final List<Widget> children;
 
   const _Section({
+    super.key,
     required this.title,
     required this.icon,
     required this.children,
@@ -419,11 +747,13 @@ class _Section extends StatelessWidget {
             children: [
               Icon(icon, size: 20),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -441,33 +771,44 @@ class _InfoGrid extends StatelessWidget {
   const _InfoGrid({required this.values});
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 16,
-    runSpacing: 14,
-    children: values.entries
-        .map(
-          (entry) => SizedBox(
-            width: MediaQuery.sizeOf(context).width < 560
-                ? double.infinity
-                : 250,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.key,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.secondaryText,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns =
+          constraints.maxWidth < 580 ||
+              MediaQuery.textScalerOf(context).scale(16) > 23
+          ? 1
+          : 2;
+      final width = (constraints.maxWidth - 18 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 18,
+        runSpacing: 18,
+        children: [
+          for (final entry in values.entries)
+            SizedBox(
+              width: width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.key,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                Text(
-                  entry.value,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  SelectableText(
+                    entry.value,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        )
-        .toList(),
+        ],
+      );
+    },
   );
 }
 
@@ -483,9 +824,9 @@ class _Answer extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(label, style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 3),
-        SelectableText(_value(value)),
+        SelectableText(_value(value), style: const TextStyle(height: 1.6)),
       ],
     ),
   );
@@ -502,35 +843,48 @@ class _DocumentRow extends StatelessWidget {
     final available = url?.trim().isNotEmpty == true;
     return Semantics(
       label: 'Document $label, ${available ? 'disponible' : 'non fourni'}',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.description_outlined),
-        title: Text(label),
-        subtitle: Text(available ? _fileName(url!) : 'Non fourni'),
-        trailing: available
-            ? TextButton(
-                onPressed: () => _openDocument(url!),
-                child: const Text('Consulter'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.description_outlined),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (available)
+              StoredAttachmentButton(
+                url: url!,
+                label: 'Consulter la pièce jointe',
               )
-            : null,
+            else
+              Text(
+                'Non fourni',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
       ),
     );
-  }
-
-  static Future<void> _openDocument(String value) async {
-    final uri = Uri.tryParse(value);
-    if (uri == null) return;
-    final resolved = uri.hasScheme
-        ? uri
-        : Uri.parse('${ApiClient.serverUrl}${uri.path}');
-    await launchUrl(resolved, webOnlyWindowName: '_blank');
   }
 }
 
 class _ReviewCard extends StatelessWidget {
   final ApplicationReviewModel review;
 
-  const _ReviewCard(this.review);
+  final Map<String, dynamic>? rubric;
+  const _ReviewCard(this.review, this.rubric);
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -540,30 +894,110 @@ class _ReviewCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.softBlack.withValues(alpha: .035),
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${review.score?.toStringAsFixed(1) ?? '—'}/20 · ${_recommendation(review.recommendation)}',
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            review.criteriaAssessment == null
+                ? 'Note antérieure · Hors de la nouvelle grille'
+                : 'Évaluation par critères',
           ),
           Text(
-            'Évaluateur : ${review.reviewerId.isEmpty ? 'Non renseigné' : review.reviewerId}',
+            '${review.score?.toStringAsFixed(1) ?? '—'}/20 · ${_recommendation(review.recommendation)}',
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
-          if (review.comment?.trim().isNotEmpty == true) Text(review.comment!),
+          Text(
+            'Évaluateur : ${review.reviewerName?.trim().isNotEmpty == true ? review.reviewerName : 'Un membre du jury'}',
+          ),
+          ..._criterionObservations(context),
+          if (review.comment?.trim().isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(review.comment!, style: const TextStyle(height: 1.6)),
+            ),
         ],
       ),
     ),
   );
+  List<Widget> _criterionObservations(BuildContext context) {
+    final rows = (review.criteriaAssessment?['ratings'] as List? ?? const [])
+        .whereType<Map>();
+    final criteria = (rubric?['criteria'] as List? ?? const [])
+        .whereType<Map>();
+    final labels = {for (final row in criteria) row['id']: row['label']};
+    return [
+      for (final row in rows)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${labels[row['criterion_id']] ?? row['criterion_id']} · ${row['rating']}/4',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                row['evidence']?.toString() ?? '',
+                style: const TextStyle(height: 1.6),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
 }
 
-double _average(List<ApplicationReviewModel> reviews) {
-  final scores = reviews.map((item) => item.score).whereType<double>().toList();
-  if (scores.isEmpty) return 0;
-  return scores.reduce((a, b) => a + b) / scores.length;
+class _HistoryEntry extends StatelessWidget {
+  final ApplicationHistoryModel entry;
+  const _HistoryEntry(this.entry);
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 18),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(switch (entry.kind) {
+          'submission' => Icons.inbox_outlined,
+          'interview' => Icons.event_outlined,
+          'integration' => Icons.person_add_alt_1_outlined,
+          _ => Icons.swap_horiz_rounded,
+        }, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.title,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                '${_dateTime(entry.occurredAt.toIso8601String())} · ${entry.actorName}',
+                style: TextStyle(
+                  height: 1.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (entry.fromStatus != null && entry.toStatus != null)
+                Text(
+                  '${ApplicationStatusPresentation.fromStatus(entry.fromStatus!).title} → ${ApplicationStatusPresentation.fromStatus(entry.toStatus!).title}',
+                  style: const TextStyle(height: 1.5),
+                ),
+              if (entry.scheduledFor != null)
+                Text(
+                  'Rendez-vous : ${_dateTime(entry.scheduledFor!.toIso8601String())}',
+                  style: const TextStyle(height: 1.5),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 String _recommendation(String value) => switch (value) {
@@ -580,10 +1014,5 @@ String _dateTime(String? raw) {
   if (value == null) return 'Non renseignée';
   final day = value.day.toString().padLeft(2, '0');
   final month = value.month.toString().padLeft(2, '0');
-  return '$day/$month/${value.year}';
-}
-
-String _fileName(String value) {
-  final segments = Uri.tryParse(value)?.pathSegments ?? const <String>[];
-  return segments.isEmpty ? value : segments.last;
+  return '$day/$month/${value.year} à ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }

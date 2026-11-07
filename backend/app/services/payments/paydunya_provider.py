@@ -1,18 +1,103 @@
+from app.core.time import utc_now
 import asyncio
 import hashlib
 import hmac
 import json
+import re
+import time
+import math
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
+from uuid import UUID
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.parse import quote, urlsplit, unquote
 
 from app.core.config import settings
 from app.services.payments.base import (
+    MAX_MOBILE_MONEY_AMOUNT,
     PaymentProviderError,
     PaymentProviderRequest,
     PaymentProviderResult,
 )
+
+
+MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024
+
+
+def provider_text(value, maximum: int, *, required: bool = False):
+    if value is None and not required:
+        return None
+    if not isinstance(value, str) or not value or len(value) > maximum or any(
+        ord(char) < 32 or ord(char) == 127 for char in value
+    ):
+        raise PaymentProviderError("Invalid provider field", code="provider_invalid_response")
+    return value
+
+
+def validated_provider_token(value):
+    token = provider_text(value, 180, required=True)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,180}", token):
+        raise PaymentProviderError("Invalid invoice token", code="provider_invalid_response")
+    return token
+
+
+def provider_amount(value, *, required: bool):
+    if value is None and not required:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise PaymentProviderError("Invalid provider amount", code="provider_invalid_response")
+    try:
+        amount = Decimal(str(value))
+        if not amount.is_finite() or amount != amount.to_integral_value() or not 0 < amount <= MAX_MOBILE_MONEY_AMOUNT:
+            raise ValueError("Invalid amount")
+        return int(amount)
+    except (InvalidOperation, ValueError):
+        raise PaymentProviderError("Invalid provider amount", code="provider_invalid_response") from None
+
+
+def strict_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def reject_json_constant(value):
+    raise ValueError("Non-finite JSON value")
+
+
+class _NoProviderRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise PaymentProviderError("Provider redirect refused", code="provider_redirect_refused")
+
+
+def provider_timeout_seconds() -> float:
+    value = float(settings.PAYDUNYA_TIMEOUT_SECONDS)
+    return min(30.0, max(1.0, value)) if math.isfinite(value) else 15.0
+
+
+def validated_checkout_url(value, token: str) -> str:
+    if not isinstance(value, str) or len(value) > 2048 or any(
+        char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value
+    ):
+        raise PaymentProviderError("Invalid checkout URL", code="provider_invalid_response")
+    try:
+        url = urlsplit(value)
+        expected = {"/checkout/invoice/" + token, "/sandbox-checkout/invoice/" + token}
+        valid = (
+            url.scheme == "https" and url.hostname == "app.paydunya.com"
+            and url.port in {None, 443} and url.username is None and url.password is None
+            and not url.fragment and unquote(url.path) in expected
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise PaymentProviderError("Invalid checkout URL", code="provider_invalid_response")
+    return value
 
 
 class PayDunyaProvider:
@@ -60,31 +145,29 @@ class PayDunyaProvider:
             headers=self._headers(),
             method=method,
         )
+        timeout = provider_timeout_seconds()
+        deadline = time.monotonic() + timeout
         try:
-            with urlopen(
-                request,
-                timeout=settings.PAYDUNYA_TIMEOUT_SECONDS,
-            ) as response:
-                response_body = response.read().decode("utf-8")
+            with build_opener(_NoProviderRedirect()).open(request, timeout=timeout) as response:
+                chunks = bytearray()
+                reader = getattr(response, "read1", response.read)
+                while True:
+                    if time.monotonic() >= deadline:
+                        raise PaymentProviderError("Provider deadline reached", code="provider_timeout")
+                    chunk = reader(min(65536, MAX_PROVIDER_RESPONSE_BYTES + 1 - len(chunks)))
+                    if not chunk:
+                        break
+                    chunks.extend(chunk)
+                    if len(chunks) > MAX_PROVIDER_RESPONSE_BYTES:
+                        raise PaymentProviderError("Provider response too large", code="provider_response_too_large")
+                data = json.loads(chunks.decode("utf-8"), object_pairs_hook=strict_json_object, parse_constant=reject_json_constant)
         except HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="ignore")
-            raise PaymentProviderError(
-                f"PayDunya HTTP error {exc.code}: {error_body[:200]}",
-                code="provider_http_error",
-            ) from exc
-        except URLError as exc:
-            raise PaymentProviderError(
-                f"PayDunya network error: {exc.reason}",
-                code="provider_network_error",
-            ) from exc
-
-        try:
-            data = json.loads(response_body)
-        except json.JSONDecodeError as exc:
-            raise PaymentProviderError(
-                "PayDunya returned an invalid JSON response",
-                code="provider_invalid_response",
-            ) from exc
+            # Never read or propagate the provider's error body.
+            raise PaymentProviderError("Provider HTTP error", code="provider_http_error") from exc
+        except (TimeoutError, URLError, OSError) as exc:
+            raise PaymentProviderError("Provider network unavailable", code="provider_network_error") from exc
+        except (UnicodeError, ValueError, RecursionError) as exc:
+            raise PaymentProviderError("Invalid provider response", code="provider_invalid_response") from exc
         if not isinstance(data, dict):
             raise PaymentProviderError(
                 "PayDunya returned an unexpected response",
@@ -98,7 +181,13 @@ class PayDunyaProvider:
         path: str,
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(self._request_sync, method, path, payload)
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._request_sync, method, path, payload),
+                timeout=provider_timeout_seconds() + 1,
+            )
+        except TimeoutError as exc:
+            raise PaymentProviderError("Provider deadline reached", code="provider_timeout") from exc
 
     def _checkout_urls(self, request: PaymentProviderRequest) -> dict[str, str]:
         actions = {
@@ -113,14 +202,32 @@ class PayDunyaProvider:
         request: PaymentProviderRequest,
     ) -> dict[str, Any]:
         custom_data = {
-            "enactspace_transaction_id": request.transaction_id,
             **request.custom_data,
+            "enactspace_transaction_id": request.transaction_id,
         }
         if request.channel:
             custom_data["channel"] = request.channel
 
+        customer = {
+            key: value.strip()
+            for key, value in {
+                "name": request.customer_name,
+                "email": request.customer_email,
+                "phone": request.customer_phone,
+            }.items()
+            if isinstance(value, str) and value.strip()
+        }
+        channels = {}
+        if request.channel:
+            allowed = {value.strip() for value in settings.PAYDUNYA_ALLOWED_CHANNELS.split(",") if value.strip()}
+            if request.channel not in allowed:
+                raise PaymentProviderError("Unsupported payment channel", code="unsupported_channel")
+            channels = {"channels": [request.channel]}
+
         return {
             "invoice": {
+                **({"customer": customer} if customer else {}),
+                **channels,
                 "items": {
                     "enactspace_fee": {
                         "name": "Paiement EnactSpace",
@@ -139,18 +246,18 @@ class PayDunyaProvider:
         }
 
     def _status_from_paydunya(self, provider_status: str | None) -> str:
-        normalized = (provider_status or "").lower()
-        if normalized in {"completed", "complete", "paid", "success", "successful"}:
-            return "successful"
-        if normalized in {"cancelled", "canceled"}:
-            return "cancelled"
-        if normalized in {"failed", "failure", "declined"}:
-            return "failed"
-        if normalized == "expired":
-            return "expired"
-        if normalized == "refunded":
-            return "refunded"
-        return "pending"
+        value = provider_text(provider_status, 100, required=True).strip().lower()
+        statuses = {
+            "completed": "successful", "complete": "successful", "paid": "successful",
+            "success": "successful", "successful": "successful",
+            "cancelled": "cancelled", "canceled": "cancelled",
+            "failed": "failed", "failure": "failed", "declined": "failed",
+            "expired": "expired", "refunded": "refunded",
+            "pending": "pending", "created": "pending", "processing": "pending",
+        }
+        if value not in statuses:
+            raise PaymentProviderError("Unknown provider status", code="provider_invalid_response")
+        return statuses[value]
 
     def _callback_data(self, payload: dict[str, Any]) -> dict[str, Any]:
         data = payload.get("data", payload)
@@ -162,19 +269,16 @@ class PayDunyaProvider:
         return data
 
     def _callback_hash(self, data: dict[str, Any]) -> str | None:
-        hash_value = data.get("hash")
-        if hash_value:
-            return str(hash_value)
-        nested = data.get("data")
-        if isinstance(nested, dict) and nested.get("hash"):
-            return str(nested.get("hash"))
-        return None
+        value = data.get("hash")
+        if value is None and isinstance(data.get("data"), dict):
+            value = data["data"].get("hash")
+        return value if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{128}", value) else None
 
     def _callback_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
-        invoice = data.get("invoice")
-        if isinstance(invoice, dict):
-            return invoice
-        return {}
+        invoice = data.get("invoice", {})
+        if not isinstance(invoice, dict):
+            raise PaymentProviderError("Invalid callback invoice", code="invalid_callback")
+        return invoice
 
     async def create_payment(
         self,
@@ -186,7 +290,7 @@ class PayDunyaProvider:
                 "PayDunya V1.1 only supports XOF",
                 code="currency_not_supported",
             )
-        if request.amount <= 0:
+        if isinstance(request.amount, bool) or not isinstance(request.amount, int) or not 0 < request.amount <= MAX_MOBILE_MONEY_AMOUNT:
             raise PaymentProviderError(
                 "PayDunya amount must be positive",
                 code="invalid_amount",
@@ -199,7 +303,7 @@ class PayDunyaProvider:
         )
         if response.get("response_code") != "00":
             raise PaymentProviderError(
-                f"PayDunya invoice creation failed: {response.get('description')}",
+                "PayDunya invoice creation failed",
                 code="invoice_creation_failed",
                 public_message="Le paiement n'a pas pu etre initialise.",
             )
@@ -212,14 +316,17 @@ class PayDunyaProvider:
                 code="provider_invalid_response",
             )
 
+        token = validated_provider_token(token)
+        checkout_url = validated_checkout_url(checkout_url, token)
+
         return PaymentProviderResult(
             provider=self.name,
             status="pending",
             provider_token=str(token),
             checkout_url=str(checkout_url),
-            expires_at=datetime.utcnow()
+            expires_at=utc_now()
             + timedelta(minutes=settings.PAYMENT_TRANSACTION_TTL_MINUTES),
-            provider_status=response.get("description") or "created",
+            provider_status=provider_text(response.get("description"), 100) or "created",
             metadata={
                 "response_code": response.get("response_code"),
                 "mode": settings.PAYDUNYA_MODE,
@@ -238,29 +345,50 @@ class PayDunyaProvider:
                 "PayDunya invoice token is required for status lookup",
                 code="missing_provider_token",
             )
+        provider_token_value = validated_provider_token(provider_token)
         response = await self._request(
             "GET",
-            f"/checkout-invoice/confirm/{provider_token}",
+            f"/checkout-invoice/confirm/{quote(provider_token_value, safe='')}",
         )
+        if response.get("response_code") != "00":
+            raise PaymentProviderError("PayDunya status lookup failed", code="provider_invalid_response")
         invoice = response.get("invoice")
-        if not isinstance(invoice, dict):
-            invoice = {}
-        provider_status = (
-            response.get("status")
-            or invoice.get("status")
-            or response.get("description")
-        )
+        if not isinstance(invoice, dict) or invoice.get("token") != provider_token_value:
+            raise PaymentProviderError("Inconsistent invoice response", code="provider_invalid_response")
+        returned_status = response.get("status", invoice.get("status"))
+        status = self._status_from_paydunya(returned_status)
+        amount = provider_amount(invoice.get("total_amount"), required=status == "successful")
+        raw_currency = invoice.get("currency", response.get("currency"))
+        currency = provider_text("XOF" if raw_currency is None else raw_currency, 10, required=True)
+        if currency.strip().upper() not in {"XOF", "FCFA", "CFA"}:
+            raise PaymentProviderError("Unsupported provider currency", code="provider_invalid_response")
+        reference = provider_text(
+            invoice.get("transaction_id", response.get("transaction_id", provider_transaction_id)), 180)
+        # Only retain the internal reference; no arbitrary provider/customer payload is persisted.
+        raw_custom = response.get("custom_data", invoice.get("custom_data", {}))
+        if raw_custom is None:
+            raw_custom = {}
+        if not isinstance(raw_custom, dict):
+            raise PaymentProviderError("Invalid provider metadata", code="provider_invalid_response")
+        custom_data = {}
+        if "enactspace_transaction_id" in raw_custom:
+            internal_id = provider_text(raw_custom["enactspace_transaction_id"], 36, required=True)
+            try:
+                custom_data["enactspace_transaction_id"] = str(UUID(internal_id))
+            except ValueError:
+                raise PaymentProviderError("Invalid internal reference", code="provider_invalid_response") from None
         return PaymentProviderResult(
             provider=self.name,
-            provider_token=provider_token,
-            provider_transaction_id=provider_transaction_id
-            or invoice.get("transaction_id")
-            or invoice.get("receipt_url"),
-            status=self._status_from_paydunya(str(provider_status)),
-            provider_status=str(provider_status) if provider_status else None,
+            provider_token=provider_token_value,
+            provider_transaction_id=reference,
+            status=status,
+            provider_status=returned_status,
             metadata={
-                "response_code": response.get("response_code"),
+                "response_code": "00",
                 "mode": settings.PAYDUNYA_MODE,
+                "amount": amount,
+                "currency": "XOF",
+                "custom_data": custom_data,
             },
         )
 
@@ -271,7 +399,7 @@ class PayDunyaProvider:
         expected_hash = hashlib.sha512(
             (settings.PAYDUNYA_MASTER_KEY or "").encode("utf-8")
         ).hexdigest()
-        if not received_hash or not hmac.compare_digest(received_hash, expected_hash):
+        if not received_hash or not hmac.compare_digest(received_hash.encode("utf-8"), expected_hash.encode("ascii")):
             raise PaymentProviderError(
                 "Invalid PayDunya callback hash",
                 code="invalid_callback_hash",
@@ -288,45 +416,13 @@ class PayDunyaProvider:
             or data.get("invoice_token")
             or custom_data.get("provider_token")
         )
-        provider_status = (
-            data.get("status")
-            or invoice.get("status")
-            or data.get("response_text")
-            or data.get("response_code")
-        )
-        amount = (
-            invoice.get("total_amount")
-            or data.get("total_amount")
-            or data.get("amount")
-        )
-        currency = (
-            invoice.get("currency")
-            or data.get("currency")
-            or custom_data.get("currency")
-            or "XOF"
-        )
-        provider_transaction_id = (
-            invoice.get("receipt_url")
-            or invoice.get("transaction_id")
-            or data.get("transaction_id")
-        )
-        return PaymentProviderResult(
-            provider=self.name,
-            provider_token=str(token) if token else None,
-            provider_transaction_id=(
-                str(provider_transaction_id) if provider_transaction_id else None
-            ),
-            status=self._status_from_paydunya(str(provider_status)),
-            provider_status=str(provider_status) if provider_status else None,
-            metadata={
-                "amount": amount,
-                "currency": currency,
-                "custom_data": custom_data,
-                "event_id": data.get("event_id") or data.get("reference"),
-                "response_code": data.get("response_code"),
-                "mode": settings.PAYDUNYA_MODE,
-            },
-        )
+        try:
+            token = validated_provider_token(token)
+        except PaymentProviderError:
+            raise PaymentProviderError("Invalid callback invoice token", code="invalid_callback") from None
+        # A callback only triggers a lookup; its status and amounts cannot authorize money.
+        confirmed = await self.get_payment_status(provider_token=str(token))
+        return confirmed
 
     async def cancel_payment(
         self,

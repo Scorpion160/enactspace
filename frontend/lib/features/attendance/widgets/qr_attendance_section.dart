@@ -79,7 +79,7 @@ class QrAttendanceSection extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   isOpen
-                      ? 'QR dynamique pret. Les compteurs se mettent a jour automatiquement.'
+                      ? 'Le QR code est prêt. Les participants peuvent le scanner pour pointer.'
                       : 'Ouvrez la session pour activer le pointage QR.',
                   style: const TextStyle(
                     color: Colors.black54,
@@ -90,7 +90,7 @@ class QrAttendanceSection extends StatelessWidget {
                 if (token != null) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'Renouvellement automatique a ${_formatShortTime(token!.expiresAt)}.',
+                    'Prochain renouvellement à ${_formatShortTime(token!.expiresAt)}.',
                     style: const TextStyle(
                       color: Colors.black54,
                       fontWeight: FontWeight.w600,

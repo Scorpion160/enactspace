@@ -1,34 +1,197 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/text/searchable_text.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../models/archive_models.dart';
+import 'archive_visuals.dart';
 import '../services/archives_gateway.dart';
 import 'archive_forms.dart';
+import 'archive_minutes_screen.dart';
+
+Future<void> _refreshAfterWrite(
+  Future<bool> result,
+  VoidCallback? onChanged,
+) async {
+  if (await result) onChanged?.call();
+}
+
+class HistoricalMemoryContents extends StatefulWidget {
+  final ArchivesHomeData home;
+  final ArchivesGateway gateway;
+
+  final VoidCallback? onChanged;
+  const HistoricalMemoryContents({
+    super.key,
+    required this.home,
+    this.onChanged,
+    required this.gateway,
+  });
+
+  @override
+  State<HistoricalMemoryContents> createState() =>
+      _HistoricalMemoryContentsState();
+}
+
+class _HistoricalMemoryContentsState extends State<HistoricalMemoryContents> {
+  String _section = 'Vue d’ensemble';
+
+  @override
+  Widget build(BuildContext context) {
+    final home = widget.home;
+    final gateway = widget.gateway;
+    final contents = switch (_section) {
+      'Minute de l’enacteur' => ArchiveMinutesCollection(
+        home: home,
+        gateway: gateway,
+      ),
+      'Chiffres' => HistoricalStatisticsCenter(
+        statistics: home.statistics,
+        permissions: home.permissions,
+        gateway: gateway,
+        onChanged: widget.onChanged,
+      ),
+      'Projets' => HistoricalProjectsCenter(
+        home: home,
+        gateway: gateway,
+        onChanged: widget.onChanged,
+      ),
+      'Hall of Fame' => HallOfFameCenter(
+        home: home,
+        gateway: gateway,
+        onChanged: widget.onChanged,
+      ),
+      'Médias' => ArchiveMediaCenter(
+        home: home,
+        gateway: gateway,
+        onChanged: widget.onChanged,
+      ),
+      'Palmarès' || 'Compétitions' || 'Documents' => ArchivesCollectionCenter(
+        sectionLabel: _section,
+        home: home,
+        gateway: gateway,
+        onChanged: widget.onChanged,
+      ),
+      _ => ArchivesOverview(
+        home: home,
+        gateway: gateway,
+        onOpenStatistics: () => setState(() => _section = 'Chiffres'),
+        onChanged: widget.onChanged,
+      ),
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const sections = [
+              'Vue d’ensemble',
+              'Chiffres',
+              'Projets',
+              'Palmarès',
+              'Compétitions',
+              'Hall of Fame',
+              'Minute de l’enacteur',
+              'Documents',
+              'Médias',
+            ];
+            if (constraints.maxWidth < 600) {
+              return KeyedSubtree(
+                key: ValueKey(_section),
+                child: DropdownButtonFormField<String>(
+                  key: const Key('historical_section_selector'),
+                  initialValue: _section,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Explorer la mémoire',
+                  ),
+                  items: [
+                    for (final section in sections)
+                      DropdownMenuItem(value: section, child: Text(section)),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _section = value);
+                  },
+                ),
+              );
+            }
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final section in sections)
+                  ChoiceChip(
+                    label: Text(section),
+                    selected: _section == section,
+                    onSelected: (_) => setState(() => _section = section),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+        contents,
+      ],
+    );
+  }
+}
 
 class ArchivesOverview extends StatelessWidget {
   final ArchivesHomeData home;
   final ArchivesGateway gateway;
+  final VoidCallback? onOpenStatistics;
+  final VoidCallback? onChanged;
   const ArchivesOverview({
     super.key,
     required this.home,
     required this.gateway,
+    this.onOpenStatistics,
+    this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SectionIntro(
-        eyebrow: 'MÉMOIRE VIVANTE',
-        title: 'Ce que les sources disponibles racontent',
+      const ArchiveBanner(
+        eyebrow: 'MÉMOIRE INSTITUTIONNELLE',
+        title: 'L’aventure Enactus ESP',
         description:
-            'Les chiffres non validés restent explicitement présentés comme historiques à confirmer.',
+            'Depuis 2015, des générations d’étudiants de l’ESP transforment leurs idées en solutions pour les communautés. Découvre les projets qui ont porté cette aventure, les personnes qu’ils accompagnent et les moments qui ont fait grandir le club.',
+        motif: ArchiveMotif.binder,
       ),
       const SizedBox(height: 16),
-      HistoricalImpactSummaryWrap(summary: home.summary),
-      if (home.summary.values.isNotEmpty) const SizedBox(height: 16),
-      HistoricalStatisticsWrap(statistics: home.statistics.take(6).toList()),
+      if (home.statistics.isEmpty)
+        HistoricalImpactSummaryWrap(summary: home.summary)
+      else
+        HistoricalStatisticsWrap(statistics: home.statistics.take(4).toList()),
+      if (onOpenStatistics != null)
+        TextButton.icon(
+          onPressed: onOpenStatistics,
+          icon: const Icon(Icons.insights_outlined),
+          label: const Text('Voir tous les chiffres historiques'),
+        ),
+      const SizedBox(height: 28),
+      if (home.media.any((item) => item.imageAsset != null))
+        EditorialList(
+          title: 'Trophées et moments du club',
+          children: home.media
+              .where((item) => item.imageAsset != null)
+              .take(3)
+              .map(
+                (item) => ArchiveMediaCard(
+                  item: item,
+                  gateway: gateway,
+                  canEdit: false,
+                ),
+              )
+              .toList(),
+        ),
       const SizedBox(height: 28),
       EditorialList(
         title: 'Projets historiques',
@@ -39,6 +202,7 @@ class ArchivesOverview extends StatelessWidget {
                 item: item,
                 gateway: gateway,
                 canEdit: home.permissions.canCreate,
+                onChanged: onChanged,
               ),
             )
             .toList(),
@@ -53,6 +217,7 @@ class ArchivesOverview extends StatelessWidget {
                 item: item,
                 gateway: gateway,
                 canEdit: home.permissions.canCreate,
+                onChanged: onChanged,
               ),
             )
             .toList(),
@@ -67,6 +232,7 @@ class ArchivesOverview extends StatelessWidget {
                 item: item,
                 gateway: gateway,
                 canEdit: home.permissions.canCreate,
+                onChanged: onChanged,
               ),
             )
             .toList(),
@@ -114,7 +280,7 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
+    final query = searchableText(_search.text);
     final values = widget.items.where((item) {
       final matchesSearch =
           query.isEmpty ||
@@ -136,15 +302,13 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
         const SectionIntro(
           eyebrow: 'COLLECTION',
           title: 'Archives',
-          description:
-              'Contenus documentés, sources et fichiers conservés par le club.',
+          description: 'Documents, photos et récits de la vie du club.',
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -179,6 +343,13 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
               onChanged: (value) => setState(() => _visibility = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount: [
+            _year,
+            _category,
+            _status,
+            _visibility,
+          ].where((v) => v != null).length,
         ),
         const SizedBox(height: 20),
         if (values.isEmpty)
@@ -195,7 +366,7 @@ class _ArchiveItemsCenterState extends State<ArchiveItemsCenter> {
               badges: [item.statusLabel, item.visibilityLabel],
               featured: item.isFeatured,
               memoryOnly: !item.isPersisted,
-              onOpen: () => context.go(
+              onOpen: () => context.push(
                 '/archives/items/${item.id}',
                 extra: widget.gateway,
               ),
@@ -218,15 +389,12 @@ class SearchField extends StatelessWidget {
   const SearchField({super.key, required this.controller});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 280,
-    child: TextField(
-      key: const Key('archives_search'),
-      controller: controller,
-      decoration: const InputDecoration(
-        labelText: 'Rechercher',
-        prefixIcon: Icon(Icons.search),
-      ),
+  Widget build(BuildContext context) => TextField(
+    key: const Key('archives_search'),
+    controller: controller,
+    decoration: const InputDecoration(
+      hintText: 'Rechercher',
+      prefixIcon: Icon(Icons.search),
     ),
   );
 }
@@ -247,31 +415,31 @@ class FilterDropdown<T> extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 190,
-    child: DropdownButtonFormField<T>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: [
-        DropdownMenuItem<T>(value: null, child: const Text('Tous')),
-        for (final item in values)
-          DropdownMenuItem<T>(
-            value: item,
-            child: Text(itemLabel?.call(item) ?? '$item'),
-          ),
-      ],
-      onChanged: onChanged,
-    ),
+  Widget build(BuildContext context) => DropdownButtonFormField<T>(
+    key: ValueKey((label, value)),
+    initialValue: values.contains(value) ? value : null,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      DropdownMenuItem<T>(value: null, child: const Text('Tous')),
+      for (final item in values)
+        DropdownMenuItem<T>(
+          value: item,
+          child: Text(itemLabel?.call(item) ?? '$item'),
+        ),
+    ],
+    onChanged: onChanged,
   );
 }
 
 class HistoricalProjectsCenter extends StatefulWidget {
   final ArchivesHomeData home;
   final ArchivesGateway gateway;
+  final VoidCallback? onChanged;
   const HistoricalProjectsCenter({
     super.key,
     required this.home,
+    this.onChanged,
     required this.gateway,
   });
 
@@ -300,55 +468,50 @@ class _HistoricalProjectsCenterState extends State<HistoricalProjectsCenter> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
+    final query = searchableText(_search.text);
     final years =
         widget.home.projects
-            .map((item) => item.year)
-            .whereType<int>()
+            .expand((item) => item.matchingYears)
             .toSet()
             .toList()
           ..sort((a, b) => b.compareTo(a));
+    final statuses =
+        widget.home.projects.map((item) => item.statusLabel).toSet().toList()
+          ..sort();
     final values = widget.home.projects.where(
       (item) =>
           (query.isEmpty ||
-              '${item.name} ${item.description ?? ''}'.toLowerCase().contains(
-                query,
-              )) &&
-          (_year == null || item.year == _year) &&
-          (_status == null || item.status == _status),
+              searchableText(
+                '${item.name} ${item.description ?? ''} ${item.sourceLabel ?? ''}',
+              ).contains(query)) &&
+          (_year == null || item.matchingYears.contains(_year)) &&
+          (_status == null || item.statusLabel == _status),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 16,
-          runSpacing: 12,
-          children: [
-            const SizedBox(
-              width: 650,
-              child: SectionIntro(
-                eyebrow: 'HÉRITAGE',
-                title: 'Projets historiques',
-                description:
-                    'Les initiatives retournées par le serveur, sans récit ni indicateur ajouté côté Flutter.',
-              ),
-            ),
-            if (widget.home.permissions.canCreate)
-              FilledButton.icon(
-                onPressed: () =>
+        ArchiveBanner(
+          eyebrow: 'HÉRITAGE',
+          title: 'Projets historiques',
+          description:
+              'Découvrez les projets d’Enactus ESP, leur histoire, leur impact et leur héritage.',
+          motif: ArchiveMotif.binder,
+          actions: widget.home.permissions.canCreate
+              ? FilledButton.icon(
+                  onPressed: () => _refreshAfterWrite(
                     showHistoricalProjectDialog(context, widget.gateway),
-                icon: const Icon(Icons.add),
-                label: const Text('Nouveau projet historique'),
-              ),
-          ],
+                    widget.onChanged,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nouveau projet historique'),
+                )
+              : null,
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -358,27 +521,36 @@ class _HistoricalProjectsCenterState extends State<HistoricalProjectsCenter> {
             FilterDropdown<String>(
               label: 'Statut',
               value: _status,
-              values: const [
-                'historique',
-                'archive',
-                'archivé',
-                'continue',
-                'continué',
-                'developpement',
-                'développement',
-              ],
-              itemLabel: historicalProjectStatusLabel,
+              values: statuses,
               onChanged: (value) => setState(() => _status = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount:
+              [_year, _status].where((v) => v != null).length +
+              (query.isEmpty ? 0 : 1),
+          onReset: () => setState(() {
+            _search.clear();
+            _year = null;
+            _status = null;
+          }),
         ),
         const SizedBox(height: 20),
-        for (final item in values)
-          HistoricalProjectCard(
-            item: item,
-            gateway: widget.gateway,
-            canEdit: widget.home.permissions.canCreate,
+        if (values.isEmpty)
+          const EmptyArchivesState(
+            label: 'Aucun projet ne correspond à ces filtres.',
           ),
+        ResponsiveArchiveGrid(
+          children: [
+            for (final item in values)
+              HistoricalProjectCard(
+                item: item,
+                gateway: widget.gateway,
+                canEdit: widget.home.permissions.canCreate,
+                onChanged: widget.onChanged,
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -388,9 +560,11 @@ class HistoricalProjectCard extends StatelessWidget {
   final HistoricalProjectModel item;
   final ArchivesGateway gateway;
   final bool canEdit;
+  final VoidCallback? onChanged;
   const HistoricalProjectCard({
     super.key,
     required this.item,
+    this.onChanged,
     required this.gateway,
     required this.canEdit,
   });
@@ -399,12 +573,18 @@ class HistoricalProjectCard extends StatelessWidget {
   Widget build(BuildContext context) => RecordCard(
     title: item.name,
     eyebrow: '${item.periodLabel} · ${item.statusLabel}',
+    imageAsset: item.imageAsset,
+    sourceUrl: item.sourceUrl,
+    sourceLabel: item.sourceLabel,
     description: item.description,
     memoryOnly: !item.isPersisted,
-    onOpen: () => context.go('/archives/projects/${item.id}', extra: gateway),
-    openLabel: 'Ouvrir projet',
+    onOpen: () => context.push('/archives/projects/${item.id}', extra: gateway),
+    openLabel: 'Ouvrir le projet',
     onEdit: canEdit && item.isPersisted
-        ? () => showHistoricalProjectDialog(context, gateway, item: item)
+        ? () => _refreshAfterWrite(
+            showHistoricalProjectDialog(context, gateway, item: item),
+            onChanged,
+          )
         : null,
   );
 }
@@ -412,9 +592,11 @@ class HistoricalProjectCard extends StatelessWidget {
 class HallOfFameCenter extends StatefulWidget {
   final ArchivesHomeData home;
   final ArchivesGateway gateway;
+  final VoidCallback? onChanged;
   const HallOfFameCenter({
     super.key,
     required this.home,
+    this.onChanged,
     required this.gateway,
   });
 
@@ -443,7 +625,7 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
+    final query = searchableText(_search.text);
     final years =
         widget.home.hallOfFame
             .map((item) => item.year)
@@ -451,6 +633,9 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
             .toSet()
             .toList()
           ..sort((a, b) => b.compareTo(a));
+    final hasUndatedEntries = widget.home.hallOfFame.any(
+      (item) => item.year == null,
+    );
     final types =
         widget.home.hallOfFame
             .map((item) => item.entryType)
@@ -461,49 +646,51 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
     final values = widget.home.hallOfFame.where(
       (item) =>
           (query.isEmpty ||
-              '${item.title} ${item.subtitle ?? ''} ${item.description ?? ''}'
-                  .toLowerCase()
-                  .contains(query)) &&
-          (_year == null || item.year == _year) &&
+              searchableText(
+                '${item.title} ${item.subtitle ?? ''} ${item.description ?? ''} ${item.sourceLabel ?? ''}',
+              ).contains(query)) &&
+          (_year == null || (item.year ?? -1) == _year) &&
           (_type == null || item.entryType == _type) &&
           (!_featured || item.isFeatured),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 16,
-          runSpacing: 12,
-          children: [
-            const SizedBox(
-              width: 650,
-              child: SectionIntro(
-                eyebrow: 'HALL OF FAME',
-                title: 'Les moments qui restent',
-                description:
-                    'Une lecture chronologique et humaine, strictement fondée sur les informations disponibles.',
-              ),
-            ),
-            if (widget.home.permissions.canCreate)
-              FilledButton.icon(
-                key: const Key('new_hall_of_fame_button'),
-                onPressed: () => showHallOfFameDialog(context, widget.gateway),
-                icon: const Icon(Icons.add),
-                label: const Text('Nouvelle entrée Hall of Fame'),
-              ),
-          ],
+        ArchiveBanner(
+          eyebrow: 'HALL OF FAME',
+          title: 'Les moments qui restent',
+          description: 'Les moments qui ont marqué l’histoire d’Enactus ESP.',
+          motif: ArchiveMotif.award,
+          actions: widget.home.permissions.canCreate
+              ? FilledButton.icon(
+                  key: const Key('new_hall_of_fame_button'),
+                  onPressed: () => _refreshAfterWrite(
+                    showHallOfFameDialog(context, widget.gateway),
+                    widget.onChanged,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nouvelle entrée Hall of Fame'),
+                )
+              : null,
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: [
+            FilterChip(
+              label: const Text('Mis en avant'),
+              selected: _featured,
+              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+              showCheckmark: true,
+              onSelected: (value) => setState(() => _featured = value),
+            ),
+          ],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
-              values: years,
+              values: [...years, if (hasUndatedEntries) -1],
+              itemLabel: (year) => year == -1 ? 'Non renseignée' : '$year',
               onChanged: (value) => setState(() => _year = value),
             ),
             FilterDropdown<String>(
@@ -513,20 +700,35 @@ class _HallOfFameCenterState extends State<HallOfFameCenter> {
               itemLabel: hallOfFameEntryTypeLabel,
               onChanged: (value) => setState(() => _type = value),
             ),
-            FilterChip(
-              label: const Text('Mis en avant'),
-              selected: _featured,
-              onSelected: (value) => setState(() => _featured = value),
-            ),
           ],
+          actions: const [],
+          activeFilterCount:
+              [_year, _type].where((v) => v != null).length +
+              (_featured ? 1 : 0) +
+              (query.isEmpty ? 0 : 1),
+          onReset: () => setState(() {
+            _search.clear();
+            _year = null;
+            _type = null;
+            _featured = false;
+          }),
         ),
         const SizedBox(height: 20),
-        for (final item in values)
-          HallOfFameCard(
-            item: item,
-            gateway: widget.gateway,
-            canEdit: widget.home.permissions.canCreate,
+        if (values.isEmpty)
+          const EmptyArchivesState(
+            label: 'Aucune entrée ne correspond à ces filtres.',
           ),
+        ResponsiveArchiveGrid(
+          children: [
+            for (final item in values)
+              HallOfFameCard(
+                item: item,
+                gateway: widget.gateway,
+                canEdit: widget.home.permissions.canCreate,
+                onChanged: widget.onChanged,
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -536,9 +738,11 @@ class HallOfFameCard extends StatelessWidget {
   final HallOfFameEntryModel item;
   final ArchivesGateway gateway;
   final bool canEdit;
+  final VoidCallback? onChanged;
   const HallOfFameCard({
     super.key,
     required this.item,
+    this.onChanged,
     required this.gateway,
     required this.canEdit,
   });
@@ -547,6 +751,9 @@ class HallOfFameCard extends StatelessWidget {
   Widget build(BuildContext context) => RecordCard(
     title: item.title,
     eyebrow: '${item.year ?? 'Année non renseignée'} · ${item.entryTypeLabel}',
+    imageAsset: item.imageAsset,
+    sourceUrl: item.sourceUrl ?? item.externalUrl,
+    sourceLabel: item.sourceLabel,
     description: item.subtitle ?? item.description,
     featured: item.isFeatured,
     memoryOnly: !item.isPersisted,
@@ -554,10 +761,13 @@ class HallOfFameCard extends StatelessWidget {
         ? const []
         : ['${item.scoreValue} ${item.scoreLabel ?? ''}'.trim()],
     onOpen: () =>
-        context.go('/archives/hall-of-fame/${item.id}', extra: gateway),
+        context.push('/archives/hall-of-fame/${item.id}', extra: gateway),
     openLabel: 'Ouvrir le Hall of Fame',
     onEdit: canEdit && item.isPersisted
-        ? () => showHallOfFameDialog(context, gateway, item: item)
+        ? () => _refreshAfterWrite(
+            showHallOfFameDialog(context, gateway, item: item),
+            onChanged,
+          )
         : null,
   );
 }
@@ -566,10 +776,12 @@ class HistoricalStatisticsCenter extends StatelessWidget {
   final List<HistoricalStatisticModel> statistics;
   final ArchivePermissions permissions;
   final ArchivesGateway gateway;
+  final VoidCallback? onChanged;
   const HistoricalStatisticsCenter({
     super.key,
     required this.statistics,
     required this.permissions,
+    this.onChanged,
     required this.gateway,
   });
 
@@ -577,17 +789,22 @@ class HistoricalStatisticsCenter extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SectionIntro(
+      const ArchiveBanner(
         eyebrow: 'IMPACT HISTORIQUE',
-        title: 'Chiffres et niveau de confiance',
+        title: 'Chiffres et provenance',
+        motif: ArchiveMotif.binder,
         description:
-            'Une valeur historique fournie par le serveur n’est pas présentée comme certifiée sans validation.',
+            'Retrouvez les principaux résultats du club au fil des années.',
       ),
       const SizedBox(height: 18),
       HistoricalStatisticsWrap(
         statistics: statistics,
+        showStatus: true,
         onEdit: permissions.canValidate
-            ? (item) => showHistoricalStatisticDialog(context, gateway, item)
+            ? (item) => _refreshAfterWrite(
+                showHistoricalStatisticDialog(context, gateway, item),
+                onChanged,
+              )
             : null,
       ),
     ],
@@ -597,9 +814,11 @@ class HistoricalStatisticsCenter extends StatelessWidget {
 class ArchiveMediaCenter extends StatefulWidget {
   final ArchivesHomeData home;
   final ArchivesGateway gateway;
+  final VoidCallback? onChanged;
   const ArchiveMediaCenter({
     super.key,
     required this.home,
+    this.onChanged,
     required this.gateway,
   });
 
@@ -629,7 +848,7 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
+    final query = searchableText(_search.text);
     final years =
         widget.home.media
             .map((item) => item.year)
@@ -650,9 +869,9 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
     final values = widget.home.media.where(
       (item) =>
           (query.isEmpty ||
-              '${item.title} ${item.description ?? ''}'.toLowerCase().contains(
-                query,
-              )) &&
+              searchableText(
+                '${item.title} ${item.description ?? ''} ${item.sourceLabel ?? ''}',
+              ).contains(query)) &&
           (_year == null || item.year == _year) &&
           (_type == null || item.mediaType == _type) &&
           (_projectId == null || item.projectId == _projectId),
@@ -660,31 +879,27 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 16,
-          runSpacing: 12,
-          children: [
-            const SectionIntro(
-              eyebrow: 'MÉMOIRE COLLECTIVE',
-              title: 'Médias historiques',
-              description:
-                  'Photos, vidéos, presse et présentations historiques.',
-            ),
-            if (widget.home.permissions.canCreate)
-              FilledButton.icon(
-                onPressed: () => showMediaDialog(context, widget.gateway),
-                icon: const Icon(Icons.add),
-                label: const Text('Nouveau média'),
-              ),
-          ],
+        ArchiveBanner(
+          eyebrow: 'MÉMOIRE COLLECTIVE',
+          title: 'Médias historiques',
+          description: 'Photos, vidéos, presse et présentations historiques.',
+          motif: ArchiveMotif.media,
+          actions: widget.home.permissions.canCreate
+              ? FilledButton.icon(
+                  onPressed: () => _refreshAfterWrite(
+                    showMediaDialog(context, widget.gateway),
+                    widget.onChanged,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nouveau média'),
+                )
+              : null,
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SearchField(controller: _search),
+        AppFilterToolbar(
+          search: SearchField(controller: _search),
+          quickFilters: const [],
+          filters: [
             FilterDropdown<int>(
               label: 'Année',
               value: _year,
@@ -705,6 +920,16 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
               onChanged: (value) => setState(() => _projectId = value),
             ),
           ],
+          actions: const [],
+          activeFilterCount:
+              [_year, _type, _projectId].where((v) => v != null).length +
+              (query.isEmpty ? 0 : 1),
+          onReset: () => setState(() {
+            _search.clear();
+            _year = null;
+            _type = null;
+            _projectId = null;
+          }),
         ),
         const SizedBox(height: 20),
         if (values.isEmpty)
@@ -712,12 +937,17 @@ class _ArchiveMediaCenterState extends State<ArchiveMediaCenter> {
             label: 'Aucun média ne correspond à ces filtres.',
           )
         else
-          for (final item in values)
-            ArchiveMediaCard(
-              item: item,
-              gateway: widget.gateway,
-              canEdit: widget.home.permissions.canCreate,
-            ),
+          ResponsiveArchiveGrid(
+            children: [
+              for (final item in values)
+                ArchiveMediaCard(
+                  item: item,
+                  gateway: widget.gateway,
+                  canEdit: widget.home.permissions.canCreate,
+                  onChanged: widget.onChanged,
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -727,10 +957,12 @@ class ArchivesCollectionCenter extends StatelessWidget {
   final String sectionLabel;
   final ArchivesHomeData home;
   final ArchivesGateway gateway;
+  final VoidCallback? onChanged;
   const ArchivesCollectionCenter({
     super.key,
     required this.sectionLabel,
     required this.home,
+    this.onChanged,
     required this.gateway,
   });
 
@@ -746,11 +978,21 @@ class ArchivesCollectionCenter extends StatelessWidget {
             item.rank,
             item.result,
           ].where((value) => value != null && '$value'.isNotEmpty).join(' · '),
+          onOpen: () =>
+              context.push('/archives/awards/${item.id}', extra: gateway),
+          openLabel: 'Découvrir la distinction',
           description: item.description,
+          imageAsset: item.imageAsset,
+          motif: ArchiveMotif.award,
+          sourceUrl: item.sourceUrl,
+          sourceLabel: item.sourceLabel,
           featured: item.isFeatured,
           memoryOnly: !item.isPersisted,
           onEdit: home.permissions.canCreate && item.isPersisted
-              ? () => showAwardDialog(context, gateway, item: item)
+              ? () => _refreshAfterWrite(
+                  showAwardDialog(context, gateway, item: item),
+                  onChanged,
+                )
               : null,
         ),
       ),
@@ -763,11 +1005,21 @@ class ArchivesCollectionCenter extends StatelessWidget {
             item.result,
             item.location,
           ].where((value) => value != null && '$value'.isNotEmpty).join(' · '),
+          onOpen: () =>
+              context.push('/archives/competitions/${item.id}', extra: gateway),
+          openLabel: 'Découvrir le concours',
           description: item.description,
+          imageAsset: item.imageAsset,
+          motif: ArchiveMotif.award,
+          sourceUrl: item.sourceUrl,
+          sourceLabel: item.sourceLabel,
           featured: item.isFeatured,
           memoryOnly: !item.isPersisted,
           onEdit: home.permissions.canCreate && item.isPersisted
-              ? () => showCompetitionDialog(context, gateway, item: item)
+              ? () => _refreshAfterWrite(
+                  showCompetitionDialog(context, gateway, item: item),
+                  onChanged,
+                )
               : null,
         ),
       ),
@@ -776,6 +1028,7 @@ class ArchivesCollectionCenter extends StatelessWidget {
           item: item,
           gateway: gateway,
           canEdit: home.permissions.canCreate,
+          onChanged: onChanged,
         ),
       ),
       'Documents' => home.documents.map(
@@ -783,6 +1036,7 @@ class ArchivesCollectionCenter extends StatelessWidget {
           item: item,
           gateway: gateway,
           canEdit: home.permissions.canCreate,
+          onChanged: onChanged,
         ),
       ),
       _ => const Iterable<RecordCard>.empty(),
@@ -790,50 +1044,55 @@ class ArchivesCollectionCenter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            SectionIntro(
-              eyebrow: 'MÉMOIRE COLLECTIVE',
-              title: sectionLabel,
-              description: _description,
-            ),
-            if (home.permissions.canCreate)
-              FilledButton.icon(
-                onPressed: () => _create(context),
-                icon: const Icon(Icons.add),
-                label: Text('Nouveau · $sectionLabel'),
-              ),
-          ],
+        ArchiveBanner(
+          eyebrow: 'MÉMOIRE COLLECTIVE',
+          title: sectionLabel,
+          description: _description,
+          motif: switch (sectionLabel) {
+            'Palmarès' || 'Compétitions' => ArchiveMotif.award,
+            'Médias' => ArchiveMotif.media,
+            _ => ArchiveMotif.binder,
+          },
+          actions: home.permissions.canCreate
+              ? FilledButton.icon(
+                  onPressed: () =>
+                      _refreshAfterWrite(_create(context), onChanged),
+                  icon: const Icon(Icons.add),
+                  label: Text(switch (sectionLabel) {
+                    'Palmarès' => 'Nouvelle distinction',
+                    'Compétitions' => 'Nouvelle compétition',
+                    'Documents' => 'Nouveau document historique',
+                    _ => 'Nouveau média',
+                  }),
+                )
+              : null,
         ),
         const SizedBox(height: 18),
         if (children.isEmpty)
           const EmptyArchivesState(label: 'Aucun contenu disponible.')
         else
-          ...children,
+          ResponsiveArchiveGrid(children: children),
       ],
     );
   }
 
   String get _description => switch (sectionLabel) {
     'Palmarès' =>
-      'Distinctions, rangs et résultats, sans confondre les informations.',
+      'Les distinctions et résultats d’Enactus ESP au fil des années.',
     'Compétitions' =>
-      'Une chronologie des participations retournées par le serveur.',
+      'Les participations d’Enactus ESP aux compétitions nationales et internationales.',
     'Médias' => 'Photos, vidéos, presse et présentations historiques.',
     'Documents' =>
       'Une collection historique dédiée, distincte du module Documents.',
     _ => '',
   };
 
-  Future<void> _create(BuildContext context) => switch (sectionLabel) {
+  Future<bool> _create(BuildContext context) => switch (sectionLabel) {
     'Palmarès' => showAwardDialog(context, gateway),
     'Compétitions' => showCompetitionDialog(context, gateway),
     'Médias' => showMediaDialog(context, gateway),
     'Documents' => showArchiveDocumentDialog(context, gateway),
-    _ => Future.value(),
+    _ => Future.value(false),
   };
 }
 
@@ -841,9 +1100,11 @@ class ArchiveMediaCard extends StatelessWidget {
   final ArchiveMediaModel item;
   final ArchivesGateway gateway;
   final bool canEdit;
+  final VoidCallback? onChanged;
   const ArchiveMediaCard({
     super.key,
     required this.item,
+    this.onChanged,
     required this.gateway,
     required this.canEdit,
   });
@@ -852,16 +1113,62 @@ class ArchiveMediaCard extends StatelessWidget {
   Widget build(BuildContext context) => RecordCard(
     title: item.title,
     eyebrow: '${item.year ?? ''} · ${item.mediaTypeLabel}',
+    imageAsset: item.imageAsset,
+    motif: ArchiveMotif.media,
+    placeholderLabel:
+        item.fileId != null &&
+            item.file?.downloadUrl == null &&
+            item.file?.previewUrl == null
+        ? 'Média indisponible'
+        : null,
+    attachment: item.file,
+    sourceUrl: item.sourceUrl ?? item.externalUrl,
+    sourceLabel: item.sourceLabel,
     description: item.description,
     featured: item.isFeatured,
     memoryOnly: !item.isPersisted,
-    onOpen: () => openArchiveUrl(
-      context,
-      item.file?.previewUrl ?? item.file?.downloadUrl ?? item.externalUrl,
-    ),
-    openLabel: item.externalUrl == null ? 'Ouvrir média' : 'Ouvrir',
+    onOpen: item.mediaType == 'minute_enacteur'
+        ? () => context.push('/archives/minutes/${item.id}', extra: gateway)
+        : item.mediaType == 'recit'
+        ? () => showDialog<void>(
+            context: context,
+            builder: (context) => Dialog.fullscreen(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text(item.title),
+                  leading: IconButton(
+                    tooltip: 'Retour aux récits',
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                body: SingleChildScrollView(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 980),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: ArchiveMinuteReading(item: item),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+        : null,
+    openLabel: item.mediaType == 'minute_enacteur'
+        ? 'Lire sa Minute'
+        : item.mediaType == 'recit'
+        ? 'Lire le récit'
+        : item.externalUrl == null
+        ? 'Ouvrir média'
+        : 'Ouvrir',
     onEdit: canEdit && item.isPersisted
-        ? () => showMediaDialog(context, gateway, item: item)
+        ? () => _refreshAfterWrite(
+            showMediaDialog(context, gateway, item: item),
+            onChanged,
+          )
         : null,
   );
 }
@@ -870,9 +1177,11 @@ class ArchiveDocumentCard extends StatelessWidget {
   final ArchiveDocumentModel item;
   final ArchivesGateway gateway;
   final bool canEdit;
+  final VoidCallback? onChanged;
   const ArchiveDocumentCard({
     super.key,
     required this.item,
+    this.onChanged,
     required this.gateway,
     required this.canEdit,
   });
@@ -882,23 +1191,32 @@ class ArchiveDocumentCard extends StatelessWidget {
     title: item.title,
     eyebrow:
         '${item.year ?? ''} · ${item.documentTypeLabel} · ${archiveVisibilityLabel(item.visibility)}',
-    description: item.description ?? item.sourceLabel,
+    description: item.description,
+    sourceLabel: item.sourceLabel,
+    attachment: item.file,
     featured: item.isFeatured,
     memoryOnly: !item.isPersisted,
-    onOpen: () => openArchiveUrl(
-      context,
-      item.file?.previewUrl ?? item.file?.downloadUrl,
-    ),
+    onOpen: item.documentId == null
+        ? null
+        : () => context.push('/documents/${item.documentId}'),
     openLabel: 'Ouvrir document',
     onEdit: canEdit && item.isPersisted
-        ? () => showArchiveDocumentDialog(context, gateway, item: item)
+        ? () => _refreshAfterWrite(
+            showArchiveDocumentDialog(context, gateway, item: item),
+            onChanged,
+          )
         : null,
   );
 }
 
 Future<void> openArchiveUrl(BuildContext context, String? value) async {
-  final uri = value == null ? null : Uri.tryParse(value);
-  if (uri == null || !await launchUrl(uri, webOnlyWindowName: '_blank')) {
+  final resolved = value?.startsWith('/') == true
+      ? '${ApiClient.serverUrl}$value'
+      : value;
+  final uri = resolved == null ? null : Uri.tryParse(resolved);
+  if (uri == null ||
+      !{'https', 'http'}.contains(uri.scheme) ||
+      !await launchUrl(uri, webOnlyWindowName: '_blank')) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Aucun lien exploitable disponible.')),
@@ -909,6 +1227,12 @@ Future<void> openArchiveUrl(BuildContext context, String? value) async {
 
 class RecordCard extends StatelessWidget {
   final String title;
+  final String? imageAsset;
+  final ArchiveMotif motif;
+  final String? placeholderLabel;
+  final ArchiveFileModel? attachment;
+  final String? sourceUrl;
+  final String? sourceLabel;
   final String eyebrow;
   final String? description;
   final List<String> badges;
@@ -920,6 +1244,12 @@ class RecordCard extends StatelessWidget {
   const RecordCard({
     super.key,
     required this.title,
+    this.imageAsset,
+    this.motif = ArchiveMotif.binder,
+    this.placeholderLabel,
+    this.attachment,
+    this.sourceUrl,
+    this.sourceLabel,
     required this.eyebrow,
     this.description,
     this.badges = const [],
@@ -931,62 +1261,97 @@ class RecordCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(eyebrow, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          if (description != null && description!.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(description!),
-          ],
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (featured) const Chip(label: Text('Mis en avant')),
-              if (memoryOnly)
-                const Chip(label: Text('Mémoire historique Enactus ESP')),
-              for (final badge in badges) Chip(label: Text(badge)),
-            ],
-          ),
-          if (onOpen != null || onEdit != null)
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  if (onOpen != null)
-                    TextButton.icon(
-                      onPressed: onOpen,
-                      icon: const Icon(Icons.open_in_new),
-                      label: Text(openLabel),
-                    ),
-                  if (onEdit != null)
-                    TextButton.icon(
-                      key: const Key('archive_edit_button'),
-                      onPressed: onEdit,
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Modifier'),
-                    ),
-                ],
-              ),
+  Widget build(BuildContext context) {
+    final fileUrl = attachment?.downloadUrl ?? attachment?.previewUrl;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (imageAsset != null) ...[
+              HeritageImage(asset: imageAsset!, title: title),
+            ] else
+              ArchivePlaceholder(motif: motif, label: placeholderLabel),
+            const SizedBox(height: 14),
+            Text(eyebrow, style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
-        ],
+            if (description != null && description!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                description!,
+                maxLines: onOpen == null ? null : 4,
+                overflow: onOpen == null
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (featured) const Chip(label: Text('Mis en avant')),
+
+                for (final badge in badges) Chip(label: Text(badge)),
+              ],
+            ),
+            if (sourceLabel != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Source : $sourceLabel',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (onOpen != null ||
+                onEdit != null ||
+                sourceUrl != null ||
+                fileUrl != null)
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (fileUrl != null)
+                      StoredAttachmentButton(
+                        url: fileUrl,
+                        fileName: attachment!.name,
+                      ),
+                    if (sourceUrl != null)
+                      TextButton.icon(
+                        onPressed: () => openArchiveUrl(context, sourceUrl),
+                        icon: const Icon(Icons.link),
+                        label: const Text('Consulter la source'),
+                      ),
+                    if (onOpen != null)
+                      TextButton.icon(
+                        onPressed: onOpen,
+                        icon: const Icon(Icons.open_in_new),
+                        label: Text(openLabel),
+                      ),
+                    if (onEdit != null)
+                      TextButton.icon(
+                        key: const Key('archive_edit_button'),
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Modifier'),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class SectionIntro extends StatelessWidget {
@@ -1037,7 +1402,7 @@ class EditorialList extends StatelessWidget {
       if (children.isEmpty)
         const EmptyArchivesState(label: 'Aucune donnée disponible.')
       else
-        ...children,
+        ResponsiveArchiveGrid(children: children),
     ],
   );
 }
@@ -1067,7 +1432,7 @@ class HistoricalImpactSummaryWrap extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${entry.value}',
+                            _historicalNumber(entry.value),
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
@@ -1085,10 +1450,12 @@ class HistoricalImpactSummaryWrap extends StatelessWidget {
 
 class HistoricalStatisticsWrap extends StatelessWidget {
   final List<HistoricalStatisticModel> statistics;
+  final bool showStatus;
   final ValueChanged<HistoricalStatisticModel>? onEdit;
   const HistoricalStatisticsWrap({
     super.key,
     required this.statistics,
+    this.showStatus = false,
     this.onEdit,
   });
 
@@ -1118,20 +1485,29 @@ class HistoricalStatisticsWrap extends StatelessWidget {
                           Text(
                             item.value == null
                                 ? 'Non renseigné'
-                                : '${item.value} ${item.unit ?? ''}'.trim(),
+                                : '${item.isMinimum ? 'Plus de ' : ''}${_historicalNumber(item.value!)} ${item.unit ?? ''}'
+                                      .trim(),
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 8),
-                          Chip(label: Text(item.confidenceLabel)),
+
                           if (item.description != null) Text(item.description!),
-                          if (item.sourceLabel != null)
-                            Text('Source : ${item.sourceLabel}'),
-                          if (item.validatedAt != null)
+                          Text(
+                            item.sourceLabel == null
+                                ? 'Source non renseignée'
+                                : 'Source : ${item.sourceLabel}',
+                          ),
+                          if (showStatus) ...[
+                            const SizedBox(height: 8),
                             Text(
-                              'Validé le ${archiveDateLabel(item.validatedAt!)}',
+                              item.confidenceLabel,
+                              style: Theme.of(context).textTheme.labelMedium,
                             ),
-                          if (onEdit != null)
+                          ],
+
+                          if (onEdit != null &&
+                              !(item.isPersisted && item.isValidated))
                             TextButton.icon(
                               onPressed: () => onEdit!(item),
                               icon: const Icon(Icons.edit_outlined),
@@ -1161,17 +1537,33 @@ class EmptyArchivesState extends StatelessWidget {
 String archiveDateLabel(DateTime value) =>
     '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 
+String _historicalNumber(num value) => NumberFormat(
+  '#,##0.########',
+  'fr_FR',
+).format(value).replaceAll(RegExp('[\u00a0\u202f]'), ' ');
+
 String _impactSummaryLabel(String key) {
   const labels = {
+    'lives_impacted': 'Vies impactées',
+    'jobs_created': 'Emplois créés',
+    'people_trained': 'Personnes formées',
+    'products_developed': 'Produits développés',
+    'work_hours': 'Heures de travail investies',
+    'sdgs_touched': 'ODD touchés',
+    'revenue_usd_2021_2022': 'Revenus 2021–2022 (USD)',
+    'beneficiary_income_increase_pct':
+        'Hausse des revenus des bénéficiaires (%)',
+    'trees_planted': 'Arbres plantés',
+    'field_kilometers': 'Kilomètres parcourus sur le terrain',
     'created_projects': 'Projets créés',
     'developing_projects': 'Projets en développement',
     'developed_products': 'Produits développés',
     'touched_sdgs': 'ODD concernés',
-    'created_jobs': 'Emplois documentés',
-    'saved_lives': 'Vies préservées documentées',
-    'planted_trees': 'Arbres plantés documentés',
-    'cumulative_fcfa_gains': 'Gains cumulés documentés',
-    'impacted_lives': 'Vies touchées documentées',
+    'created_jobs': 'Emplois créés',
+    'saved_lives': 'Vies préservées',
+    'planted_trees': 'Arbres plantés',
+    'cumulative_fcfa_gains': 'Gains cumulés',
+    'impacted_lives': 'Vies touchées',
   };
   final known = labels[key];
   if (known != null) return known;

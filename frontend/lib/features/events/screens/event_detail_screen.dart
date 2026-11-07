@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 
 import '../models/event_center_models.dart';
 import '../models/event_model.dart';
@@ -343,11 +344,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           _Section(
             title: 'Rapport',
             icon: Icons.description_rounded,
-            child: Text(
-              event.reportUrl?.trim().isNotEmpty == true
-                  ? event.reportUrl!
-                  : 'Aucun rapport disponible.',
-            ),
+            child: event.reportUrl?.trim().isNotEmpty == true
+                ? StoredAttachmentButton(
+                    url: event.reportUrl!,
+                    label: 'Consulter le rapport',
+                  )
+                : const Text('Aucun rapport disponible.'),
           ),
           if (event.canManage)
             _Section(

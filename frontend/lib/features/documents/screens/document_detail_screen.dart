@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/preview_mode_scope.dart';
+import '../../../shared/models/project_presentation.dart';
+import '../../../shared/ui/project_reference_documents.dart';
+
 import '../models/document_center_models.dart';
 import '../models/document_model.dart';
 import '../services/documents_gateway.dart';
@@ -137,6 +141,26 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       false;
 
   Future<void> _openFile() async {
+    final asset = _document!.fileUrl;
+    if (PreviewModeScope.active(context) &&
+        asset != null &&
+        ProjectReferenceDocument.isAllowedAsset(asset)) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => Dialog.fullscreen(
+          child: ProjectReferencePdfViewer(
+            document: ProjectReferenceDocument(
+              title: _document!.title,
+              asset: asset,
+              description: 'Document public Enactus ESP',
+              filename: asset.split('/').last,
+              pages: 26,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     final uri = Uri.tryParse(_document!.fileUrl ?? '');
     if (uri == null ||
         !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -265,7 +289,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
                 if (doc.seasonId != null)
                   _Datum(
-                    'Saison',
+                    'Année',
                     _references.seasonName(doc.seasonId) ??
                         'Référence indisponible',
                   ),

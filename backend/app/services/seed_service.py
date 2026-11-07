@@ -133,7 +133,7 @@ DEFAULT_PROJECTS = [
         "status": "prototype",
     },
     {
-        "name": "Cherry",
+        "name": "SHERY",
         "description": "Projet actif de Enactus ESP.",
         "status": "prototype",
     },
@@ -217,7 +217,7 @@ def seed_current_season(db: Session) -> tuple[Season, bool]:
         return existing, False
 
     season = Season(
-        name="Saison 2025-2026",
+        name="Année 2025-2026",
         start_date=date(2025, 10, 1),
         end_date=date(2026, 9, 30),
         is_current=True,

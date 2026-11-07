@@ -178,6 +178,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('tasks-reset')));
       await tester.pump();
+      await tester.tap(find.byTooltip('Afficher les filtres'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('tasks-status-filter')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Annulé').last);
@@ -258,8 +260,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Préparer atelier'), findsOneWidget);
       expect(find.text('Modifier'), findsOneWidget);
-      expect(find.text('Valider'), findsOneWidget);
-      expect(find.text('Historique technique'), findsOneWidget);
+      expect(find.text('Valider'), findsNothing);
+      expect(find.text('Dates du suivi'), findsOneWidget);
     });
 
     testWidgets('current_user_assigned expose statut/preuve sans édition', (
@@ -276,7 +278,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Changer le statut'), findsOneWidget);
-      expect(find.text('Preuve'), findsWidgets);
+      expect(find.text('Joindre un justificatif'), findsOneWidget);
       expect(find.text('Modifier'), findsNothing);
     });
 

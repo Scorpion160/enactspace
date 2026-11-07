@@ -34,7 +34,16 @@ class ArchivesService {
     final raw = response is List
         ? response
         : response is Map
-        ? response['items'] ?? response['data'] ?? const []
+        ? response['items'] ??
+              response['data'] ??
+              response['projects'] ??
+              response['awards'] ??
+              response['competitions'] ??
+              response['hall_of_fame'] ??
+              response['documents'] ??
+              response['media'] ??
+              response['statistics'] ??
+              const []
         : const [];
     return raw is List
         ? raw.whereType<Map>().map(archiveMap).toList(growable: false)
@@ -42,7 +51,11 @@ class ArchivesService {
   }
 
   Map<String, dynamic> _object(dynamic response) {
-    if (response is! Map) throw const FormatException('Réponse API invalide.');
+    if (response is! Map) {
+      throw const FormatException(
+        'Les archives n’ont pas pu être chargées. Réessayez.',
+      );
+    }
     return archiveMap(response);
   }
 
@@ -158,7 +171,7 @@ class ArchivesService {
     String? search,
     int? year,
     String? status,
-    bool includeStatic = false,
+    bool includeStatic = true,
   }) async {
     final response = await _apiClient.get(
       _path('/archives/historical-projects', {
@@ -199,8 +212,14 @@ class ArchivesService {
     HistoricalProjectModel.fromJson,
   );
 
-  Future<List<ArchiveAwardModel>> getAwards() =>
-      _list('/archives/awards', ArchiveAwardModel.fromJson);
+  Future<List<ArchiveAwardModel>> getAwards({bool includeStatic = true}) async {
+    final response = await _apiClient.get(
+      _path('/archives/awards', {'include_static': includeStatic}),
+      token: await _token(),
+    );
+    return _items(response).map(ArchiveAwardModel.fromJson).toList();
+  }
+
   Future<ArchiveAwardModel> getAward(String id) =>
       _get('/archives/awards/$id', ArchiveAwardModel.fromJson);
   Future<ArchiveAwardModel> createAward(Map<String, dynamic> payload) =>
@@ -210,8 +229,16 @@ class ArchivesService {
     Map<String, dynamic> payload,
   ) => _update('/archives/awards/$id', payload, ArchiveAwardModel.fromJson);
 
-  Future<List<ArchiveCompetitionModel>> getCompetitions() =>
-      _list('/archives/competitions', ArchiveCompetitionModel.fromJson);
+  Future<List<ArchiveCompetitionModel>> getCompetitions({
+    bool includeStatic = true,
+  }) async {
+    final response = await _apiClient.get(
+      _path('/archives/competitions', {'include_static': includeStatic}),
+      token: await _token(),
+    );
+    return _items(response).map(ArchiveCompetitionModel.fromJson).toList();
+  }
+
   Future<ArchiveCompetitionModel> getCompetition(String id) =>
       _get('/archives/competitions/$id', ArchiveCompetitionModel.fromJson);
   Future<ArchiveCompetitionModel> createCompetition(
@@ -268,11 +295,14 @@ class ArchivesService {
     ArchiveDocumentModel.fromJson,
   );
 
-  Future<List<HallOfFameEntryModel>> getHallOfFame() async {
-    final values = await _list(
-      '/archives/hall-of-fame',
-      HallOfFameEntryModel.fromJson,
+  Future<List<HallOfFameEntryModel>> getHallOfFame({
+    bool includeStatic = true,
+  }) async {
+    final response = await _apiClient.get(
+      _path('/archives/hall-of-fame', {'include_static': includeStatic}),
+      token: await _token(),
     );
+    final values = _items(response).map(HallOfFameEntryModel.fromJson).toList();
     values.sort((a, b) {
       final order = a.orderIndex.compareTo(b.orderIndex);
       if (order != 0) return order;

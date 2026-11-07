@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -67,7 +68,7 @@ def update_preferences(
     if changes.get("notification_push_enabled") is False:
         db.flush()
         disable_user_push(db, current_user.id)
-    preference.updated_at = datetime.utcnow()
+    preference.updated_at = utc_now()
     db.commit()
     db.refresh(preference)
     return preference
@@ -148,7 +149,7 @@ def cancel_account_deletion(
     if deletion_request is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Aucune demande annulable")
     deletion_request.status = "cancelled"
-    deletion_request.cancelled_at = datetime.utcnow()
+    deletion_request.cancelled_at = utc_now()
     create_audit_log(
         db, "account_deletion_cancelled", current_user.id,
         "account_deletion_request", deletion_request.id,
@@ -189,7 +190,7 @@ def process_account_deletion_request(
         raise HTTPException(status_code=409, detail="Transition de statut invalide")
     deletion_request.status = next_status
     deletion_request.admin_note = (payload.admin_note or "").strip() or None
-    deletion_request.processed_at = datetime.utcnow()
+    deletion_request.processed_at = utc_now()
     create_audit_log(
         db, "account_deletion_processed", current_user.id,
         "account_deletion_request", deletion_request.id,

@@ -1,6 +1,7 @@
 import argparse
 import time
 
+import app.models.base  # noqa: F401
 from app.db.database import SessionLocal
 from app.services.push_worker_service import drain_push_deliveries
 

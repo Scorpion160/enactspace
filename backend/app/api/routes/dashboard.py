@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
@@ -26,7 +27,7 @@ from app.models.notification import Notification
 from app.models.pole import Pole, PoleMember
 from app.models.post import Post
 from app.models.project import Project, ProjectMember
-from app.models.recruitment import Application
+from app.models.recruitment import Application, RecruitmentCampaign
 from app.models.task import Task, TaskAssignee
 from app.models.user import User
 
@@ -93,10 +94,12 @@ def get_dashboard_summary(
 
     if flags["can_view_global_members"]:
         summary["counts"]["members_active"] = _count(
-            db.query(User.id).filter(User.status == "active", User.is_active.is_(True))
+            db.query(User.id).filter(User.status == "active", User.is_active.is_(True),
+                User.profile_type.in_(("enacteur", "enactrice")))
         )
         summary["counts"]["members_inactive"] = _count(
             db.query(User.id).filter(
+                User.profile_type.in_(("enacteur", "enactrice")),
                 or_(User.status != "active", User.is_active.is_(False))
             )
         )
@@ -204,7 +207,7 @@ def _late_tasks_query(db: Session, user_id):
     return _assigned_tasks_query(db, user_id).filter(
         Task.status.in_(["a_faire", "en_cours", "bloque"]),
         Task.due_date.isnot(None),
-        Task.due_date < datetime.utcnow(),
+        Task.due_date < utc_now(),
     )
 
 
@@ -231,7 +234,7 @@ def _unread_messages_count(db: Session, user_id) -> int:
 
 
 def _upcoming_events_query(db: Session, user_id, flags: dict, scope: dict):
-    query = db.query(Event.id).filter(Event.start_time >= datetime.utcnow())
+    query = db.query(Event.id).filter(Event.start_time >= utc_now())
     if (
         flags["can_view_global"]
         or flags["can_view_global_attendance"]
@@ -373,17 +376,27 @@ def _recent_activity(db: Session, current_user: User, flags: dict, scope: dict) 
         )
 
     if flags["can_view_recruitment"]:
+        from app.api.routes.recruitment import anonymous_code
+        from app.services.recruitment_selection import identity_is_visible, uses_blind_selection
         applications = (
             db.query(Application)
             .order_by(Application.created_at.desc())
             .limit(3)
             .all()
         )
+        campaigns = {row.id: row for row in db.query(RecruitmentCampaign).filter(
+            RecruitmentCampaign.id.in_({row.campaign_id for row in applications})
+        ).all()} if applications else {}
         for application in applications:
+            campaign = campaigns.get(application.campaign_id)
+            anonymous = campaign is None or (
+                uses_blind_selection(campaign, application) and not identity_is_visible(db, current_user, campaign)
+            )
+            title = anonymous_code(application) if anonymous else f"Candidature {application.first_name} {application.last_name}".strip()
             items.append(
                 _activity_item(
                     "recruitment",
-                    f"Candidature {application.first_name} {application.last_name}".strip(),
+                    title,
                     application.created_at,
                     "/recruitment",
                 )

@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.document import Document
+from app.models.institutional_document import InstitutionalDocumentRequest
 from app.models.event import Event
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
@@ -257,11 +259,27 @@ def is_scope_lead(db: Session, current_user: User, document: Document) -> bool:
     return False
 
 
+def is_generated_institutional_document(db: Session, document: Document) -> bool:
+    return db.query(InstitutionalDocumentRequest.id).filter(
+        InstitutionalDocumentRequest.generated_document_id == document.id
+    ).first() is not None
+
+
+def ensure_document_mutable(db: Session, document: Document) -> None:
+    if is_generated_institutional_document(db, document):
+        raise HTTPException(status_code=409, detail=(
+            "Ce PDF institutionnel est figé. Pour le corriger, créez une nouvelle "
+            "demande et conservez l'original et sa référence."
+        ))
+
+
 def can_manage_document(
     db: Session,
     current_user: User,
     document: Document,
 ) -> bool:
+    if is_generated_institutional_document(db, document):
+        return False
     roles = get_user_role_names(db, current_user.id)
     return (
         bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS))
@@ -278,6 +296,8 @@ def can_validate_document(
     current_user: User,
     document: Document,
 ) -> bool:
+    if is_generated_institutional_document(db, document):
+        return False
     roles = get_user_role_names(db, current_user.id)
     return bool(roles.intersection(GLOBAL_DOCUMENT_MANAGERS))
 
@@ -327,7 +347,7 @@ def promote_document_file(stored_file: StoredFile | None) -> None:
     stored_file.expires_at = None
     stored_file.storage_scope = "official"
     stored_file.visibility = "internal"
-    stored_file.updated_at = datetime.utcnow()
+    stored_file.updated_at = utc_now()
 
 
 def active_document_users(db: Session) -> list[User]:
@@ -503,7 +523,7 @@ def create_document(
         is_template=payload.is_template,
         is_official=False,
         is_permanent=False,
-        expires_at=datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS),
+        expires_at=utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS),
     )
     sync_document_file(document, linked_file)
 
@@ -513,7 +533,7 @@ def create_document(
         linked_file.entity_type = "document"
         linked_file.entity_id = document.id
         linked_file.visibility = payload.visibility
-        linked_file.updated_at = datetime.utcnow()
+        linked_file.updated_at = utc_now()
     notify_users(
         db,
         user_ids=document_validator_user_ids(
@@ -521,7 +541,7 @@ def create_document(
             document,
             exclude_user_ids={current_user.id},
         ),
-        title="Document a valider",
+        title="Document à valider",
         message=document.title,
         notification_type="document_submitted",
         related_type="document",
@@ -640,6 +660,7 @@ def update_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -684,7 +705,7 @@ def update_document(
         linked_file.entity_type = "document"
         linked_file.entity_id = document.id
         linked_file.visibility = document.visibility
-        linked_file.updated_at = datetime.utcnow()
+        linked_file.updated_at = utc_now()
 
     if payload.file_type is not None:
         document.file_type = payload.file_type
@@ -704,7 +725,7 @@ def update_document(
     if payload.is_template is not None:
         document.is_template = payload.is_template
 
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     db.commit()
     db.refresh(document)
@@ -720,6 +741,7 @@ def validate_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -730,12 +752,12 @@ def validate_document(
     document.is_permanent = True
     document.status = "validated"
     document.validated_by = current_user.id
-    document.validated_at = datetime.utcnow()
+    document.validated_at = utc_now()
     document.rejected_by = None
     document.rejected_at = None
     document.rejection_reason = None
     document.expires_at = None
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
     linked_file = (
         db.query(StoredFile).filter(StoredFile.id == document.file_id).first()
         if document.file_id
@@ -747,7 +769,7 @@ def validate_document(
         notify_user(
             db,
             user_id=document.uploaded_by,
-            title="Document valide",
+            title="Document validé",
             message=f"Votre document {document.title} est maintenant officiel.",
             notification_type="document_validated",
             related_type="document",
@@ -796,6 +818,7 @@ def submit_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -808,8 +831,8 @@ def submit_document(
     document.rejected_by = None
     document.rejected_at = None
     document.rejection_reason = None
-    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
-    document.updated_at = datetime.utcnow()
+    document.expires_at = utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
+    document.updated_at = utc_now()
     db.flush()
     notify_users(
         db,
@@ -818,7 +841,7 @@ def submit_document(
             document,
             exclude_user_ids={current_user.id},
         ),
-        title="Document a valider",
+        title="Document à valider",
         message=document.title,
         notification_type="document_submitted",
         related_type="document",
@@ -837,6 +860,7 @@ def unvalidate_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -848,13 +872,13 @@ def unvalidate_document(
     document.status = "pending_validation"
     document.validated_by = None
     document.validated_at = None
-    document.expires_at = datetime.utcnow() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
-    document.updated_at = datetime.utcnow()
+    document.expires_at = utc_now() + timedelta(days=DOCUMENT_TEMPORARY_DAYS)
+    document.updated_at = utc_now()
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
             db,
             user_id=document.uploaded_by,
-            title="Document retire des officiels",
+            title="Document retiré des documents officiels",
             message=f"Votre document {document.title} n'est plus officiel.",
             notification_type="document_rejected",
             related_type="document",
@@ -876,6 +900,7 @@ def reject_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -895,15 +920,15 @@ def reject_document(
     document.validated_by = None
     document.validated_at = None
     document.rejected_by = current_user.id
-    document.rejected_at = datetime.utcnow()
+    document.rejected_at = utc_now()
     document.rejection_reason = reason
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     if document.uploaded_by and document.uploaded_by != current_user.id:
         notify_user(
             db,
             user_id=document.uploaded_by,
-            title="Document refuse",
+            title="Document refusé",
             message=reason,
             notification_type="document_rejected",
             related_type="document",
@@ -923,6 +948,7 @@ def archive_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_validate_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -931,7 +957,7 @@ def archive_document(
 
     document.status = "archived"
     document.is_official = False
-    document.updated_at = datetime.utcnow()
+    document.updated_at = utc_now()
 
     db.commit()
     db.refresh(document)
@@ -945,6 +971,7 @@ def delete_document(
     current_user: User = Depends(get_current_active_validated_user),
 ):
     document = get_visible_document_or_404(db, current_user, document_id)
+    ensure_document_mutable(db, document)
     if not can_manage_document(db, current_user, document):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

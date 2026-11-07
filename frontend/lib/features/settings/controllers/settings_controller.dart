@@ -9,6 +9,7 @@ class SettingsController extends ChangeNotifier {
   final SettingsGateway gateway;
   final AppearanceController appearance;
   final PushLifecycleController push;
+  final bool presentationMode;
 
   UserPreferences? preferences;
   AccountDeletionRequest? deletionRequest;
@@ -20,6 +21,7 @@ class SettingsController extends ChangeNotifier {
     required this.gateway,
     required this.appearance,
     PushLifecycleController? pushController,
+    this.presentationMode = false,
   }) : push = pushController ?? PushLifecycleController.instance;
 
   Future<void> load() async {
@@ -34,7 +36,9 @@ class SettingsController extends ChangeNotifier {
       preferences = results[0] as UserPreferences;
       deletionRequest = results[1] as AccountDeletionRequest?;
       await appearance.synchronizeServer(preferences!.theme);
-      push.synchronizeServerPreference(preferences!.pushNotifications);
+      if (!presentationMode) {
+        push.synchronizeServerPreference(preferences!.pushNotifications);
+      }
     } catch (_) {
       error = 'Impossible de charger vos réglages. Réessayez dans un instant.';
     } finally {
@@ -55,6 +59,11 @@ class SettingsController extends ChangeNotifier {
       _patch({'notification_email_enabled': value}, appliedLocally: false);
 
   Future<bool> setPushNotifications(bool value) async {
+    if (presentationMode) {
+      return _patch({
+        'notification_push_enabled': value,
+      }, appliedLocally: false);
+    }
     saving = true;
     error = null;
     notifyListeners();

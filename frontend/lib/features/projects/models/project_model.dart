@@ -1,6 +1,8 @@
 import 'project_status_presentation.dart';
+import '../../../shared/models/project_presentation.dart';
 
 class ProjectModel {
+  final ProjectPresentation? presentation;
   final String id;
   final String? seasonId;
   final String name;
@@ -16,6 +18,7 @@ class ProjectModel {
   final DateTime createdAt;
 
   const ProjectModel({
+    this.presentation,
     required this.id,
     required this.seasonId,
     required this.name,
@@ -33,6 +36,7 @@ class ProjectModel {
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
     return ProjectModel(
+      presentation: ProjectPresentation.parse(json['presentation']),
       id: json['id']?.toString() ?? '',
       seasonId: json['season_id']?.toString(),
       name: json['name']?.toString() ?? 'Projet sans nom',

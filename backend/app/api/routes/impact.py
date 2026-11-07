@@ -1,3 +1,8 @@
+from app.core.time import utc_now
+from app.services.impact_pdf_service import (
+    ImpactPdfGenerationError,
+    build_impact_summary_pdf,
+)
 import csv
 from datetime import datetime
 from io import StringIO
@@ -33,6 +38,65 @@ from app.services.notification_service import notify_user, notify_users
 
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
+
+
+def attach_impact_file(db: Session, stored_file, impact_project, current_user) -> None:
+    if stored_file.entity_type == "impact_record":
+        if stored_file.entity_id != impact_project.id:
+            raise HTTPException(400, "Cette pièce jointe appartient à une autre fiche impact.")
+        ensure_file_access(db, stored_file, current_user)
+    else:
+        ensure_file_access(db, stored_file, current_user, manage=True)
+        stored_file.entity_type = "impact_record"
+        stored_file.entity_id = impact_project.id
+    stored_file.visibility = "private"
+    stored_file.is_temporary = False
+    stored_file.is_ephemeral = False
+    stored_file.expires_at = None
+
+
+INSTITUTIONAL_IMPACT_SOURCE_LABEL = "Mémoire institutionnelle Enactus ESP 2015–2026"
+INSTITUTIONAL_HISTORICAL_IMPACT = {
+    "source_label": INSTITUTIONAL_IMPACT_SOURCE_LABEL,
+    "impacted_lives": 150000,
+    "impacted_lives_is_minimum": True,
+    "created_jobs": 200,
+    "created_jobs_is_minimum": True,
+    "people_trained": 1597,
+    "developed_products": 39,
+    "work_hours": 36640,
+    "touched_sdgs": 11,
+    "revenue_usd_2021_2022": 173193,
+    "dimbali_revenue_usd_2021_2022": 125521,
+    "men_nan_revenue_usd_2021_2022": 47672,
+    "beneficiary_income_increase_pct": 77,
+    "malnutrition_before_pct": 15,
+    "malnutrition_after_pct": 0,
+    "planted_trees": 1425,
+    "field_kilometers": 8949,
+    "emblematic_projects": [
+        "Dimbali",
+        "Mën Nañ",
+        "SHERY",
+        "Terrasen",
+        "Aquatus",
+        "Deconaane",
+        "Javelisel",
+    ],
+    "distinctions": [
+        "Premier prix d'excellence Fondation Sonatel 2016",
+        "Vice-champion national 2016",
+        "4 prix sur 5 — Compétition UHODARI 2016",
+        "Champion national 2017",
+        "Champion national 2018",
+        "Demi-finaliste Enactus World Cup 2018",
+        "Champion national 2023",
+        "1er prix Salon du Polytechnicien 2023 — SHERY",
+        "1er prix Polytech'Innovation 2025 — Terrasen",
+        "2e prix Polytech'Innovation 2025 — Aquatus",
+        "2e prix SENAYSKILLS 2025 — Terrasen",
+    ],
+}
 
 
 CLAIM_TYPES = {"MEASURED", "ESTIMATE", "PROJECTION", "HISTORICAL_CLAIM"}
@@ -395,14 +459,15 @@ def _project_payload(db: Session, project: Project) -> dict:
         db.query(func.count(Task.id))
         .filter(
             Task.project_id == project.id,
-            Task.status.in_(["termine", "terminé", "done", "completed"]),
+            Task.status.in_(["termine", "valide"]),
         )
         .scalar()
         or 0
     )
     late_tasks = (
         db.query(func.count(Task.id))
-        .filter(Task.project_id == project.id, Task.status.in_(["en_retard", "late"]))
+        .filter(Task.project_id == project.id, Task.due_date < utc_now(),
+                Task.status.notin_(["termine", "valide", "annule"]))
         .scalar()
         or 0
     )
@@ -458,6 +523,7 @@ def _project_payload(db: Session, project: Project) -> dict:
     payload = {
         "id": str(project.id),
         "project_name": project.name,
+        "impact_record_id": str(impact_profile.id) if impact_profile else None,
         "status": project.status,
         "pole_name": _project_pole_name(db, project.id),
         "project_lead": lead,
@@ -557,7 +623,7 @@ def create_impact_record(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Donnee impact a verifier",
+            title="Donnée d’impact à vérifier",
             message=f"{impact_project.title} attend une validation.",
             notification_type="impact_submitted",
             related_type="impact_project",
@@ -583,7 +649,7 @@ def update_impact_record(
         _ensure_pending_validation(data)
     for field, value in data.items():
         setattr(impact_project, field, value)
-    impact_project.updated_at = datetime.utcnow()
+    impact_project.updated_at = utc_now()
 
     if impact_project.validation_status in {"EVIDENCE_PENDING", "UNDER_REVIEW"}:
         notify_users(
@@ -593,8 +659,8 @@ def update_impact_record(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Donnee impact mise a jour",
-            message=f"{impact_project.title} attend une verification.",
+            title="Donnée d’impact mise à jour",
+            message=f"{impact_project.title} attend une vérification.",
             notification_type="impact_submitted",
             related_type="impact_project",
             related_id=impact_project.id,
@@ -615,9 +681,9 @@ def validate_impact_record(
     impact_project.validation_status = "VERIFIED"
     impact_project.status = "validated"
     impact_project.validated_by_id = current_user.id
-    impact_project.validated_at = datetime.utcnow()
+    impact_project.validated_at = utc_now()
     impact_project.rejection_reason = None
-    impact_project.updated_at = datetime.utcnow()
+    impact_project.updated_at = utc_now()
     create_audit_log(
         db, "impact_record_verified", current_user.id,
         "impact_project", impact_project.id,
@@ -625,8 +691,8 @@ def validate_impact_record(
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
-        title="Impact valide",
-        message=f"{impact_project.title} a ete valide.",
+        title="Impact validé",
+        message=f"{impact_project.title} a été validé.",
         notification_type="impact_validated",
         related_type="impact_project",
         related_id=impact_project.id,
@@ -648,9 +714,9 @@ def reject_impact_record(
     impact_project.validation_status = "REJECTED"
     impact_project.status = "rejected"
     impact_project.validated_by_id = current_user.id
-    impact_project.validated_at = datetime.utcnow()
+    impact_project.validated_at = utc_now()
     impact_project.rejection_reason = reason
-    impact_project.updated_at = datetime.utcnow()
+    impact_project.updated_at = utc_now()
     create_audit_log(
         db, "impact_record_rejected", current_user.id,
         "impact_project", impact_project.id,
@@ -659,8 +725,8 @@ def reject_impact_record(
     _notify_impact_author(
         db,
         user_id=impact_project.created_by_id,
-        title="Impact refuse",
-        message=f"{impact_project.title} a ete refuse: {reason}",
+        title="Impact refusé",
+        message=f"{impact_project.title} a été refusé : {reason}",
         notification_type="impact_rejected",
         related_type="impact_project",
         related_id=impact_project.id,
@@ -711,7 +777,7 @@ def create_impact_metric(
     _ensure_pending_validation(data)
     if payload.evidence_file_id:
         stored_file = get_file_or_404(db, str(payload.evidence_file_id))
-        ensure_file_access(db, stored_file, current_user, manage=True)
+        attach_impact_file(db, stored_file, impact_project, current_user)
     if payload.supersedes_metric_id:
         replaced = (
             db.query(ImpactMetric)
@@ -756,7 +822,7 @@ def create_impact_metric(
                 for user_id in _impact_reviewer_ids(db)
                 if user_id != current_user.id
             ],
-            title="Indicateur impact a verifier",
+            title="Indicateur d’impact à vérifier",
             message=f"{metric.title} attend une validation.",
             notification_type="impact_metric_submitted",
             related_type="impact_metric",
@@ -826,7 +892,7 @@ def validate_impact_metric(
             )
         predecessor.validation_status = "SUPERSEDED"
         predecessor.status = "archived"
-        predecessor.updated_at = datetime.utcnow()
+        predecessor.updated_at = utc_now()
         create_audit_log(
             db,
             "impact_claim_superseded",
@@ -838,9 +904,9 @@ def validate_impact_metric(
     metric.validation_status = "VERIFIED"
     metric.status = "validated"
     metric.validated_by_id = current_user.id
-    metric.validated_at = datetime.utcnow()
+    metric.validated_at = utc_now()
     metric.rejection_reason = None
-    metric.updated_at = datetime.utcnow()
+    metric.updated_at = utc_now()
     create_audit_log(
         db, "impact_claim_verified", current_user.id,
         "impact_metric", metric.id,
@@ -849,8 +915,8 @@ def validate_impact_metric(
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
-        title="Indicateur impact valide",
-        message=f"{metric.title} a ete valide.",
+        title="Indicateur d’impact validé",
+        message=f"{metric.title} a été validé.",
         notification_type="impact_metric_validated",
         related_type="impact_metric",
         related_id=metric.id,
@@ -887,9 +953,9 @@ def reject_impact_metric(
     metric.validation_status = "REJECTED"
     metric.status = "rejected"
     metric.validated_by_id = current_user.id
-    metric.validated_at = datetime.utcnow()
+    metric.validated_at = utc_now()
     metric.rejection_reason = reason
-    metric.updated_at = datetime.utcnow()
+    metric.updated_at = utc_now()
     create_audit_log(
         db, "impact_claim_rejected", current_user.id,
         "impact_metric", metric.id,
@@ -898,8 +964,8 @@ def reject_impact_metric(
     _notify_impact_author(
         db,
         user_id=metric.created_by_id,
-        title="Indicateur impact refuse",
-        message=f"{metric.title} a ete refuse: {reason}",
+        title="Indicateur d’impact refusé",
+        message=f"{metric.title} a été refusé : {reason}",
         notification_type="impact_metric_rejected",
         related_type="impact_metric",
         related_id=metric.id,
@@ -941,7 +1007,7 @@ def create_impact_evidence(
     _validate_linked_metric(db, impact_project.id, payload.metric_id)
     if payload.file_id:
         stored_file = get_file_or_404(db, str(payload.file_id))
-        ensure_file_access(db, stored_file, current_user, manage=True)
+        attach_impact_file(db, stored_file, impact_project, current_user)
     data = payload.model_dump()
     if "validation_status" not in payload.model_fields_set:
         data.pop("validation_status", None)
@@ -968,8 +1034,8 @@ def create_impact_evidence(
             for user_id in _impact_reviewer_ids(db)
             if user_id != current_user.id
         ],
-        title="Preuve impact ajoutee",
-        message=f"{evidence.title} attend une verification.",
+        title="Preuve d’impact ajoutée",
+        message=f"{evidence.title} attend une vérification.",
         notification_type="impact_evidence_submitted",
         related_type="impact_evidence",
         related_id=evidence.id,
@@ -997,9 +1063,9 @@ def validate_impact_evidence(
     evidence.validation_status = "VERIFIED"
     evidence.status = "validated"
     evidence.validated_by_id = current_user.id
-    evidence.validated_at = datetime.utcnow()
+    evidence.validated_at = utc_now()
     evidence.rejection_reason = None
-    evidence.updated_at = datetime.utcnow()
+    evidence.updated_at = utc_now()
     create_audit_log(
         db, "impact_evidence_verified", current_user.id,
         "impact_evidence", evidence.id,
@@ -1007,8 +1073,8 @@ def validate_impact_evidence(
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
-        title="Preuve impact validee",
-        message=f"{evidence.title} a ete validee.",
+        title="Preuve d’impact validée",
+        message=f"{evidence.title} a été validée.",
         notification_type="impact_evidence_validated",
         related_type="impact_evidence",
         related_id=evidence.id,
@@ -1037,9 +1103,9 @@ def reject_impact_evidence(
     evidence.validation_status = "REJECTED"
     evidence.status = "rejected"
     evidence.validated_by_id = current_user.id
-    evidence.validated_at = datetime.utcnow()
+    evidence.validated_at = utc_now()
     evidence.rejection_reason = reason
-    evidence.updated_at = datetime.utcnow()
+    evidence.updated_at = utc_now()
     create_audit_log(
         db, "impact_evidence_rejected", current_user.id,
         "impact_evidence", evidence.id,
@@ -1048,8 +1114,8 @@ def reject_impact_evidence(
     _notify_impact_author(
         db,
         user_id=evidence.submitted_by_id,
-        title="Preuve impact refusee",
-        message=f"{evidence.title} a ete refusee: {reason}",
+        title="Preuve d’impact refusée",
+        message=f"{evidence.title} a été refusée : {reason}",
         notification_type="impact_evidence_rejected",
         related_type="impact_evidence",
         related_id=evidence.id,
@@ -1133,7 +1199,7 @@ def get_impact_summary(
             "financial_health": None,
         },
         "claim_overview": claim_overview,
-        "historical_impact": None,
+        "historical_impact": INSTITUTIONAL_HISTORICAL_IMPACT,
     }
 
 
@@ -1232,7 +1298,8 @@ def get_impact_report_summary(
     organization = summary["organization"]
     return {
         "title": "Synthese impact Enactus ESP",
-        "generated_at": datetime.utcnow(),
+        "generated_at": utc_now(),
+        "institutional_historical_impact": INSTITUTIONAL_HISTORICAL_IMPACT,
         "global_summary": {
             "active_projects": organization["active_projects"],
             "direct_beneficiaries": organization["direct_impact_total"],
@@ -1274,5 +1341,29 @@ def get_impact_report_summary(
             }
             for project in projects
         ],
-        "todo": "Generation PDF a brancher apres validation du modele de rapport.",
     }
+
+
+@router.get("/report/summary.pdf")
+def download_impact_report_summary_pdf(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_enacchef_or_admin),
+):
+    report = get_impact_report_summary(db=db, current_user=current_user)
+    try:
+        pdf = build_impact_summary_pdf(report)
+    except ImpactPdfGenerationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                'attachment; filename="enactspace-impact-summary.pdf"'
+            ),
+            "Cache-Control": "no-store",
+        },
+    )

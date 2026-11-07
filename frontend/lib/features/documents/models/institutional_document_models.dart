@@ -80,7 +80,8 @@ class InstitutionalTemplateModel {
     );
   }
 
-  bool get requiresPole => scope == 'pole_required' || scope == 'veille_required';
+  bool get requiresPole =>
+      scope == 'pole_required' || scope == 'veille_required';
   bool get requiresProject => scope == 'project_required';
   bool get hasOptionalScope => scope == 'optional';
   bool get isVeilleOnly => scope == 'veille_required';
@@ -154,7 +155,9 @@ class InstitutionalDocumentRequestModel {
     required this.canCancel,
   });
 
-  factory InstitutionalDocumentRequestModel.fromJson(Map<String, dynamic> json) {
+  factory InstitutionalDocumentRequestModel.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return InstitutionalDocumentRequestModel(
       id: json['id']?.toString() ?? '',
       templateCode: json['template_code']?.toString() ?? '',
