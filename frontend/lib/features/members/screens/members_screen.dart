@@ -655,6 +655,7 @@ class _MembersScreenState extends State<MembersScreen> {
     return RefreshIndicator(
       onRefresh: _loadMembers,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           AppResponsiveContainer(
@@ -665,6 +666,7 @@ class _MembersScreenState extends State<MembersScreen> {
                   total: _members.where((member) => !member.isAlumni).length,
                   active: _activeCount,
                   pending: _pendingCount,
+                  loaded: !_loading && _error == null,
                   canManage: canManageMembers,
                   onRefresh: _loadMembers,
                   onAdd: _openAddMemberDialog,
@@ -747,6 +749,7 @@ class _MembersHeader extends StatelessWidget {
   final int total;
   final int active;
   final int pending;
+  final bool loaded;
   final bool canManage;
   final VoidCallback onRefresh;
   final VoidCallback onAdd;
@@ -755,93 +758,44 @@ class _MembersHeader extends StatelessWidget {
     required this.total,
     required this.active,
     required this.pending,
+    required this.loaded,
     required this.canManage,
     required this.onRefresh,
     required this.onAdd,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final identity = Row(
-      children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: AppTheme.enactusYellow,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Icon(
-            Icons.people_alt_rounded,
-            color: AppTheme.softBlack,
-            size: 34,
-          ),
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: 'Membres',
+    subtitle: 'Consultez l’annuaire et retrouvez les personnes de l’équipe.',
+    icon: Icons.people_outline_rounded,
+    details: [
+      if (loaded) ...[
+        AppStatusBadge(label: '$total ${total == 1 ? 'membre' : 'membres'}'),
+        AppStatusBadge(
+          label: '$active ${active == 1 ? 'actif' : 'actifs'}',
+          tone: AppStatusTone.success,
         ),
-        SizedBox(width: 18),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Membres',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 6),
-              Text(
-                '$total membre(s) • $active actif(s) • $pending en attente',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
+        AppStatusBadge(
+          label: '$pending en attente',
+          tone: pending > 0 ? AppStatusTone.warning : AppStatusTone.neutral,
         ),
       ],
-    );
-    final actions = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        AppSecondaryButton(
-          label: 'Actualiser',
-          icon: Icons.refresh_rounded,
-          onPressed: onRefresh,
-        ),
-        if (canManage)
-          AppPrimaryButton(
-            label: 'Ajouter',
-            icon: Icons.person_add_alt_1_rounded,
-            onPressed: onAdd,
-          ),
-      ],
-    );
-
-    return AppDataCard(
-      padding: const EdgeInsets.all(26),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 700) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [identity, SizedBox(height: 18), actions],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(child: identity),
-              SizedBox(width: 16),
-              actions,
-            ],
-          );
-        },
+    ],
+    actions: [
+      AppSecondaryButton(
+        label: 'Actualiser',
+        icon: Icons.refresh_rounded,
+        onPressed: onRefresh,
       ),
-    );
-  }
+      if (canManage)
+        AppPrimaryButton(
+          label: 'Ajouter',
+          icon: Icons.person_add_alt_1_rounded,
+          onPressed: onAdd,
+        ),
+    ],
+  );
 }
 
 class _SearchAndActions extends StatelessWidget {

@@ -106,6 +106,163 @@ class AppPageHeader extends StatelessWidget {
   }
 }
 
+class AppModuleHeader extends StatelessWidget {
+  const AppModuleHeader({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.eyebrow,
+    this.details = const [],
+    this.actions = const [],
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String? eyebrow;
+  final List<Widget> details;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = dark ? const Color(0xFF84DFDC) : const Color(0xFF005A60);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        final showEmblem =
+            constraints.maxWidth >= 680 &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+        return Card(
+          color: Color.alphaBlend(
+            accent.withValues(alpha: dark ? 0.10 : 0.045),
+            colors.surface,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 24),
+            child: Row(
+              spacing: 24,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        spacing: 10,
+                        children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppTheme.enactusYellow,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(9),
+                              child: Icon(
+                                icon,
+                                size: 22,
+                                color: AppTheme.softBlack,
+                              ),
+                            ),
+                          ),
+                          if (eyebrow != null)
+                            Flexible(
+                              child: Text(
+                                eyebrow!,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          title,
+                          style:
+                              (compact
+                                      ? theme.textTheme.headlineSmall
+                                      : theme.textTheme.headlineMedium)
+                                  ?.copyWith(
+                                    color: colors.onSurface,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                      if (details.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(spacing: 8, runSpacing: 8, children: details),
+                      ],
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(spacing: 8, runSpacing: 8, children: actions),
+                      ],
+                    ],
+                  ),
+                ),
+                if (showEmblem)
+                  ExcludeSemantics(
+                    child: SizedBox(
+                      width: 152,
+                      height: 116,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            right: 10,
+                            top: 8,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppTheme.enactusYellow.withValues(
+                                  alpha: 0.55,
+                                ),
+                              ),
+                              child: const SizedBox.square(dimension: 30),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: -0.17,
+                            child: Container(
+                              width: 100,
+                              height: 83,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.32),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Icon(icon, size: 46, color: accent),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class AppSectionHeader extends StatelessWidget {
   const AppSectionHeader({
     super.key,
@@ -253,7 +410,9 @@ class AppStatusBadge extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     (Color, Color) accentColors(Color accent) => (
       accent.withValues(alpha: dark ? 0.24 : 0.12),
-      dark ? Color.lerp(accent, Colors.white, 0.48)! : accent,
+      dark
+          ? Color.lerp(accent, Colors.white, 0.48)!
+          : Color.lerp(accent, Colors.black, 0.22)!,
     );
     final colors = switch (tone) {
       AppStatusTone.success => accentColors(AppTheme.success),

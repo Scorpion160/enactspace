@@ -587,19 +587,19 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return RefreshIndicator(
       onRefresh: _loadFinance,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(
           MediaQuery.sizeOf(context).width < 560 ? 14 : 24,
         ),
         children: [
           _FinanceHeader(
-            totalExpected: _totalExpected,
-            totalDue: _totalDue,
-            totalPaid: _totalPaid,
-            pendingPayments: _pendingPayments,
-            onRefresh: _loadFinance,
-            onCreatePayment: _openPaymentActions,
-            onCreateFee: _openCreateFeeDialog,
-            canCreateFee: _canManageFinance,
+            onRefresh: _loading ? null : _loadFinance,
+            onCreatePayment: _loading || _error != null
+                ? null
+                : _openPaymentActions,
+            onCreateFee: !_loading && _error == null && _canManageFinance
+                ? _openCreateFeeDialog
+                : null,
             personalView: !_canManageFinance,
           ),
           SizedBox(height: 22),
@@ -613,6 +613,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _loadFinance)
           else ...[
+            _FinanceStatsGrid(
+              totalExpected: _totalExpected,
+              totalDue: _totalDue,
+              totalPaid: _totalPaid,
+              pendingPayments: _pendingPayments,
+            ),
+            const SizedBox(height: 18),
             if (_canManageFinance) ...[
               _FinanceRiskPanel(
                 debtorsCount: _debtorsCount,
@@ -677,98 +684,45 @@ class _FinanceScreenState extends State<FinanceScreen> {
 }
 
 class _FinanceHeader extends StatelessWidget {
-  final double totalExpected;
-  final double totalDue;
-  final double totalPaid;
-  final double pendingPayments;
-  final VoidCallback onRefresh;
-  final VoidCallback onCreatePayment;
-  final VoidCallback onCreateFee;
-  final bool canCreateFee;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onCreatePayment;
+  final VoidCallback? onCreateFee;
   final bool personalView;
+
   const _FinanceHeader({
-    required this.totalExpected,
-    required this.totalDue,
-    required this.totalPaid,
-    required this.pendingPayments,
     required this.onRefresh,
     required this.onCreatePayment,
     required this.onCreateFee,
-    required this.canCreateFee,
     required this.personalView,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final actions = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: personalView ? 'Mes finances' : 'Finance',
+    subtitle: personalView
+        ? 'Consultez vos cotisations, vos paiements et vos échéances.'
+        : 'Suivez les encaissements, les échéances et les paiements à vérifier.',
+    icon: Icons.account_balance_wallet_outlined,
+    eyebrow: personalView ? 'Situation personnelle' : 'Suivi financier',
+    actions: [
+      OutlinedButton.icon(
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Actualiser'),
+      ),
+      if (onCreateFee != null)
         OutlinedButton.icon(
-          onPressed: onRefresh,
-          icon: Icon(Icons.refresh_rounded),
-          label: Text('Actualiser'),
+          onPressed: onCreateFee,
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text('Ajouter des frais'),
         ),
-        if (canCreateFee)
-          ElevatedButton.icon(
-            onPressed: onCreateFee,
-            icon: Icon(Icons.receipt_long_rounded),
-            label: Text('Ajouter des frais'),
-          ),
-        ElevatedButton.icon(
-          onPressed: onCreatePayment,
-          icon: Icon(Icons.add_card_rounded),
-          label: Text(
-            personalView ? 'Payer / déclarer' : 'Enregistrer un paiement',
-          ),
-        ),
-      ],
-    );
-
-    return AppDataCard(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppPageHeader(
-            title: personalView ? 'Mes finances' : 'Finance',
-            eyebrow: personalView ? 'Situation personnelle' : 'Suivi financier',
-            subtitle: personalView
-                ? 'Cotisations, déclarations et échéances de votre compte.'
-                : 'Encaissements, paiements à vérifier et échéances du moment.',
-            leading: _HeaderIcon(),
-            actions: [actions],
-          ),
-          SizedBox(height: 18),
-          _FinanceStatsGrid(
-            totalExpected: totalExpected,
-            totalDue: totalDue,
-            totalPaid: totalPaid,
-            pendingPayments: pendingPayments,
-          ),
-        ],
+      FilledButton.icon(
+        onPressed: onCreatePayment,
+        icon: const Icon(Icons.add_card_rounded),
+        label: Text(personalView ? 'Payer / déclarer' : 'Enregistrer un paiement'),
       ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Icon(
-        Icons.account_balance_wallet_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _FinanceStatsGrid extends StatelessWidget {

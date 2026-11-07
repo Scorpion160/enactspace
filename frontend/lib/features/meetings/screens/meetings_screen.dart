@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
 import '../../poles/models/pole_model.dart';
@@ -232,81 +232,20 @@ class _MeetHero extends StatelessWidget {
   const _MeetHero({required this.onCreate});
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.softBlack, const Color(0xFF25313A)],
-        ),
-        borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: 'Vos réunions',
+    subtitle:
+        'Planifiez un échange, invitez les participants et rejoignez le salon.',
+    icon: Icons.video_call_rounded,
+    eyebrow: 'EnactMeet',
+    actions: [
+      FilledButton.icon(
+        onPressed: onCreate,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Nouvelle réunion'),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 650;
-          final copy = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.video_call_rounded, color: colors.secondary),
-                  const SizedBox(width: 8),
-                  const Flexible(child: Text(
-                    'ENACTMEET',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  )),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Un espace simple pour se retrouver et avancer ensemble.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 25,
-                  height: 1.15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Créez une réunion, invitez les bonnes personnes et retrouvez immédiatement les rendez-vous à venir.',
-                style: TextStyle(color: Colors.white70, height: 1.4),
-              ),
-            ],
-          );
-          final action = FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.secondary,
-              foregroundColor: colors.onSecondary,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            ),
-            onPressed: onCreate,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Nouvelle réunion'),
-          );
-          return compact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [copy, const SizedBox(height: 18), action],
-                )
-              : Row(
-                  children: [
-                    Expanded(child: copy),
-                    const SizedBox(width: 24),
-                    action,
-                  ],
-                );
-        },
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _FilterBar extends StatelessWidget {

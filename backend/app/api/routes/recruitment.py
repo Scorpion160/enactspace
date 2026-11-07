@@ -1049,7 +1049,8 @@ def application_payload(
                 "attachment_url": None,
             }
         )
-        for field in ("motivation", "contribution", "project_ideas", "leadership_profile", "enactus_knowledge",
+        for field in ("department", "study_level", "class_name", "motivation", "contribution",
+                      "project_ideas", "leadership_profile", "enactus_knowledge",
                       "known_enactus_from", "other_clubs", "associative_experience", "preferred_pole",
                       "project_interest", "interview_availability"):
             data[field] = redact_candidate_text(data.get(field), application)

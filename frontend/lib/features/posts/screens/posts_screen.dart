@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/user_experience.dart';
+import '../../../shared/ui/app_components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
 import '../../poles/models/pole_model.dart';
@@ -627,6 +628,7 @@ class _PostsScreenState extends State<PostsScreen> with WidgetsBindingObserver {
             total: _posts.length,
             official: _posts.where((post) => post.isOfficial).length,
             pinned: _posts.where((post) => post.isPinned).length,
+            loaded: !_loading && _error == null,
             onRefresh: _loadPosts,
           );
           final canModerate = _user?.isEnacchef ?? false;
@@ -1012,127 +1014,47 @@ class _PostsHeader extends StatelessWidget {
   final int total;
   final int official;
   final int pinned;
+  final bool loaded;
   final VoidCallback onRefresh;
 
   const _PostsHeader({
     required this.total,
     required this.official,
     required this.pinned,
+    required this.loaded,
     required this.onRefresh,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 560;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : 4,
-        vertical: compact ? 6 : 8,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const _HeaderIcon(),
-          SizedBox(width: compact ? 12 : 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Communication',
-                  style: TextStyle(
-                    fontSize: compact ? 25 : 30,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.6,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'La vie d’Enactus ESP, en un coup d’œil.',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _HeaderChip(label: '$total publications'),
-                    if (official > 0)
-                      _HeaderChip(
-                        label: '$official officielles',
-                        highlighted: true,
-                      ),
-                    if (pinned > 0) _HeaderChip(label: '$pinned épinglées'),
-                  ],
-                ),
-              ],
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: 'Communication',
+    subtitle: 'Retrouvez les annonces et les nouvelles de l’équipe.',
+    icon: Icons.campaign_outlined,
+    details: loaded
+        ? [
+            AppStatusBadge(
+              label: '$total ${total == 1 ? 'publication' : 'publications'}',
             ),
-          ),
-          const SizedBox(width: 10),
-          IconButton.filledTonal(
-            onPressed: onRefresh,
-            tooltip: 'Actualiser le fil',
-            icon: Icon(Icons.refresh_rounded),
-          ),
-        ],
+            if (official > 0)
+              AppStatusBadge(
+                label:
+                    '$official ${official == 1 ? 'officielle' : 'officielles'}',
+                tone: AppStatusTone.info,
+              ),
+            if (pinned > 0)
+              AppStatusBadge(
+                label: '$pinned ${pinned == 1 ? 'épinglée' : 'épinglées'}',
+              ),
+          ]
+        : const [],
+    actions: [
+      OutlinedButton.icon(
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Actualiser le fil'),
       ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppTheme.enactusYellow, width: 2.5),
-      ),
-      child: CircleAvatar(
-        backgroundColor: AppTheme.softBlack,
-        foregroundColor: AppTheme.enactusYellow,
-        child: Icon(Icons.forum_rounded, size: 28),
-      ),
-    );
-  }
-}
-
-class _HeaderChip extends StatelessWidget {
-  final String label;
-  final bool highlighted;
-
-  const _HeaderChip({required this.label, this.highlighted = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: highlighted
-            ? AppTheme.enactusYellow.withValues(alpha: 0.28)
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.045),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: highlighted
-              ? AppTheme.enactusYellow.withValues(alpha: 0.70)
-              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07),
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _CommunityPulseCard extends StatelessWidget {

@@ -37,6 +37,7 @@ def sync_interview_meeting(db, application, payload, actor):
     require_private_meet()
     if not can_manage_jury(db, actor):
         raise HTTPException(403, "La création des salles d’entretien est réservée aux responsables du recrutement.")
+    db.flush()  # The appointment's jury is staged in this transaction.
     jurors = db.query(RecruitmentJuryMember.user_id).join(
         ApplicationInterviewJuror, ApplicationInterviewJuror.jury_member_id == RecruitmentJuryMember.id
     ).filter(ApplicationInterviewJuror.application_id == application.id, RecruitmentJuryMember.is_active.is_(True)).all()

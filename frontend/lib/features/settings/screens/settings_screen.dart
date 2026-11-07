@@ -11,6 +11,7 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/appearance_controller.dart';
 import '../../../core/push/push_lifecycle_controller.dart';
 import '../../../core/push/push_platform.dart';
+import '../../../shared/ui/app_components.dart';
 import '../controllers/settings_controller.dart';
 import '../models/settings_models.dart';
 import '../services/settings_gateway.dart';
@@ -236,14 +237,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Réglages',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Personnalisez EnactSpace et gérez votre compte.',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                    const AppModuleHeader(
+                      title: 'Réglages',
+                      subtitle: 'Retrouvez vos préférences, votre profil et les options de sécurité du compte.',
+                      icon: Icons.settings_outlined,
                     ),
                     if (_controller.error != null) ...[
                       const SizedBox(height: 12),

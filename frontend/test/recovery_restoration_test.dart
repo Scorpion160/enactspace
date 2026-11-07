@@ -141,7 +141,6 @@ void main() {
       'lib/features/events/screens/events_screen.dart',
       'lib/features/meetings/screens/meeting_detail_screen.dart',
       'lib/features/settings/screens/settings_screen.dart',
-      'lib/features/tasks/screens/tasks_screen.dart',
     ]) {
       final source = File(path).readAsStringSync();
       expect(
@@ -154,6 +153,11 @@ void main() {
       );
       expect(source, contains('showSelectedIcon:'), reason: path);
     }
+    final tasks = File(
+      'lib/features/tasks/screens/tasks_screen.dart',
+    ).readAsStringSync();
+    expect(tasks, contains('ChoiceChip('));
+    expect(tasks, contains('Wrap('));
   });
 
   test(

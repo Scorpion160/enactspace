@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - integration/enactspace-web-v3-20261107
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -127,6 +128,7 @@ jobs:
             echo "PostgreSQL-dependent tests were skipped." >&2
             exit 1
           fi
+          python -m unittest discover -s tests -v
 
   flutter:
     name: Flutter 3.47.5 / analyze, test, web only
@@ -183,6 +185,7 @@ jobs:
           test/recruitment_jury_personality_test.dart
           test/recruitment_campaigns_test.dart
           test/member_join_requests_test.dart
+          test/ui_final_acceptance_test.dart
 
       - name: Build release web application
         run: >-

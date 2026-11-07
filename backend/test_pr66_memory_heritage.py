@@ -718,7 +718,8 @@ class PR66MemoryHeritageTests(unittest.TestCase):
                 current_user=self.reader,
             )["items"],
         ]
-        self.assertTrue(all(listing == [] for listing in listings))
+        for child, listing in zip(children, listings, strict=True):
+            self.assertNotIn(str(child.id), {str(row["id"]) for row in listing})
         for child in children:
             with self.subTest(child=type(child).__name__):
                 self.assertFalse(
@@ -879,26 +880,22 @@ class PR66MemoryHeritageTests(unittest.TestCase):
                     archives._can_view_legacy_child(self.db, self.reader, child)
                 )
 
-    def test_static_legacy_is_curator_only_and_tagged(self):
-        with self.assertRaises(HTTPException):
-            archives.list_awards(
+    def test_sourced_award_catalogue_is_visible_to_validated_members(self):
+        for user in (self.reader, self.curator):
+            result = archives.list_awards(
                 search=None,
                 year=None,
                 featured=None,
                 include_static=True,
                 db=self.db,
-                current_user=self.reader,
+                current_user=user,
             )
-        result = archives.list_awards(
-            search=None,
-            year=None,
-            featured=None,
-            include_static=True,
-            db=self.db,
-            current_user=self.curator,
-        )
-        self.assertTrue(result["awards"])
-        self.assertTrue(all(item["legacy"] and not item["verified"] for item in result["awards"]))
+            self.assertTrue(result["awards"])
+            for item in result["awards"]:
+                self.assertEqual(item["trust"], "institutional_verified")
+                self.assertTrue(item["source_label"])
+                with self.assertRaises(ValueError):
+                    uuid.UUID(item["id"])
 
 
 if __name__ == "__main__":

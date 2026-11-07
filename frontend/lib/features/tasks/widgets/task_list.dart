@@ -59,6 +59,158 @@ class TaskCenterList extends StatelessWidget {
   }
 }
 
+class TaskBoard extends StatelessWidget {
+  const TaskBoard({
+    super.key,
+    required this.tasks,
+    required this.data,
+    required this.now,
+    required this.onOpen,
+  });
+
+  final List<TaskModel> tasks;
+  final TaskCenterData data;
+  final DateTime now;
+  final ValueChanged<TaskModel> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final toDo = <TaskModel>[];
+    final inProgress = <TaskModel>[];
+    final finished = <TaskModel>[];
+    final other = <TaskModel>[];
+    for (final task in tasks) {
+      switch (task.status) {
+        case 'a_faire':
+          toDo.add(task);
+        case 'en_cours':
+        case 'bloque':
+        case 'termine':
+          inProgress.add(task);
+        case 'valide':
+          finished.add(task);
+        default:
+          other.add(task);
+      }
+    }
+
+    final colors = Theme.of(context).colorScheme;
+    final lanes = [
+      _lane(
+        context,
+        'À faire',
+        Icons.radio_button_unchecked,
+        colors.secondaryContainer,
+        toDo,
+      ),
+      _lane(
+        context,
+        'En cours',
+        Icons.timelapse_rounded,
+        colors.tertiaryContainer,
+        inProgress,
+      ),
+      _lane(
+        context,
+        'Terminées',
+        Icons.task_alt_rounded,
+        colors.primaryContainer,
+        finished,
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 900) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 12,
+                children: lanes,
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 12,
+              children: [for (final lane in lanes) Expanded(child: lane)],
+            );
+          },
+        ),
+        if (other.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _lane(
+            context,
+            'Hors tableau',
+            Icons.inventory_2_outlined,
+            colors.surfaceContainerHighest,
+            other,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _lane(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color accent,
+    List<TaskModel> laneTasks,
+  ) {
+    final theme = Theme.of(context);
+    return Card(
+      key: ValueKey('task-lane-$title'),
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 8,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Semantics(
+                header: true,
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    Icon(icon, size: 20, color: theme.colorScheme.onSurface),
+                    Expanded(
+                      child: Text(title, style: theme.textTheme.titleSmall),
+                    ),
+                    Text(
+                      '${laneTasks.length}',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (laneTasks.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text('Aucune tâche', style: theme.textTheme.bodySmall),
+              )
+            else
+              for (final task in laneTasks)
+                _TaskRow(
+                  task: task,
+                  data: data,
+                  now: now,
+                  onOpen: () => onOpen(task),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskRow extends StatelessWidget {
   final TaskModel task;
   final TaskCenterData data;
@@ -215,11 +367,15 @@ class _Badge extends StatelessWidget {
             color: danger ? colors.onErrorContainer : colors.onSurfaceVariant,
           ),
           SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: danger ? colors.onErrorContainer : colors.onSurfaceVariant,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: danger
+                    ? colors.onErrorContainer
+                    : colors.onSurfaceVariant,
+              ),
             ),
           ),
         ],

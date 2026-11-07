@@ -3,6 +3,7 @@ import 'package:frontend/shared/ui/app_filter_toolbar.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/ui/app_components.dart';
 import '../models/document_center_models.dart';
 import '../models/document_model.dart';
 import '../services/documents_gateway.dart';
@@ -211,30 +212,17 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Documents',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(fontWeight: FontWeight.w900),
-                              ),
-                              const Text(
-                                'Centralisez les fichiers, leurs périmètres et leur validation.',
-                              ),
-                            ],
-                          ),
-                        ),
+                    AppModuleHeader(
+                      title: 'Documents',
+                      subtitle: 'Retrouvez les fichiers de l’équipe et partagez de nouveaux documents.',
+                      icon: Icons.folder_open_rounded,
+                      eyebrow: 'Bibliothèque',
+                      actions: [
                         FilledButton.icon(
                           key: const Key('new-document'),
                           onPressed: _create,
                           icon: const Icon(Icons.add_rounded),
-                          label: Text(compact ? 'Nouveau' : 'Nouveau document'),
+                          label: const Text('Nouveau document'),
                         ),
                       ],
                     ),
