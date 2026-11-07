@@ -40,7 +40,7 @@ class _PersonalityQuestionnaireScreenState
           .whereType<Map>()
           .toList();
   bool get _finished =>
-      const {'submitted', 'declined'}.contains(_state?['status']);
+      _state?['status'] == 'submitted';
   @override
   void initState() {
     super.initState();
@@ -105,7 +105,7 @@ class _PersonalityQuestionnaireScreenState
 
   Future<bool> _save(String action) async {
     if (_busy || _state == null) return false;
-    if (action != 'decline' && !_consent) {
+    if (!_consent) {
       _showError(
         'Prends connaissance de l’utilisation des réponses avant de continuer.',
       );
@@ -127,7 +127,6 @@ class _PersonalityQuestionnaireScreenState
     try {
       final data = await widget.gateway.request(action, {
         ..._credentials,
-        if (action != 'decline') ...{
           'version': _state!['version'],
           'revision': _state!['revision'],
           'consent': _consent,
@@ -135,7 +134,6 @@ class _PersonalityQuestionnaireScreenState
           'scenario_answers': _scenarios.map(
             (key, value) => MapEntry(key, value.text.trim()),
           ),
-        },
       });
       if (!mounted) return false;
       setState(() {
@@ -190,29 +188,6 @@ class _PersonalityQuestionnaireScreenState
       ),
     );
     if (confirmed == true && mounted) await _save('submit');
-  }
-
-  Future<void> _decline() async {
-    final confirmed = await showRecruitmentDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('En parler pendant l’entretien ?'),
-        content: const Text(
-          'Tes éventuelles réponses enregistrées à ce questionnaire seront effacées. Ta candidature poursuit son parcours et le jury pourra aborder ces sujets avec toi.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Continuer le questionnaire'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Je préfère en parler'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) await _save('decline');
   }
 
   @override
@@ -311,17 +286,10 @@ class _PersonalityQuestionnaireScreenState
                   ),
                 if (_state != null && _finished) ...[
                   const SizedBox(height: 16),
-                  Icon(
-                    _state!['status'] == 'submitted'
-                        ? Icons.check_circle_outline
-                        : Icons.forum_outlined,
-                    size: 50,
-                  ),
+                  const Icon(Icons.check_circle_outline, size: 50),
                   const SizedBox(height: 16),
                   Text(
-                    _state!['status'] == 'submitted'
-                        ? 'Merci, tes réponses sont partagées.'
-                        : 'Nous en parlerons pendant l’entretien.',
+                    'Merci, tes réponses sont partagées.',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   if (_state!['results'] is Map) ...[
@@ -330,7 +298,9 @@ class _PersonalityQuestionnaireScreenState
                       'Synthèse de tes réponses',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    const Text('Synthèse par thème, sur une échelle de 1 à 5.'),
+                    const Text(
+                      'Synthèse par thème, sur une échelle de 1 à 5.',
+                    ),
                     for (final row
                         in ((_state!['results'] as Map)['dimensions'] as List)
                             .whereType<Map>())
@@ -505,10 +475,6 @@ class _PersonalityQuestionnaireScreenState
                     ],
                   ),
                   const SizedBox(height: 14),
-                  TextButton(
-                    onPressed: _busy ? null : _decline,
-                    child: const Text('Je préfère en parler en entretien'),
-                  ),
                 ],
               ],
             ),

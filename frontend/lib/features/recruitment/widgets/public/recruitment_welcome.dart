@@ -1,3 +1,4 @@
+import 'recruitment_eligibility.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../shared/ui/heritage_photo.dart';
@@ -330,6 +331,8 @@ class RecruitmentWelcome extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        const RecruitmentEligibilityCriteria(),
+        const SizedBox(height: 12),
         const Card(
           child: Column(
             children: [
@@ -346,7 +349,7 @@ class RecruitmentWelcome extends StatelessWidget {
               _WelcomeQuestion(
                 title: 'Comment mon dossier est-il étudié ?',
                 answer:
-                    'L’équipe étudie tes motivations, tes exemples et tes disponibilités. Si ton dossier est retenu pour la suite, tu retrouveras les prochaines étapes dans ton suivi.',
+                    'L’équipe étudie tes motivations, tes exemples et tes disponibilités de façon anonyme, avec plusieurs avis. Ton identité et tes documents restent masqués pendant la présélection. À chaque sélection, les résultats sont publiés ensemble dans le suivi et les mails sont préparés ensemble, pour les dossiers retenus comme pour les autres. Leur réception peut varier selon les messageries.',
               ),
               _WelcomeQuestion(
                 title: 'Comment retrouver ma candidature ?',

@@ -21,6 +21,7 @@ PublicApplicationDraft _draft(bool files) => PublicApplicationDraft(
   phone: '+221770000000',
   department: 'Génie Informatique',
   studyLevel: 'Master1',
+  otherClubsCount: 2,
   motivation: 'Apprendre et agir.',
   className: '2025-2026',
   knownEnactusFrom: 'Réseaux sociaux',
@@ -80,6 +81,7 @@ void main() {
           client: MockClient((request) async {
             requests++;
             expect(request.method, 'POST');
+            expect(request.body, matches(RegExp(r'"other_clubs_count"\s*:\s*2')));
             expect(request.body, contains('promotion_academic_year'));
             expect(request.body, contains('2025-2026'));
             expect(request.body, contains('discovery_channel'));

@@ -28,15 +28,24 @@ class PublicRecruitmentFailure implements Exception {
   const PublicRecruitmentFailure(this.kind);
 
   String get submissionMessage => switch (kind) {
-    PublicRecruitmentFailureKind.duplicateApplication => 'Une candidature a déjà été reçue avec cette adresse e-mail pour cette campagne. Consulte ton e-mail de confirmation pour retrouver ton code et suivre son avancement.',
-    PublicRecruitmentFailureKind.questionnaireChanged => 'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.',
-    PublicRecruitmentFailureKind.network => 'La connexion a été interrompue. Ta saisie et tes documents sont conservés. Vérifie ta connexion puis réessaie.',
-    PublicRecruitmentFailureKind.invalidApplication => 'Certaines informations ou certains documents ne sont pas acceptés. Vérifie les champs obligatoires et les fichiers joints avant de réessayer.',
-    PublicRecruitmentFailureKind.fileTooLarge => 'Un document dépasse la taille autorisée. Choisis un fichier plus léger avant de réessayer. Tes autres informations sont conservées.',
-    PublicRecruitmentFailureKind.campaignClosed => 'Cette campagne est désormais fermée. Consulte les campagnes disponibles pour poursuivre.',
-    PublicRecruitmentFailureKind.notFound => 'Cette campagne n’est plus disponible. Consulte les campagnes disponibles pour poursuivre.',
-    PublicRecruitmentFailureKind.rateLimited => 'Plusieurs tentatives ont été effectuées. Patiente quelques instants avant de réessayer. Ta saisie est conservée.',
-    PublicRecruitmentFailureKind.server => 'Le service n’a pas pu traiter ton envoi. Ta saisie et tes documents sont conservés. Réessaie dans quelques instants.',
+    PublicRecruitmentFailureKind.duplicateApplication =>
+      'Une candidature a déjà été reçue avec cette adresse e-mail pour cette campagne. Consulte ton e-mail de confirmation pour retrouver ton code et suivre son avancement.',
+    PublicRecruitmentFailureKind.questionnaireChanged =>
+      'Le questionnaire a été mis à jour. Relis les questions avant de confirmer ta candidature.',
+    PublicRecruitmentFailureKind.network =>
+      'La connexion a été interrompue. Ta saisie et tes documents sont conservés. Vérifie ta connexion puis réessaie.',
+    PublicRecruitmentFailureKind.invalidApplication =>
+      'Certaines informations ou certains documents ne sont pas acceptés. Vérifie les champs obligatoires et les fichiers joints avant de réessayer.',
+    PublicRecruitmentFailureKind.fileTooLarge =>
+      'Un document dépasse la taille autorisée. Choisis un fichier plus léger avant de réessayer. Tes autres informations sont conservées.',
+    PublicRecruitmentFailureKind.campaignClosed =>
+      'Cette campagne est désormais fermée. Consulte les campagnes disponibles pour poursuivre.',
+    PublicRecruitmentFailureKind.notFound =>
+      'Cette campagne n’est plus disponible. Consulte les campagnes disponibles pour poursuivre.',
+    PublicRecruitmentFailureKind.rateLimited =>
+      'Plusieurs tentatives ont été effectuées. Patiente quelques instants avant de réessayer. Ta saisie est conservée.',
+    PublicRecruitmentFailureKind.server =>
+      'Le service n’a pas pu traiter ton envoi. Ta saisie et tes documents sont conservés. Réessaie dans quelques instants.',
   };
 }
 
@@ -80,6 +89,7 @@ class RecruitmentPublicGateway implements PublicRecruitmentGateway {
         knownEnactusFrom: draft.knownEnactusFrom,
         enactusKnowledge: draft.enactusKnowledge,
         otherClubs: draft.otherClubs,
+        otherClubsCount: draft.otherClubsCount,
         contribution: draft.contribution,
         projectIdeas: draft.projectIdeas,
         leadershipProfile: draft.leadershipProfile,

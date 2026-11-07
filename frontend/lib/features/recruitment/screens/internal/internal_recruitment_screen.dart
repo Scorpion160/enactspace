@@ -1,13 +1,15 @@
 import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/internal/recruitment_interview_board.dart';
+import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import 'recruitment_jury_screen.dart';
+import 'recruitment_team_guide_screen.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../models/application_model.dart';
@@ -49,6 +51,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   DateTime? _submittedTo;
   int _page = 0;
   int _generation = 0;
+  int _selectionRevision = 0;
   RecruitmentSection _section = RecruitmentSection.applications;
   Object? _error;
 
@@ -91,6 +94,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       setState(() {
         _campaigns = result[0] as List<RecruitmentCampaignModel>;
         _applications = result[1] as List<ApplicationModel>;
+        _selectionRevision++;
         if (_campaignId != 'all' &&
             !_campaigns.any((c) => c.id == _campaignId)) {
           _campaignId = 'all';
@@ -259,6 +263,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
+            onAssignmentDeclined: () => _load(initial: false),
             onClose: () => Navigator.of(routeContext).pop(),
           ),
         ),
@@ -282,6 +287,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
+            onAssignmentDeclined: () => _load(initial: false),
             onClose: () => Navigator.of(dialogContext).pop(),
           ),
         ),
@@ -300,6 +306,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   void _applyUpdatedApplication(ApplicationModel updated) {
     if (!mounted) return;
     setState(() {
+      _selectionRevision++;
       _applications = _applications
           .map((item) => item.id == updated.id ? updated : item)
           .toList();
@@ -372,26 +379,27 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final selectedCampaign = _campaignId == 'all'
         ? 'Toutes les campagnes'
         : _campaignTitle(_campaignId);
+    final selectionCampaign = _campaigns.where((campaign) => campaign.id == _campaignId).firstOrNull;
     final padding = MediaQuery.sizeOf(context).width < 560 ? 14.0 : 24.0;
     return RefreshIndicator(
       onRefresh: () => _load(initial: false),
       child: ListView(
         padding: EdgeInsets.fromLTRB(padding, 20, padding, 28),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('recruitment-open-statistics'),
+              onPressed: () => context.go('/recruitment/statistics'),
+              icon: const Icon(Icons.bar_chart_rounded),
+              label: const Text('Campagne en chiffres'),
+            ),
+          ),
           RecruitmentWorkspaceNav(
             selected: _section,
             onSelected: _openSection,
             canManageCampaigns: _access['can_manage_campaigns'] != false,
             hasJury: _gateway is CampaignToolsProvider,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              key: const Key('recruitment-open-statistics'),
-              onPressed: () => context.go('/recruitment/statistics'),
-              icon: const Icon(Icons.bar_chart_outlined),
-              label: const Text('Campagne en chiffres'),
-            ),
           ),
           const SizedBox(height: 22),
           if (_section == RecruitmentSection.applications)
@@ -404,13 +412,18 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               onToggleFilters: () =>
                   setState(() => _filtersExpanded = !_filtersExpanded),
               onManageCampaigns: _openCampaignManagement,
+              onOpenGuide: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const RecruitmentTeamGuideScreen())),
               canManageCampaigns: _access['can_manage_campaigns'] != false,
             ),
           if (_section == RecruitmentSection.interviews)
-            const RecruitmentPageHeading(
+            RecruitmentPageHeading(
               title: 'Les entretiens',
               subtitle:
                   'Les créneaux confirmés et les dossiers à replanifier, par campagne.',
+              actions: [IconButton(tooltip: 'Guide équipe', icon: const Icon(Icons.menu_book_outlined),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const RecruitmentTeamGuideScreen())))],
             ),
           const SizedBox(height: 18),
           if (!_loading && _error == null)
@@ -463,6 +476,20 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                   icon: Icons.how_to_reg_outlined,
                 ),
               ],
+            ),
+          if (_section == RecruitmentSection.applications &&
+              _gateway is RecruitmentServiceGateway &&
+              _access['can_manage_jury'] == true &&
+              selectionCampaign?.eligibilityRequired == true)
+            RecruitmentSelectionPanel(
+              campaignId: _campaignId,
+              refreshToken: _selectionRevision,
+              onChanged: () => _load(initial: false),
+            ),
+          if (_section == RecruitmentSection.applications && _campaignId == 'all' && _access['can_manage_jury'] == true)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Sélectionne une campagne dans les filtres pour répartir les évaluations et publier les résultats.'),
             ),
           SizedBox(height: 14),
           InternalFilterBar(

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr"><meta charset="utf-8"><title>EnactMeet browser regression</title>
+<body><pre id="enactmeet-test-results" data-state="running"></pre>
+<script>
+  class FakeJitsi {
+    static created = [];
+    constructor(domain, options) {
+      this.options = options;
+      this.listeners = new Map();
+      this.frame = document.createElement('iframe');
+      this.frame.title = 'Salon de test';
+      this.frame.srcdoc = '<p>Salon ouvert</p>';
+      options.parentNode.append(this.frame);
+      FakeJitsi.created.push(this);
+    }
+    addListener(name, callback) { this.listeners.set(name, callback); }
+    fire(name, payload = {}) { this.listeners.get(name)?.(payload); }
+    executeCommand() {}
+    dispose() { this.frame.remove(); this.fire('readyToClose'); }
+  }
+  window.JitsiMeetExternalAPI = FakeJitsi;
+</script>
+<script src="__BRIDGE_URL__"></script>
+<script>
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const check = (condition, message) => { if (!condition) throw new Error(message); };
+  const options = JSON.stringify({roomName: 'synthetic-room', displayName: 'Test', email: 'test@example.org'});
+  const events = id => JSON.parse(window.enactMeetTakeEvents(id));
+  const host = (id) => {
+    const element = document.createElement('div');
+    element.id = id;
+    element.style.cssText = 'width:320px;height:240px';
+    return element;
+  };
+  const opened = (id, element, before) => {
+    check(FakeJitsi.created.length === before + 1, 'The iframe must be created exactly once');
+    check(FakeJitsi.created.at(-1).options.parentNode === element, 'Wrong platform-view element');
+    check(element.querySelector('iframe')?.isConnected, 'The iframe is not attached');
+    check(events(id).some(event => event.type === 'ready'), 'The room never became ready');
+  };
+  const cases = [
+    ['a platform-view element can be attached after creation starts', async () => {
+      const id = 'late-host', element = host(id), before = FakeJitsi.created.length;
+      const pending = window.enactMeetCreate(id, 'https://enactmeet.example', options, element);
+      check(FakeJitsi.created.length === before, 'The room started before its host was attached');
+      setTimeout(() => document.body.append(element), 75);
+      await pending;
+      opened(id, element, before);
+      window.enactMeetDispose(id); element.remove();
+    }],
+    ['the supplied element works inside a closed shadow root', async () => {
+      const wrapper = document.createElement('div'); document.body.append(wrapper);
+      const root = wrapper.attachShadow({mode:'closed'}), id = 'closed-shadow-host', element = host(id);
+      root.append(element);
+      check(document.getElementById(id) === null, 'Fixture must reproduce the inaccessible global id');
+      const before = FakeJitsi.created.length;
+      await window.enactMeetCreate(id, 'https://enactmeet.example', options, element);
+      opened(id, element, before);
+      window.enactMeetDispose(id); wrapper.remove();
+    }],
+    ['older id-only clients can find a delayed host in an open shadow root', async () => {
+      const wrapper = document.createElement('div'); document.body.append(wrapper);
+      const root = wrapper.attachShadow({mode:'open'}), id = 'cached-client-host', element = host(id);
+      const before = FakeJitsi.created.length;
+      const pending = window.enactMeetCreate(id, 'https://enactmeet.example', options);
+      setTimeout(() => root.append(element), 75);
+      await pending;
+      opened(id, element, before);
+      window.enactMeetDispose(id); wrapper.remove();
+    }],
+    ['the iframe waits for a visible layout', async () => {
+      const id = 'hidden-host', element = host(id), before = FakeJitsi.created.length;
+      element.style.display = 'none'; document.body.append(element);
+      const pending = window.enactMeetCreate(id, 'https://enactmeet.example', options, element);
+      await delay(50);
+      check(FakeJitsi.created.length === before, 'The iframe started with a zero-size layout');
+      element.style.display = 'block';
+      await pending;
+      opened(id, element, before);
+      window.enactMeetDispose(id); element.remove();
+    }],
+    ['leaving before attachment cancels the pending room', async () => {
+      const id = 'cancelled-host', element = host(id), before = FakeJitsi.created.length;
+      const pending = window.enactMeetCreate(id, 'https://enactmeet.example', options, element);
+      window.enactMeetDispose(id);
+      document.body.append(element);
+      await pending; await delay(50);
+      check(FakeJitsi.created.length === before, 'A cancelled room opened in the background');
+      check(events(id).length === 0, 'A cancelled room emitted a stale event');
+      element.remove();
+    }],
+    ['leaving while the external API loads cannot create an orphan iframe', async () => {
+      const id = 'cancelled-load', element = host(id), before = FakeJitsi.created.length;
+      document.body.append(element);
+      const append = document.head.appendChild;
+      let script;
+      delete window.JitsiMeetExternalAPI;
+      document.head.appendChild = function(node) {
+        if (node.tagName === 'SCRIPT') { script = node; return node; }
+        return append.call(this, node);
+      };
+      try {
+        const pending = window.enactMeetCreate(id, 'https://loading.enactmeet.example', options, element);
+        await delay(50);
+        check(script, 'Expected an external API load');
+        window.enactMeetDispose(id);
+        window.JitsiMeetExternalAPI = FakeJitsi; script.onload();
+        await pending;
+        check(FakeJitsi.created.length === before, 'A disposed API load opened a room');
+        check(events(id).length === 0, 'A disposed API load emitted a stale event');
+      } finally {
+        document.head.appendChild = append; window.JitsiMeetExternalAPI = FakeJitsi; element.remove();
+      }
+    }],
+    ['a failed external API load can be retried', async () => {
+      const id = 'retry-load', element = host(id), before = FakeJitsi.created.length;
+      document.body.append(element);
+      const append = document.head.appendChild;
+      let attempts = 0;
+      delete window.JitsiMeetExternalAPI;
+      document.head.appendChild = function(node) {
+        if (node.tagName !== 'SCRIPT') return append.call(this, node);
+        attempts++;
+        queueMicrotask(() => {
+          if (attempts === 1) node.onerror();
+          else { window.JitsiMeetExternalAPI = FakeJitsi; node.onload(); }
+        });
+        return node;
+      };
+      try {
+        await window.enactMeetCreate(id, 'https://retry.enactmeet.example', options, element);
+        check(events(id).some(event => event.type === 'error'), 'The failed load must report an error');
+        await window.enactMeetCreate(id, 'https://retry.enactmeet.example', options, element);
+        check(attempts === 2, 'The failed loader remained cached');
+        opened(id, element, before);
+      } finally {
+        window.enactMeetDispose(id); document.head.appendChild = append;
+        window.JitsiMeetExternalAPI = FakeJitsi; element.remove();
+      }
+    }],
+    ['disposed rooms stop emitting events while other rooms stay open', async () => {
+      const one = host('one-room'), two = host('two-room'); document.body.append(one, two);
+      await window.enactMeetCreate(one.id, 'https://enactmeet.example', options, one);
+      const first = FakeJitsi.created.at(-1);
+      await window.enactMeetCreate(two.id, 'https://enactmeet.example', options, two);
+      const second = FakeJitsi.created.at(-1);
+      events(one.id); events(two.id);
+      window.enactMeetDispose(one.id);
+      first.fire('videoConferenceJoined');
+      check(events(one.id).length === 0, 'A disposed room emitted an event');
+      check(two.querySelector('iframe')?.isConnected, 'Disposal affected another room');
+      second.fire('videoConferenceJoined');
+      check(events(two.id).some(event => event.type === 'joined'), 'The active room lost its events');
+      window.enactMeetDispose(two.id); one.remove(); two.remove();
+    }],
+    ['a missing host reports a bounded and readable failure', async () => {
+      const id = 'never-attached', before = FakeJitsi.created.length;
+      await window.enactMeetCreate(id, 'https://enactmeet.example', options, host(id));
+      check(FakeJitsi.created.length === before, 'A missing host created a room');
+      const error = events(id).find(event => event.type === 'error');
+      check(error?.message.includes('Reviens à la réunion'), 'Missing host failure is not actionable');
+      window.enactMeetDispose(id);
+    }],
+  ];
+  (async () => {
+    const results = [];
+    for (const [name, test] of cases) {
+      await fetch('/progress', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, completed:results.length})});
+      try { await test(); results.push({name, passed:true}); }
+      catch (error) { results.push({name, passed:false, error:error.message}); break; }
+    }
+    const passed = results.length === cases.length && results.every(test => test.passed);
+    const output = document.getElementById('enactmeet-test-results');
+    output.dataset.state = passed ? 'passed' : 'failed';
+    output.textContent = JSON.stringify({passed, results});
+    await fetch('/results', {method:'POST', headers:{'Content-Type':'application/json'}, body:output.textContent});
+  })();
+</script></body></html>

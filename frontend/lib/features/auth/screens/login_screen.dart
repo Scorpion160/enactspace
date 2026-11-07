@@ -16,7 +16,8 @@ import '../../../shared/ui/app_components.dart';
 class LoginScreen extends StatefulWidget {
   final AuthService? authService;
   final BiometricAuthenticator? biometrics;
-  const LoginScreen({super.key, this.authService, this.biometrics});
+  final String afterSignInPath;
+  const LoginScreen({super.key, this.authService, this.biometrics, this.afterSignInPath = '/dashboard'});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -86,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final restored = await _authService.restoreSession();
       if (!mounted) return;
       if (restored) {
-        context.go('/dashboard');
+        context.go(widget.afterSignInPath);
       } else {
         setState(() {
           _biometricAvailable = false;
@@ -128,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await LoginPreferences.rememberIdentifier(identifier);
 
       if (!mounted) return;
-      context.go('/dashboard');
+      context.go(widget.afterSignInPath);
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');

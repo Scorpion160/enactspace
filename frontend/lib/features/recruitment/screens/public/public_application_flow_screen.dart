@@ -16,6 +16,7 @@ import '../../services/public_recruitment_gateway.dart';
 import '../../widgets/public/public_recruitment_widgets.dart';
 import '../../widgets/public/public_application_field.dart';
 import '../../widgets/public/public_application_journey.dart';
+import '../../widgets/public/recruitment_eligibility.dart';
 
 class PublicApplicationFlowScreen extends StatefulWidget {
   final String campaignId;
@@ -58,6 +59,7 @@ class _PublicApplicationFlowScreenState
   bool _campaignFailed = false;
   bool _submitting = false;
   bool _confirmed = false;
+  bool _eligibilityConfirmed = false;
   String? _submitError;
   PublicRecruitmentFailureKind? _submitFailureKind;
   bool? _campusResident;
@@ -180,6 +182,7 @@ class _PublicApplicationFlowScreenState
     knownEnactusFrom: _optional('knownEnactusFrom'),
     enactusKnowledge: _optional('enactusKnowledge'),
     otherClubs: _optional('otherClubs'),
+    otherClubsCount: int.tryParse(_text('otherClubsCount')) ?? 0,
     contribution: _optional('contribution'),
     projectIdeas: _optional('projectIdeas'),
     leadershipProfile: _optional('leadershipProfile'),
@@ -217,6 +220,10 @@ class _PublicApplicationFlowScreenState
 
   Future<void> _submit() async {
     if (!_confirmed || _submitting) return;
+    if (_campaign!.eligibilityRequired && (!_eligibilityConfirmed || (int.tryParse(_text('otherClubsCount')) ?? 3) >= 3)) {
+      setState(() => _eligibilityConfirmed = false);
+      return;
+    }
     setState(() {
       _submitting = true;
       _submitError = null;
@@ -304,6 +311,17 @@ class _PublicApplicationFlowScreenState
       );
     }
 
+    if (_campaign!.eligibilityRequired && !_eligibilityConfirmed) {
+      return PublicRecruitmentShell(
+        child: RecruitmentEligibilityCheck(
+          onEligible: (level, count) => setState(() {
+            _controller('studyLevel').text = level;
+            _controller('otherClubsCount').text = '$count';
+            _eligibilityConfirmed = true;
+          }),
+        ),
+      );
+    }
     return PublicRecruitmentShell(
       child: Column(
         children: [
@@ -424,9 +442,24 @@ class _PublicApplicationFlowScreenState
     introduction:
         'Présente ton parcours avec les mots que tu utilises au quotidien.',
     children: [
+      if (_campaign!.eligibilityRequired)
+        PublicApplicationField(
+          label: 'Nombre de clubs et structures étudiantes déjà rejoints *',
+          help: 'À partir de trois structures, la candidature est inéligible.',
+          child: TextFormField(
+            key: const ValueKey('field-otherClubsCount'),
+            controller: _controller('otherClubsCount'),
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              final count = int.tryParse(value ?? '');
+              return count == null || count < 0 ? 'Indique un nombre entier.'
+                  : count >= 3 ? 'Trois structures ou plus rendent la candidature inéligible.' : null;
+            },
+          ),
+        ),
       _ResponsiveFields(
         children: [
-          _choiceField('studyLevel', 'Niveau d’études *', espAcademicLevels),
+          _choiceField('studyLevel', 'Niveau d’études *', recruitmentAcademicLevels),
           _choiceField(
             'department',
             'Département ESP *',
@@ -645,7 +678,8 @@ class _PublicApplicationFlowScreenState
 
   Widget _motivationStep() => _questionStep(
     'motivation',
-    'Parle-nous de toi et de ce qui te donne envie d’agir.',
+    'Parle-nous de ce qui te donne envie d’agir. Ton dossier sera étudié sans ton identité. '
+    'Évite de citer ton nom, tes coordonnées ou les liens vers tes profils dans tes réponses.',
   );
 
   Widget _availabilityStep() => _questionStep(
@@ -656,7 +690,7 @@ class _PublicApplicationFlowScreenState
   Widget _documentsStep() => _StepBody(
     introduction: widget.demoMode
         ? 'Essaie de joindre un document pour découvrir cette étape.'
-        : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents ; ils seront transmis avec ta candidature à l’équipe recrutement.',
+        : 'Une réalisation, une expérience ou un CV peut compléter ton histoire. Joins directement tes documents pour compléter ton dossier.',
     children: [
       AttachmentPickerField(
         label: 'Ton CV',
@@ -682,7 +716,7 @@ class _PublicApplicationFlowScreenState
       Text(
         widget.demoMode
             ? 'Le document restera dans cette démonstration.'
-            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent accessibles à l’équipe habilitée.',
+            : 'Ces documents sont facultatifs. Tes réponses suffisent pour postuler. Les pièces jointes restent masquées pendant la présélection. Après le premier filtre et la levée d’anonymat, le jury de la campagne pourra les consulter.',
         style: const TextStyle(height: 1.5),
       ),
     ],

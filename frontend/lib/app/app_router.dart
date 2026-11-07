@@ -84,6 +84,13 @@ import '../shared/layout/app_shell.dart';
 class AppRouter {
   static final AuthService _authService = AuthService();
 
+  static const _emailDestinations = {
+    '/chat', '/meetings', '/notifications', '/recruitment', '/recruitment/statistics',
+  };
+
+  static String emailDestinationAfterSignIn(String? path) =>
+      _emailDestinations.contains(path) ? path! : '/dashboard';
+
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: AuthStorage.instance.sessionChanges,
@@ -105,11 +112,14 @@ class AppRouter {
       }
 
       if (!loggedIn && !publicPath) {
-        return '/login';
+        final path = state.uri.path;
+        return _emailDestinations.contains(path)
+            ? Uri(path: '/login', queryParameters: {'next': path}).toString()
+            : '/login';
       }
 
       if (loggedIn && goingToLogin && !unlocking) {
-        return '/dashboard';
+        return emailDestinationAfterSignIn(state.uri.queryParameters['next']);
       }
 
       if (publicPath) return null;
@@ -183,7 +193,9 @@ class AppRouter {
           ),
           GoRoute(
             path: '/login',
-            builder: (context, state) => const LoginScreen(),
+            builder: (context, state) => LoginScreen(
+              afterSignInPath: emailDestinationAfterSignIn(state.uri.queryParameters['next']),
+            ),
           ),
           GoRoute(
             path: '/welcome-help',
@@ -468,12 +480,18 @@ class AppRouter {
                 routes: [
                   GoRoute(
                     path: ':profileId',
-                    builder: (context, state) => AlumniProfileDetailScreen(
-                      profileId: state.pathParameters['profileId']!,
-                      gateway: state.extra is AlumniGateway
-                          ? state.extra! as AlumniGateway
-                          : null,
-                    ),
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      return AlumniProfileDetailScreen(
+                        profileId: state.pathParameters['profileId']!,
+                        gateway: switch (extra) {
+                          AlumniProfileRouteArgs(:final gateway) => gateway,
+                          AlumniGateway gateway => gateway,
+                          _ => null,
+                        },
+                        fromDirectory: extra is AlumniProfileRouteArgs,
+                      );
+                    },
                   ),
                 ],
               ),
@@ -559,6 +577,8 @@ class AppRouter {
                         path: ':minuteId',
                         builder: (context, state) => ArchiveMinutesScreen(
                           minuteId: state.pathParameters['minuteId'],
+                          search: state.uri.queryParameters['search'],
+                          theme: state.uri.queryParameters['theme'],
                           gateway: state.extra is ArchivesGateway
                               ? state.extra! as ArchivesGateway
                               : null,

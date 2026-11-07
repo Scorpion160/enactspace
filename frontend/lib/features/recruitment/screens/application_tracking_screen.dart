@@ -3,10 +3,11 @@ import '../services/recruitment_campaign_tools.dart';
 import 'public/personality_questionnaire_screen.dart';
 
 import 'package:flutter/material.dart';
+import '../widgets/recruitment_schedule.dart';
+import '../widgets/public/candidate_interview_button.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../models/application_status_presentation.dart';
 import '../models/application_tracking_model.dart';
 import '../services/public_recruitment_gateway.dart';
 import '../widgets/public/public_recruitment_widgets.dart';
@@ -109,6 +110,8 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           TrackingResultView(tracking: _tracking!),
+                          if (_tracking!.enactmeetAvailable)
+                            CandidateInterviewButton(code: _tracking!.trackingCode, email: _tracking!.email),
                           if (_tracking!.personalityStatus != null &&
                               (widget.personalityGateway != null ||
                                   _gateway is RecruitmentPublicGateway))
@@ -132,17 +135,14 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                                         _tracking!.personalityStatus ==
                                                 'submitted'
                                             ? 'Tes réponses ont été partagées avec le jury. Tu peux retrouver ta synthèse.'
-                                            : _tracking!.personalityStatus ==
-                                                  'declined'
-                                            ? 'Tu as choisi d’en parler pendant l’entretien.'
-                                            : 'L’équipe te propose un questionnaire pour mieux préparer l’entretien.',
+                                            : 'Le questionnaire est obligatoire. Réponds à toutes les questions puis confirme leur envoi pour poursuivre la sélection.',
                                       ),
                                       const SizedBox(height: 12),
                                       FilledButton.icon(
                                         icon: const Icon(Icons.forum_outlined),
                                         label: Text(
-                                          _tracking!.personalityStatus ==
-                                                  'invited'
+                                          _tracking!.personalityStatus !=
+                                                  'submitted'
                                               ? 'Ouvrir mon questionnaire'
                                               : 'Consulter ma réponse',
                                         ),
@@ -393,9 +393,7 @@ class TrackingResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presentation = ApplicationStatusPresentation.fromStatus(
-      tracking.status,
-    );
+    final presentation = tracking.presentation;
     return Semantics(
       container: true,
       label: 'Statut de la candidature, ${presentation.title}',
@@ -435,6 +433,10 @@ class TrackingResultView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ApplicationTimeline(tracking: tracking),
+              if (tracking.selectionSchedule != null && tracking.screeningResult != 'not_shortlisted') ...[
+                const SizedBox(height: 18),
+                RecruitmentScheduleCard(schedule: tracking.selectionSchedule!),
+              ],
               const SizedBox(height: 18),
               _InformationPanel(
                 title: 'Prochaine étape',

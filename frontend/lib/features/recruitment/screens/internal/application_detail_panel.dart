@@ -1,6 +1,8 @@
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/recruitment_style.dart';
 import '../../services/recruitment_campaign_tools.dart';
+import '../../widgets/internal/recruitment_selection_panel.dart';
+import '../../services/recruitment_selection_api.dart';
 import '../../widgets/internal/interview_planning_dialog.dart';
 import '../../widgets/internal/personality_review_card.dart';
 import '../../models/application_history_model.dart';
@@ -24,6 +26,7 @@ class ApplicationDetailPanel extends StatefulWidget {
   final bool anonymized;
   final InternalRecruitmentGateway gateway;
   final ValueChanged<ApplicationModel>? onApplicationChanged;
+  final VoidCallback? onAssignmentDeclined;
   final VoidCallback onClose;
 
   const ApplicationDetailPanel({
@@ -33,6 +36,7 @@ class ApplicationDetailPanel extends StatefulWidget {
     required this.anonymized,
     required this.gateway,
     this.onApplicationChanged,
+    this.onAssignmentDeclined,
     required this.onClose,
   });
 
@@ -122,6 +126,10 @@ class _ApplicationDetailPanelState extends State<ApplicationDetailPanel> {
                       onStatusChange: _changeStatus,
                       onInterview: _scheduleInterview,
                       onConversionCompleted: _refreshAfterMutation,
+                      onAssignmentDeclined: () {
+                        widget.onClose();
+                        widget.onAssignmentDeclined?.call();
+                      },
                     ),
             ),
           ],
@@ -284,6 +292,7 @@ class _DetailBody extends StatefulWidget {
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
   final Future<void> Function() onConversionCompleted;
+  final VoidCallback onAssignmentDeclined;
 
   const _DetailBody({
     required this.application,
@@ -296,6 +305,7 @@ class _DetailBody extends StatefulWidget {
     required this.onStatusChange,
     required this.onInterview,
     required this.onConversionCompleted,
+    required this.onAssignmentDeclined,
   });
 
   @override
@@ -303,6 +313,55 @@ class _DetailBody extends StatefulWidget {
 }
 
 class _DetailBodyState extends State<_DetailBody> {
+  Future<void> _declineAssignment() async {
+    var reason = 'recognition';
+    final explanation = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Demander un autre évaluateur'),
+          content: DropdownButtonFormField<String>(
+            initialValue: reason,
+            isExpanded: true,
+            itemHeight: null,
+            decoration: const InputDecoration(
+              labelText: 'Motif du déport',
+              helperText: 'Ne communique pas l’identité de la personne.',
+              helperMaxLines: 3,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'recognition', child: Text('Je pense reconnaître la personne')),
+              DropdownMenuItem(value: 'conflict_of_interest', child: Text('Conflit d’intérêts possible')),
+              DropdownMenuItem(value: 'unavailable', child: Text('Indisponibilité')),
+            ],
+            onChanged: (value) => setDialogState(() => reason = value ?? 'recognition'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, reason),
+              child: const Text('Transmettre la demande'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (explanation == null || !mounted) return;
+    try {
+      await RecruitmentSelectionApi().request(
+        'applications/${widget.application.id}/selection/decline',
+        body: {'reason': explanation},
+      );
+      if (mounted) widget.onAssignmentDeclined();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          recruitmentMessage(error, fallback: 'La demande n’a pas pu être enregistrée.'),
+        )));
+      }
+    }
+  }
+
   late final Map<String, GlobalKey> _anchors = {
     for (final label in [
       'Réponses',
@@ -320,7 +379,7 @@ class _DetailBodyState extends State<_DetailBody> {
         const Padding(
           padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
           child: RecruitmentNotice(
-            'Lecture anonymisée : identité, documents et éléments personnels masqués.',
+            'Noms, coordonnées et documents masqués. Le parcours et les réponses restent visibles.',
             icon: Icons.visibility_off_outlined,
           ),
         ),
@@ -382,8 +441,7 @@ class _DetailBodyState extends State<_DetailBody> {
                       'Département': _value(widget.application.department),
                       'Promotion': _value(widget.application.className),
                       'Niveau': _value(widget.application.studyLevel),
-                      if (!widget.anonymized &&
-                          widget.application.knownEnactusFrom
+                      if (widget.application.knownEnactusFrom
                                   ?.trim()
                                   .isNotEmpty ==
                               true)
@@ -400,23 +458,21 @@ class _DetailBodyState extends State<_DetailBody> {
                         'Projet évoqué auparavant':
                             widget.application.projectInterest!,
                       'Disponibilité': _value(widget.application.availability),
-                      if (!widget.anonymized)
-                        'Résidence au campus':
+                      'Structures étudiantes déclarées': widget.application.otherClubsCount?.toString() ?? 'Non renseigné',
+                      'Résidence au campus':
                             widget.application.campusResident == null
                             ? 'Non renseignée'
                             : widget.application.campusResident!
                             ? 'Oui'
                             : 'Non',
-                      if (!widget.anonymized &&
-                          widget
+                      if (widget
                                   .application
                                   .interviewAvailability
                                   ?.isNotEmpty ==
                               true)
                         'Disponibilités pour l’entretien':
                             widget.application.interviewAvailability!,
-                      if (!widget.anonymized &&
-                          widget.application.interviewPreferences.isNotEmpty)
+                      if (widget.application.interviewPreferences.isNotEmpty)
                         'Formats souhaités': widget
                             .application
                             .interviewPreferences
@@ -515,7 +571,7 @@ class _DetailBodyState extends State<_DetailBody> {
                 children: [
                   FilledButton.icon(
                     key: const Key('candidate-review-action'),
-                    onPressed: widget.application.screeningRubric == null
+                    onPressed: widget.application.permissions['can_review'] == false || widget.application.screeningRubric == null
                         ? null
                         : widget.onReview,
                     icon: const Icon(Icons.rate_review_outlined),
@@ -525,6 +581,14 @@ class _DetailBodyState extends State<_DetailBody> {
                           : 'Modifier mon avis',
                     ),
                   ),
+                  if (widget.application.blindSelection &&
+                      widget.application.assessmentStage == 'screening' &&
+                      widget.application.permissions['can_review'] == true)
+                    TextButton.icon(
+                      onPressed: _declineAssignment,
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Demander un autre évaluateur'),
+                    ),
                   if (widget.application.screeningRubric == null)
                     const Text(
                       'Actualisez le dossier pour charger la grille d’évaluation.',
@@ -594,6 +658,14 @@ class _DetailBodyState extends State<_DetailBody> {
                   title: 'Actions sur la candidature',
                   icon: Icons.admin_panel_settings_outlined,
                   children: [
+                    if (widget.application.permissions['can_prepare_selection'] == true) ...[
+                      RecruitmentSelectionDecisionCard(
+                        key: ValueKey('${widget.application.id}-${widget.application.assessmentStage}'),
+                        application: widget.application,
+                        onSaved: widget.onConversionCompleted,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
                     CandidateActionsSection(
                       application: widget.application,
                       campaignTitle: widget.campaignTitle,

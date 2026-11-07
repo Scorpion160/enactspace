@@ -175,6 +175,39 @@ Future<void> _reachReview(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('eligible campaign preserves the declared club count through submission', (tester) async {
+    final gateway = _FakeGateway();
+    final campaign = RecruitmentCampaignModel(
+      id: _campaign.id, title: _campaign.title, isActive: true,
+      startDate: _campaign.startDate, endDate: _campaign.endDate,
+      serverTime: _campaign.serverTime, receivedAt: _campaign.receivedAt,
+      eligibilityRequired: true,
+    );
+    await tester.pumpWidget(_app(PublicApplicationFlowScreen(
+      campaignId: campaign.id, campaign: campaign, gateway: gateway,
+    )));
+    await tester.tap(find.byKey(const Key('eligibility-study-level')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Master1').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('eligibility-clubs-count')), '2');
+    await tester.ensureVisible(find.byKey(const Key('eligibility-continue')));
+    await tester.tap(find.byKey(const Key('eligibility-continue')));
+    await tester.pumpAndSettle();
+    await _reachReview(tester);
+    final confirmation = find.byType(CheckboxListTile);
+    await tester.ensureVisible(confirmation);
+    await tester.tap(confirmation);
+    await tester.pump();
+    final submit = find.byKey(const ValueKey('application-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(gateway.lastDraft?.otherClubsCount, 2);
+    expect(find.textContaining('AUDIT-REC-SUCCESS-001'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'another discovery channel requires detail and preserves it after returning',
     (tester) async {

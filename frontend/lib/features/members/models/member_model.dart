@@ -1,3 +1,4 @@
+import '../../../core/text/searchable_text.dart' as text_search;
 class MemberModel {
   final String id;
   final String email;
@@ -308,38 +309,8 @@ class MemberModel {
     return parts.sublist(0, parts.length - 1).join(' ');
   }
 
-  static String _alphabeticKey(String value) {
-    var result = value.trim().toLowerCase();
-    const replacements = <String, String>{
-      'à': 'a',
-      'â': 'a',
-      'ä': 'a',
-      'á': 'a',
-      'ã': 'a',
-      'ç': 'c',
-      'é': 'e',
-      'è': 'e',
-      'ê': 'e',
-      'ë': 'e',
-      'î': 'i',
-      'ï': 'i',
-      'í': 'i',
-      'ô': 'o',
-      'ö': 'o',
-      'ó': 'o',
-      'õ': 'o',
-      'ù': 'u',
-      'û': 'u',
-      'ü': 'u',
-      'ú': 'u',
-      'ÿ': 'y',
-      'œ': 'oe',
-    };
-    replacements.forEach((source, target) {
-      result = result.replaceAll(source, target);
-    });
-    return result.replaceAll(RegExp(r'\s+'), ' ');
-  }
+  static String alphabeticKey(String value) => text_search.searchableText(value);
+  static String _alphabeticKey(String value) => alphabeticKey(value);
 
   static String _formatPolePosition(String? value) {
     final raw = value?.trim();

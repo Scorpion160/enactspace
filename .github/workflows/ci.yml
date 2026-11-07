@@ -146,6 +146,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Verify EnactMeet browser attachment and cleanup
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/test_enactmeet_web_bridge.py --browser google-chrome
+
       - name: Resolve locked dependencies
         run: flutter pub get
 
@@ -169,6 +173,12 @@ jobs:
           test/archives_responsive_test.dart
           test/alumni_gamification_academy_impact_test.dart
           test/recruitment_public_test.dart
+          test/recruitment_submission_contract_test.dart
+          test/recruitment_eligibility_selection_test.dart
+          test/recruitment_schedule_test.dart
+          test/recruitment_team_guide_test.dart
+          test/alumni_individual_workflows_test.dart
+          test/meetings_creation_test.dart
           test/recruitment_internal_test.dart
           test/recruitment_jury_personality_test.dart
           test/recruitment_campaigns_test.dart
