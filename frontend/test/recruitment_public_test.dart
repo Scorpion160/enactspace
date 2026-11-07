@@ -186,11 +186,14 @@ void main() {
     await tester.pumpWidget(_app(PublicApplicationFlowScreen(
       campaignId: campaign.id, campaign: campaign, gateway: gateway,
     )));
+    await tester.ensureVisible(find.byKey(const Key('eligibility-study-level')));
     await tester.tap(find.byKey(const Key('eligibility-study-level')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Master1').last);
+    await tester.tap(find.text('DIC1').last);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('eligibility-clubs-count')));
     await tester.enterText(find.byKey(const Key('eligibility-clubs-count')), '2');
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('eligibility-continue')));
     await tester.tap(find.byKey(const Key('eligibility-continue')));
     await tester.pumpAndSettle();

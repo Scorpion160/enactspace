@@ -229,7 +229,7 @@ void main() {
       final gateway = _MemoryArchivesGateway(emptyTimeline: true);
       await _pumpCenter(tester, gateway);
       expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
-      expect(find.text('Explorer l’histoire du club'), findsOneWidget);
+      expect(find.text('L’histoire du club'), findsOneWidget);
       expect(find.text('L’aventure Enactus ESP'), findsOneWidget);
       expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
       expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
@@ -389,7 +389,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(launchedUrls, isEmpty);
-      expect(find.text('Source non accessible'), findsOneWidget);
+      expect(find.text('Reconnectez-vous pour consulter le document.'), findsOneWidget);
     });
 
     testWidgets('URL externe autorisée reste lancée sans jeton', (

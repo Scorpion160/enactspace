@@ -428,16 +428,14 @@ void main() {
         find.widgetWithText(DropdownButtonFormField<String>, 'Format'),
       );
       await _tap(tester, find.text('En ligne').last);
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Lien de l’entretien *'),
-        'https://example.org/meeting',
-      );
+      expect(find.widgetWithText(TextFormField, 'Lien de l’entretien *'), findsNothing);
       await _tap(tester, find.text('Alumni Test'));
       await _tap(tester, find.text('Confirmer l’entretien'));
       expect(tools.saved?['interview_at'], '2026-11-16T19:00:00.000Z');
       expect(tools.saved?['interview_end_at'], '2026-11-16T19:30:00.000Z');
       expect(tools.saved?['jury_member_ids'], ['member-1']);
       expect(tools.saved?['interview_location'], isNull);
+      expect(tools.saved?['use_enactmeet'], isTrue);
     },
   );
 

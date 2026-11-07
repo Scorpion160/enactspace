@@ -12,6 +12,14 @@ import 'package:frontend/features/members/widgets/alumni_transition_dialog.dart'
 import 'package:frontend/shared/ui/app_components.dart';
 
 void main() {
+  test('an ordinary Enacteur can open the restored Alumni directory', () {
+    final user = UserExperience.fromJson({
+      'id': 'member-fixture', 'status': 'active', 'profile_type': 'enacteur',
+      'roles': ['enacteur'],
+    });
+    expect(UserExperience.canAccessPath(user, '/alumni'), isTrue);
+    expect(UserExperience.canAccessPath(user, '/alumni/profile-fixture'), isTrue);
+  });
   for (final size in [const Size(360, 900), const Size(1280, 900)]) {
     for (final dark in [false, true]) {
       testWidgets('Individual mentoring form at ${size.width}, dark=$dark', (
