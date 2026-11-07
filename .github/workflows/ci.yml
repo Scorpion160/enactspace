@@ -101,6 +101,11 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q app
 
+      - name: Prepare synthetic test-only backend resources
+        env:
+          APP_ENV: test
+        run: python ops_checks/prepare_ci_resources.py
+
       - name: Generate OpenAPI schema
         run: >-
           python -c "from app.main import app; schema = app.openapi();
@@ -150,8 +155,19 @@ jobs:
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
 
-      - name: Run Flutter tests
-        run: flutter test --no-pub
+      - name: Prepare synthetic test-only backend resources
+        env:
+          APP_ENV: test
+        run: python ../backend/ops_checks/prepare_ci_resources.py
+
+      - name: Run Web recruitment and member tests
+        run: >-
+          flutter test --no-pub
+          test/recruitment_public_test.dart
+          test/recruitment_internal_test.dart
+          test/recruitment_jury_personality_test.dart
+          test/recruitment_campaigns_test.dart
+          test/member_join_requests_test.dart
 
       - name: Build release web application
         run: >-
