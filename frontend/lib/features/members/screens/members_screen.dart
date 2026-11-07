@@ -15,6 +15,7 @@ import '../../poles/models/pole_model.dart';
 import '../../poles/services/poles_service.dart';
 import '../../projects/models/project_model.dart';
 import '../../projects/services/projects_service.dart';
+import '../widgets/alumni_transition_dialog.dart';
 import '../models/member_model.dart';
 import '../services/members_service.dart';
 import 'member_import_panel.dart';
@@ -47,6 +48,7 @@ class _MembersScreenState extends State<MembersScreen> {
   bool _loading = true;
   String? _error;
   List<MemberModel> _members = [];
+  List<MemberModel> _transitionMembers = [];
   UserExperience? _userExperience;
   String _search = '';
   String _statusFilter = 'all';
@@ -77,6 +79,20 @@ class _MembersScreenState extends State<MembersScreen> {
           pendingMembers.where((member) => knownIds.add(member.id)),
         );
       }
+      final transitionMembers = (user.isAdmin || user.isTeamLeader)
+          ? members
+                .where(
+                  (member) =>
+                      member.id != user.id &&
+                      const {
+                        'active',
+                        'alumni',
+                        'inactive',
+                        'suspended',
+                      }.contains(member.status),
+                )
+                .toList()
+          : <MemberModel>[];
       members.removeWhere(
         (member) => !member.visibleInMemberManagement(
           canReviewJoinRequests: user.canReviewJoinRequests,
@@ -89,6 +105,7 @@ class _MembersScreenState extends State<MembersScreen> {
       setState(() {
         _userExperience = user;
         _members = members;
+        _transitionMembers = transitionMembers;
       });
     } catch (e) {
       if (!mounted) return;
@@ -103,6 +120,19 @@ class _MembersScreenState extends State<MembersScreen> {
         });
       }
     }
+  }
+
+  Future<void> _openAlumniTransitionDialog() async {
+    final role = _userExperience;
+    if (role == null || (!role.isAdmin && !role.isTeamLeader)) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlumniTransitionDialog(
+        service: _membersService,
+        members: _transitionMembers,
+      ),
+    );
+    if (mounted) await _loadMembers();
   }
 
   Future<void> _openAddMemberDialog() async {
@@ -643,6 +673,16 @@ class _MembersScreenState extends State<MembersScreen> {
                     onPressed: () => context.go('/members/first-access'),
                     icon: const Icon(Icons.key_outlined),
                     label: const Text('Préparer les premières connexions'),
+                  ),
+                if (canManageLifecycle && _transitionMembers.isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const Key('members-alumni-transition-control'),
+                      onPressed: _openAlumniTransitionDialog,
+                      icon: const Icon(Icons.verified_user_outlined),
+                      label: const Text('Contrôler un passage Alumni'),
+                    ),
                   ),
                 SizedBox(height: 18),
                 _SearchAndActions(

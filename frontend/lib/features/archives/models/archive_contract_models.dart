@@ -343,6 +343,22 @@ class HistoricalProjectModel {
         mediaFileIds: archiveStrings(json['media_file_ids']),
       );
 
+  Iterable<int> get matchingYears sync* {
+    final period = RegExp(r'^([0-9]{4})\s*[-–—/]\s*([0-9]{4})$')
+        .firstMatch(seasonLabel ?? '');
+    if (period != null) {
+      final start = int.parse(period[1]!);
+      final end = int.parse(period[2]!);
+      if (start >= 1800 && start <= end && end <= 2200) {
+        for (var value = start; value <= end; value++) {
+          yield value;
+        }
+        return;
+      }
+    }
+    if (year != null) yield year!;
+  }
+
   bool get isPersisted => isPersistedArchiveRecord(id);
   String get statusLabel => historicalProjectStatusLabel(status);
   String get periodLabel =>

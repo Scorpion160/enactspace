@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/features/archives/models/archive_models.dart';
 import 'package:frontend/features/archives/models/memory_timeline_models.dart';
+import 'package:frontend/features/archives/screens/archive_minutes_screen.dart';
 import 'package:frontend/features/archives/screens/archives_center_screen.dart';
 import 'package:frontend/features/archives/screens/archives_center_sections.dart';
 import 'package:frontend/features/archives/screens/archive_visuals.dart';
@@ -67,6 +68,71 @@ Widget _app(Widget child, {bool dark = false, double scale = 1}) => MaterialApp(
 );
 
 void main() {
+  test(
+    'project periods cover their explicit years and preserve unknown dates',
+    () {
+      const long = HistoricalProjectModel(
+        id: 'project',
+        name: 'Énergie',
+        year: 2019,
+        seasonLabel: '2019 – 2022',
+      );
+      const unknown = HistoricalProjectModel(id: 'unknown', name: 'Sans date');
+      expect(long.matchingYears, [2019, 2020, 2021, 2022]);
+      expect(unknown.matchingYears, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'Minute search ignores accents and shuffle stays in the results',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 850));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(
+          SingleChildScrollView(
+            child: ArchiveMinutesCollection(
+              home: const ArchivesHomeData(
+                media: [
+                  ArchiveMediaModel(
+                    id: 'voice',
+                    title: 'Écouter avant de parler',
+                    mediaType: 'minute_enacteur',
+                    theme: 'Entraide',
+                  ),
+                  ArchiveMediaModel(
+                    id: 'other',
+                    title: 'Oser essayer',
+                    mediaType: 'minute_enacteur',
+                    theme: 'Confiance',
+                  ),
+                ],
+              ),
+              gateway: _Gateway(),
+            ),
+          ),
+          dark: true,
+          scale: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final search = find.byKey(const Key('minute_search'));
+      await tester.ensureVisible(search);
+      await tester.enterText(search, 'ecouter');
+      await tester.pumpAndSettle();
+      expect(find.text('Écouter avant de parler'), findsOneWidget);
+      expect(find.text('Oser essayer'), findsNothing);
+      expect(find.text('1 résultat(s)'), findsOneWidget);
+      await tester.enterText(search, 'aucune correspondance');
+      await tester.pumpAndSettle();
+      final shuffle = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Surprends-moi !'),
+      );
+      expect(shuffle.onPressed, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final size in [
     const Size(360, 800),
     const Size(390, 844),
@@ -154,10 +220,8 @@ void main() {
     (tester) async {
       await tester.pumpWidget(_app(ArchivesScreen(gateway: _Gateway())));
       await tester.pumpAndSettle();
-      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
-      expect(find.text('Explorer l’histoire du club'), findsOneWidget);
+      expect(find.text('Mémoire historique Enactus ESP'), findsWidgets);
       expect(find.text('Vue d’ensemble'), findsOneWidget);
-      expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

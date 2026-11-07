@@ -86,6 +86,7 @@ flutter:
     - assets/fonts/poppins/
     - assets/img/
     - assets/heritage/
+    - assets/heritage/illustrations/
     - assets/heritage/resources/
     - assets/documents/
     - assets/legal/

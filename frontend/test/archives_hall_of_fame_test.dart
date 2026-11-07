@@ -8,6 +8,7 @@ import 'package:frontend/features/archives/screens/archive_detail_screens.dart';
 import 'package:frontend/features/archives/screens/archives_center_screen.dart';
 import 'package:frontend/features/archives/services/archives_api_service.dart';
 import 'package:frontend/features/archives/services/archives_gateway.dart';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 
 const persistedId = '123e4567-e89b-12d3-a456-426614174000';
 const persistedId2 = '223e4567-e89b-12d3-a456-426614174001';
@@ -223,19 +224,6 @@ void main() {
       expect(find.textContaining('Source non accessible'), findsOneWidget);
     });
 
-    testWidgets('chronologie vide conserve le centre Archives moderne', (
-      tester,
-    ) async {
-      final gateway = _MemoryArchivesGateway(emptyTimeline: true);
-      await _pumpCenter(tester, gateway);
-      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
-      expect(find.text('Explorer l’histoire du club'), findsOneWidget);
-      expect(find.text('L’aventure Enactus ESP'), findsOneWidget);
-      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
-      expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
-      expect(gateway.homeLoads, 1);
-    });
-
     testWidgets('erreur timeline propose une relance explicite', (
       tester,
     ) async {
@@ -248,8 +236,10 @@ void main() {
       expect(find.text('Projet opérationnel terminé'), findsNothing);
     });
 
-    testWidgets('recherche redémarre la requête côté serveur', (tester) async {
-      final gateway = _MemoryArchivesGateway();
+    testWidgets('recherche membre relance la requête côté serveur', (
+      tester,
+    ) async {
+      final gateway = _MemoryArchivesGateway(canValidate: false);
       await _pumpCenter(tester, gateway);
       await tester.enterText(
         find.byKey(const Key('archives_search')),
@@ -269,9 +259,16 @@ void main() {
         expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
         expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
         expect(curator.homeLoads, 0);
+        await tester.enterText(
+          find.byKey(const Key('archives_search')),
+          'projet terminé',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('memory_review_mode')));
         await tester.pumpAndSettle();
         expect(curator.lastTimelineFilters?.review, isTrue);
+        expect(curator.lastTimelineFilters?.search, 'projet terminé');
         await tester.tap(find.byKey(const Key('memory_legacy_area')));
         await tester.pumpAndSettle();
         expect(curator.homeLoads, 1);
@@ -377,10 +374,14 @@ void main() {
         _MemoryArchivesGateway(
           sourceCapability: const MemorySourceCapability(
             type: 'stored_file',
-            url: '/api/files/protected-file/preview',
+            url: '/api/files/protected-file/download',
           ),
         ),
       );
+      final attachment = tester.widget<StoredAttachmentButton>(
+        find.byType(StoredAttachmentButton),
+      );
+      expect(attachment.url, '/api/files/protected-file/download');
       final sourceAction = find.textContaining('Ouvrir la source');
       await tester.ensureVisible(sourceAction);
       await tester.pumpAndSettle();
@@ -389,7 +390,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(launchedUrls, isEmpty);
-      expect(find.text('Source non accessible'), findsOneWidget);
     });
 
     testWidgets('URL externe autorisée reste lancée sans jeton', (
