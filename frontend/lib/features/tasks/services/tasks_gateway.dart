@@ -193,6 +193,7 @@ class ApiTasksGateway implements TasksGateway {
       dueDate: input.dueDate,
       proofRequired: input.proofRequired,
       proofUrl: input.proofUrl,
+      deadlineChangeReason: input.deadlineChangeReason,
     );
     invalidate();
     return task;

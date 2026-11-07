@@ -1,6 +1,10 @@
 // ignore_for_file: unused_element
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
+import '../widgets/alumni_community_hero.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -8,11 +12,13 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../members/models/member_model.dart';
+import '../../members/widgets/searchable_member_picker.dart';
 import '../../poles/models/pole_model.dart';
 import '../../projects/models/project_model.dart';
 import '../models/alumni_profile_model.dart';
 import '../models/mentorship_model.dart';
 import '../services/alumni_gateway.dart';
+import '../services/alumni_error_message.dart';
 
 class AlumniScreen extends StatefulWidget {
   final AlumniGateway? gateway;
@@ -79,7 +85,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
+        _error = alumniErrorMessage(e);
       });
     } finally {
       if (mounted) {
@@ -165,18 +171,16 @@ class _AlumniScreenState extends State<AlumniScreen> {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Supprimer le mentorat ?'),
-            content: const Text(
-              'La suppression sera contrôlée par le backend.',
-            ),
+            title: Text('Supprimer le mentorat ?'),
+            content: Text('Vérifie le profil à supprimer avant de confirmer.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler'),
+                child: Text('Annuler'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Supprimer'),
+                child: Text('Supprimer'),
               ),
             ],
           ),
@@ -194,7 +198,13 @@ class _AlumniScreenState extends State<AlumniScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            content: Text(
+              alumniErrorMessage(
+                error,
+                fallback:
+                    'Impossible de mettre à jour le mentorat. Réessayez dans quelques instants.',
+              ),
+            ),
           ),
         );
       }
@@ -241,12 +251,12 @@ class _AlumniScreenState extends State<AlumniScreen> {
                           onRefresh: _loadAlumni,
                         ),
                         if (_canCreateOwnProfile) ...[
-                          const SizedBox(height: 14),
+                          SizedBox(height: 14),
                           _AlumniProfilePrompt(
                             onCreateProfile: _openCreateProfileSheet,
                           ),
                         ],
-                        const SizedBox(height: 18),
+                        SizedBox(height: 18),
                         _AlumniToolbar(
                           searchController: _searchController,
                           mentorsOnly: _mentorsOnly,
@@ -261,7 +271,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
                             await _loadAlumni();
                           },
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: 18),
                         Card(
                           child: TabBar(
                             onTap: (index) {
@@ -279,7 +289,7 @@ class _AlumniScreenState extends State<AlumniScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 22),
+                        SizedBox(height: 22),
                         if (_loading)
                           const _LoadingCard()
                         else if (_error != null)
@@ -335,59 +345,31 @@ class _AlumniHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 860;
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(28),
+  Widget build(BuildContext context) => AlumniCommunityHero(
+    total: total,
+    mentors: mentors,
+    activeMentorships: activeMentorships,
+    onMemories: () => context.go('/archives'),
+    actions: [
+      IconButton.filledTonal(
+        tooltip: 'Actualiser l’annuaire',
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
       ),
-      child: isWide
-          ? Row(
-              children: [
-                const _HeaderIcon(),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: _HeaderText(
-                    total: total,
-                    mentors: mentors,
-                    activeMentorships: activeMentorships,
-                  ),
-                ),
-                const SizedBox(width: 18),
-                _HeaderActions(
-                  onCreateProfile: onCreateProfile,
-                  onCreateMentorship: onCreateMentorship,
-                  onRefresh: onRefresh,
-                  canCreateProfile: canCreateProfile,
-                  canCreateMentorship: canCreateMentorship,
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _HeaderIcon(),
-                const SizedBox(height: 18),
-                _HeaderText(
-                  total: total,
-                  mentors: mentors,
-                  activeMentorships: activeMentorships,
-                ),
-                const SizedBox(height: 18),
-                _HeaderActions(
-                  onCreateProfile: onCreateProfile,
-                  onCreateMentorship: onCreateMentorship,
-                  onRefresh: onRefresh,
-                  canCreateProfile: canCreateProfile,
-                  canCreateMentorship: canCreateMentorship,
-                ),
-              ],
-            ),
-    );
-  }
+      if (canCreateProfile)
+        FilledButton.tonalIcon(
+          onPressed: onCreateProfile,
+          icon: const Icon(Icons.person_add_alt_1_outlined),
+          label: const Text('Créer un profil'),
+        ),
+      if (canCreateMentorship)
+        FilledButton.tonalIcon(
+          onPressed: onCreateMentorship,
+          icon: const Icon(Icons.handshake_outlined),
+          label: const Text('Créer un mentorat'),
+        ),
+    ],
+  );
 }
 
 class _HeaderIcon extends StatelessWidget {
@@ -402,11 +384,7 @@ class _HeaderIcon extends StatelessWidget {
         color: AppTheme.enactusYellow,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Icon(
-        Icons.school_rounded,
-        color: AppTheme.softBlack,
-        size: 36,
-      ),
+      child: Icon(Icons.school_rounded, color: AppTheme.softBlack, size: 36),
     );
   }
 }
@@ -427,7 +405,7 @@ class _HeaderText extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Alumni & Mentorat',
           style: TextStyle(
             color: Colors.white,
@@ -435,12 +413,12 @@ class _HeaderText extends StatelessWidget {
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 6),
-        const Text(
+        SizedBox(height: 6),
+        Text(
           'Un pont vivant entre anciens, Enacteurs, projets et pôles.',
           style: TextStyle(color: Colors.white70, height: 1.4),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -478,20 +456,20 @@ class _HeaderActions extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          icon: Icon(Icons.refresh_rounded),
+          label: Text('Actualiser'),
         ),
         if (canCreateProfile)
           ElevatedButton.icon(
             onPressed: onCreateProfile,
-            icon: const Icon(Icons.person_add_alt_rounded),
-            label: const Text('Profil alumni'),
+            icon: Icon(Icons.person_add_alt_rounded),
+            label: Text('Profil alumni'),
           ),
         if (canCreateMentorship)
           ElevatedButton.icon(
             onPressed: onCreateMentorship,
-            icon: const Icon(Icons.handshake_rounded),
-            label: const Text('Mentorat'),
+            icon: Icon(Icons.handshake_rounded),
+            label: Text('Mentorat'),
           ),
       ],
     );
@@ -509,7 +487,7 @@ class _HeaderChip extends StatelessWidget {
       label: Text(label),
       backgroundColor: Colors.white.withValues(alpha: 0.10),
       side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
-      labelStyle: const TextStyle(color: Colors.white),
+      labelStyle: TextStyle(color: Colors.white),
     );
   }
 }
@@ -526,13 +504,13 @@ class _AlumniProfilePrompt extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               backgroundColor: AppTheme.enactusYellow,
               foregroundColor: AppTheme.softBlack,
               child: Icon(Icons.badge_rounded),
             ),
-            const SizedBox(width: 14),
-            const Expanded(
+            SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -543,16 +521,18 @@ class _AlumniProfilePrompt extends StatelessWidget {
                   SizedBox(height: 4),
                   Text(
                     'Ajoutez promotion, parcours, expertises et disponibilité mentorat.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             ElevatedButton.icon(
               onPressed: onCreateProfile,
-              icon: const Icon(Icons.edit_rounded),
-              label: const Text('Compléter'),
+              icon: Icon(Icons.edit_rounded),
+              label: Text('Compléter'),
             ),
           ],
         ),
@@ -580,76 +560,46 @@ class _AlumniToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final searchWidth = constraints.maxWidth >= 760
-                ? 360.0
-                : constraints.maxWidth;
-            final filterWidth = constraints.maxWidth >= 520
-                ? 240.0
-                : constraints.maxWidth;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: searchWidth,
-                  child: TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Rechercher alumni',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: IconButton(
-                        onPressed: onSearch,
-                        icon: const Icon(Icons.arrow_forward_rounded),
-                      ),
-                    ),
-                    onSubmitted: (_) => onSearch(),
-                  ),
-                ),
-                FilterChip(
-                  selected: mentorsOnly,
-                  onSelected: onMentorsOnlyChanged,
-                  avatar: const Icon(Icons.handshake_rounded),
-                  label: const Text('Mentors disponibles'),
-                ),
-                SizedBox(
-                  width: filterWidth,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: mentorshipStatus,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Mentorats'),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Tous')),
-                      DropdownMenuItem(value: 'active', child: Text('Actifs')),
-                      DropdownMenuItem(
-                        value: 'paused',
-                        child: Text('En pause'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'completed',
-                        child: Text('Terminés'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'cancelled',
-                        child: Text('Annulés'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onMentorshipStatusChanged(value);
-                    },
-                  ),
-                ),
-              ],
-            );
+    return AppFilterToolbar(
+      search: TextField(
+        controller: searchController,
+        decoration: InputDecoration(
+          hintText: 'Rechercher alumni',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: IconButton(
+            onPressed: onSearch,
+            icon: Icon(Icons.arrow_forward_rounded),
+          ),
+        ),
+        onSubmitted: (_) => onSearch(),
+      ),
+      quickFilters: [
+        FilterChip(
+          selected: mentorsOnly,
+          onSelected: onMentorsOnlyChanged,
+          avatar: Icon(Icons.handshake_rounded),
+          label: Text('Mentors disponibles'),
+        ),
+      ],
+      filters: [
+        DropdownButtonFormField<String>(
+          initialValue: mentorshipStatus,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Mentorats'),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Tous')),
+            DropdownMenuItem(value: 'active', child: Text('Actifs')),
+            DropdownMenuItem(value: 'paused', child: Text('En pause')),
+            DropdownMenuItem(value: 'completed', child: Text('Terminés')),
+            DropdownMenuItem(value: 'cancelled', child: Text('Annulés')),
+          ],
+          onChanged: (value) {
+            if (value != null) onMentorshipStatusChanged(value);
           },
         ),
-      ),
+      ],
+      actions: const [],
+      activeFilterCount: mentorshipStatus == 'all' ? 0 : 1,
     );
   }
 }
@@ -740,7 +690,7 @@ class _ProfileCard extends StatelessWidget {
                         : NetworkImage(photoUrl),
                     child: photoUrl == null ? Text(_initials(name)) : null,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -748,7 +698,7 @@ class _ProfileCard extends StatelessWidget {
                         Text(
                           name,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -759,14 +709,18 @@ class _ProfileCard extends StatelessWidget {
                             fallback: 'Position à préciser',
                           ),
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.black54),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -791,7 +745,7 @@ class _ProfileCard extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Text(
                 _safeText(
                   profile.experienceSummary,
@@ -799,9 +753,9 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(height: 1.4),
+                style: TextStyle(height: 1.4),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               if (skills.isNotEmpty)
                 Wrap(
                   spacing: 8,
@@ -810,25 +764,27 @@ class _ProfileCard extends StatelessWidget {
                     return Chip(label: Text(skill));
                   }).toList(),
                 ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               const Divider(height: 26),
               Row(
                 children: [
-                  const Icon(Icons.public_rounded, size: 18),
-                  const SizedBox(width: 8),
+                  Icon(Icons.public_rounded, size: 18),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _safeText(profile.domain, fallback: 'Domaine à préciser'),
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
                   Text(
                     profile.visibilityLabel,
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded, size: 18),
+                  SizedBox(width: 6),
+                  Icon(Icons.chevron_right_rounded, size: 18),
                 ],
               ),
             ],
@@ -958,12 +914,12 @@ class _MentorshipCard extends StatelessWidget {
                     color: AppTheme.enactusYellow,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.handshake_rounded,
                     color: AppTheme.softBlack,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,7 +927,7 @@ class _MentorshipCard extends StatelessWidget {
                       Text(
                         _safeText(mentorship.title, fallback: 'Mentorat'),
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                         ),
@@ -979,7 +935,9 @@ class _MentorshipCard extends StatelessWidget {
                       Text(
                         '$alumniName • $started',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -1011,7 +969,7 @@ class _MentorshipCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1024,12 +982,12 @@ class _MentorshipCard extends StatelessWidget {
                 _SoftChip(icon: Icons.flag_rounded, label: target),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Text(
               _safeText(mentorship.objective, fallback: 'Objectif à préciser.'),
               maxLines: 5,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(height: 1.4),
+              style: TextStyle(height: 1.4),
             ),
           ],
         ),
@@ -1102,7 +1060,8 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
         .where(
           (member) => member.status == 'alumni' && !usedIds.contains(member.id),
         )
-        .toList();
+        .toList()
+      ..sort(MemberModel.compareAlphabetically);
   }
 
   Future<void> _submit() async {
@@ -1132,7 +1091,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(alumniErrorMessage(e)),
         ),
       );
     } finally {
@@ -1151,25 +1110,18 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (widget.canSelectUser)
-              DropdownButtonFormField<String>(
-                initialValue: _userId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Utilisateur Alumni',
-                  prefixIcon: Icon(Icons.person_rounded),
-                ),
-                items: _availableMembers.map((member) {
-                  return DropdownMenuItem(
-                    value: member.id,
-                    child: Text(member.displayName),
-                  );
-                }).toList(),
+              SearchableMemberPickerField(
+                members: _availableMembers,
+                value: _userId,
+                label: 'Profil Alumni',
+                hintText: 'Choisir un Alumni',
+                emptyText: 'Tous les Alumni disposent déjà d’un profil.',
                 onChanged: (value) => setState(() => _userId = value),
                 validator: (value) =>
                     value == null ? 'Choisis un utilisateur.' : null,
               )
             else
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
                   backgroundColor: AppTheme.enactusYellow,
@@ -1180,7 +1132,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                   'Ce profil sera rattaché à votre compte validé.',
                 ),
               ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _yearController,
               keyboardType: TextInputType.number,
@@ -1189,7 +1141,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.school_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _companyController,
               decoration: const InputDecoration(
@@ -1197,7 +1149,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.business_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _positionController,
               decoration: const InputDecoration(
@@ -1205,7 +1157,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.work_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _domainController,
               decoration: const InputDecoration(
@@ -1213,7 +1165,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.public_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _skillsController,
               decoration: const InputDecoration(
@@ -1221,7 +1173,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.psychology_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _summaryController,
               minLines: 2,
@@ -1231,7 +1183,7 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                 prefixIcon: Icon(Icons.notes_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _visibility,
               decoration: const InputDecoration(
@@ -1254,13 +1206,13 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
             SwitchListTile(
               value: _available,
               onChanged: (value) => setState(() => _available = value),
-              title: const Text('Disponible pour mentorat'),
+              title: Text('Disponible pour mentorat'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _saving ? null : _submit,
               icon: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -1268,8 +1220,8 @@ class _CreateProfileSheetState extends State<_CreateProfileSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.person_add_alt_rounded),
-              label: const Text('Créer le profil'),
+                  : Icon(Icons.person_add_alt_rounded),
+              label: Text('Créer le profil'),
             ),
           ],
         ),
@@ -1336,7 +1288,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(alumniErrorMessage(e)),
         ),
       );
     } finally {
@@ -1376,7 +1328,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
               validator: (value) =>
                   value == null ? 'Choisis un alumni mentor.' : null,
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -1384,7 +1336,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
                 prefixIcon: Icon(Icons.title_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             TextFormField(
               controller: _objectiveController,
               minLines: 2,
@@ -1394,7 +1346,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
                 prefixIcon: Icon(Icons.flag_rounded),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _projectId,
               isExpanded: true,
@@ -1415,7 +1367,7 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
                 });
               },
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: _poleId,
               isExpanded: true,
@@ -1439,11 +1391,11 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
                 return null;
               },
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: _saving ? null : _submit,
               icon: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -1451,8 +1403,8 @@ class _CreateMentorshipSheetState extends State<_CreateMentorshipSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.handshake_rounded),
-              label: const Text('Créer le mentorat'),
+                  : Icon(Icons.handshake_rounded),
+              label: Text('Créer le mentorat'),
             ),
           ],
         ),
@@ -1485,12 +1437,9 @@ class _SheetFrame extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 child,
               ],
             ),
@@ -1521,7 +1470,7 @@ class _SoftChip extends StatelessWidget {
           ? AppTheme.enactusYellow
           : AppTheme.enactusYellow.withValues(alpha: 0.14),
       side: BorderSide(color: AppTheme.enactusYellow.withValues(alpha: 0.34)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -1531,7 +1480,7 @@ class _LoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(40),
         child: Center(child: CircularProgressIndicator()),
@@ -1558,18 +1507,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement des alumni',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1624,14 +1573,14 @@ void _showAlumniDetails(
                       : NetworkImage(photoUrl),
                   child: photoUrl == null ? Text(_initials(name)) : null,
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1641,14 +1590,16 @@ void _showAlumniDetails(
                           profile.currentPosition,
                           fallback: 'Position à préciser',
                         ),
-                        style: const TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1680,26 +1631,20 @@ void _showAlumniDetails(
                   ),
               ],
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Parcours',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
+            SizedBox(height: 20),
+            Text('Parcours', style: TextStyle(fontWeight: FontWeight.w900)),
+            SizedBox(height: 6),
             Text(
               _safeText(
                 profile.experienceSummary,
                 fallback: 'Parcours à compléter.',
               ),
-              style: const TextStyle(height: 1.5),
+              style: TextStyle(height: 1.5),
             ),
             if (skills.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              const Text(
-                'Expertises',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 8),
+              SizedBox(height: 20),
+              Text('Expertises', style: TextStyle(fontWeight: FontWeight.w900)),
+              SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1710,18 +1655,18 @@ void _showAlumniDetails(
             ],
             if ((profile.linkedinUrl ?? '').trim().isNotEmpty ||
                 (profile.portfolioUrl ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 20),
-              const Text(
+              SizedBox(height: 20),
+              Text(
                 'Liens professionnels',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               if ((profile.linkedinUrl ?? '').trim().isNotEmpty)
                 SelectableText(profile.linkedinUrl!.trim()),
               if ((profile.portfolioUrl ?? '').trim().isNotEmpty)
                 SelectableText(profile.portfolioUrl!.trim()),
             ],
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
           ],
         ),
       );

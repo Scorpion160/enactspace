@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../models/document_center_models.dart';
@@ -9,7 +11,13 @@ import '../widgets/document_widgets.dart';
 
 class DocumentsScreen extends StatefulWidget {
   final DocumentsGateway? gateway;
-  const DocumentsScreen({super.key, this.gateway});
+  final String? initialPoleId, initialProjectId;
+  const DocumentsScreen({
+    super.key,
+    this.gateway,
+    this.initialPoleId,
+    this.initialProjectId,
+  });
   @override
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
@@ -23,11 +31,19 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   String _category = 'all', _status = 'all', _visibility = 'all';
   String _pole = 'all', _project = 'all', _event = 'all';
   bool _templates = false, _officials = false, _loading = true;
+  bool _usingOfflineCache = false;
   String? _error;
+
+  bool get _gatewayUsesOfflineCache => switch (_gateway) {
+    ApiDocumentsGateway gateway => gateway.usingOfflineCache,
+    _ => false,
+  };
 
   @override
   void initState() {
     super.initState();
+    _pole = widget.initialPoleId ?? 'all';
+    _project = widget.initialProjectId ?? 'all';
     _initialLoad();
   }
 
@@ -51,6 +67,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       setState(() {
         _documents = values[0] as List<DocumentModel>;
         _references = values[1] as DocumentReferenceData;
+        _usingOfflineCache = _gatewayUsesOfflineCache;
         _loading = false;
       });
     } catch (error) {
@@ -85,6 +102,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       if (mounted) {
         setState(() {
           _documents = values;
+          _usingOfflineCache = _gatewayUsesOfflineCache;
           _loading = false;
         });
       }
@@ -122,6 +140,19 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 700;
     final filters = _Filters(
+      search: TextField(
+        controller: _search,
+        onSubmitted: (_) => _applyFilters(),
+        decoration: InputDecoration(
+          hintText: 'Rechercher un document',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: IconButton(
+            tooltip: 'Rechercher',
+            onPressed: _applyFilters,
+            icon: const Icon(Icons.arrow_forward_rounded),
+          ),
+        ),
+      ),
       category: _category,
       status: _status,
       visibility: _visibility,
@@ -208,31 +239,40 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       ],
                     ),
                     const SizedBox(height: 18),
-                    TextField(
-                      controller: _search,
-                      onSubmitted: (_) => _applyFilters(),
-                      decoration: InputDecoration(
-                        labelText: 'Rechercher un document',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          tooltip: 'Rechercher',
-                          onPressed: _applyFilters,
-                          icon: const Icon(Icons.arrow_forward_rounded),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.menu_book_rounded),
+                        title: const Text('Règlement intérieur Enactus ESP'),
+                        subtitle: const Text(
+                          '13 articles · lecture disponible hors connexion',
                         ),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                        ),
+                        onTap: () =>
+                            context.push('/documents/reglement-interieur'),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (compact)
+                    if (_usingOfflineCache) ...[
                       Card(
-                        child: ExpansionTile(
-                          title: const Text('Filtres'),
-                          leading: const Icon(Icons.filter_list_rounded),
-                          childrenPadding: const EdgeInsets.all(14),
-                          children: [filters],
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        child: const ListTile(
+                          leading: Icon(Icons.offline_bolt_rounded),
+                          title: Text('Mode hors connexion'),
+                          subtitle: Text(
+                            'La dernière liste de documents enregistrée reste consultable. '
+                            'Les filtres fonctionnent localement ; un fichier distant non '
+                            'déjà disponible sur l’appareil nécessite une connexion.',
+                          ),
                         ),
-                      )
-                    else
-                      filters,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    filters,
                     if (_references.unavailableSources.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -323,6 +363,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 }
 
 class _Filters extends StatelessWidget {
+  final Widget search;
   final String category, status, visibility, pole, project, event;
   final bool templates, officials;
   final DocumentReferenceData references;
@@ -334,6 +375,7 @@ class _Filters extends StatelessWidget {
       onEvent;
   final ValueChanged<bool> onTemplates, onOfficials;
   const _Filters({
+    required this.search,
     required this.category,
     required this.status,
     required this.visibility,
@@ -354,89 +396,104 @@ class _Filters extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 10,
-    runSpacing: 10,
-    children: [
-      _Select(
-        label: 'Catégorie',
-        value: category,
-        items: [
-          const MapEntry('all', 'Toutes les catégories'),
-          ...DocumentModel.categoryOptions.map(
-            (item) => MapEntry(item.value, item.label),
-          ),
-        ],
-        onChanged: onCategory,
-      ),
-      _Select(
-        label: 'Statut',
-        value: status,
-        items: const [
-          MapEntry('all', 'Tous les statuts'),
-          MapEntry('draft', 'Brouillon'),
-          MapEntry('submitted', 'Soumis'),
-          MapEntry('pending_validation', 'En attente de validation'),
-          MapEntry('validated', 'Validé'),
-          MapEntry('rejected', 'Rejeté'),
-          MapEntry('archived', 'Archivé'),
-          MapEntry('expired', 'Expiré'),
-        ],
-        onChanged: onStatus,
-      ),
-      _Select(
-        label: 'Visibilité',
-        value: visibility,
-        items: const [
-          MapEntry('all', 'Toutes les visibilités'),
-          MapEntry('public_club', 'Tout le club'),
-          MapEntry('internal', 'Membres'),
-          MapEntry('pole_only', 'Pôle sélectionné'),
-          MapEntry('project_only', 'Projet sélectionné'),
-          MapEntry('enacchef_only', 'Responsables'),
-          MapEntry('private', 'Privé'),
-        ],
-        onChanged: onVisibility,
-      ),
-      _Select(
-        label: 'Pôle',
-        value: pole,
-        items: [
-          const MapEntry('all', 'Tous les pôles'),
-          ...references.poles.map((item) => MapEntry(item.id, item.name)),
-        ],
-        onChanged: onPole,
-      ),
-      _Select(
-        label: 'Projet',
-        value: project,
-        items: [
-          const MapEntry('all', 'Tous les projets'),
-          ...references.projects.map((item) => MapEntry(item.id, item.name)),
-        ],
-        onChanged: onProject,
-      ),
-      _Select(
-        label: 'Événement',
-        value: event,
-        items: [
-          const MapEntry('all', 'Tous les événements'),
-          ...references.events.map((item) => MapEntry(item.id, item.title)),
-        ],
-        onChanged: onEvent,
-      ),
-      FilterChip(
-        label: const Text('Modèles'),
-        selected: templates,
-        onSelected: onTemplates,
-      ),
-      FilterChip(
-        label: const Text('Officiels'),
-        selected: officials,
-        onSelected: onOfficials,
-      ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    return AppFilterToolbar(
+      search: search,
+      quickFilters: [
+        FilterChip(
+          label: const Text('Modèles'),
+          selected: templates,
+          onSelected: onTemplates,
+        ),
+        FilterChip(
+          label: const Text('Officiels'),
+          selected: officials,
+          onSelected: onOfficials,
+        ),
+      ],
+      filters: [
+        _Select(
+          label: 'Catégorie',
+          value: category,
+          items: [
+            const MapEntry('all', 'Toutes les catégories'),
+            ...DocumentModel.categoryOptions.map(
+              (item) => MapEntry(item.value, item.label),
+            ),
+          ],
+          onChanged: onCategory,
+        ),
+        _Select(
+          label: 'Statut',
+          value: status,
+          items: const [
+            MapEntry('all', 'Tous les statuts'),
+            MapEntry('draft', 'Brouillon'),
+            MapEntry('submitted', 'Soumis'),
+            MapEntry('pending_validation', 'En attente de validation'),
+            MapEntry('validated', 'Validé'),
+            MapEntry('rejected', 'Rejeté'),
+            MapEntry('archived', 'Archivé'),
+            MapEntry('expired', 'Expiré'),
+          ],
+          onChanged: onStatus,
+        ),
+        _Select(
+          label: 'Visibilité',
+          value: visibility,
+          items: const [
+            MapEntry('all', 'Toutes les visibilités'),
+            MapEntry('public_club', 'Tout le club'),
+            MapEntry('internal', 'Membres'),
+            MapEntry('pole_only', 'Pôle sélectionné'),
+            MapEntry('project_only', 'Projet sélectionné'),
+            MapEntry('enacchef_only', 'Responsables'),
+            MapEntry('private', 'Privé'),
+          ],
+          onChanged: onVisibility,
+        ),
+        _Select(
+          label: 'Pôle',
+          value: pole,
+          items: [
+            const MapEntry('all', 'Tous les pôles'),
+            ...references.poles.map((item) => MapEntry(item.id, item.name)),
+          ],
+          onChanged: onPole,
+        ),
+        _Select(
+          label: 'Projet',
+          value: project,
+          items: [
+            const MapEntry('all', 'Tous les projets'),
+            ...references.projects.map((item) => MapEntry(item.id, item.name)),
+          ],
+          onChanged: onProject,
+        ),
+        _Select(
+          label: 'Événement',
+          value: event,
+          items: [
+            const MapEntry('all', 'Tous les événements'),
+            ...references.events.map((item) => MapEntry(item.id, item.title)),
+          ],
+          onChanged: onEvent,
+        ),
+      ],
+      actions: const [],
+      activeFilterCount:
+          [
+            category,
+            status,
+            visibility,
+            pole,
+            project,
+            event,
+          ].where((v) => v != 'all').length +
+          (templates ? 1 : 0) +
+          (officials ? 1 : 0),
+    );
+  }
 }
 
 class _Select extends StatelessWidget {
@@ -450,22 +507,19 @@ class _Select extends StatelessWidget {
     required this.onChanged,
   });
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 220,
-    child: DropdownButtonFormField<String>(
-      isExpanded: true,
-      initialValue: value,
-      decoration: InputDecoration(labelText: label),
-      items: items
-          .map(
-            (item) => DropdownMenuItem(
-              value: item.key,
-              child: Text(item.value, overflow: TextOverflow.ellipsis),
-            ),
-          )
-          .toList(),
-      onChanged: (value) => onChanged(value!),
-    ),
+  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+    isExpanded: true,
+    initialValue: value,
+    decoration: InputDecoration(labelText: label),
+    items: items
+        .map(
+          (item) => DropdownMenuItem(
+            value: item.key,
+            child: Text(item.value, overflow: TextOverflow.ellipsis),
+          ),
+        )
+        .toList(),
+    onChanged: (value) => onChanged(value!),
   );
 }
 

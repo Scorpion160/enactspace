@@ -125,7 +125,8 @@ void main() {
     await tester.pumpWidget(_app(ImpactRecordsScreen(gateway: _ImpactFake())));
     await tester.pumpAndSettle();
     expect(find.text('Fiche solaire'), findsOneWidget);
-    expect(find.text('Validation autorisée'), findsOneWidget);
+    expect(find.text('Validation autorisée'), findsNothing);
+    expect(find.text('Nouvelle fiche Impact'), findsOneWidget);
   });
 
   testWidgets('métriques et preuves restent lazy sur la fiche Impact', (

@@ -1,27 +1,154 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from uuid import UUID
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Literal
+from urllib.parse import urlsplit
+from app.services.recruitment_application_metadata import academic_year, discovery_answer
+from app.services.recruitment_questionnaire import effective_questions, questionnaire_version, LEGACY_FIELDS
+from app.schemas.recruitment_schedule import RecruitmentSchedule
 
 
-class RecruitmentCampaignCreate(BaseModel):
-    season_id: Optional[UUID] = None
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+class RecruitmentPosition(BaseModel):
     title: str
+    headcount: int = Field(default=1, ge=1)
     description: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: bool = True
+    target_profile: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "title" not in value:
+            value = dict(value)
+            for alias in ("name", "position", "label"):
+                if alias in value:
+                    value["title"] = value[alias]
+                    break
+        return value
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Le poste ne peut pas être vide")
+        return cleaned
+
+    @field_validator("description", "target_profile")
+    @classmethod
+    def clean_optional_fields(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
 
 
-class RecruitmentCampaignUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: Optional[bool] = None
+class RecruitmentCommunicationAction(BaseModel):
+    action: str
+    channel: Optional[str] = None
+    owner: Optional[str] = None
+    timing: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "action" not in value:
+            value = dict(value)
+            for alias in ("title", "name", "label", "text"):
+                if alias in value:
+                    value["action"] = value[alias]
+                    break
+        return value
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("L'action de communication ne peut pas être vide")
+        return cleaned
+
+    @field_validator("channel", "owner", "timing")
+    @classmethod
+    def clean_optional_fields(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
 
 
-class RecruitmentCampaignRead(BaseModel):
+class RecruitmentInterviewQuestion(BaseModel):
+    question: str
+    category: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, value):
+        if isinstance(value, dict) and "question" not in value:
+            value = dict(value)
+            for alias in ("text", "title", "label"):
+                if alias in value:
+                    value["question"] = value[alias]
+                    break
+        return value
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("La question d'entretien ne peut pas être vide")
+        return cleaned
+
+    @field_validator("category")
+    @classmethod
+    def clean_category(cls, value: str | None) -> str | None:
+        return _clean_optional_text(value)
+
+
+class RecruitmentApplicationQuestion(BaseModel):
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    label: str = Field(min_length=1, max_length=300)
+    hint: str = Field(default="", max_length=500)
+    section: Literal["motivation", "availability"] = "motivation"
+    required: bool = False
+    legacy_field: Optional[str] = None
+
+    @field_validator("label", "hint")
+    @classmethod
+    def clean_text(cls, value):
+        cleaned = value.strip()
+        if not cleaned and value != "":
+            raise ValueError("Le libellé ne peut pas être vide")
+        return cleaned
+
+    @field_validator("legacy_field")
+    @classmethod
+    def validate_mapping(cls, value):
+        if value is not None and value not in LEGACY_FIELDS:
+            raise ValueError("Champ de compatibilité invalide")
+        return value
+
+
+def validate_question_list(values):
+    if values is not None and len({q.id for q in values}) != len(values):
+        raise ValueError("Chaque question doit avoir un identifiant unique")
+    if values is not None:
+        mapped = [q.legacy_field for q in values if q.legacy_field]
+        if len(set(mapped)) != len(mapped):
+            raise ValueError("Un champ de compatibilité ne peut être utilisé qu’une fois")
+    return values
+
+
+class RecruitmentPublicSchedule(BaseModel):
+    """Candidate-facing deposit window; the selection calendar stays internal."""
+    applications_open: Optional[date] = None
+    applications_close: Optional[date] = None
+
+
+class RecruitmentCampaignPublicRead(BaseModel):
+    eligibility_required: bool = False
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     id: UUID
     season_id: Optional[UUID]
     title: str
@@ -32,44 +159,159 @@ class RecruitmentCampaignRead(BaseModel):
     created_by: Optional[UUID]
     created_at: datetime
     updated_at: datetime
+    application_questions: list[RecruitmentApplicationQuestion] = Field(default_factory=list, max_length=40)
+    questionnaire_version: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def public_questionnaire(cls, value):
+        eligibility_required = value.get("eligibility_required", False) if isinstance(value, dict) else getattr(value, "selection_policy_version", None) == "blind-selection-v1"
+        if not isinstance(value, dict):
+            value = {name: getattr(value, name, None) for name in cls.model_fields}
+        else:
+            value = dict(value)
+        value['eligibility_required'] = eligibility_required
+        value['selection_schedule'] = {
+            'applications_open': value.get('start_date'),
+            'applications_close': value.get('end_date'),
+        }
+        questions = value.get('application_questions')
+        value['application_questions'] = effective_questions(questions)
+        value['questionnaire_version'] = questionnaire_version(questions)
+        return value
 
     class Config:
         from_attributes = True
 
 
+class RecruitmentCampaignCreate(BaseModel):
+    season_id: Optional[UUID] = None
+    title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    target_headcount: Optional[int] = Field(default=None, ge=1)
+    positions: list[RecruitmentPosition] = Field(default_factory=list)
+    target_profiles: list[str] = Field(default_factory=list)
+    communication_actions: list[RecruitmentCommunicationAction] = Field(default_factory=list)
+    interview_questions: list[RecruitmentInterviewQuestion] = Field(default_factory=list)
+    application_questions: Optional[list[RecruitmentApplicationQuestion]] = Field(default=None, max_length=40)
+    _question_ids = field_validator('application_questions')(validate_question_list)
+    is_active: bool = True
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def clean_title(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("target_profiles")
+    @classmethod
+    def clean_target_profiles(cls, values: list[str]) -> list[str]:
+        return [cleaned for value in values if (cleaned := value.strip())]
+
+
+class RecruitmentCampaignUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    target_headcount: Optional[int] = Field(default=None, ge=1)
+    positions: Optional[list[RecruitmentPosition]] = None
+    target_profiles: Optional[list[str]] = None
+    communication_actions: Optional[list[RecruitmentCommunicationAction]] = None
+    interview_questions: Optional[list[RecruitmentInterviewQuestion]] = None
+    application_questions: Optional[list[RecruitmentApplicationQuestion]] = Field(default=None, max_length=40)
+    _question_ids = field_validator('application_questions')(validate_question_list)
+    is_active: Optional[bool] = None
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def clean_title(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("target_profiles")
+    @classmethod
+    def clean_target_profiles(cls, values: list[str] | None) -> list[str] | None:
+        if values is None:
+            return None
+        return [cleaned for value in values if (cleaned := value.strip())]
+
+
+class RecruitmentCampaignRead(RecruitmentCampaignPublicRead):
+    target_headcount: Optional[int] = None
+    positions: Optional[list[RecruitmentPosition]] = None
+    target_profiles: Optional[list[str]] = None
+    communication_actions: Optional[list[RecruitmentCommunicationAction]] = None
+    interview_questions: Optional[list[RecruitmentInterviewQuestion]] = None
+
+
 class ApplicationCreate(BaseModel):
+    # Additive fields: canonical text is persisted in the existing columns.
+    # Older clients and historical records keep their original free text.
+    promotion_academic_year: Optional[str] = None
+    discovery_channel: Optional[str] = None
+    discovery_other: Optional[str] = None
+
+    @model_validator(mode="after")
+    def normalize_application_metadata(self):
+        if self.promotion_academic_year is not None:
+            year = academic_year(self.promotion_academic_year)
+            if self.class_name and self.class_name.strip() != year:
+                raise ValueError('La promotion et son année académique ne correspondent pas.')
+            self.promotion_academic_year = year
+            self.class_name = year
+        if self.discovery_channel is not None:
+            answer = discovery_answer(self.discovery_channel, self.discovery_other)
+            if self.known_enactus_from and self.known_enactus_from.strip() != answer:
+                raise ValueError('Le canal et sa description ne correspondent pas.')
+            self.known_enactus_from = answer
+        elif self.discovery_other:
+            raise ValueError('Choisis le canal Autre avant de préciser le moyen.')
+        return self
+
+    questionnaire_answers: Optional[dict[str, str]] = Field(default=None, max_length=40)
+    questionnaire_version: Optional[str] = Field(default=None, max_length=64)
     campaign_id: UUID
-    first_name: str
-    last_name: str
-    gender: Optional[str] = None
-    email: EmailStr
-    phone: Optional[str] = None
-    department: Optional[str] = None
-    study_level: Optional[str] = None
-    class_name: Optional[str] = None
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    gender: str = Field(min_length=1, max_length=40)
+    email: EmailStr = Field(max_length=150)
+    phone: str = Field(min_length=6, max_length=30)
+    department: str = Field(min_length=1, max_length=150)
+    study_level: str = Field(min_length=1, max_length=100)
+    class_name: Optional[str] = Field(default=None, max_length=120)
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
     other_clubs: Optional[str] = None
+    other_clubs_count: Optional[int] = Field(default=None, ge=0, le=100, strict=True)
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
-    preferred_pole: Optional[str] = None
-    project_interest: Optional[str] = None
+    preferred_pole: Optional[str] = Field(default=None, max_length=150)
+    project_interest: Optional[str] = Field(default=None, max_length=180)
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
+    campus_resident: Optional[bool] = Field(default=None, strict=True)
+    interview_preferences: Optional[list[Literal["in_person", "online", "hybrid"]]] = Field(default=None, max_length=3)
+    interview_availability: Optional[str] = Field(default=None, max_length=2000)
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
     attachment_url: Optional[str] = None
 
+    @field_validator('first_name', 'last_name', 'phone', 'department', 'study_level', mode='before')
+    @classmethod
+    def clean_identity(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 
 class ApplicationUpdate(BaseModel):
-    gender: Optional[str] = None
-    phone: Optional[str] = None
-    department: Optional[str] = None
-    study_level: Optional[str] = None
-    class_name: Optional[str] = None
+    gender: Optional[str] = Field(default=None, max_length=40)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    department: Optional[str] = Field(default=None, max_length=150)
+    study_level: Optional[str] = Field(default=None, max_length=100)
+    class_name: Optional[str] = Field(default=None, max_length=120)
     motivation: Optional[str] = None
     known_enactus_from: Optional[str] = None
     enactus_knowledge: Optional[str] = None
@@ -77,11 +319,14 @@ class ApplicationUpdate(BaseModel):
     contribution: Optional[str] = None
     project_ideas: Optional[str] = None
     leadership_profile: Optional[str] = None
-    preferred_pole: Optional[str] = None
-    project_interest: Optional[str] = None
+    preferred_pole: Optional[str] = Field(default=None, max_length=150)
+    project_interest: Optional[str] = Field(default=None, max_length=180)
     associative_experience: Optional[str] = None
     availability: Optional[str] = None
     public_comment: Optional[str] = None
+    campus_resident: Optional[bool] = Field(default=None, strict=True)
+    interview_preferences: Optional[list[Literal["in_person", "online", "hybrid"]]] = Field(default=None, max_length=3)
+    interview_availability: Optional[str] = Field(default=None, max_length=2000)
     cv_url: Optional[str] = None
     motivation_letter_url: Optional[str] = None
     attachment_url: Optional[str] = None
@@ -89,14 +334,74 @@ class ApplicationUpdate(BaseModel):
 
 
 class ApplicationInterviewSchedule(BaseModel):
+    use_enactmeet: bool = False
     interview_at: datetime
-    interview_location: Optional[str] = None
+    interview_end_at: Optional[datetime] = None
+    interview_mode: Optional[Literal["in_person", "online", "hybrid"]] = None
+    jury_member_ids: Optional[list[UUID]] = Field(default=None, min_length=1, max_length=200)
+    jury_team_id: Optional[UUID] = None
+    jury_team_revision: Optional[int] = Field(default=None, ge=1, strict=True)
+    interview_location: Optional[str] = Field(default=None, max_length=180)
     interview_link: Optional[str] = None
     interview_jury: Optional[str] = None
-    interview_note: Optional[str] = None
+    interview_note: Optional[str] = Field(default=None, max_length=4000)
+
+    @field_validator("interview_link")
+    @classmethod
+    def safe_interview_link(cls, value):
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        parts = urlsplit(value)
+        if (len(value) > 2000 or parts.scheme != "https" or not parts.hostname
+                or parts.username or parts.password or any(c.isspace() for c in value)):
+            raise ValueError("Le lien d’entretien doit être une adresse HTTPS valide.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_schedule(self):
+        if self.interview_mode in {"in_person", "hybrid"} and not (self.interview_location or "").strip():
+            raise ValueError("Précise le lieu de l’entretien.")
+        if self.use_enactmeet and self.interview_mode not in {"online", "hybrid"}:
+            raise ValueError("Choisis un entretien en ligne ou mixte pour EnactMeet.")
+        if self.interview_mode in {"online", "hybrid"} and not self.interview_link and not self.use_enactmeet:
+            raise ValueError("Précise le lien de l’entretien.")
+        if self.interview_end_at is not None:
+            from app.services.operational_integrity import to_naive_utc
+            minutes = (to_naive_utc(self.interview_end_at) - to_naive_utc(self.interview_at)).total_seconds() / 60
+            if not 5 <= minutes <= 180:
+                raise ValueError("La durée de l’entretien doit être comprise entre 5 et 180 minutes.")
+        if self.jury_member_ids is not None and len(set(self.jury_member_ids)) != len(self.jury_member_ids):
+            raise ValueError("Un membre du jury ne peut être choisi qu’une fois.")
+        if self.jury_team_id is not None and (self.jury_team_revision is None or self.jury_member_ids is not None):
+            raise ValueError("Choisis une équipe avec sa version, ou une composition personnalisée.")
+        return self
+
+
+class ApplicationHistoryRead(BaseModel):
+    id: str
+    kind: Literal["submission", "status", "interview", "integration"]
+    title: str
+    occurred_at: datetime
+    actor_name: str
+    from_status: Optional[str] = None
+    to_status: Optional[str] = None
+    scheduled_for: Optional[datetime] = None
 
 
 class ApplicationRead(BaseModel):
+    other_clubs_count: Optional[int] = None
+    my_review: Optional[dict] = None
+    screening_rubric: Optional[dict] = None
+    screening_score: Optional[float] = None
+    screening_review_count: int = 0
+    screening_spread: Optional[float] = None
+    assessment_stage: str = "screening"
+    screening_decision: Optional[str] = None
+    pending_final_decision: Optional[str] = None
+    screening_published: bool = False
+    history: list[ApplicationHistoryRead] = Field(default_factory=list)
+    questionnaire_answers: Optional[list[dict[str, str]]] = None
     id: UUID
     campaign_id: UUID
     first_name: str
@@ -119,9 +424,20 @@ class ApplicationRead(BaseModel):
     associative_experience: Optional[str]
     availability: Optional[str]
     public_comment: Optional[str]
+    campus_resident: Optional[bool] = None
+    interview_preferences: Optional[list[str]] = None
+    interview_availability: Optional[str] = None
+    interview_end_at: Optional[datetime] = None
+    interview_mode: Optional[str] = None
+    interview_jurors: list[dict] = Field(default_factory=list)
+    interview_needs_reassignment: bool = False
+    interview_team: Optional[dict] = None
+    permissions: dict = Field(default_factory=dict)
+    personality_status: Optional[str] = None
     interview_at: Optional[datetime]
     interview_location: Optional[str]
     interview_link: Optional[str]
+    interview_meeting_id: Optional[UUID] = None
     interview_jury: Optional[str]
     interview_note: Optional[str]
     cv_url: Optional[str]
@@ -146,11 +462,13 @@ class ApplicationStatusChange(BaseModel):
 
 
 class ApplicationTrackingRequest(BaseModel):
-    application_id: str
-    email: EmailStr
+    application_id: str = Field(min_length=1, max_length=64)
+    email: EmailStr = Field(max_length=150)
 
 
 class ApplicationTrackingRead(BaseModel):
+    enactmeet_available: bool = False
+    selection_schedule: Optional[RecruitmentPublicSchedule] = None
     application_id: UUID
     tracking_code: str
     campaign_title: str
@@ -169,22 +487,31 @@ class ApplicationTrackingRead(BaseModel):
     interview_details: Optional[str] = None
     final_result: Optional[str] = None
     account_created: bool
+    personality_status: Optional[str] = None
+    personality_due_at: Optional[datetime] = None
+    screening_result: Optional[str] = None
+    result_published_at: Optional[datetime] = None
 
 
 class ApplicationReviewCreate(BaseModel):
+    criteria_assessment: Optional[dict] = None
     application_id: UUID
-    score: Optional[float] = None
+    score: Optional[float] = Field(default=None, ge=0, le=20, allow_inf_nan=False)
     comment: Optional[str] = None
     recommendation: str = "reserve"
 
 
 class ApplicationReviewUpdate(BaseModel):
-    score: Optional[float] = None
+    criteria_assessment: Optional[dict] = None
+    score: Optional[float] = Field(default=None, ge=0, le=20, allow_inf_nan=False)
     comment: Optional[str] = None
     recommendation: Optional[str] = None
 
 
 class ApplicationReviewRead(BaseModel):
+    stage: str = "screening"
+    criteria_assessment: Optional[dict] = None
+    reviewer_name: Optional[str] = None
     id: UUID
     application_id: UUID
     reviewer_id: UUID
@@ -199,7 +526,7 @@ class ApplicationReviewRead(BaseModel):
 
 
 class ConvertApplicationToUserRequest(BaseModel):
-    password: str
+    password: Optional[str] = None
     profile_type: Optional[str] = None
     core_pole_id: Optional[UUID] = None
     support_pole_ids: list[UUID] = []

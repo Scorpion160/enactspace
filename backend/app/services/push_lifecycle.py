@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -6,10 +7,19 @@ from app.core.config import settings
 from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.product_services import AppInstallation, PushDelivery
+from app.models.user import User
 from app.services.push_locking import lock_user_installations
 
 
 UNSENT_PUSH_STATUSES = ("pending", "retry", "processing")
+
+
+def push_recipient_allowed(db: Session, user_id) -> bool:
+    if not settings.PUSH_RESTRICT_TO_TEST_USER_EMAIL:
+        return True
+    expected = (settings.PUSH_TEST_USER_EMAIL or "").strip().casefold()
+    email = db.query(User.email).filter(User.id == user_id).scalar()
+    return bool(email and email.strip().casefold() == expected)
 
 
 def cancel_unsent_deliveries(
@@ -24,7 +34,7 @@ def cancel_unsent_deliveries(
         ).filter(AppInstallation.user_id == user_id)
     if token_hash is not None:
         query = query.filter(PushDelivery.token_hash_snapshot == token_hash)
-    now = datetime.utcnow()
+    now = utc_now()
     rows = query.order_by(PushDelivery.id).populate_existing().with_for_update().all()
     for delivery in rows:
         delivery.status = "cancelled"
@@ -41,7 +51,7 @@ def clear_installation_push(db: Session, installation: AppInstallation) -> int:
     installation.push_token_ciphertext = None
     installation.push_token_hash = None
     installation.push_token_updated_at = None
-    installation.updated_at = datetime.utcnow()
+    installation.updated_at = utc_now()
     return cancelled
 
 
@@ -50,7 +60,7 @@ def disable_user_push(db: Session, user_id, *, revoke: bool = False) -> tuple[in
     cleared = 0
     revoked = 0
     cancelled = 0
-    now = datetime.utcnow()
+    now = utc_now()
     for installation in installations:
         if installation.push_token_hash:
             cleared += 1
@@ -66,7 +76,11 @@ def enqueue_push_deliveries(
     notification: Notification,
     preference: UserPreference | None,
 ) -> int:
-    if not settings.push_enabled or preference is None:
+    if (
+        not settings.push_enabled
+        or preference is None
+        or not push_recipient_allowed(db, notification.user_id)
+    ):
         return 0
     # Preserve changes already made by the current transaction before the
     # lock refreshes database-backed state.

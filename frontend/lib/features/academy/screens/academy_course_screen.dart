@@ -3,6 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/academy_quiz_dialog.dart';
+import '../widgets/academy_course_hero.dart';
+import '../widgets/academy_lesson_reader.dart';
+import '../widgets/academy_style.dart';
+
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../models/academy_models.dart';
@@ -12,11 +17,13 @@ class AcademyCourseScreen extends StatefulWidget {
   final String courseId;
   final AcademyGateway? gateway;
   final UserExperience? currentUser;
+  final bool resume;
   const AcademyCourseScreen({
     super.key,
     required this.courseId,
     this.gateway,
     this.currentUser,
+    this.resume = false,
   });
   @override
   State<AcademyCourseScreen> createState() => _AcademyCourseScreenState();
@@ -29,6 +36,7 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
   String? error;
   bool loading = true;
   String? busy;
+  bool _resumed = false;
   @override
   void initState() {
     super.initState();
@@ -56,7 +64,21 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
     });
     try {
       final value = await gateway.getCourse(widget.courseId);
-      if (mounted) setState(() => course = value);
+      if (mounted) {
+        setState(() => course = value);
+        if (widget.resume && !_resumed && !value.isLocked) {
+          _resumed = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final next = value.lessons.where((l) => !l.completed).toList();
+            if (next.isNotEmpty) {
+              lesson(next.first);
+            } else if (value.quiz.id.isNotEmpty) {
+              quiz();
+            }
+          });
+        }
+      }
     } catch (e) {
       if (mounted) setState(() => error = _msg(e));
     } finally {
@@ -64,15 +86,15 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
     }
   }
 
-  Future<void> lesson(AcademyLessonModel l) async {
-    if (busy != null) return;
-    setState(() => busy = l.id);
+  Future<void> lesson(AcademyLessonModel value) async {
+    if (busy != null || course?.isLocked == true) return;
+    setState(() => busy = value.id);
     try {
-      if (!l.started && !l.completed)
-        await gateway.startLesson(l.id);
-      else if (!l.completed)
-        await gateway.completeLesson(l.id);
-      await load();
+      if (!value.started && !value.completed)
+        await gateway.startLesson(value.id);
+      if (!mounted) return;
+      await readLesson(value);
+      if (mounted) await load();
     } catch (e) {
       _snack(_msg(e));
     } finally {
@@ -80,35 +102,38 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
     }
   }
 
+  Future<void> readLesson(AcademyLessonModel value) async {
+    if (course?.isLocked == true) return;
+    final notice = await showDialog<String>(
+      context: context,
+      useSafeArea: false,
+      builder: (_) => AcademyLessonReader(
+        course: course!,
+        initialLesson: value,
+        gateway: gateway,
+      ),
+    );
+    if (mounted && notice != null) _snack(notice);
+  }
+
   Future<void> quiz() async {
+    if (busy != null || course?.canTakeQuiz != true) return;
+    setState(() => busy = 'quiz');
     try {
       final q = await gateway.getQuiz(course!.quiz.id);
       if (!mounted) return;
-      final answers = await showDialog<List<int>>(
+      await showDialog<AcademyQuizResult>(
         context: context,
-        builder: (_) => _QuizDialog(quiz: q),
+        builder: (_) => AcademyQuizDialog(
+          quiz: q,
+          submit: (answers) => gateway.submitQuiz(q.id, answers),
+        ),
       );
-      if (answers == null) return;
-      final result = await gateway.submitQuiz(q.id, answers);
-      if (mounted)
-        await showDialog<void>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text(result.passed ? 'Quiz réussi' : 'Quiz à reprendre'),
-            content: Text(
-              'Score : ${result.score.toStringAsFixed(0)}\nBonnes réponses : ${result.correctAnswers?.toString() ?? 'Non communiqué'} / ${result.total}\nPoints : ${result.points}${result.attemptNumber == null ? '' : '\nTentative : ${result.attemptNumber}'}',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Fermer'),
-              ),
-            ],
-          ),
-        );
-      await load();
+      if (mounted) await load();
     } catch (e) {
       _snack(_msg(e));
+    } finally {
+      if (mounted) setState(() => busy = null);
     }
   }
 
@@ -117,163 +142,408 @@ class _AcademyCourseScreenState extends State<AcademyCourseScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(v)));
   }
 
+  void _continueCourse() {
+    final c = course;
+    if (c == null || busy != null || c.isLocked || c.lessons.isEmpty) return;
+    if (c.canTakeQuiz && !c.quizPassed) {
+      quiz();
+      return;
+    }
+    final next =
+        c.lessons.where((l) => l.started && !l.completed).firstOrNull ??
+        c.lessons.where((l) => !l.completed).firstOrNull ??
+        c.lessons.first;
+    lesson(next);
+  }
+
   @override
-  Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
-    if (error != null)
-      return Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(error!),
-                FilledButton(onPressed: load, child: const Text('Réessayer')),
-              ],
-            ),
-          ),
-        ),
-      );
-    final c = course!;
-    return RefreshIndicator(
-      onRefresh: load,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          _CourseHeader(
-            course: c,
-            canManage: currentUser?.canManageAcademy == true,
-          ),
-          const SizedBox(height: 16),
-          Card(
+  Widget build(BuildContext context) => AcademyStyle(
+    child: Builder(
+      builder: (context) {
+        if (loading) return const Center(child: CircularProgressIndicator());
+        if (error != null)
+          return Center(
             child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Wrap(
-                spacing: 24,
-                runSpacing: 14,
+              padding: const EdgeInsets.all(20),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(error!),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: load,
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        final c = course!;
+        final started = c.lessons.any((l) => l.started || l.completed);
+        final title = c.isLocked
+            ? 'Formation à débloquer'
+            : c.isMastered
+            ? 'Relire la formation'
+            : c.canTakeQuiz
+            ? 'Passer au quiz'
+            : started
+            ? 'Reprendre ma leçon'
+            : 'Commencer la formation';
+        final program = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Le programme',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 14),
+            if (c.lessons.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'Les leçons de cette formation seront bientôt disponibles.',
+                  ),
+                ),
+              ),
+            for (var i = 0; i < c.lessons.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _CourseLessonCard(
+                  index: i,
+                  lesson: c.lessons[i],
+                  busy: busy != null,
+                  locked: c.isLocked,
+                  onProgress: () => lesson(c.lessons[i]),
+                ),
+              ),
+          ],
+        );
+        final aside = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Ta progression',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    AcademyProgressBar(
+                      value: c.progress,
+                      label:
+                          '${c.completedLessonCount}/${c.lessonCount} leçons terminées',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      c.isMastered
+                          ? 'Formation terminée. Tu peux la relire à tout moment.'
+                          : 'Chaque leçon te rapproche de la prochaine étape.',
+                      style: const TextStyle(height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (c.quiz.id.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Icon(
+                        c.canTakeQuiz
+                            ? Icons.quiz_outlined
+                            : Icons.lock_outline_rounded,
+                        size: 30,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        c.quizPassed
+                            ? 'Quiz réussi'
+                            : c.canTakeQuiz
+                            ? 'À toi de jouer'
+                            : 'Quiz à débloquer',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        c.quizPassed
+                            ? 'Reviens sur les questions et les explications pour consolider tes acquis.'
+                            : c.canTakeQuiz
+                            ? 'Les leçons sont terminées. Prends un moment pour vérifier ce que tu as retenu.'
+                            : 'Termine les leçons pour ouvrir le quiz et débloquer la suite du parcours.',
+                        style: const TextStyle(height: 1.5),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: !c.canTakeQuiz || busy != null ? null : quiz,
+                        icon: const Icon(Icons.quiz_rounded),
+                        label: Text(
+                          c.quizPassed ? 'Revoir le quiz' : 'Ouvrir le quiz',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Card(
+              child: ExpansionTile(
+                title: const Text('À propos de cette formation'),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 children: [
-                  _D('Durée', '${c.durationMinutes} min'),
-                  _D('Points', '${c.points}'),
-                  _D('Progression', '${(c.progress * 100).round()} %'),
-                  _D('Rôles cibles', c.targetRolesLabel),
-                  _D('Pôle', c.poleId == null ? 'Tous' : 'Pôle associé'),
-                  _D('Projet', c.projectId == null ? 'Tous' : 'Projet associé'),
+                  Text(c.description, style: const TextStyle(height: 1.5)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Pour : ${c.targetRolesLabel}',
+                    style: const TextStyle(height: 1.5),
+                  ),
+                  if (c.poleId != null)
+                    const Text('Cette formation est associée à un pôle.'),
+                  if (c.projectId != null)
+                    const Text('Cette formation est associée à un projet.'),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Leçons',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          for (final l in c.lessons)
-            Card(
-              child: ListTile(
-                minVerticalPadding: 12,
-                leading: CircleAvatar(
-                  child: Icon(
-                    l.completed
-                        ? Icons.check_rounded
-                        : l.started
-                        ? Icons.play_arrow_rounded
-                        : Icons.menu_book_rounded,
-                  ),
-                ),
-                title: Text(
-                  l.title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Text(
-                  '${l.typeLabel} · ${l.durationMinutes} min · ${l.statusLabel}${l.externalUrl == null && l.resourceFileId == null ? '' : ' · Ressource disponible'}\n${l.summary}',
-                ),
-                isThreeLine: true,
-                trailing: SizedBox(
-                  width: 120,
-                  child: FilledButton.tonal(
-                    onPressed: busy == l.id || l.completed
-                        ? null
-                        : () => lesson(l),
-                    child: Text(l.started ? 'Terminer' : 'Commencer'),
+          ],
+        );
+        return RefreshIndicator(
+          onRefresh: load,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1280),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AcademyCourseHero(
+                        course: c,
+                        actionLabel: title,
+                        onContinue:
+                            busy != null || c.isLocked || c.lessons.isEmpty
+                            ? null
+                            : _continueCourse,
+                        onManage: currentUser?.canManageAcademy == true
+                            ? () => context.go('/academy/admin', extra: gateway)
+                            : null,
+                      ),
+                      if (c.isLocked) ...[
+                        const SizedBox(height: 16),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Cette formation se débloque à la prochaine étape',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  c.lockReason,
+                                  style: const TextStyle(height: 1.6),
+                                ),
+                                for (final p in c.prerequisites.where(
+                                  (p) => !p.completed,
+                                ))
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: OutlinedButton.icon(
+                                      onPressed: p.available
+                                          ? () => context.go(
+                                              '/academy/courses/${p.id}?resume=true',
+                                              extra: gateway,
+                                            )
+                                          : null,
+                                      icon: const Icon(Icons.arrow_forward),
+                                      label: Text(
+                                        p.available
+                                            ? p.title
+                                            : '${p.title} · publication à venir',
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 22),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final wide =
+                              constraints.maxWidth >= 950 &&
+                              MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+                          if (wide)
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: program),
+                                const SizedBox(width: 22),
+                                SizedBox(width: 300, child: aside),
+                              ],
+                            );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              program,
+                              const SizedBox(height: 16),
+                              aside,
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: c.quiz.id.isEmpty ? null : quiz,
-            icon: const Icon(Icons.quiz_rounded),
-            label: const Text('Ouvrir le quiz'),
+            ],
           ),
-        ],
+        );
+      },
+    ),
+  );
+}
+
+class _CourseLessonCard extends StatelessWidget {
+  final int index;
+  final AcademyLessonModel lesson;
+  final bool busy;
+  final bool locked;
+  final VoidCallback onProgress;
+  const _CourseLessonCard({
+    required this.index,
+    required this.lesson,
+    required this.busy,
+    required this.locked,
+    required this.onProgress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final label = locked
+        ? 'À débloquer'
+        : lesson.completed
+        ? 'Relire'
+        : lesson.started
+        ? 'Reprendre'
+        : 'Commencer';
+    final button = FilledButton.tonal(
+      key: ValueKey('academy-lesson-${lesson.id}'),
+      onPressed: busy || locked ? null : onProgress,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        backgroundColor: lesson.started && !locked
+            ? academyYellow
+            : colors.secondaryContainer,
+        foregroundColor: lesson.started && !locked
+            ? academyInk
+            : colors.onSecondaryContainer,
+      ),
+      child: Text(label, textAlign: TextAlign.center),
+    );
+    final details = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: lesson.completed
+              ? colors.secondaryContainer
+              : colors.tertiaryContainer,
+          foregroundColor: lesson.completed
+              ? colors.onSecondaryContainer
+              : colors.onTertiaryContainer,
+          child: _LessonNumber(index: index, completed: lesson.completed),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                lesson.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${lesson.typeLabel} · ${lesson.durationMinutes} min · ${lesson.statusLabel}',
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 340 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [details, const SizedBox(height: 12), button],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: details),
+                const SizedBox(width: 12),
+                button,
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-class _CourseHeader extends StatelessWidget {
-  final AcademyCourseModel course;
-  final bool canManage;
-
-  const _CourseHeader({required this.course, required this.canManage});
-
+class _LessonNumber extends StatelessWidget {
+  final int index;
+  final bool completed;
+  const _LessonNumber({required this.index, required this.completed});
   @override
-  Widget build(BuildContext context) {
-    final details = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            Chip(label: Text(course.levelLabel)),
-            Chip(label: Text(course.categoryLabel)),
-            if (course.isRequired) const Chip(label: Text('Obligatoire')),
-          ],
-        ),
-        Text(
-          course.title,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        Text(course.description),
-      ],
-    );
-    final action = OutlinedButton.icon(
-      onPressed: () => context.go('/academy/admin'),
-      icon: const Icon(Icons.admin_panel_settings_rounded),
-      label: const Text('Gestion Academy'),
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stack =
-            constraints.maxWidth < 700 ||
-            MediaQuery.textScalerOf(context).scale(1) > 1.3;
-        if (stack) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              details,
-              if (canManage) ...[const SizedBox(height: 12), action],
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: details),
-            if (canManage) ...[const SizedBox(width: 16), action],
-          ],
+  Widget build(BuildContext context) => completed
+      ? const Icon(Icons.check_rounded, size: 20)
+      : Text(
+          '${index + 1}'.padLeft(2, '0'),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         );
-      },
-    );
-  }
 }
 
 class AcademyAdminScreen extends StatefulWidget {
@@ -350,25 +620,23 @@ class _AcademyAdminScreenState extends State<AcademyAdminScreen> {
     child: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Gestion Academy',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final copy = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Gestion Academy',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
                   ),
-                  const Text(
-                    'Cours, publication et leçons — accès contrôlé par le backend.',
-                  ),
-                ],
-              ),
-            ),
-            FilledButton.icon(
+                ),
+                const Text(
+                  'Rédige les cours, organise les leçons et prépare leur publication.',
+                ),
+              ],
+            );
+            final action = FilledButton.icon(
               onPressed: () =>
                   showDialog<bool>(
                     context: context,
@@ -378,8 +646,24 @@ class _AcademyAdminScreenState extends State<AcademyAdminScreen> {
                   }),
               icon: const Icon(Icons.add_rounded),
               label: const Text('Créer un cours'),
-            ),
-          ],
+            );
+            final stack =
+                constraints.maxWidth < 650 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3;
+            if (stack) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [copy, const SizedBox(height: 12), action],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: copy),
+                const SizedBox(width: 16),
+                action,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
         if (error != null)
@@ -448,72 +732,6 @@ class _AcademyAdminScreenState extends State<AcademyAdminScreen> {
   );
 }
 
-class _QuizDialog extends StatefulWidget {
-  final AcademyQuizModel quiz;
-  const _QuizDialog({required this.quiz});
-  @override
-  State<_QuizDialog> createState() => _QuizDialogState();
-}
-
-class _QuizDialogState extends State<_QuizDialog> {
-  final Map<int, int> answers = {};
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.quiz.title),
-    content: SizedBox(
-      width: 620,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < widget.quiz.questions.length; i++)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${i + 1}. ${widget.quiz.questions[i].question}',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      for (
-                        var j = 0;
-                        j < widget.quiz.questions[i].choices.length;
-                        j
-                      )
-                        RadioListTile<int>(
-                          value: j,
-                          groupValue: answers[i],
-                          onChanged: (v) => setState(() => answers[i] = v!),
-                          title: Text(widget.quiz.questions[i].choices[j]),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Annuler'),
-      ),
-      FilledButton(
-        onPressed: answers.length == widget.quiz.questions.length
-            ? () => Navigator.pop(context, [
-                for (var i = 0; i < widget.quiz.questions.length; i++)
-                  answers[i]!,
-              ])
-            : null,
-        child: const Text('Soumettre'),
-      ),
-    ],
-  );
-}
-
 class _CourseDialog extends StatefulWidget {
   final AcademyGateway gateway;
   final AcademyCourseModel? course;
@@ -526,6 +744,9 @@ class _CourseDialogState extends State<_CourseDialog> {
   late final Map<String, TextEditingController> c;
   late bool requiredCourse, published;
   late String level;
+  List<AcademyCourseModel>? choices;
+  late Set<String> prerequisites;
+  String? failure;
   bool busy = false;
   @override
   void initState() {
@@ -548,6 +769,18 @@ class _CourseDialogState extends State<_CourseDialog> {
     requiredCourse = v?.isRequired ?? false;
     published = v?.isPublished ?? false;
     level = v?.level ?? 'debutant';
+    prerequisites = {...?v?.prerequisiteCourseIds};
+    widget.gateway
+        .getAdminCourses()
+        .then((items) {
+          if (mounted)
+            setState(
+              () => choices = items.where((item) => item.id != v?.id).toList(),
+            );
+        })
+        .catchError((Object e) {
+          if (mounted) setState(() => failure = _msg(e));
+        });
   }
 
   @override
@@ -564,6 +797,7 @@ class _CourseDialogState extends State<_CourseDialog> {
       'description': c['description']!.text,
       'category': c['category']!.text,
       'level': level,
+      'prerequisite_course_ids': prerequisites.toList(),
       'target_roles': c['target_roles']!.text
           .split(',')
           .map((v) => v.trim())
@@ -578,11 +812,18 @@ class _CourseDialogState extends State<_CourseDialog> {
           ? null
           : c['project_id']!.text,
     };
-    if (widget.course == null)
-      await widget.gateway.createCourse(f);
-    else
-      await widget.gateway.updateCourse(widget.course!.id, f);
-    if (mounted) Navigator.pop(context, true);
+    try {
+      if (widget.course == null) {
+        await widget.gateway.createCourse(f);
+      } else {
+        await widget.gateway.updateCourse(widget.course!.id, f);
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) setState(() => failure = _msg(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   @override
@@ -619,6 +860,35 @@ class _CourseDialogState extends State<_CourseDialog> {
               ],
               onChanged: (v) => level = v!,
             ),
+            const SizedBox(height: 18),
+            const Text(
+              'Formations à réussir avant ce cours',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'Sans sélection, la formation reste accessible librement. Chaque prérequis demande les leçons terminées et le quiz réussi.',
+            ),
+            if (choices == null) const LinearProgressIndicator(),
+            for (final item in choices ?? <AcademyCourseModel>[])
+              CheckboxListTile(
+                dense: true,
+                value: prerequisites.contains(item.id),
+                title: Text(item.title),
+                onChanged: busy
+                    ? null
+                    : (checked) => setState(() {
+                        if (checked == true) {
+                          prerequisites.add(item.id);
+                        } else {
+                          prerequisites.remove(item.id);
+                        }
+                      }),
+              ),
+            if (failure != null)
+              Text(
+                failure!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             SwitchListTile(
               value: requiredCourse,
               onChanged: (v) => setState(() => requiredCourse = v),

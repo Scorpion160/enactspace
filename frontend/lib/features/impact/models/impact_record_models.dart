@@ -100,7 +100,8 @@ class ImpactRecordModel {
     required this.canManage,
     required this.canValidate,
   });
-  String get statusLabel => validationStatus == 'VERIFIED' || status == 'validated'
+  String get statusLabel =>
+      validationStatus == 'VERIFIED' || status == 'validated'
       ? 'Fiche vérifiée'
       : impactStatusLabel(validationStatus);
   factory ImpactRecordModel.fromJson(Map<String, dynamic> j) =>

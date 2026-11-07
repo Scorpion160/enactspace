@@ -1,3 +1,5 @@
+import '../recruitment_style.dart';
+import '../../services/recruitment_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/application_model.dart';
@@ -20,6 +22,7 @@ class CandidateActionsSection extends StatelessWidget {
   final double? reviewAverage;
   final CandidateStatusCallback onStatusChange;
   final CandidateInterviewCallback onInterview;
+  final VoidCallback? onAdvancedInterview;
   final String? feedback;
 
   const CandidateActionsSection({
@@ -30,6 +33,7 @@ class CandidateActionsSection extends StatelessWidget {
     required this.reviewAverage,
     required this.onStatusChange,
     required this.onInterview,
+    this.onAdvancedInterview,
     this.feedback,
   });
 
@@ -51,20 +55,22 @@ class CandidateActionsSection extends StatelessWidget {
       if (allowed.contains('interview_scheduled') ||
           application.status == 'interview_scheduled')
         _ActionButton(
-        key: const Key('candidate-action-interview'),
-        icon: Icons.event_available_rounded,
-        label: application.status == 'interview_scheduled'
-            ? 'Modifier l’entretien'
-            : 'Planifier un entretien',
-        onPressed: () => showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => CandidateInterviewDialog(
-            application: application,
-            onConfirm: onInterview,
-          ),
+          key: const Key('candidate-action-interview'),
+          icon: Icons.event_available_rounded,
+          label: application.status == 'interview_scheduled'
+              ? 'Modifier l’entretien'
+              : 'Planifier un entretien',
+          onPressed:
+              onAdvancedInterview ??
+              () => showRecruitmentDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) => CandidateInterviewDialog(
+                  application: application,
+                  onConfirm: onInterview,
+                ),
+              ),
         ),
-      ),
       if (allowed.contains('waiting_list'))
         _ActionButton(
           key: const Key('candidate-action-waiting-list'),
@@ -126,7 +132,7 @@ class CandidateActionsSection extends StatelessWidget {
         Wrap(spacing: 10, runSpacing: 10, children: actions),
         const SizedBox(height: 10),
         Text(
-          'La conversion en utilisateur reste une action séparée.',
+          'La création du compte membre vient après la décision de recrutement.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -138,13 +144,24 @@ class CandidateActionsSection extends StatelessWidget {
     return switch (application.status) {
       'submitted' => const {'under_review', 'cancelled'},
       'under_review' => const {
-        'interview_scheduled', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+        'interview_scheduled',
+        'waiting_list',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       'interview_scheduled' => const {
-        'under_review', 'waiting_list', 'accepted', 'rejected', 'cancelled',
+        'under_review',
+        'waiting_list',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       'waiting_list' => const {
-        'interview_scheduled', 'accepted', 'rejected', 'cancelled',
+        'interview_scheduled',
+        'accepted',
+        'rejected',
+        'cancelled',
       },
       _ => const {},
     };
@@ -154,7 +171,7 @@ class CandidateActionsSection extends StatelessWidget {
     BuildContext context, {
     required String targetStatus,
     required CandidateDecisionKind kind,
-  }) => showDialog<void>(
+  }) => showRecruitmentDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) => CandidateDecisionDialog(
@@ -266,7 +283,7 @@ class _CandidateDecisionDialogState extends State<CandidateDecisionDialog> {
             _DialogLine('Nouveau statut', target),
             if (widget.kind == CandidateDecisionKind.acceptance) ...[
               _DialogLine(
-                'Moyenne officielle',
+                'Évaluation par critères',
                 widget.reviewAverage == null
                     ? 'Non disponible'
                     : '${widget.reviewAverage!.toStringAsFixed(1)}/20',
@@ -276,13 +293,13 @@ class _CandidateDecisionDialogState extends State<CandidateDecisionDialog> {
                 '${widget.reviewCount} enregistrée${widget.reviewCount > 1 ? 's' : ''}',
               ),
               const Text(
-                'Cette action marque le dossier comme retenu sans convertir '
-                'automatiquement la personne en utilisateur.',
+                'Après validation, prépare son intégration depuis sa fiche '
+                'candidat.',
               ),
             ] else if (widget.kind == CandidateDecisionKind.rejection)
               const Text(
-                'Cette décision est sensible. Vérifiez le dossier avant de '
-                'marquer la candidature comme non retenue.',
+                'Vérifie le dossier avant de confirmer que la candidature '
+                'n’est pas retenue.',
               )
             else if (widget.kind == CandidateDecisionKind.closure)
               const Text(
@@ -625,7 +642,5 @@ String? _optional(String value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-String _humanError(Object error, String fallback) {
-  final raw = error.toString().replaceFirst('Exception: ', '').trim();
-  return raw.isEmpty ? fallback : raw;
-}
+String _humanError(Object error, String fallback) =>
+    recruitmentMessage(error, fallback: fallback);

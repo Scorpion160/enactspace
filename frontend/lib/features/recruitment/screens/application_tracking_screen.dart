@@ -1,3 +1,7 @@
+import '../widgets/recruitment_style.dart';
+import '../services/recruitment_campaign_tools.dart';
+import 'public/personality_questionnaire_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,8 +13,13 @@ import '../widgets/public/public_recruitment_widgets.dart';
 
 class ApplicationTrackingScreen extends StatefulWidget {
   final PublicRecruitmentGateway? gateway;
+  final PublicPersonalityGateway? personalityGateway;
 
-  const ApplicationTrackingScreen({super.key, this.gateway});
+  const ApplicationTrackingScreen({
+    super.key,
+    this.gateway,
+    this.personalityGateway,
+  });
 
   @override
   State<ApplicationTrackingScreen> createState() =>
@@ -56,7 +65,7 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
         _error = switch (error.kind) {
           PublicRecruitmentFailureKind.notFound => TrackingErrorKind.notFound,
           PublicRecruitmentFailureKind.network => TrackingErrorKind.network,
-          PublicRecruitmentFailureKind.server => TrackingErrorKind.server,
+          _ => TrackingErrorKind.server,
         };
       });
     } catch (_) {
@@ -72,7 +81,10 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     return PublicRecruitmentShell(
       child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
@@ -93,7 +105,72 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                 );
                 final result = _tracking == null
                     ? const _TrackingIntroduction()
-                    : TrackingResultView(tracking: _tracking!);
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TrackingResultView(tracking: _tracking!),
+                          if (_tracking!.personalityStatus != null &&
+                              (widget.personalityGateway != null ||
+                                  _gateway is RecruitmentPublicGateway))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        'Préparons notre échange',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _tracking!.personalityStatus ==
+                                                'submitted'
+                                            ? 'Tes réponses ont été partagées avec le jury. Tu peux retrouver ta synthèse.'
+                                            : _tracking!.personalityStatus ==
+                                                  'declined'
+                                            ? 'Tu as choisi d’en parler pendant l’entretien.'
+                                            : 'L’équipe te propose un questionnaire pour mieux préparer l’entretien.',
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton.icon(
+                                        icon: const Icon(Icons.forum_outlined),
+                                        label: Text(
+                                          _tracking!.personalityStatus ==
+                                                  'invited'
+                                              ? 'Ouvrir mon questionnaire'
+                                              : 'Consulter ma réponse',
+                                        ),
+                                        onPressed: () async {
+                                          final tracking = _tracking!;
+                                          await Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (context) =>
+                                                  PersonalityQuestionnaireScreen(
+                                                    code: tracking.trackingCode,
+                                                    email: tracking.email,
+                                                    gateway:
+                                                        widget
+                                                            .personalityGateway ??
+                                                        ApiPublicPersonalityGateway(),
+                                                  ),
+                                            ),
+                                          );
+                                          if (mounted) await _search();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                 if (constraints.maxWidth < 860) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -156,14 +233,17 @@ class _TrackingSearchFormState extends State<TrackingSearchForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Suivre ma candidature',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Saisis le code reçu après l’envoi et la même adresse e-mail.',
-                style: TextStyle(color: AppTheme.secondaryText, height: 1.5),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 22),
               TextFormField(
@@ -204,11 +284,11 @@ class _TrackingSearchFormState extends State<TrackingSearchForm> {
                 },
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Code perdu ? Consulte le message affiché après ton envoi. Aucun mécanisme de récupération automatique n’est disponible actuellement.',
+              Text(
+                'Retrouve ton code dans l’e-mail de confirmation ou le message affiché après l’envoi de ta candidature. Si tu ne l’as plus, contacte l’équipe recrutement.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.secondaryText,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
@@ -266,10 +346,7 @@ class _TrackingError extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: AppTheme.error,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -286,7 +363,7 @@ class _TrackingIntroduction extends StatelessWidget {
         color: AppTheme.softBlack,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.route_rounded, color: AppTheme.enactusYellow, size: 44),
@@ -328,28 +405,28 @@ class TrackingResultView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(presentation.icon, size: 38, color: AppTheme.softBlack),
+              Icon(
+                presentation.icon,
+                size: 38,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 presentation.title,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 6),
-              Text(
-                presentation.explanation,
-                style: const TextStyle(height: 1.5),
-              ),
+              Text(presentation.explanation, style: TextStyle(height: 1.5)),
               const SizedBox(height: 16),
               Text(
                 tracking.campaignTitle,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               Text(
                 tracking.candidateName,
-                style: const TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 6),
               Semantics(
@@ -391,16 +468,16 @@ class TrackingResultView extends StatelessWidget {
               const SizedBox(height: 18),
               Text(
                 'Dernière mise à jour : ${_formatDate(tracking.updatedAt)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.secondaryText,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 14),
               TextButton.icon(
                 onPressed: () => context.go('/recruitment/apply'),
                 icon: const Icon(Icons.campaign_outlined),
-                label: const Text('Voir les campagnes ouvertes'),
+                label: Text('Voir les campagnes ouvertes'),
               ),
             ],
           ),
@@ -437,9 +514,9 @@ class _InformationPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              Text(text, style: const TextStyle(height: 1.4)),
+              Text(text, style: TextStyle(height: 1.4)),
             ],
           ),
         ),

@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -213,7 +214,7 @@ def _revoke_tag(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Statut de revocation NFC invalide",
         )
-    now = datetime.utcnow()
+    now = utc_now()
     tag.status = new_status
     tag.revoked_by_id = current_user.id
     tag.revoked_at = now
@@ -263,7 +264,7 @@ def _create_tag(
 ) -> AttendanceNfcTag:
     tag_uid_hash = hash_nfc_tag_payload(payload.tag_payload)
     _ensure_tag_can_be_assigned(db, tag_uid_hash=tag_uid_hash, member_id=member_id)
-    now = datetime.utcnow()
+    now = utc_now()
     tag = AttendanceNfcTag(
         member_id=member_id,
         tag_uid_hash=tag_uid_hash,
@@ -369,7 +370,7 @@ def nfc_check_in(
         db.commit()
         return _nfc_scan_result("not_eligible", member=member)
 
-    now = datetime.utcnow()
+    now = utc_now()
     if (
         session.is_closed
         or session.status != "open"

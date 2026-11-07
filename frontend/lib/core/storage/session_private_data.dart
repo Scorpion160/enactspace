@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 const legacyChatAttachmentDraftsKey = '_chat_attachment_drafts_v1';
+const documentOfflineCacheSecureKey = 'enactspace.documents.offline_cache.v1';
+const chatOfflineCacheSecureKey = 'enactspace.chat.offline_cache.v1';
 
 const _privateSessionKeyPrefixes = <String>[
   '_chat_messages_cache_',

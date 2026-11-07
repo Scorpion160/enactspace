@@ -53,7 +53,8 @@ abstract class InstitutionalDocumentsGateway {
   Future<bool> rendererAvailable();
 }
 
-class ApiInstitutionalDocumentsGateway implements InstitutionalDocumentsGateway {
+class ApiInstitutionalDocumentsGateway
+    implements InstitutionalDocumentsGateway {
   final InstitutionalDocumentsService _service;
   final DocumentsGateway _documentsGateway;
   final MembersService _membersService;

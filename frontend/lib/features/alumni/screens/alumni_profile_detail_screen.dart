@@ -6,7 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/user_experience.dart';
 import '../models/alumni_profile_model.dart';
+import '../../members/screens/members_screen.dart' show EditMemberDialog;
+import '../../members/services/members_service.dart';
 import '../services/alumni_gateway.dart';
+import '../services/alumni_error_message.dart';
 
 class AlumniProfileDetailScreen extends StatefulWidget {
   final String profileId;
@@ -80,13 +83,26 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
     if (updated == true) await _load();
   }
 
+  Future<void> _editIdentity() async {
+    try {
+      final service = MembersService();
+      final member = await service.getMember(_profile!.userId);
+      if (!mounted) return;
+      final saved = await showDialog<bool>(context: context,
+        builder: (_) => EditMemberDialog(member: member, membersService: service));
+      if (saved == true) await _load();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(error))));
+    }
+  }
+
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer le profil alumni ?'),
         content: const Text(
-          'Cette suppression est définitive et sera contrôlée par le backend.',
+          'Cette suppression est définitive. Vérifie le profil avant de confirmer.',
         ),
         actions: [
           TextButton(
@@ -190,8 +206,10 @@ class _AlumniProfileDetailScreenState extends State<AlumniProfileDetailScreen> {
                         PopupMenuButton<String>(
                           tooltip: 'Gérer le profil',
                           onSelected: (value) =>
-                              value == 'edit' ? _edit() : _delete(),
-                          itemBuilder: (_) => const [
+                              value == 'edit' ? _edit() : value == 'identity' ? _editIdentity() : _delete(),
+                          itemBuilder: (_) => [
+                            if (_user?.isAdmin == true || _user?.isSecretary == true || _user?.isTeamLeader == true)
+                              const PopupMenuItem(value: 'identity', child: Text('Identité et coordonnées')),
                             PopupMenuItem(
                               value: 'edit',
                               child: Text('Modifier'),
@@ -469,5 +487,8 @@ List<String> _skills(String? value) => value == null
           .map((v) => v.trim())
           .where((v) => v.isNotEmpty)
           .toList();
-String _message(Object error) =>
-    error.toString().replaceFirst('Exception: ', '');
+String _message(Object error) => alumniErrorMessage(
+  error,
+  fallback:
+      'Impossible d’ouvrir ou de mettre à jour ce profil. Réessayez dans quelques instants.',
+);

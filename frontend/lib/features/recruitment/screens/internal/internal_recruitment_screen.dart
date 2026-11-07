@@ -1,3 +1,9 @@
+import '../../widgets/recruitment_style.dart';
+import '../../widgets/recruitment_workspace.dart';
+import '../../widgets/internal/recruitment_interview_board.dart';
+import '../../services/recruitment_campaign_tools.dart';
+import 'recruitment_jury_screen.dart';
+import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -30,6 +36,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   final _className = TextEditingController();
   List<RecruitmentCampaignModel> _campaigns = const [];
   List<ApplicationModel> _applications = const [];
+  Map<String, dynamic> _access = const {};
   bool _loading = true;
   bool _refreshing = false;
   bool _filtersExpanded = false;
@@ -40,6 +47,8 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   DateTime? _submittedFrom;
   DateTime? _submittedTo;
   int _page = 0;
+  int _generation = 0;
+  RecruitmentSection _section = RecruitmentSection.applications;
   Object? _error;
 
   @override
@@ -51,6 +60,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
 
   @override
   void dispose() {
+    _generation++;
     for (final controller in [
       _search,
       _pole,
@@ -64,6 +74,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   }
 
   Future<void> _load({required bool initial}) async {
+    final generation = ++_generation;
     setState(() {
       initial ? _loading = true : _refreshing = true;
       _error = null;
@@ -72,17 +83,26 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       final result = await Future.wait<dynamic>([
         _gateway.loadCampaigns(),
         _gateway.loadApplications(),
+        if (_gateway is CampaignToolsProvider)
+          (_gateway as CampaignToolsProvider).campaignTools.loadAccess(),
       ]);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _campaigns = result[0] as List<RecruitmentCampaignModel>;
         _applications = result[1] as List<ApplicationModel>;
+        if (_campaignId != 'all' &&
+            !_campaigns.any((c) => c.id == _campaignId)) {
+          _campaignId = 'all';
+        }
+        _access = result.length > 2
+            ? result[2] as Map<String, dynamic>
+            : const {};
         _page = 0;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted && generation == _generation) setState(() => _error = error);
     } finally {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _loading = false;
           _refreshing = false;
@@ -95,14 +115,14 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final query = _search.text.trim().toLowerCase();
     final result = _applications.where((item) {
       final searchable = [
-        item.fullName,
-        item.email,
+        if (!_anonymized && !item.isAnonymized) item.fullName,
+        if (!_anonymized && !item.isAnonymized) item.email,
         item.id,
         item.trackingCode,
       ].whereType<String>().join(' ').toLowerCase();
       return (_campaignId == 'all' || item.campaignId == _campaignId) &&
           (_status == 'all' || item.status == _status) &&
-          (_gender == 'all' || item.gender?.toLowerCase() == _gender) &&
+          (_gender == 'all' || _normalizedGender(item.gender) == _gender) &&
           (query.isEmpty || searchable.contains(query)) &&
           _matches(item.preferredPole, _pole.text) &&
           _matches(item.projectInterest, _project.text) &&
@@ -110,9 +130,35 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
           _matches(item.className, _className.text) &&
           _inDateRange(item.createdAt);
     }).toList();
-    result.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+    final hideNames = _anonymized || result.any((row) => row.isAnonymized);
+    String sortKey(ApplicationModel row) => hideNames
+        ? (row.trackingCode ?? row.anonymousCode)
+        : '${row.lastName} ${row.firstName}'.toLowerCase();
+    final evaluator = _access['can_review_any'] == true;
+    result.sort((a, b) {
+      if (evaluator) {
+        // Prioritize candidates missing assessments (0, 1, 2 before 3+).
+        final countComparison = a.screeningReviewCount.compareTo(
+          b.screeningReviewCount,
+        );
+        if (countComparison != 0) return countComparison;
+        // For identical totals, show unreviewed candidates first.
+        final ownA = a.myReview != null ? 1 : 0;
+        final ownB = b.myReview != null ? 1 : 0;
+        if (ownA != ownB) return ownA.compareTo(ownB);
+      }
+      final comparison = sortKey(a).compareTo(sortKey(b));
+      return comparison == 0 ? a.id.compareTo(b.id) : comparison;
+    });
     return result;
   }
+
+  static String _normalizedGender(String? raw) => switch (raw?.toLowerCase()) {
+    'femme' || 'female' => 'female',
+    'homme' || 'male' => 'male',
+    null || '' || 'non_precise' || 'unspecified' => 'non_precise',
+    _ => 'other',
+  };
 
   static bool _matches(String? value, String filter) {
     final normalized = filter.trim().toLowerCase();
@@ -122,7 +168,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
 
   bool _inDateRange(String? raw) {
     if (_submittedFrom == null && _submittedTo == null) return true;
-    final date = DateTime.tryParse(raw ?? '')?.toLocal();
+    final date = DateTime.tryParse(raw ?? '')?.toUtc();
     if (date == null) return false;
     final day = DateTime(date.year, date.month, date.day);
     if (_submittedFrom != null && day.isBefore(_submittedFrom!)) return false;
@@ -180,6 +226,17 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       helpText: from ? 'Début de période' : 'Fin de période',
     );
     if (selected == null || !mounted) return;
+    if ((from && _submittedTo != null && selected.isAfter(_submittedTo!)) ||
+        (!from &&
+            _submittedFrom != null &&
+            selected.isBefore(_submittedFrom!))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La fin de période doit suivre le début.'),
+        ),
+      );
+      return;
+    }
     setState(() {
       if (from) {
         _submittedFrom = selected;
@@ -198,7 +255,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
           builder: (routeContext) => ApplicationDetailPanel(
             summary: application,
             campaignTitle: _campaignTitle(application.campaignId),
-            anonymized: _anonymized,
+            anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
             onClose: () => Navigator.of(routeContext).pop(),
@@ -211,17 +268,17 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Fermer la fiche candidat',
-      barrierColor: Colors.black45,
+      barrierColor: Colors.black.withValues(alpha: .55),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (dialogContext, animation, secondaryAnimation) => Align(
         alignment: Alignment.centerRight,
         child: SizedBox(
-          width: math.min(760, width * .62),
+          width: math.min(880, width * .78),
           height: double.infinity,
           child: ApplicationDetailPanel(
             summary: application,
             campaignTitle: _campaignTitle(application.campaignId),
-            anonymized: _anonymized,
+            anonymized: _anonymized || application.isAnonymized,
             gateway: _gateway,
             onApplicationChanged: _applyUpdatedApplication,
             onClose: () => Navigator.of(dialogContext).pop(),
@@ -248,17 +305,63 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     });
   }
 
-  Future<void> _openCampaignManagement() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => CampaignManagementScreen(gateway: _gateway),
-      ),
-    );
-    if (mounted) await _load(initial: false);
+  Future<void> _openCampaignManagement() =>
+      _openSection(RecruitmentSection.campaigns);
+
+  Future<void> _openSection(RecruitmentSection section) async {
+    var next = section;
+    while (mounted) {
+      if (next == RecruitmentSection.applications ||
+          next == RecruitmentSection.interviews) {
+        setState(() => _section = next);
+        return;
+      }
+      if (next == RecruitmentSection.campaigns &&
+          _access['can_manage_campaigns'] == false) {
+        return;
+      }
+      if (next == RecruitmentSection.jury &&
+          _gateway is! CampaignToolsProvider) {
+        return;
+      }
+      if (!mounted) return;
+      final result = await Navigator.of(context).push<RecruitmentSection>(
+        MaterialPageRoute(
+          builder: (routeContext) {
+            void navigate(RecruitmentSection value) =>
+                Navigator.of(routeContext).pop(value);
+            if (next == RecruitmentSection.campaigns) {
+              return CampaignManagementScreen(
+                gateway: _gateway,
+                onSectionSelected: navigate,
+              );
+            }
+            return RecruitmentJuryScreen(
+              tools: (_gateway as CampaignToolsProvider).campaignTools,
+              campaigns: _campaigns,
+              initialCampaignId: _campaignId == 'all' ? null : _campaignId,
+              onSectionSelected: navigate,
+              canManageCampaigns: _access['can_manage_campaigns'] != false,
+              onOpenApplication: (id) async {
+                final row = _applications.where((a) => a.id == id).firstOrNull;
+                if (row != null) await _openApplication(row);
+              },
+            );
+          },
+        ),
+      );
+      if (!mounted) return;
+      await _load(initial: false);
+      if (result == null) return;
+      next = result;
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      RecruitmentStyle(child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     final filtered = _filtered;
     final pageCount = math.max(1, (filtered.length / _pageSize).ceil());
     final safePage = math.min(_page, pageCount - 1);
@@ -274,17 +377,84 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(padding, 20, padding, 28),
         children: [
-          InternalRecruitmentHeader(
-            campaignLabel: selectedCampaign,
-            visibleCount: filtered.length,
-            totalCount: _applications.length,
-            activeFilterCount: _activeFilterCount,
-            onRefresh: () => _load(initial: false),
-            onToggleFilters: () =>
-                setState(() => _filtersExpanded = !_filtersExpanded),
-            onManageCampaigns: _openCampaignManagement,
+          RecruitmentWorkspaceNav(
+            selected: _section,
+            onSelected: _openSection,
+            canManageCampaigns: _access['can_manage_campaigns'] != false,
+            hasJury: _gateway is CampaignToolsProvider,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 22),
+          if (_section == RecruitmentSection.applications)
+            InternalRecruitmentHeader(
+              campaignLabel: selectedCampaign,
+              visibleCount: filtered.length,
+              totalCount: _applications.length,
+              activeFilterCount: _activeFilterCount,
+              onRefresh: () => _load(initial: false),
+              onToggleFilters: () =>
+                  setState(() => _filtersExpanded = !_filtersExpanded),
+              onManageCampaigns: _openCampaignManagement,
+              canManageCampaigns: _access['can_manage_campaigns'] != false,
+            ),
+          if (_section == RecruitmentSection.interviews)
+            const RecruitmentPageHeading(
+              title: 'Les entretiens',
+              subtitle:
+                  'Les créneaux confirmés et les dossiers à replanifier, par campagne.',
+            ),
+          const SizedBox(height: 18),
+          if (!_loading && _error == null)
+            RecruitmentStats(
+              values: [
+                (
+                  label: 'Dossiers reçus',
+                  count: _applications
+                      .where(
+                        (a) =>
+                            _campaignId == 'all' || a.campaignId == _campaignId,
+                      )
+                      .length,
+                  icon: Icons.inbox_outlined,
+                ),
+                (
+                  label: 'À examiner',
+                  count: _applications
+                      .where(
+                        (a) =>
+                            (_campaignId == 'all' ||
+                                a.campaignId == _campaignId) &&
+                            ['submitted', 'under_review'].contains(a.status),
+                      )
+                      .length,
+                  icon: Icons.rate_review_outlined,
+                ),
+                (
+                  label: 'Entretiens prévus',
+                  count: _applications
+                      .where(
+                        (a) =>
+                            (_campaignId == 'all' ||
+                                a.campaignId == _campaignId) &&
+                            a.status == 'interview_scheduled',
+                      )
+                      .length,
+                  icon: Icons.event_available_outlined,
+                ),
+                (
+                  label: 'Candidatures retenues',
+                  count: _applications
+                      .where(
+                        (a) =>
+                            (_campaignId == 'all' ||
+                                a.campaignId == _campaignId) &&
+                            a.status == 'accepted',
+                      )
+                      .length,
+                  icon: Icons.how_to_reg_outlined,
+                ),
+              ],
+            ),
+          SizedBox(height: 14),
           InternalFilterBar(
             searchController: _search,
             poleController: _pole,
@@ -296,8 +466,9 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             status: _status,
             gender: _gender,
             anonymized: _anonymized,
-            expanded:
-                _filtersExpanded || MediaQuery.sizeOf(context).width >= 1100,
+            expanded: _filtersExpanded,
+            onExpandedChanged: (value) =>
+                setState(() => _filtersExpanded = value),
             submittedFrom: _submittedFrom,
             submittedTo: _submittedTo,
             onSearchChanged: (_) => setState(() => _page = 0),
@@ -327,14 +498,14 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             }),
             onReset: _resetFilters,
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (_refreshing)
             const LinearProgressIndicator(minHeight: 3)
           else
-            const SizedBox(height: 3),
-          const SizedBox(height: 10),
+            SizedBox(height: 3),
+          SizedBox(height: 10),
           if (_loading)
-            const Card(
+            Card(
               child: Padding(
                 padding: EdgeInsets.all(48),
                 child: Center(child: CircularProgressIndicator()),
@@ -348,7 +519,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               title: _isAccessDenied(_error!)
                   ? 'Accès refusé'
                   : 'Erreur de chargement',
-              message: _error.toString().replaceAll('Exception: ', ''),
+              message: recruitmentMessage(
+                _error!,
+                fallback:
+                    'Impossible de charger les candidatures. Réessaie dans un instant.',
+              ),
               actionLabel: 'Réessayer',
               onAction: () => _load(initial: true),
             )
@@ -365,6 +540,12 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               message: 'Aucun dossier ne correspond aux filtres actifs.',
               actionLabel: 'Réinitialiser les filtres',
               onAction: _resetFilters,
+            )
+          else if (_section == RecruitmentSection.interviews)
+            RecruitmentInterviewBoard(
+              applications: filtered,
+              anonymized: _anonymized,
+              onOpen: _openApplication,
             )
           else
             ApplicationWorkbench(

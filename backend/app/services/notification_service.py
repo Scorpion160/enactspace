@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from collections.abc import Iterable
 from datetime import datetime
 
@@ -29,6 +30,7 @@ def create_notification(
     created_by_id=None,
     metadata: dict | None = None,
     dedupe: bool = True,
+    send_email: bool = True,
 ) -> Notification:
     recipient = recipient_id or user_id
     if recipient is None:
@@ -74,7 +76,11 @@ def create_notification(
     )
     db.add(notification)
     recipient_user = db.query(User).filter(User.id == recipient).first()
-    dispatch_notification_channels(db, notification, recipient_user, preference)
+    if send_email:
+        dispatch_notification_channels(db, notification, recipient_user, preference)
+    else:
+        dispatch_notification_channels(db, notification, recipient_user, preference,
+                                       send_email=False)
     return notification
 
 
@@ -97,6 +103,7 @@ def create_notifications(
     created_by_id=None,
     metadata: dict | None = None,
     dedupe: bool = True,
+    send_email: bool = True,
 ) -> list[Notification]:
     notifications = []
     recipients = recipient_ids if recipient_ids is not None else user_ids
@@ -119,6 +126,7 @@ def create_notifications(
                 created_by_id=created_by_id,
                 metadata=metadata,
                 dedupe=dedupe,
+                send_email=send_email,
             )
         )
     return notifications
@@ -134,7 +142,7 @@ def notify_users(db: Session, **kwargs) -> list[Notification]:
 
 def mark_read(db: Session, notification: Notification) -> Notification:
     notification.is_read = True
-    notification.read_at = datetime.utcnow()
+    notification.read_at = utc_now()
     return notification
 
 
@@ -150,7 +158,7 @@ def mark_all_read(db: Session, *, user_id) -> int:
         Notification.is_read.is_(False),
         Notification.in_app_suppressed.is_(False),
     ).all()
-    now = datetime.utcnow()
+    now = utc_now()
     for notification in notifications:
         notification.is_read = True
         notification.read_at = now

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/fee_model.dart';
@@ -93,6 +95,9 @@ class FinanceService {
     required String method,
     String? reference,
     String? proofUrl,
+    String? proofFileId,
+    List<String> feeIds = const [],
+    String? receiptText,
   }) async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');
@@ -106,6 +111,9 @@ class FinanceService {
         'method': method,
         'reference': reference,
         'proof_url': proofUrl,
+        'proof_file_id': proofFileId,
+        'fee_ids': feeIds,
+        'receipt_text': receiptText,
       },
     );
 
@@ -114,6 +122,26 @@ class FinanceService {
     }
 
     throw Exception('Réponse invalide lors de la création du paiement.');
+  }
+
+  Future<String> uploadPaymentReceipt(String fileName, Uint8List bytes) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+    final result = await _apiClient.postMultipart(
+      '/files/upload',
+      token: token,
+      bytes: bytes,
+      fileName: fileName,
+      fields: {
+        'storage_scope': 'finance',
+        'visibility': 'private',
+        'is_temporary': 'true',
+      },
+    );
+    if (result is Map<String, dynamic> && result['id'] != null) {
+      return result['id'].toString();
+    }
+    throw Exception('Le reçu n’a pas pu être envoyé.');
   }
 
   Future<PaymentModel> validatePayment(String paymentId) async {
@@ -170,6 +198,7 @@ class FinanceService {
   Future<MobileMoneyTransactionModel> initiateMobileMoneyPayment({
     required List<String> feeIds,
     required String channel,
+    required int amount,
     String? memberId,
   }) async {
     final token = await _authService.getToken();
@@ -178,6 +207,7 @@ class FinanceService {
     final data = <String, dynamic>{
       'finance_item_ids': feeIds,
       'channel': channel,
+      'amount': amount,
     };
     if (memberId != null) {
       data['member_id'] = memberId;

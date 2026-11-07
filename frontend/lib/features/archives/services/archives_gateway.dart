@@ -131,27 +131,28 @@ class ApiArchivesGateway implements ArchivesGateway {
 
   @override
   Future<ArchivesHomeData> loadHome() async {
+    final permissions = await getPermissions();
+    const includeStatic = true;
     final values = await Future.wait<Object>([
-      getPermissions(),
       _service.getHistoricalImpactSummary(),
       getHistoricalStatistics(),
-      getHistoricalProjects(),
-      getAwards(),
-      getCompetitions(),
-      getHallOfFame(),
+      _service.getHistoricalProjects(includeStatic: includeStatic),
+      _service.getAwards(includeStatic: includeStatic),
+      _service.getCompetitions(includeStatic: includeStatic),
+      _service.getHallOfFame(includeStatic: includeStatic),
       getDocuments(),
       getMedia(),
     ]);
     return ArchivesHomeData(
-      permissions: values[0] as ArchivePermissions,
-      summary: values[1] as ArchiveImpactSummaryModel,
-      statistics: values[2] as List<HistoricalStatisticModel>,
-      projects: values[3] as List<HistoricalProjectModel>,
-      awards: values[4] as List<ArchiveAwardModel>,
-      competitions: values[5] as List<ArchiveCompetitionModel>,
-      hallOfFame: values[6] as List<HallOfFameEntryModel>,
-      documents: values[7] as List<ArchiveDocumentModel>,
-      media: values[8] as List<ArchiveMediaModel>,
+      permissions: permissions,
+      summary: values[0] as ArchiveImpactSummaryModel,
+      statistics: values[1] as List<HistoricalStatisticModel>,
+      projects: values[2] as List<HistoricalProjectModel>,
+      awards: values[3] as List<ArchiveAwardModel>,
+      competitions: values[4] as List<ArchiveCompetitionModel>,
+      hallOfFame: values[5] as List<HallOfFameEntryModel>,
+      documents: values[6] as List<ArchiveDocumentModel>,
+      media: values[7] as List<ArchiveMediaModel>,
     );
   }
 

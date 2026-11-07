@@ -75,8 +75,40 @@ class ChatParticipantRead(BaseModel):
         from_attributes = True
 
 
+class ChatPollCreate(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    options: List[str] = Field(min_length=2, max_length=10)
+    allows_multiple: bool = False
+    closes_at: Optional[datetime] = None
+    client_message_id: Optional[str] = None
+
+
+class ChatPollVoteCreate(BaseModel):
+    option_ids: List[UUID] = Field(min_length=1, max_length=10)
+
+
+class ChatPollOptionRead(BaseModel):
+    id: UUID
+    label: str
+    position: int
+    votes_count: int = 0
+    current_user_voted: bool = False
+
+
+class ChatPollRead(BaseModel):
+    id: UUID
+    message_id: UUID
+    question: str
+    allows_multiple: bool
+    closes_at: Optional[datetime] = None
+    is_closed: bool = False
+    total_votes: int = 0
+    total_voters: int = 0
+    options: List[ChatPollOptionRead] = Field(default_factory=list)
+
 class ChatMessageCreate(BaseModel):
     content: str
+    client_message_id: Optional[str] = None
     message_type: str = "text"
     attachment_file_id: Optional[UUID] = None
     attachment_url: Optional[str] = None
@@ -92,6 +124,7 @@ class ChatMessageRead(BaseModel):
     id: UUID
     thread_id: UUID
     author_id: UUID
+    client_message_id: Optional[str] = None
     content: str
     message_type: str
     created_at: datetime
@@ -108,6 +141,7 @@ class ChatMessageRead(BaseModel):
     reactions_count: int = 0
     reactions_summary: dict[str, int] = Field(default_factory=dict)
     current_user_reaction: Optional[str] = None
+    poll: Optional[ChatPollRead] = None
 
     class Config:
         from_attributes = True
