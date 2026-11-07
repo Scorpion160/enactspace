@@ -231,6 +231,7 @@ class UserExperience {
         '/academy',
         '/archives',
         '/alumni',
+        '/recruitment/statistics',
         if (user.canViewRecruitment) '/recruitment',
       ];
     }
@@ -267,6 +268,10 @@ class UserExperience {
       routes.addAll({'/poles', '/projects', '/events'});
     } else {
       routes.add('/events');
+    }
+
+    if (user.isActiveMember) {
+      routes.add('/recruitment/statistics');
     }
 
     if (user.canViewRecruitment) {

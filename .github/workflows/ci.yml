@@ -163,6 +163,7 @@ jobs:
       - name: Run Web recruitment and member tests
         run: >-
           flutter test --no-pub
+          test/recruitment_statistics_screen_test.dart
           test/recruitment_public_test.dart
           test/recruitment_internal_test.dart
           test/recruitment_jury_personality_test.dart

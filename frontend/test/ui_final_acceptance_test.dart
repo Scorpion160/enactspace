@@ -72,6 +72,7 @@ void main() {
         '/veille',
         'records/:kind/:id',
         '/finance',
+        '/recruitment/statistics',
         '/recruitment',
         '/documents',
         'reglement-interieur',

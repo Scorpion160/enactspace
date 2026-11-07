@@ -59,3 +59,14 @@ les provisionner en dehors du dépôt.
 La PR est une **intégration en brouillon** : les sources sont réunies et les
 tests ciblés passent, mais les vérifications finales doivent encore être
 terminées. Aucun build Android n'est prévu.
+
+## Restauration de l'écran « Campagne en chiffres » (7 novembre 2026)
+
+- La route protégée `/recruitment/statistics` réutilise l'API existante `GET /api/recruitment/statistics` (lecture seule, sans données personnelles).
+- Visible par tous les enacteurs et alumni validés ; les dossiers et les évaluations restent soumis aux permissions des jurés et d'EnacChef.
+- Cinq ventilations : département, année, niveau, promotion, canal de découverte.
+- Les deux comptes créés par erreur ont été supprimés en production à la demande de l'administration ; leurs courriels d'orientation ont été envoyés. Ne jamais reproduire ces actions sur une base de test ou lors du déploiement.
+- 136 tests ciblés Flutter réussis. Formulaire public vérifié dans un navigateur vierge sur une prévisualisation HTTPS, sans candidature fictive.
+- Version Web publiée : `b8773cad16cd0b53b698ead0d52696573e5ea958df3782ab3f60c12940f4cf4d` SHA256 de `main.dart.js`.
+- Retour arrière VPS : `/opt/enactspace/releases/web-before-campaign-stats-20261107`.
+- **Aucun build Android, aucune migration ou modification du backend** lors de cette restauration.

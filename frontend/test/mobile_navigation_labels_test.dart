@@ -19,6 +19,7 @@ void main() {
   );
   for (final entry in {
     '/recruitment': 'Recrutement',
+    '/recruitment/statistics': 'Campagne en chiffres',
     '/events': 'Événements',
   }.entries) {
     for (final width in [360.0, 384.0]) {

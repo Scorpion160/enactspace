@@ -7,6 +7,7 @@ import '../../services/recruitment_message.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../models/application_model.dart';
@@ -382,6 +383,15 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onSelected: _openSection,
             canManageCampaigns: _access['can_manage_campaigns'] != false,
             hasJury: _gateway is CampaignToolsProvider,
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('recruitment-open-statistics'),
+              onPressed: () => context.go('/recruitment/statistics'),
+              icon: const Icon(Icons.bar_chart_outlined),
+              label: const Text('Campagne en chiffres'),
+            ),
           ),
           const SizedBox(height: 22),
           if (_section == RecruitmentSection.applications)

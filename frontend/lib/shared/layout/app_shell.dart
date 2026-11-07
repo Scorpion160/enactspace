@@ -744,6 +744,11 @@ class _SideMenu extends StatelessWidget {
                     path: '/alumni',
                   ),
                   _MenuItem(
+                    label: 'Campagne en chiffres',
+                    icon: Icons.bar_chart_rounded,
+                    path: '/recruitment/statistics',
+                  ),
+                  _MenuItem(
                     label: 'Recrutement',
                     icon: Icons.how_to_reg_rounded,
                     path: '/recruitment',
@@ -1213,6 +1218,12 @@ class MobileBottomNavigation extends StatelessWidget {
         path: '/alumni',
       ),
       _MobileDestination(
+        label: 'Campagne en chiffres',
+        icon: Icons.bar_chart_outlined,
+        selectedIcon: Icons.bar_chart_rounded,
+        path: '/recruitment/statistics',
+      ),
+      _MobileDestination(
         label: 'Recrutement',
         icon: Icons.how_to_reg_outlined,
         selectedIcon: Icons.how_to_reg_rounded,
@@ -1381,6 +1392,10 @@ class _MenuItem {
 }
 
 bool _isSelected(String currentPath, String itemPath) {
+  if (itemPath == '/recruitment' &&
+      currentPath.startsWith('/recruitment/statistics')) {
+    return false;
+  }
   return currentPath == itemPath || currentPath.startsWith('$itemPath/');
 }
 
@@ -1410,6 +1425,7 @@ String _navigationTitle(String currentPath) {
     '/documents': 'Documents',
     '/archives': 'Archives & Mémoire collective',
     '/alumni': 'Alumni',
+    '/recruitment/statistics': 'Campagne en chiffres',
     '/recruitment': 'Recrutement',
     '/notifications': 'Notifications',
     '/posts': 'Communication',

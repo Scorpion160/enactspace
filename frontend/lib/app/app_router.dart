@@ -67,6 +67,7 @@ import '../features/profile/screens/my_profile_screen.dart';
 import '../features/projects/screens/project_detail_screen.dart';
 import '../features/projects/screens/projects_portfolio_screen.dart';
 import '../features/recruitment/screens/internal/internal_recruitment_screen.dart';
+import '../features/recruitment/screens/recruitment_statistics_screen.dart';
 import '../features/recruitment/screens/application_tracking_screen.dart';
 import '../features/recruitment/screens/public/public_application_flow_screen.dart';
 import '../features/recruitment/screens/public/public_recruitment_campaigns_screen.dart';
@@ -332,6 +333,11 @@ class AppRouter {
               GoRoute(
                 path: '/finance',
                 builder: (context, state) => const FinanceScreen(),
+              ),
+              GoRoute(
+                path: '/recruitment/statistics',
+                builder: (context, state) =>
+                    const RecruitmentStatisticsScreen(),
               ),
               GoRoute(
                 path: '/recruitment',
