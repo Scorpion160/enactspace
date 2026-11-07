@@ -223,6 +223,19 @@ void main() {
       expect(find.textContaining('Source non accessible'), findsOneWidget);
     });
 
+    testWidgets('chronologie vide conserve le centre Archives moderne', (
+      tester,
+    ) async {
+      final gateway = _MemoryArchivesGateway(emptyTimeline: true);
+      await _pumpCenter(tester, gateway);
+      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
+      expect(find.text('Explorer l’histoire du club'), findsOneWidget);
+      expect(find.text('L’aventure Enactus ESP'), findsOneWidget);
+      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+      expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
+      expect(gateway.homeLoads, 1);
+    });
+
     testWidgets('erreur timeline propose une relance explicite', (
       tester,
     ) async {

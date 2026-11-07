@@ -582,9 +582,6 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
   bool _scheduled = false;
   DateTime? _start;
   DateTime? _end;
-  bool _audioMuted = true;
-  bool _videoMuted = true;
-  bool _lobby = true;
   bool _saving = false;
 
   @override
@@ -758,31 +755,15 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
               ],
             ),
           ],
-          const SizedBox(height: 10),
-          const Divider(),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Micro coupé au démarrage'),
-            subtitle: const Text(
-              'Chaque participant peut le réactiver ensuite.',
+          const SizedBox(height: 12),
+          Text(
+            'Les réglages du microphone, de la caméra et de l’accueil des '
+            'participants se trouvent dans les paramètres de la réunion '
+            'après sa création.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            value: _audioMuted,
-            onChanged: (value) => setState(() => _audioMuted = value),
-          ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Caméra coupée au démarrage'),
-            value: _videoMuted,
-            onChanged: (value) => setState(() => _videoMuted = value),
-          ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Autoriser le contrôle lobby'),
-            subtitle: const Text(
-              'L’hôte peut activer la salle d’attente depuis les options de sécurité Jitsi.',
-            ),
-            value: _lobby,
-            onChanged: (value) => setState(() => _lobby = value),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -887,9 +868,11 @@ class _CreateMeetingSheetState extends State<_CreateMeetingSheet> {
         scheduledStart: _scheduled ? _start : null,
         scheduledEnd: _scheduled ? _end : null,
         inviteUserIds: _selectedUsers.toList(),
-        startWithAudioMuted: _audioMuted,
-        startWithVideoMuted: _videoMuted,
-        lobbyEnabled: _lobby,
+        // Safe initial choices. Organizers can adjust these in the
+        // dedicated meeting settings, not the quick-create form.
+        startWithAudioMuted: true,
+        startWithVideoMuted: true,
+        lobbyEnabled: true,
       );
       if (!mounted) return;
       Navigator.pop(context, meeting);

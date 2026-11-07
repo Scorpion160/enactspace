@@ -154,8 +154,10 @@ void main() {
     (tester) async {
       await tester.pumpWidget(_app(ArchivesScreen(gateway: _Gateway())));
       await tester.pumpAndSettle();
-      expect(find.text('Mémoire historique Enactus ESP'), findsWidgets);
+      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
+      expect(find.text('Explorer l’histoire du club'), findsOneWidget);
       expect(find.text('Vue d’ensemble'), findsOneWidget);
+      expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

@@ -81,7 +81,8 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
         if (page.items.isEmpty &&
             !effectiveFilters.isFiltered &&
             !effectiveFilters.review) {
-          _legacyMode = true;
+          // Keep the redesigned Archives shell, even when the new timeline
+          // has no rows. The historical collections remain discoverable.
           _legacyHome ??= _gateway.loadHome();
         }
       });
@@ -285,15 +286,24 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
               hasScrollBody: false,
               child: _MemoryError(onRetry: _loadInitial),
             )
+          else if (_items.isEmpty && !_filters.isFiltered && !_filters.review)
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
+                16,
+                MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
+                32,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: _buildModernHistoricalLanding(),
+              ),
+            )
           else if (_items.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: _MemoryEmpty(
                 filtered: _filters.isFiltered,
-                onOpenHistorical:
-                    !_filters.isFiltered && _permissions.canValidate
-                    ? _showLegacy
-                    : null,
+                onOpenHistorical: null,
               ),
             )
           else
@@ -345,6 +355,62 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
       ),
     ),
   );
+
+  Widget _buildModernHistoricalLanding() {
+    final future = _legacyHome ??= _gateway.loadHome();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Explorer l’histoire du club',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'La chronologie se construit progressivement. Retrouvez dès '
+          'maintenant nos projets, distinctions, événements et souvenirs '
+          'dans la mémoire historique.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 22),
+        FutureBuilder<ArchivesHomeData>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return Column(
+                children: [
+                  const Text(
+                    'La mémoire historique est momentanément indisponible.',
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        setState(() => _legacyHome = _gateway.loadHome()),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Réessayer'),
+                  ),
+                ],
+              );
+            }
+            return HistoricalMemoryContents(
+              home: snapshot.requireData,
+              gateway: _gateway,
+            );
+          },
+        ),
+      ],
+    );
+  }
 
   Widget _header() => DecoratedBox(
     decoration: BoxDecoration(

@@ -70,3 +70,24 @@ terminées. Aucun build Android n'est prévu.
 - Version Web publiée : `b8773cad16cd0b53b698ead0d52696573e5ea958df3782ab3f60c12940f4cf4d` SHA256 de `main.dart.js`.
 - Retour arrière VPS : `/opt/enactspace/releases/web-before-campaign-stats-20261107`.
 - **Aucun build Android, aucune migration ou modification du backend** lors de cette restauration.
+
+## Refondes Alumni, Archives et EnactMeet – correction du 7 novembre 2026
+
+- L'interface Alumni modernisée (nouvelle section de présentation, annuaire,
+  mentorat et liens vers les souvenirs) est conservée dans le build Web.
+- Dans Archives, l'absence de données de chronologie ne force plus l'affichage
+  de l'ancien écran « Mémoire historique ». Les collections historiques,
+  photographies, projets et Hall of Fame apparaissent dans le centre
+  modernisé, même si les tables structurées sont encore vides.
+- Dans EnactMeet, la création rapide n'affiche plus les commutateurs du micro,
+  de la caméra et du lobby. Leurs valeurs par défaut sont conservées et
+  ces réglages restent disponibles dans les paramètres de réunion.
+- Les tests locaux de navigation, d'Archives, d'Alumni, d'EnactMeet et du
+  recrutement sont réussis : **204 tests** et **analyse Dart sans erreur**.
+- Version Web publiée : SHA256 de `main.dart.js` :
+  `fa19f83ae52ee3f88ec6ea7c1d1ec68b5c7f527d7b231bce0ddaa49486e130a7`.
+- Un navigateur HTTPS isolé a confirmé le formulaire public et les routes
+  protégées ; aucune candidature fictive n'a été déposée.
+- Sauvegarde VPS avant cette publication :
+  `/opt/enactspace/releases/web-before-modules-review-20261107`.
+- Aucun changement backend ou PostgreSQL, aucun build Android.

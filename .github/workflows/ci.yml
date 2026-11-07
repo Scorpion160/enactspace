@@ -164,6 +164,10 @@ jobs:
         run: >-
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
+          test/enactmeet_quick_create_test.dart
+          test/archives_hall_of_fame_test.dart
+          test/archives_responsive_test.dart
+          test/alumni_gamification_academy_impact_test.dart
           test/recruitment_public_test.dart
           test/recruitment_internal_test.dart
           test/recruitment_jury_personality_test.dart
