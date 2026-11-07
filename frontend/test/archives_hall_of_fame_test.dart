@@ -10,6 +10,7 @@ import 'package:frontend/features/archives/screens/archive_detail_screens.dart';
 import 'package:frontend/features/archives/screens/archives_center_screen.dart';
 import 'package:frontend/features/archives/services/archives_api_service.dart';
 import 'package:frontend/features/archives/services/archives_gateway.dart';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 
 const persistedId = '123e4567-e89b-12d3-a456-426614174000';
 const persistedId2 = '223e4567-e89b-12d3-a456-426614174001';
@@ -386,6 +387,10 @@ void main() {
         ),
       );
       final sourceAction = find.textContaining('Ouvrir la source');
+      final attachment = find.byType(StoredAttachmentButton);
+      expect(attachment, findsOneWidget);
+      expect(tester.widget<StoredAttachmentButton>(attachment).url,
+          '/api/files/protected-file/preview');
       await tester.ensureVisible(sourceAction);
       await tester.pumpAndSettle();
       expect(sourceAction.hitTestable(), findsOneWidget);
@@ -393,7 +398,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(launchedUrls, isEmpty);
-      expect(find.text('Reconnectez-vous pour consulter le document.'), findsOneWidget);
     });
 
     testWidgets('URL externe autorisée reste lancée sans jeton', (
