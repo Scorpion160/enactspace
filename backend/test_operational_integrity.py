@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import app.models.base  # noqa: F401
 from app.api.routes import academic, attendance, events, files, finance, projects, recruitment, seasons, tasks, users
+from app.core.config import settings
 from app.core.roles import RECRUITMENT_ACCESS_ROLES
 from app.db.database import Base
 from app.models.academic import UserAcademicHistory
@@ -23,6 +24,7 @@ from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.audit import AuditLog
 from app.models.event import Event, EventParticipant
 from app.models.finance import ClubTransaction, Fee, FinancialAccount, Payment, PaymentAllocation
+from app.models.meeting import Meeting, MeetingMember
 from app.models.mobile_money import MobileMoneyTransaction
 from app.models.notification import Notification
 from app.models.pole import Pole, PoleMember
@@ -33,7 +35,7 @@ from app.models.season import Season
 from app.models.stored_file import StoredFile
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.recruitment import ConvertApplicationToUserRequest
+from app.schemas.recruitment import ApplicationInterviewSchedule, ConvertApplicationToUserRequest
 from app.schemas.mobile_money import MobileMoneyInitiateRequest
 from app.schemas.season import YearActivation
 from app.schemas.user import UserAdminUpdate, UserRoleAssign
@@ -259,6 +261,42 @@ class OperationalIntegrityTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as reader_denied:
             files.get_file_metadata(str(cv.id), self.db, reader)
         self.assertEqual(reader_denied.exception.status_code, 403)
+
+    def test_enactmeet_interview_uses_the_jury_selected_in_the_same_request(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        juror = self._user()
+        now = datetime.now(timezone.utc)
+        campaign = RecruitmentCampaign(
+            title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+            screening_published_at=to_naive_utc(now), identities_revealed_at=to_naive_utc(now),
+        )
+        self.db.add(campaign)
+        self.db.flush()
+        appointment = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id)
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", status="under_review", screening_decision="shortlisted",
+        )
+        self.db.add_all([appointment, application])
+        self.db.commit()
+
+        payload = ApplicationInterviewSchedule(
+            interview_at=now + timedelta(hours=1), interview_mode="online",
+            use_enactmeet=True, jury_member_ids=[appointment.id],
+        )
+        with patch.multiple(
+            settings, MEET_SERVER_URL="https://meet.example.invalid", MEET_REQUIRE_JWT=True,
+            MEET_JWT_APP_ID="enactspace-test", MEET_JWT_SECRET="local-test-secret",
+        ):
+            result = recruitment.schedule_application_interview(
+                str(application.id), payload, _request(), self.db, manager,
+            )
+        meeting = self.db.get(Meeting, result["interview_meeting_id"])
+        self.assertTrue(meeting.lobby_enabled)
+        self.assertFalse(meeting.recording_enabled)
+        members = self.db.query(MeetingMember).filter_by(meeting_id=meeting.id).all()
+        self.assertEqual({member.user_id: member.role for member in members}, {manager.id: "host", juror.id: "cohost"})
 
     def test_member_lifecycle_removes_authority_without_restoring_memberships(self):
         member = self._user()
