@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../models/alumni_profile_model.dart';
 import '../models/mentorship_model.dart';
+import '../models/individual_mentorship.dart';
 
 class AlumniService {
   final ApiClient _apiClient;
@@ -12,6 +13,44 @@ class AlumniService {
   AlumniService({ApiClient? apiClient, AuthService? authService})
     : _apiClient = apiClient ?? ApiClient(),
       _authService = authService ?? AuthService();
+
+  Future<List<IndividualMentorship>> listIndividualRequests() async {
+    final result = await _apiClient.get(
+      '/alumni/individual-mentorships',
+      token: await _requireToken(),
+    );
+    return (result as List)
+        .cast<Map<String, dynamic>>()
+        .map(IndividualMentorship.fromJson)
+        .toList();
+  }
+
+  Future<void> createIndividualRequest({
+    required String mentorId,
+    required String menteeId,
+    required String objective,
+  }) async {
+    await _apiClient.postJson(
+      '/alumni/individual-mentorships',
+      token: await _requireToken(),
+      data: {
+        'mentor_id': mentorId,
+        'mentee_id': menteeId,
+        'objective': objective,
+      },
+    );
+  }
+
+  Future<void> updateIndividualRequest(
+    String requestId,
+    IndividualMentorshipStatus status,
+  ) async {
+    await _apiClient.patchJson(
+      '/alumni/individual-mentorships/$requestId',
+      token: await _requireToken(),
+      data: {'status': status.name},
+    );
+  }
 
   Future<List<AlumniProfileModel>> getProfiles({
     String? search,

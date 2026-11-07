@@ -160,7 +160,7 @@ jobs:
           APP_ENV: test
         run: python ../backend/ops_checks/prepare_ci_resources.py
 
-      - name: Run Web recruitment and member tests
+      - name: Test Web recruitment, Alumni, Archives and EnactMeet
         run: >-
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
@@ -168,6 +168,11 @@ jobs:
           test/archives_hall_of_fame_test.dart
           test/archives_responsive_test.dart
           test/alumni_gamification_academy_impact_test.dart
+          test/alumni_individual_workflows_test.dart
+          test/alumni_error_message_test.dart
+          test/archives_api_contract_test.dart
+          test/archive_minutes_test.dart
+          test/archives_story_detail_test.dart
           test/recruitment_public_test.dart
           test/recruitment_internal_test.dart
           test/recruitment_jury_personality_test.dart
