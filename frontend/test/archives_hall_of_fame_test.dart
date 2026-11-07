@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/features/archives/models/archive_models.dart';
 import 'package:frontend/features/archives/models/memory_timeline_models.dart';
@@ -356,6 +358,8 @@ void main() {
     testWidgets('fichier protégé ne déclenche aucun lancement externe', (
       tester,
     ) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
       const channel = MethodChannel('plugins.flutter.io/url_launcher');
       final launchedUrls = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
