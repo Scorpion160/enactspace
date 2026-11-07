@@ -1,0 +1,48 @@
+{
+  "title": "EnactSpace Web — sources effectivement publiées",
+  "captured_on": "2026-11-07",
+  "production_url": "https://enactspace.kerunjombor.net",
+  "api_url": "https://api-enactspace.kerunjombor.net",
+  "deployed_web_javascript_sha256": "721bb91ddd55465309acebef2f6f8e5f9dac08fbc58d150cfd07c451749dcc90",
+  "deployed_backend": "enactspace-backend:recruitment-access-delete-20261106-v3",
+  "scope": "Archive des neuf fichiers frontend modifiés lors de la livraison Web.",
+  "runtime_integration": "Cette branche n'intègre PAS directement la refonte complète dans main.",
+  "source_files": {
+    "lib/features/auth/screens/login_screen.dart": {
+      "sha256": "b741cc342478180d7667034632fcaa8df291641eb79923e916930aaf846b13c6",
+      "bytes": 49321
+    },
+    "lib/features/members/screens/members_screen.dart": {
+      "sha256": "e48c170d96bd0d7142ba7d6c7fe5e7ede39d05e80283abf4dcc027f28b067f19",
+      "bytes": 104660
+    },
+    "lib/features/members/services/members_service.dart": {
+      "sha256": "c6d9152fcdd6439885012b7516bb47de0fbae7d905a7aaf61239126f2714cea0",
+      "bytes": 8899
+    },
+    "lib/features/recruitment/screens/internal/internal_recruitment_screen.dart": {
+      "sha256": "0a68b19db14527b798180e863fd19693fb75cd31c90af03893849916b855865a",
+      "bytes": 21080
+    },
+    "lib/features/recruitment/screens/internal/recruitment_jury_screen.dart": {
+      "sha256": "daa7f8371941ae06db9ab06548db45ca6ffe8f50ed25cfca624b825766a16e13",
+      "bytes": 19025
+    },
+    "lib/features/recruitment/services/recruitment_campaign_tools.dart": {
+      "sha256": "7ac6ba1184587108a87a87ad77cb2e980a39af063798fef88f1d6d2b02ab00df",
+      "bytes": 6628
+    },
+    "lib/features/recruitment/widgets/internal/recruitment_internal_widgets.dart": {
+      "sha256": "3c76e2c8f073c7f38470b0d50f4876ee78bde64863dc5c8d0975c3129a9c8f67",
+      "bytes": 22044
+    },
+    "lib/features/recruitment/widgets/internal/recruitment_viewers_section.dart": {
+      "sha256": "694dba8c798be31b3ff134920872653f1eaf993d7cc54ba191b00b1fda93755e",
+      "bytes": 8864
+    },
+    "tool/build_web_production_guarded.ps1": {
+      "sha256": "9a40f694af5ba8137e343ad46d57b3d77e13ae1a6da02dfce4eb81c8ae20d2e8",
+      "bytes": 2037
+    }
+  }
+}

@@ -1,0 +1,315 @@
+import '../../../core/api/api_client.dart';
+import '../../../core/auth/auth_service.dart';
+import '../models/member_import_model.dart';
+import '../models/member_model.dart';
+
+class MembersService {
+  final ApiClient _apiClient;
+  final AuthService _authService;
+
+  MembersService({ApiClient? apiClient, AuthService? authService})
+    : _apiClient = apiClient ?? ApiClient(),
+      _authService = authService ?? AuthService();
+
+  Future<List<MemberModel>> getMembers() {
+    return _getMembersFrom('/users/directory');
+  }
+
+  Future<List<MemberModel>> getManagedMembers() {
+    return _getMembersFrom('/users/');
+  }
+
+  Future<MemberModel> getMember(String memberId) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    final response = await _apiClient.get('/users/$memberId', token: token);
+    if (response is! Map<String, dynamic>) {
+      throw Exception('Profil membre invalide.');
+    }
+    return MemberModel.fromJson(response);
+  }
+
+  Future<List<MemberModel>> getPendingMembers() {
+    return _getMembersFrom('/users/pending');
+  }
+
+  Future<List<MemberModel>> _getMembersFrom(String path) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.get(path, token: token);
+
+    final List<dynamic> rawList;
+
+    if (response is List) {
+      rawList = response;
+    } else if (response is Map && response['data'] is List) {
+      rawList = response['data'] as List;
+    } else if (response is Map && response['items'] is List) {
+      rawList = response['items'] as List;
+    } else {
+      rawList = [];
+    }
+
+    final members = rawList
+        .whereType<Map<String, dynamic>>()
+        .map(MemberModel.fromJson)
+        .toList();
+    members.sort(MemberModel.compareAlphabetically);
+    return members;
+  }
+
+  Future<MemberModel> createMember({
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? password,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/',
+      token: token,
+      data: {
+        'first_name': firstName.trim(),
+        'last_name': lastName.trim(),
+        'email': email.trim(),
+        'status': 'pending',
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la création du membre.');
+  }
+
+  Future<MemberModel> approveMember(String userId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/approve',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de l’approbation du membre.');
+  }
+
+  Future<MemberModel> rejectMember(String userId) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/reject',
+      token: token,
+      data: {},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors du rejet de la demande.');
+  }
+
+  Future<MemberModel> suspendMember(String userId) {
+    return _postMemberAction(userId, 'suspend');
+  }
+
+  Future<MemberModel> reactivateMember(String userId) {
+    return _postMemberAction(userId, 'reactivate');
+  }
+
+  Future<Map<String, dynamic>> previewAccountDeletion(String userId) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    final result = await _apiClient.get(
+      '/users/$userId/deletion-impact',
+      token: token,
+    );
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  Future<void> permanentlyDeleteAccount({
+    required String userId,
+    required String confirmEmail,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Utilisateur non connecté.');
+    }
+    await _apiClient.postJson(
+      '/users/$userId/delete-account',
+      token: token,
+      data: {'confirm_email': confirmEmail},
+    );
+  }
+
+  Future<Map<String, dynamic>> previewAlumni(String memberId) async {
+    final token = await _authService.getToken();
+    final result = await _apiClient.get(
+      '/users/$memberId/alumni-transition',
+      token: token,
+    );
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  Future<MemberModel> makeAlumni(String userId) {
+    return _postMemberAction(userId, 'make-alumni');
+  }
+
+  Future<MemberModel> _postMemberAction(String userId, String action) async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/$action',
+      token: token,
+      data: {},
+    );
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+    throw Exception('Réponse invalide lors de la mise à jour du membre.');
+  }
+
+  Future<MemberModel> assignRoles({
+    required String userId,
+    required List<String> roleNames,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final response = await _apiClient.postJson(
+      '/users/$userId/roles',
+      token: token,
+      data: {'role_names': roleNames},
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de l’assignation du rôle.');
+  }
+
+  Future<MemberModel> updateMemberAdmin({
+    required String userId,
+    Map<String, dynamic>? profileData,
+    bool? emailVerified,
+    String? department,
+    String? studyLevel,
+  }) async {
+    final token = await _authService.getToken();
+
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final Map<String, dynamic> data = {...?profileData};
+
+    if (emailVerified != null) data['email_verified'] = emailVerified;
+    if (department != null) data['department'] = department;
+    if (studyLevel != null) data['study_level'] = studyLevel;
+
+    final response = await _apiClient.patchJson(
+      '/users/$userId/admin',
+      token: token,
+      data: data,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return MemberModel.fromJson(response);
+    }
+
+    throw Exception('Réponse invalide lors de la mise à jour du membre.');
+  }
+
+  Future<String> downloadImportTemplate() async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    return _apiClient.getText('/members/import/template', token: token);
+  }
+
+  Future<MemberImportReport> previewImport({
+    required List<int> bytes,
+    required String fileName,
+    bool updateExisting = false,
+  }) {
+    return _uploadImport(
+      action: 'preview',
+      bytes: bytes,
+      fileName: fileName,
+      updateExisting: updateExisting,
+    );
+  }
+
+  Future<MemberImportReport> applyImport({
+    required List<int> bytes,
+    required String fileName,
+    bool updateExisting = false,
+  }) {
+    return _uploadImport(
+      action: 'apply',
+      bytes: bytes,
+      fileName: fileName,
+      updateExisting: updateExisting,
+    );
+  }
+
+  Future<MemberImportReport> _uploadImport({
+    required String action,
+    required List<int> bytes,
+    required String fileName,
+    required bool updateExisting,
+  }) async {
+    final token = await _authService.getToken();
+    if (token == null) {
+      throw Exception('Utilisateur non connecté.');
+    }
+
+    final decoded = await _apiClient.postMultipart(
+      '/members/import/$action?update_existing=$updateExisting',
+      token: token,
+      bytes: bytes,
+      fileName: fileName,
+    );
+    if (decoded is Map<String, dynamic>) {
+      return MemberImportReport.fromJson(decoded);
+    }
+
+    throw Exception('Réponse invalide lors de l’import des membres.');
+  }
+}
