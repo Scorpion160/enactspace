@@ -181,8 +181,8 @@ def register_recruitment_extensions(router):
         rows = db.query(RecruitmentJuryMember, User).join(User, User.id == RecruitmentJuryMember.user_id).filter(
             RecruitmentJuryMember.campaign_id == campaign_id).order_by(User.last_name, User.first_name).all()
         return {"can_manage": can_manage_jury(db, user), "members": [member_payload(m, u) for m, u in rows],
-                "teams": campaign_teams(db, campaign_id),
-                "interviews_needing_reassignment": interviews_needing_reassignment(db, campaign_id)}
+                "teams": campaign_teams(db, campaign_id, user),
+                "interviews_needing_reassignment": interviews_needing_reassignment(db, campaign_id, user)}
 
     @router.get("/campaigns/{campaign_id}/jury/eligible")
     def eligible_members(campaign_id: UUID, search: str = Query(default="", max_length=100),

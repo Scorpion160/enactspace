@@ -18,6 +18,18 @@ from app.services.operational_integrity import to_naive_utc
 from app.services.recruitment_access import can_manage_jury
 
 
+def candidate_interview_released(campaign, application):
+    return bool(campaign.screening_published_at and campaign.identities_revealed_at
+                and application.screening_decision == "shortlisted")
+
+
+def candidate_interview_room(db, application):
+    if application.status != "interview_scheduled" or application.interview_meeting_id is None:
+        return None
+    meeting = db.get(Meeting, application.interview_meeting_id)
+    return meeting if meeting and meeting.status in {"scheduled", "live"} else None
+
+
 def require_private_meet():
     hostname = urlparse(settings.MEET_SERVER_URL).hostname
     if (not hostname or hostname in {"meet.jit.si", "8x8.vc"} or hostname.endswith(".8x8.vc")
@@ -78,10 +90,10 @@ def register_recruitment_meetings(router):
         if application is None or not application.tracking_code or payload.application_id.strip().upper() != application.tracking_code.upper():
             raise HTTPException(404, "Aucun entretien ne correspond à ces informations.")
         campaign = campaign_for_application(db, application)
-        if not campaign.screening_published_at or not campaign.identities_revealed_at or application.screening_decision != "shortlisted":
+        if not candidate_interview_released(campaign, application):
             raise HTTPException(409, "L’équipe n’a pas encore ouvert cet entretien.")
-        meeting = db.get(Meeting, application.interview_meeting_id) if application.interview_meeting_id else None
-        if application.status != "interview_scheduled" or meeting is None or meeting.status in {"ended", "cancelled"}:
+        meeting = candidate_interview_room(db, application)
+        if meeting is None:
             raise HTTPException(409, "Cet entretien EnactMeet n’est pas disponible.")
         now = utc_now()
         start, end = application.interview_at, application.interview_end_at

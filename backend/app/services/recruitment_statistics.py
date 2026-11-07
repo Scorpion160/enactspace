@@ -72,6 +72,8 @@ def discovery_label(value):
     for code, label in DISCOVERY_CHANNELS.items():
         if key == code or key == plain(label):
             return label
+    if key.partition(':')[0].strip() == 'autre':
+        return DISCOVERY_CHANNELS['other']
     if any(word in key for word in ('reseau', 'instagram', 'facebook', 'tiktok', 'whatsapp', 'linkedin')):
         return DISCOVERY_CHANNELS['social_media']
     if any(word in key for word in ('membre', 'enacteur', 'enactrice')):

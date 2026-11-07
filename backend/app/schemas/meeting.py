@@ -98,6 +98,7 @@ class MeetingRead(BaseModel):
     recording_enabled: bool
     can_manage: bool = False
     can_delete: bool = False
+    is_recruitment_interview: bool = False
     current_user_role: str = "participant"
     invited_count: int = 0
     joined_count: int = 0

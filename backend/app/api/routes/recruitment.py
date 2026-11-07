@@ -64,7 +64,7 @@ from app.services.operational_integrity import lock_row, to_naive_utc
 from app.services.recruitment_rubric import VERSION as RUBRIC_VERSION, rubric_payload, assess_ratings, structured_summary
 
 from app.services.recruitment_selection import (
-    POLICY_VERSION, uses_blind_selection, identity_is_visible, review_stage,
+    POLICY_VERSION, anonymous_code, uses_blind_selection, identity_is_visible, review_stage,
     require_application_access, require_review_assignment,
     redact_candidate_text, public_selection_state, reviewed_summary,
     distribute_assignments, can_review_application, valid_reviews_query,
@@ -286,6 +286,13 @@ def get_application_or_404(db: Session, application_id: str) -> Application:
     return application
 
 
+def _review_score(reviews, summary):
+    if summary["screening_score"] is not None:
+        return round(summary["screening_score"] / 5, 2)
+    values = [float(review.score) for review in reviews if review.score is not None]
+    return round(sum(values) / len(values), 2) if values else None
+
+
 def recompute_application_score(db: Session, application: Application):
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     stage = review_stage(campaign, application)
@@ -293,11 +300,7 @@ def recompute_application_score(db: Session, application: Application):
         ApplicationReview.application_id == application.id, ApplicationReview.stage == stage,
     ).all()
     summary = structured_summary(reviews, campaign.screening_rubric_version or RUBRIC_VERSION)
-    values = [float(review.score) for review in reviews if review.score is not None]
-    application.final_score = (
-        round(summary["screening_score"] / 5, 2) if summary["screening_score"] is not None
-        else round(sum(values) / len(values), 2) if values else None
-    )
+    application.final_score = _review_score(reviews, summary)
     application.updated_at = utc_now()
 
 
@@ -938,10 +941,6 @@ def ensure_project_membership(db: Session, user: User, project_id) -> None:
         db.add(ProjectMember(project_id=project_id, user_id=user.id, position="membre"))
 
 
-def anonymous_code(application: Application) -> str:
-    return f"Candidat #{str(application.id).replace('-', '')[:12].upper()}"
-
-
 def review_payload(review, *, anonymized=False, reviewer_name=None, viewer_id=None):
     data = ApplicationReviewRead.model_validate(review).model_dump()
     if reviewer_name is not None:
@@ -972,7 +971,8 @@ def application_payload(
     if current_user is not None:
         campaign = (prefetched_campaigns.get(application.campaign_id) if prefetched_campaigns is not None
                     else get_campaign_or_404(db, str(application.campaign_id)))
-        if uses_blind_selection(campaign, application):
+        blind = uses_blind_selection(campaign, application)
+        if blind:
             anonymized = anonymized or not identity_is_visible(db, current_user, campaign)
             permission_data = dict(permission_data)
             manager = can_manage_jury(db, current_user)
@@ -995,17 +995,20 @@ def application_payload(
                    else valid_reviews_query(db).filter(ApplicationReview.application_id == application.id).all())
         stage = review_stage(campaign, application)
         stage_reviews = [review for review in reviews if review.stage == stage]
-        data.update(structured_summary(stage_reviews, version))
+        summary = structured_summary(stage_reviews, version)
+        data.update(summary)
+        if blind:
+            data["final_score"] = _review_score(stage_reviews, summary)
         data["screening_rubric"] = rubric_payload(version)
         own_review = next((review for review in stage_reviews if review.reviewer_id == current_user.id), None)
-        if uses_blind_selection(campaign, application) and own_review is None and not can_manage_jury(db, current_user):
+        if blind and own_review is None and not can_manage_jury(db, current_user):
             data.update(screening_score=None, screening_spread=None, final_score=None)
         data["my_review"] = review_payload(own_review, anonymized=anonymized, viewer_id=current_user.id) if own_review else None
     if include_history and current_user is not None:
         data["history"] = application_history(db, application)
     data["status"] = normalize_application_status(application.status)
     data["tracking_code"] = application.tracking_code or str(application.id)
-    if current_user is not None and uses_blind_selection(campaign, application):
+    if current_user is not None and blind:
         # The personal tracking code also opens the candidate questionnaire
         # and guest interview. It is never a credential for internal jurors.
         data["tracking_code"] = anonymous_code(application)
@@ -1089,7 +1092,13 @@ def track_application(
     normalized_status = normalize_application_status(public_status)
     tracking_code = ensure_tracking_code(db, application)
     from app.models.recruitment import ApplicationPersonality
+    from app.services.recruitment_meetings import candidate_interview_released, candidate_interview_room
     attempt = db.get(ApplicationPersonality, application.id)
+    enactmeet_available = (
+        normalized_status == "interview_scheduled"
+        and candidate_interview_released(campaign, application)
+        and candidate_interview_room(db, application) is not None
+    )
     db.commit()
     next_step = APPLICATION_TRACKING_NEXT_STEPS.get(normalized_status, "Votre dossier est en cours de traitement.")
     candidate_message = APPLICATION_TRACKING_MESSAGES.get(normalized_status)
@@ -1115,7 +1124,7 @@ def track_application(
         "status": normalized_status,
         "screening_result": screening_result,
         "selection_schedule": public_deposit_dates(campaign),
-        "enactmeet_available": bool(application.interview_meeting_id and normalized_status == "interview_scheduled"),
+        "enactmeet_available": enactmeet_available,
         "result_published_at": published_at,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,
@@ -1256,7 +1265,7 @@ def export_applications_csv(
         RecruitmentCampaign.id.in_({row.campaign_id for row in applications})).all()} if applications else {}
     latest_reviews = {}
     if applications:
-        for review in db.query(ApplicationReview).filter(
+        for review in valid_reviews_query(db).filter(
             ApplicationReview.application_id.in_([row.id for row in applications])
         ).order_by(ApplicationReview.updated_at.desc(), ApplicationReview.id.desc()).all():
             latest_reviews.setdefault(review.application_id, review)
@@ -1334,15 +1343,15 @@ def schedule_application_interview(
     campaign = get_campaign_or_404(db, str(application.campaign_id))
     if uses_blind_selection(campaign, application) and (review_stage(campaign, application) == "screening" or application.screening_decision != "shortlisted"):
         raise HTTPException(409, "Publie d’abord la présélection de ce dossier avant de préparer son entretien.")
+    from app.services.recruitment_interviews import assign_interview, effective_interview_end
     if campaign.selection_schedule:
         from app.schemas.recruitment_schedule import RecruitmentSchedule
         calendar = RecruitmentSchedule.model_validate(campaign.selection_schedule)
         starts = to_naive_utc(payload.interview_at)
-        ends = to_naive_utc(payload.interview_end_at) if payload.interview_end_at else starts
+        ends = effective_interview_end(starts, to_naive_utc(payload.interview_end_at) if payload.interview_end_at else None)
         closing = datetime.combine(calendar.interviews_end + timedelta(days=1), datetime.min.time())
         if not calendar.interviews_start <= starts.date() <= calendar.interviews_end or ends > closing:
             raise HTTPException(422, "L’entretien doit se dérouler dans la période prévue au calendrier de la campagne.")
-    from app.services.recruitment_interviews import assign_interview
     old_interview = {
         name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
         for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link", "interview_jury", "interview_note")

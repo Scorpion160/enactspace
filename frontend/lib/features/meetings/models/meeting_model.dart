@@ -19,6 +19,7 @@ class MeetingModel {
   final bool recordingEnabled;
   final bool canManage;
   final bool canDelete;
+  final bool isRecruitmentInterview;
   final String currentUserRole;
   final int invitedCount;
   final int joinedCount;
@@ -45,6 +46,7 @@ class MeetingModel {
     required this.recordingEnabled,
     required this.canManage,
     required this.canDelete,
+    this.isRecruitmentInterview = false,
     required this.currentUserRole,
     required this.invitedCount,
     required this.joinedCount,
@@ -73,6 +75,7 @@ class MeetingModel {
       recordingEnabled: json['recording_enabled'] == true,
       canManage: json['can_manage'] == true,
       canDelete: json['can_delete'] == true,
+      isRecruitmentInterview: json['is_recruitment_interview'] == true,
       currentUserRole: json['current_user_role']?.toString() ?? 'participant',
       invitedCount: int.tryParse(json['invited_count']?.toString() ?? '') ?? 0,
       joinedCount: int.tryParse(json['joined_count']?.toString() ?? '') ?? 0,

@@ -27,10 +27,21 @@ from app.services.recruitment_access import (
     can_manage_jury, eligible_juror, require_campaign_access,
     is_enachef, is_recruitment_staff, active_jury_member, active_reader,
 )
+from app.services.recruitment_interviews import interview_completed
 from app.services.recruitment_rubric import VERSION, structured_summary
 from app.schemas.recruitment_schedule import RecruitmentSchedule, NOVEMBER_2026_SCHEDULE
 
 POLICY_VERSION = "blind-selection-v1"
+
+
+def anonymous_code(application: Application) -> str:
+    return f"Candidat #{str(application.id).replace('-', '')[:12].upper()}"
+
+
+def interview_candidate_label(application: Application, *, anonymized: bool) -> str:
+    if anonymized and not application.legacy_result_published:
+        return anonymous_code(application)
+    return f"{application.first_name} {application.last_name}".strip()
 
 
 def uses_blind_selection(campaign, application=None):
@@ -104,16 +115,15 @@ def require_application_access(db, user, application):
 
 
 def can_review_application(db, user, application, campaign):
+    if user.email.casefold() == application.email.casefold():
+        return False
     if not uses_blind_selection(campaign, application):
-        return (user.email.casefold() != application.email.casefold()
-                and (is_recruitment_staff(db, user)
-                     or active_jury_member(db, user, campaign.id)))
+        return is_recruitment_staff(db, user) or active_jury_member(db, user, campaign.id)
     if campaign.final_published_at or application.status in {"accepted", "rejected", "cancelled"}:
         return False
     if review_stage(campaign, application) == "screening":
         # Every active jury member can evaluate any candidate, except themselves.
-        return (active_jury_member(db, user, campaign.id)
-                and user.email.casefold() != application.email.casefold())
+        return active_jury_member(db, user, campaign.id)
     if application.screening_decision != "shortlisted":
         return False
     return db.query(ApplicationInterviewJuror.application_id).join(
@@ -182,16 +192,26 @@ def reviewed_summary(reviews, campaign, stage):
 
 
 def valid_reviews_query(db):
+    self_review = (
+        select(Application.id)
+        .join(User, User.id == ApplicationReview.reviewer_id)
+        .where(
+            Application.id == ApplicationReview.application_id,
+            func.lower(User.email) == func.lower(Application.email),
+        )
+        .correlate(ApplicationReview)
+        .exists()
+    )
     return db.query(ApplicationReview).outerjoin(
         ApplicationScreeningAssignment,
         and_(
             ApplicationScreeningAssignment.application_id == ApplicationReview.application_id,
             ApplicationScreeningAssignment.reviewer_id == ApplicationReview.reviewer_id,
         ),
-    ).filter(or_(
-        ApplicationReview.stage != "screening",
-        ApplicationScreeningAssignment.declined_at.is_(None),
-    ))
+    ).filter(
+        ~self_review,
+        or_(ApplicationReview.stage != "screening", ApplicationScreeningAssignment.declined_at.is_(None)),
+    )
 
 
 def required_reviews(campaign, summary):
@@ -328,7 +348,7 @@ def selection_overview(db, campaign):
         target = required_reviews(campaign, summary)
         rows.append({
             "application_id": str(application.id),
-            "anonymous_code": "Candidat #" + str(application.id).replace("-", "")[:12].upper(),
+            "anonymous_code": anonymous_code(application),
             "decision": application.screening_decision if stage == "screening" else application.pending_final_decision,
             "review_count": summary["screening_review_count"],
             "required_reviews": target,
@@ -434,7 +454,7 @@ def register_recruitment_selection(router):
         if stage == "screening":
             application.screening_decision = payload.decision
         else:
-            if application.status != "interview_scheduled" or application.interview_at is None or application.interview_at > utc_now():
+            if not interview_completed(application, utc_now()):
                 raise HTTPException(409, "Programme et réalise l’entretien avant de préparer la décision finale.")
             if payload.decision in {"accepted", "waiting_list"}:
                 from app.api.routes.recruitment_extensions import require_completed_questionnaire
@@ -474,8 +494,7 @@ def register_recruitment_selection(router):
         ).order_by(Application.id).with_for_update().all()
         published_at = utc_now()
         if payload.stage == "interview" and any(
-            application.status != "interview_scheduled" or application.interview_at is None
-            or application.interview_at > published_at for application in applications
+            not interview_completed(application, published_at) for application in applications
         ):
             raise HTTPException(409, "Chaque entretien doit être réalisé avant de publier les décisions finales.")
         for application in applications:

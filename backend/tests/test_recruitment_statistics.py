@@ -6,10 +6,15 @@ from sqlalchemy.orm import Session
 import app.models.base  # noqa: F401
 from app.db.database import Base
 from app.models.recruitment import Application, RecruitmentCampaign
-from app.services.recruitment_statistics import campaign_statistics
+from app.services.recruitment_application_metadata import DISCOVERY_CHANNELS, discovery_answer
+from app.services.recruitment_statistics import campaign_statistics, discovery_label
 
 
 class RecruitmentStatisticsTests(unittest.TestCase):
+    def test_explicit_other_channel_is_kept_even_when_its_detail_mentions_a_channel(self):
+        self.assertEqual(discovery_label(discovery_answer('other', 'Un atelier vu sur Instagram')), 'Autre')
+        self.assertEqual(discovery_label('Un atelier vu sur Instagram'), DISCOVERY_CHANNELS['social_media'])
+
     def test_study_years_follow_the_esp_curriculum_and_preserve_totals(self):
         engine = create_engine('sqlite://')
         self.addCleanup(engine.dispose)
