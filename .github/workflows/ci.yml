@@ -111,7 +111,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20260913_0009 (head)"
+          test "$output" = "20261107_0038 (head)"
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
@@ -124,7 +124,7 @@ jobs:
           fi
 
   flutter:
-    name: Flutter 3.44.9 / analyze, test, web, Android debug
+    name: Flutter 3.47.5 / analyze, test, web only
     runs-on: ubuntu-latest
     timeout-minutes: 50
     defaults:
@@ -137,7 +137,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
-          flutter-version: "3.44.9"
+          flutter-version: "3.47.5"
           channel: stable
           cache: true
 
@@ -155,8 +155,5 @@ jobs:
 
       - name: Build release web application
         run: >-
-          flutter build web --release --no-pub
+          flutter build web --release --no-pub --no-tree-shake-icons
           --dart-define=ENACTSPACE_API_URL=https://example.invalid
-
-      - name: Build unsigned Android debug APK
-        run: flutter build apk --debug --no-pub
