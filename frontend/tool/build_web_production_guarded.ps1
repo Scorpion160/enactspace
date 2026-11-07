@@ -38,8 +38,17 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw 'Configuration client ou worker Firebase invalide.' }
     Push-Location $frontend
     try {
-        & $flutter build web --release --no-tree-shake-icons "--dart-define=ENACTSPACE_API_URL=$expectedApi" "--dart-define-from-file=$ClientDefinesFile"
-        if ($LASTEXITCODE -ne 0) { throw 'Echec compilation Flutter Web.' }
+        # Windows PowerShell emits native stderr as an error record even when
+        # Flutter exits successfully. Use the exit code as the build result.
+        $previousErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & $flutter build web --release --no-tree-shake-icons --no-wasm-dry-run "--dart-define=ENACTSPACE_API_URL=$expectedApi" "--dart-define-from-file=$ClientDefinesFile"
+            $flutterExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorAction
+        }
+        if ($flutterExit -ne 0) { throw 'Echec compilation Flutter Web.' }
     } finally {
         Pop-Location
     }
