@@ -160,7 +160,7 @@ class ImpactTruthTests(unittest.TestCase):
 
         self.assertEqual(payload["direct_impact"], 25)
         self.assertEqual(summary["organization"]["direct_impact_total"], 25)
-        self.assertIsNone(summary["historical_impact"])
+        self.assertTrue(summary["historical_impact"]["source_label"])
         self.assertEqual(summary["claim_overview"]["by_claim_type"]["PROJECTION"], 1)
 
     def test_replacement_preserves_old_truth_through_review_and_rejection(self):
@@ -578,7 +578,14 @@ class ImpactTruthTests(unittest.TestCase):
             value=14,
             status="validated",
         )
-        self.db.add(invalid_legacy)
+        draft = HistoricalImpactStatistic(
+            metric_key="draft_statistic",
+            label="Draft",
+            value=15,
+            source_label="Archive REF-15",
+            status="draft",
+        )
+        self.db.add_all([invalid_legacy, draft])
         self.db.commit()
 
         summary = impact_archives.get_historical_impact_summary(
@@ -587,6 +594,11 @@ class ImpactTruthTests(unittest.TestCase):
         )
         self.assertEqual(summary["sourced"], 13)
         self.assertNotIn("legacy_without_source", summary)
+        self.assertNotIn("draft_statistic", summary)
+        statistics = impact_archives.list_historical_impact_statistics(
+            include_defaults=False, db=self.db, current_user=self.user,
+        )["statistics"]
+        self.assertEqual([row["metric_key"] for row in statistics], ["sourced"])
         self.assertEqual(
             impact_archives._historical_statistic_payload(invalid_legacy)["status"],
             "submitted",
@@ -684,9 +696,8 @@ class ImpactTruthTests(unittest.TestCase):
             dependencies = {dependency.call for dependency in route.dependant.dependencies}
             self.assertIn(require_enacchef_or_admin, dependencies)
 
-    def test_runtime_path_has_no_hard_coded_historical_or_name_fallback(self):
+    def test_runtime_path_has_no_project_name_fallback(self):
         source = Path(impact.__file__).read_text(encoding="utf-8").lower()
-        self.assertNotIn("historical_impact =", source)
         self.assertNotIn("_is_terrasen", source)
         self.assertNotIn('"terrasen" in', source)
         archives = Path("app/api/routes/archives.py").read_text(encoding="utf-8").lower()

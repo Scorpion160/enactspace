@@ -428,6 +428,26 @@ void main() {
       expect(find.byTooltip('Masquer le mot de passe'), findsOneWidget);
     });
 
+    testWidgets('la connexion signale les champs manquants sans erreur technique', (
+      tester,
+    ) async {
+      await _pumpLogin(tester, const Size(390, 844));
+      final submit = find.text('Se connecter');
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Renseigne ton email ou ton nom d’utilisateur.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'membre@example.test');
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Renseigne ton mot de passe.'), findsOneWidget);
+      expect(find.textContaining('Invalid argument'), findsNothing);
+    });
+
     testWidgets('le parcours membre et alumni conserve ce tooltip', (
       tester,
     ) async {

@@ -1015,7 +1015,8 @@ def _timeline_source_payload(
         except HTTPException:
             pass
         else:
-            capability = {"type": "stored_file", "url": f"/api/files/{stored_file.id}/download"}
+            if review or stored_file.visibility != "private":
+                capability = {"type": "stored_file", "url": f"/api/files/{stored_file.id}/download"}
     elif source.document_id:
         visible_document = (
             visible_documents_query(db, current_user)

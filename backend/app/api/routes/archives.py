@@ -2175,14 +2175,18 @@ def list_historical_impact_statistics(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_active_validated_user),
 ):
+    curator = _is_memory_curator(db, current_user)
+    query = db.query(HistoricalImpactStatistic)
+    if not curator:
+        query = query.filter(HistoricalImpactStatistic.status == "validated")
     db_statistics = {
         statistic.metric_key: _historical_statistic_payload(statistic)
-        for statistic in db.query(HistoricalImpactStatistic)
-        .order_by(
+        for statistic in query.order_by(
             HistoricalImpactStatistic.is_featured.desc(),
             HistoricalImpactStatistic.metric_key.asc(),
         )
         .all()
+        if curator or _historical_statistic_has_provenance(statistic)
     }
     statistics = list(db_statistics.values())
     if include_defaults:

@@ -115,22 +115,33 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    if (_loading) return;
+    final identifier = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (identifier.isEmpty || password.isEmpty) {
+      setState(() {
+        _error = identifier.isEmpty
+            ? 'Renseigne ton email ou ton nom d’utilisateur.'
+            : 'Renseigne ton mot de passe.';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final identifier = _emailController.text.trim();
       await _authService.login(
         identifier: identifier,
-        password: _passwordController.text,
+        password: password,
       );
       await LoginPreferences.rememberIdentifier(identifier);
 
       if (!mounted) return;
       context.go(widget.afterSignInPath);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
       });

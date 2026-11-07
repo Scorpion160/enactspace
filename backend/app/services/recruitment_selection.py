@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.email_delivery import EmailDelivery
 from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row
+from app.services.recruitment_application_metadata import academic_year
 from app.services.recruitment_access import (
     can_manage_jury, eligible_juror, require_campaign_access,
     is_enachef, is_recruitment_staff, active_jury_member, active_reader,
@@ -163,8 +164,16 @@ def redact_candidate_text(value, application):
                 result = result[:start] + "[identité masquée]" + result[end:]
     result = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[e-mail masqué]", result)
     result = re.sub(r"https?://\S+|www\.\S+", "[lien masqué]", result, flags=re.IGNORECASE)
-    result = re.sub(r"(?<!\w)\+?\d[\d ()-]{6,}\d(?!\w)", "[numéro masqué]", result)
-    return result
+
+    def redact_number(match):
+        number = match.group()
+        try:
+            academic_year(re.sub(r"\s*-\s*", "-", number))
+        except ValueError:
+            return "[numéro masqué]"
+        return number
+
+    return re.sub(r"(?<!\w)\+?\d[\d ()-]{6,}\d(?!\w)", redact_number, result)
 
 
 def reviewed_summary(reviews, campaign, stage):

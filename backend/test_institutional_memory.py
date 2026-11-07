@@ -618,7 +618,7 @@ class InstitutionalMemoryTests(unittest.TestCase):
         )
         self.assertEqual(self.db.query(AuditLog).count(), audit_count)
 
-    def test_static_archive_data_stays_compatible_and_not_normalized_verified(self):
+    def test_sourced_archive_catalogue_stays_separate_from_normalized_memory(self):
         curator = self.curator()
         archive_awards = archives.list_awards(
             search=None,
@@ -639,10 +639,9 @@ class InstitutionalMemoryTests(unittest.TestCase):
 
         self.assertGreater(len(archive_awards), 0)
         self.assertGreater(len(archive_competitions), 0)
-        self.assertTrue(all(row["legacy"] and not row["verified"] for row in archive_awards))
-        self.assertTrue(
-            all(row["legacy"] and not row["verified"] for row in archive_competitions)
-        )
+        for row in [*archive_awards, *archive_competitions]:
+            self.assertEqual(row["trust"], "institutional_verified")
+            self.assertTrue(row["source_label"])
         self.assertEqual(
             memory.list_awards(
                 year=None,

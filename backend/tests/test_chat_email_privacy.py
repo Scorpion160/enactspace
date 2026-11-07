@@ -1,27 +1,21 @@
 """Exercise the actual email enqueue policy without sending or accessing a DB."""
-import ast
-from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
+
+from app.services import email_delivery_service
+from app.services.email_templates import app_link
 
 class ChatEmailPrivacyTests(unittest.TestCase):
     def setUp(self):
-        source = Path(__file__).resolve().parents[1] / "app/services/email_delivery_service.py"
-        tree = ast.parse(source.read_text(encoding="utf-8"))
-        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
-                        and n.name == "enqueue_notification_email")
-        module = ast.Module(body=[function], type_ignores=[])
-        module.body.insert(0, ast.ImportFrom(module="__future__", names=[
-            ast.alias(name="annotations")], level=0))
-        ast.fix_missing_locations(module)
         self.captured = {}
+
         def enqueue(db, **kwargs):
             self.captured.update(kwargs)
             return kwargs
-        namespace = {"enqueue_email_delivery": enqueue,
-                     "APP_URL": "https://enactspace.kerunjombor.net"}
-        exec(compile(module, str(source), "exec"), namespace)
-        self.enqueue = namespace["enqueue_notification_email"]
+
+        self.enterContext(patch.object(email_delivery_service, "enqueue_email_delivery", enqueue))
+        self.enqueue = email_delivery_service.enqueue_notification_email
         self.db = SimpleNamespace(flush=lambda: None)
 
     def test_all_chat_content_stays_out_of_subject_and_body(self):
@@ -41,7 +35,10 @@ class ChatEmailPrivacyTests(unittest.TestCase):
                                         title="Nouvelle tâche", message="Votre tâche est prête.")
         self.enqueue(self.db, notification, "recipient@example.org")
         self.assertEqual(self.captured["subject"], notification.title)
-        self.assertEqual(self.captured["text_body"], notification.message)
+        self.assertEqual(
+            self.captured["text_body"],
+            f"{notification.message}\n\nConsulter dans EnactSpace : {app_link('notifications')}",
+        )
 
 if __name__ == "__main__":
     unittest.main()

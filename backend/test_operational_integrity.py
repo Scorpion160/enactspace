@@ -3,7 +3,7 @@
 import asyncio
 import unittest
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -15,9 +15,10 @@ from starlette.requests import Request
 from unittest.mock import patch
 
 import app.models.base  # noqa: F401
-from app.api.routes import attendance, events, finance, projects, recruitment, tasks, users
+from app.api.routes import academic, attendance, events, files, finance, projects, recruitment, seasons, tasks, users
 from app.core.roles import RECRUITMENT_ACCESS_ROLES
 from app.db.database import Base
+from app.models.academic import UserAcademicHistory
 from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.audit import AuditLog
 from app.models.event import Event, EventParticipant
@@ -26,15 +27,19 @@ from app.models.mobile_money import MobileMoneyTransaction
 from app.models.notification import Notification
 from app.models.pole import Pole, PoleMember
 from app.models.project import Project, ProjectMember
-from app.models.recruitment import Application, RecruitmentCampaign
+from app.models.recruitment import Application, RecruitmentCampaign, RecruitmentJuryMember, RecruitmentViewerAccess
 from app.models.role import Role, UserRole
+from app.models.season import Season
+from app.models.stored_file import StoredFile
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.recruitment import ConvertApplicationToUserRequest
 from app.schemas.mobile_money import MobileMoneyInitiateRequest
+from app.schemas.season import YearActivation
 from app.schemas.user import UserAdminUpdate, UserRoleAssign
 from app.services.operational_integrity import reconcile_user_lifecycle, to_naive_utc
 from app.services.payments import PaymentProviderResult
+from app.services.recruitment_selection import POLICY_VERSION
 
 
 def _request() -> Request:
@@ -126,6 +131,134 @@ class OperationalIntegrityTests(unittest.TestCase):
             .filter(Notification.user_id == user.id)
             .count(),
         }
+
+    def test_open_year_preserves_existing_work_and_academic_confirmations(self):
+        admin = self._user()
+        self._role(admin, "administrateur")
+        member = self._user()
+        previous = Season(
+            name="2025–2026", start_date=date(2025, 10, 1),
+            end_date=date(2026, 9, 30), is_current=True,
+        )
+        upcoming = Season(
+            name="2026–2027", start_date=date(2026, 10, 1),
+            end_date=date(2027, 9, 30),
+        )
+        self.db.add_all([previous, upcoming])
+        self.db.flush()
+        member.study_level = "DIC2"
+        member.academic_confirmed_season_id = previous.id
+        history = UserAcademicHistory(
+            user_id=member.id, season_id=previous.id, department="Génie électrique",
+            cursus="DIC", study_level="DIC2",
+        )
+        project = Project(name="Projet en cours", season_id=previous.id)
+        campaign = RecruitmentCampaign(
+            title="Campagne en cours", season_id=previous.id, is_active=True,
+            start_date=date(2026, 11, 6), end_date=date(2026, 11, 9),
+        )
+        self.db.add_all([history, project, campaign])
+        self.db.flush()
+        task = Task(title="Tâche en cours", project_id=project.id, status="en_cours")
+        self.db.add(task)
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as stale:
+            seasons.activate_season(upcoming.id, YearActivation(), self.db, admin)
+        self.assertEqual(stale.exception.status_code, 409)
+        self.db.rollback()
+        self.assertTrue(previous.is_current)
+        self.assertFalse(upcoming.is_current)
+
+        activation = YearActivation(expected_current_id=previous.id)
+        for _ in range(2):
+            opened = seasons.activate_season(upcoming.id, activation, self.db, admin)
+            self.assertTrue(opened.is_current)
+        self.assertFalse(previous.is_current)
+        self.assertTrue(previous.archived)
+        self.assertEqual(project.season_id, previous.id)
+        self.assertEqual(task.project_id, project.id)
+        self.assertEqual(task.status, "en_cours")
+        self.assertEqual(campaign.season_id, previous.id)
+        self.assertTrue(campaign.is_active)
+        self.assertEqual(campaign.end_date, date(2026, 11, 9))
+        self.assertEqual(member.study_level, "DIC2")
+        self.assertEqual(history.season_id, previous.id)
+        profile = academic.read_profile(self.db, member)
+        self.assertEqual(profile.current_season_id, upcoming.id)
+        self.assertEqual(profile.confirmed_season_id, previous.id)
+        self.assertFalse(profile.confirmed_current_season)
+        self.assertEqual(self.db.query(AuditLog).filter_by(action="activation_annee").count(), 1)
+        self.assertEqual(self.db.query(Notification).filter_by(user_id=member.id).count(), 1)
+
+    def test_blind_recruitment_keeps_answers_and_seals_candidate_documents(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        juror = self._user()
+        reader = self._user(status="alumni", profile_type="alumni")
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION)
+        self.db.add(campaign)
+        self.db.flush()
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", phone="+221 77 123 45 67",
+            department="Génie électrique", study_level="DIC2",
+            class_name="2025-2026 (emilie@example.com)",
+            questionnaire_answers=[{"id": "motivation", "question": "Pourquoi ?", "answer": "Je suis Emilie et je souhaite agir."}],
+        )
+        self.db.add_all([
+            application,
+            RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id),
+            RecruitmentViewerAccess(campaign_id=campaign.id, user_id=reader.id),
+        ])
+        self.db.flush()
+        cv = StoredFile(
+            original_filename="cv-emilie.pdf", stored_filename="fake.pdf",
+            storage_path="recruitment/fake.pdf", file_size=5, visibility="private",
+            storage_scope="recruitment", entity_type="application", entity_id=application.id,
+        )
+        self.db.add(cv)
+        self.db.flush()
+        application.cv_url = f"/api/files/{cv.id}/download"
+        self.db.commit()
+        reveal = next(
+            route.endpoint for route in recruitment.router.routes
+            if route.path == "/recruitment/campaigns/{campaign_id}/selection/reveal"
+        )
+
+        for user in (manager, juror, reader):
+            with self.subTest(user=user.id):
+                dossier = recruitment.get_application(str(application.id), False, self.db, user)
+                self.assertTrue(dossier["is_anonymized"])
+                self.assertEqual(dossier["department"], "Génie électrique")
+                self.assertEqual(dossier["study_level"], "DIC2")
+                self.assertEqual(dossier["class_name"], "2025-2026 ([identité masquée])")
+                self.assertEqual(dossier["questionnaire_answers"][0]["answer"], "Je suis [identité masquée] et je souhaite agir.")
+                self.assertEqual(dossier["permissions"]["can_review"], user.id == juror.id)
+                self.assertIsNone(dossier["cv_url"])
+                for read_file in (files.get_file_metadata, files.preview_file, files.download_file):
+                    with self.assertRaises(HTTPException) as hidden:
+                        read_file(str(cv.id), self.db, user)
+                    self.assertEqual(hidden.exception.status_code, 403)
+
+        with self.assertRaises(HTTPException) as early:
+            reveal(campaign.id, self.db, manager)
+        self.assertEqual(early.exception.status_code, 409)
+        campaign.screening_published_at = datetime(2026, 11, 15)
+        self.db.commit()
+        with self.assertRaises(HTTPException) as unauthorized:
+            reveal(campaign.id, self.db, juror)
+        self.assertEqual(unauthorized.exception.status_code, 403)
+        self.assertIsNone(recruitment.get_application(str(application.id), False, self.db, juror)["cv_url"])
+
+        reveal(campaign.id, self.db, manager)
+        dossier = recruitment.get_application(str(application.id), False, self.db, juror)
+        self.assertEqual(dossier["first_name"], "Émilie")
+        self.assertEqual(dossier["cv_url"], application.cv_url)
+        self.assertEqual(files.get_file_metadata(str(cv.id), self.db, juror)["original_filename"], "cv-emilie.pdf")
+        with self.assertRaises(HTTPException) as reader_denied:
+            files.get_file_metadata(str(cv.id), self.db, reader)
+        self.assertEqual(reader_denied.exception.status_code, 403)
 
     def test_member_lifecycle_removes_authority_without_restoring_memberships(self):
         member = self._user()
@@ -403,6 +536,7 @@ class OperationalIntegrityTests(unittest.TestCase):
     def test_generic_admin_patch_cannot_bypass_lifecycle(self):
         target = self._user()
         admin = self._user()
+        self._role(admin, "administrateur")
         with self.assertRaises(HTTPException) as caught:
             users.admin_update_user(
                 str(target.id),
@@ -597,6 +731,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_rejects_incompatible_user_and_preserves_active_user(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Campaign")
         self.db.add(campaign)
         self.db.flush()
@@ -624,6 +759,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_profile_type_is_operational_and_existing_identity_is_preserved(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Profile conversion")
         core_pole = Pole(name="Existing conversion core", type="core")
         support_pole = Pole(name="Existing conversion support", type="support")
