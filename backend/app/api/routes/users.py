@@ -51,7 +51,6 @@ from app.api.deps import (
     can_review_join_requests,
     get_user_role_names,
 )
-from app.services.alumni_profiles import alumni_transition_control, ensure_alumni_profile
 from app.services.audit_service import create_audit_log, get_client_ip
 from app.services.notification_service import notify_user
 from app.services.file_storage_service import delete_physical_file, infer_mime_type, store_bytes
@@ -465,7 +464,6 @@ def list_pending_users(
     ).order_by(User.created_at.desc()).all()
 
     return [build_user_with_roles(db, user) for user in users]
-
 
 
 # Les suppressions irreversibles sont reservees aux administrateurs et
@@ -924,40 +922,8 @@ def preview_alumni_transition(user_id: str, db:Session=Depends(get_db), current_
     projects=[{"name":p.name,"position":m.position} for m,p in db.query(ProjectMember,Project).join(Project,Project.id==ProjectMember.project_id).filter(ProjectMember.user_id==user.id,ProjectMember.is_active.is_(True),ProjectMember.left_at.is_(None)).all()]
     tasks=[{"id":str(t.id),"title":t.title,"status":t.status} for t in db.query(Task).join(TaskAssignee,TaskAssignee.task_id==Task.id).filter(TaskAssignee.user_id==user.id,Task.status.notin_({"valide","annule"})).all()]
     return {"member_id":str(user.id),"status":user.status,"roles":roles,"poles":poles,"projects":projects,"pending_tasks":tasks,
-        "control":alumni_transition_control(db, user, set(roles)),
         "can_convert":user.status=="active" and user.is_active and user.profile_type in {"enacteur","enactrice"} and user.id!=current_user.id and "administrateur" not in roles,
         "message":"Le compte et l’historique sont conservés. Les responsabilités et affectations actives dans les pôles et projets sont clôturées. Les tâches ouvertes restent à transmettre ; elles ne sont ni supprimées ni validées automatiquement."}
-
-
-@router.post("/{user_id}/alumni-transition/repair")
-def repair_alumni_transition(
-    user_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    actor, user = lock_account_management(
-        db, current_user.id, user_id, allowed_roles=GLOBAL_MANAGEMENT_ROLES,
-    )
-    roles = get_user_role_names(db, user.id)
-    control = alumni_transition_control(db, user, roles)
-    if control["state"] in {"linked_visible", "linked_restricted"}:
-        return control
-    if not control["can_repair"]:
-        raise HTTPException(409, "Le passage Alumni doit être confirmé et le compte synchronisé.")
-    profile = ensure_alumni_profile(db, user)
-    create_audit_log(
-        db=db,
-        action="reparation_fiche_alumni",
-        user_id=actor.id,
-        entity_type="user",
-        entity_id=user.id,
-        new_value={"profile_id": str(profile.id), "visibility": profile.visibility},
-        ip_address=get_client_ip(request),
-    )
-    control = alumni_transition_control(db, user, roles)
-    db.commit()
-    return control
 
 
 @router.post("/{user_id}/make-alumni", response_model=UserRead)
