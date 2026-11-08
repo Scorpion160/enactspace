@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/api/api_client.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../core/widgets/preview_mode_scope.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../../../shared/models/project_presentation.dart';
 import '../../../shared/ui/project_reference_documents.dart';
 
@@ -29,6 +34,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       widget.gateway ?? ApiDocumentsGateway();
   DocumentModel? _document;
   DocumentReferenceData _references = const DocumentReferenceData();
+  String? _resolvedFileName;
+  String? _validatedByName;
   bool _loading = true, _acting = false;
   String? _error;
 
@@ -50,6 +57,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
           _references = values[1] as DocumentReferenceData;
           _loading = false;
         });
+        if (widget.gateway == null) {
+          unawaited(_loadMetadata(values[0] as DocumentModel));
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -59,6 +69,58 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadMetadata(DocumentModel document) async {
+    final token = await AuthService().getToken();
+    if (token == null || !mounted) return;
+    final api = ApiClient(requestTimeout: const Duration(seconds: 12));
+
+    Future<String?> fileName() async {
+      final id = document.fileId?.trim();
+      if (id == null || id.isEmpty) return null;
+      try {
+        final data = await api.get('/files/$id', token: token);
+        if (data is Map) {
+          final value = data['original_filename']?.toString().trim();
+          if (value != null && value.isNotEmpty) return value;
+        }
+      } catch (_) {
+        // The document can still be downloaded if metadata is unavailable.
+      }
+      return null;
+    }
+
+    Future<String?> validatorName() async {
+      final id = document.validatedBy?.trim();
+      if (id == null || id.isEmpty) return null;
+      try {
+        final data = await api.get('/users/$id', token: token);
+        if (data is Map) {
+          final first = data['first_name']?.toString().trim() ?? '';
+          final last = data['last_name']?.toString().trim() ?? '';
+          final fullName = [
+            first,
+            last,
+          ].where((part) => part.isNotEmpty).join(' ');
+          if (fullName.isNotEmpty) return fullName;
+        }
+      } catch (_) {
+        // Never expose an internal UUID instead of a readable name.
+      }
+      return null;
+    }
+
+    final values = await Future.wait([fileName(), validatorName()]);
+    if (!mounted ||
+        _document?.id != document.id ||
+        _document?.fileId != document.fileId) {
+      return;
+    }
+    setState(() {
+      _resolvedFileName = values[0];
+      _validatedByName = values[1];
+    });
   }
 
   Future<void> _edit() async {
@@ -253,10 +315,20 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _fileName(doc.fileUrl) ?? doc.fileTypeLabel,
+                  _resolvedFileName ??
+                      ((doc.fileId?.trim().isNotEmpty ?? false)
+                          ? 'Document ${doc.fileTypeLabel}'
+                          : _fileName(doc.fileUrl) ?? doc.fileTypeLabel),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                if (doc.fileUrl != null) ...[
+                if ((doc.fileId?.trim().isNotEmpty ?? false) &&
+                    !PreviewModeScope.active(context)) ...[
+                  const SizedBox(height: 10),
+                  StoredAttachmentButton(
+                    url: '/api/files/${doc.fileId!.trim()}/download',
+                    label: 'Télécharger',
+                  ),
+                ] else if (doc.fileUrl != null) ...[
                   const SizedBox(height: 10),
                   FilledButton.icon(
                     onPressed: _openFile,
@@ -309,7 +381,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                     _Datum('Officiel', doc.isOfficial ? 'Oui' : 'Non'),
                     _Datum('Permanent', doc.isPermanent ? 'Oui' : 'Non'),
                     if (doc.validatedBy != null)
-                      _Datum('Validé par', doc.validatedBy!),
+                      _Datum(
+                        'Validé par',
+                        _validatedByName ?? 'Responsable de validation',
+                      ),
                     if (doc.validatedAt != null)
                       _Datum('Date de validation', _date(doc.validatedAt!)),
                     if (doc.rejectedBy != null)
