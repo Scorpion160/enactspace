@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/widgets/preview_mode_scope.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../../../shared/models/project_presentation.dart';
 import '../../../shared/ui/project_reference_documents.dart';
 
@@ -256,7 +257,14 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   _fileName(doc.fileUrl) ?? doc.fileTypeLabel,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                if (doc.fileUrl != null) ...[
+                if ((doc.fileId?.trim().isNotEmpty ?? false) &&
+                    !PreviewModeScope.active(context)) ...[
+                  const SizedBox(height: 10),
+                  StoredAttachmentButton(
+                    url: '/api/files/${doc.fileId!.trim()}/download',
+                    label: 'Télécharger',
+                  ),
+                ] else if (doc.fileUrl != null) ...[
                   const SizedBox(height: 10),
                   FilledButton.icon(
                     onPressed: _openFile,
