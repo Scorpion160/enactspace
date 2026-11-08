@@ -99,9 +99,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         if (data is Map) {
           final first = data['first_name']?.toString().trim() ?? '';
           final last = data['last_name']?.toString().trim() ?? '';
-          final fullName = [first, last]
-              .where((part) => part.isNotEmpty)
-              .join(' ');
+          final fullName = [
+            first,
+            last,
+          ].where((part) => part.isNotEmpty).join(' ');
           if (fullName.isNotEmpty) return fullName;
         }
       } catch (_) {
