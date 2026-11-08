@@ -387,6 +387,20 @@ void main() {
       expect(find.text('Expiration'), findsOneWidget);
     });
 
+    testWidgets('le détail évite le libellé technique download', (tester) async {
+      final gateway = MemoryDocumentsGateway(
+        documents: [_document(fileId: '00000000-0000-0000-0000-000000000123')],
+      );
+      await _pump(
+        tester,
+        DocumentDetailScreen(documentId: 'doc-1', gateway: gateway),
+      );
+      await tester.scrollUntilVisible(find.text('Document PDF'), 300);
+      expect(find.text('Document PDF'), findsOneWidget);
+      expect(find.text('download'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('PV stocké utilise la route API authentifiée', (tester) async {
       const fileId = '00000000-0000-0000-0000-000000000123';
       final gateway = MemoryDocumentsGateway(
