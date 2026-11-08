@@ -34,7 +34,7 @@ void main() {
     test('le router déclare exactement les routes attendues', () {
       final source = File('lib/app/app_router.dart').readAsStringSync();
       final declared = RegExp(
-        r"path:\s*'([^']+)'",
+        r"GoRoute\(\s*path:\s*'([^']+)'",
       ).allMatches(source).map((match) => match.group(1)!).toList();
 
       const expectedRoutes = [
@@ -428,7 +428,27 @@ void main() {
       expect(find.byTooltip('Masquer le mot de passe'), findsOneWidget);
     });
 
-    testWidgets('le formulaire de demande de compte conserve ce tooltip', (
+    testWidgets('la connexion signale les champs manquants sans erreur technique', (
+      tester,
+    ) async {
+      await _pumpLogin(tester, const Size(390, 844));
+      final submit = find.text('Se connecter');
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Renseigne ton email ou ton nom d’utilisateur.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'membre@example.test');
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(find.text('Renseigne ton mot de passe.'), findsOneWidget);
+      expect(find.textContaining('Invalid argument'), findsNothing);
+    });
+
+    testWidgets('le parcours membre et alumni conserve ce tooltip', (
       tester,
     ) async {
       await _pumpLogin(tester, const Size(390, 844));
@@ -436,6 +456,10 @@ void main() {
       await tester.ensureVisible(accountAction);
       await tester.pumpAndSettle();
       await tester.tap(accountAction);
+      await tester.pumpAndSettle();
+      final memberAction = find.text('Je suis déjà enacteur ou alumni');
+      expect(memberAction, findsOneWidget);
+      await tester.tap(memberAction);
       await tester.pumpAndSettle();
       final joinSheet = find.byType(DraggableScrollableSheet);
       expect(joinSheet, findsOneWidget);

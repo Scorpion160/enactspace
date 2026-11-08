@@ -18,6 +18,7 @@ from app.models.meeting import Meeting, MeetingMember
 from app.models.notification import Notification
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
+from app.models.recruitment import Application
 from app.models.user import User
 from app.schemas.meeting import (
     MeetingCreate,
@@ -74,16 +75,25 @@ def _scope_member(db: Session, meeting: Meeting, user_id) -> bool:
     return False
 
 
+def _interview_application_id(db: Session, meeting: Meeting):
+    return db.query(Application.id).filter(Application.interview_meeting_id == meeting.id).limit(1).scalar()
+
+
+def _require_regular_meeting(db: Session, meeting: Meeting) -> None:
+    if _interview_application_id(db, meeting) is not None:
+        raise HTTPException(409, "Le créneau et le jury de cet entretien se gèrent depuis la candidature.")
+
+
 def _can_access(db: Session, meeting: Meeting, user: User) -> bool:
-    from app.models.recruitment import Application, ApplicationInterviewJuror, RecruitmentJuryMember
+    from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
     from app.services.recruitment_access import can_manage_jury, eligible_juror
-    application = db.query(Application).filter(Application.interview_meeting_id == meeting.id).first()
-    if application is not None:
+    application_id = _interview_application_id(db, meeting)
+    if application_id is not None:
         if can_manage_jury(db, user):
             return True
         return eligible_juror(user) and db.query(ApplicationInterviewJuror.application_id).join(
             RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
-        ).filter(ApplicationInterviewJuror.application_id == application.id,
+        ).filter(ApplicationInterviewJuror.application_id == application_id,
                  RecruitmentJuryMember.user_id == user.id, RecruitmentJuryMember.is_active.is_(True)).first() is not None
     if meeting.created_by == user.id:
         return True
@@ -123,6 +133,7 @@ def _require_manage(db: Session, meeting: Meeting, user: User) -> None:
 
 def _meeting_payload(db: Session, meeting: Meeting, user: User) -> MeetingRead:
     member = _member(db, meeting, user.id)
+    is_recruitment_interview = _interview_application_id(db, meeting) is not None
     invited_count = db.query(MeetingMember.id).filter(
         MeetingMember.meeting_id == meeting.id
     ).count()
@@ -150,7 +161,8 @@ def _meeting_payload(db: Session, meeting: Meeting, user: User) -> MeetingRead:
         lobby_enabled=meeting.lobby_enabled,
         recording_enabled=meeting.recording_enabled,
         can_manage=_can_manage(db, meeting, user),
-        can_delete=_can_delete(db, meeting, user),
+        can_delete=not is_recruitment_interview and _can_delete(db, meeting, user),
+        is_recruitment_interview=is_recruitment_interview,
         current_user_role=(
             member.role
             if member is not None
@@ -368,6 +380,7 @@ def update_meeting(
 ):
     meeting = _meeting_or_404(db, meeting_id)
     _require_manage(db, meeting, current_user)
+    _require_regular_meeting(db, meeting)
     if meeting.status in {"ended", "cancelled"}:
         raise HTTPException(status_code=409, detail="Cette réunion est clôturée")
     changes = payload.model_dump(exclude_unset=True)
@@ -415,6 +428,7 @@ def invite_members(
 ):
     meeting = _meeting_or_404(db, meeting_id)
     _require_manage(db, meeting, current_user)
+    _require_regular_meeting(db, meeting)
     if meeting.status in {"ended", "cancelled"}:
         raise HTTPException(status_code=409, detail="Cette réunion est clôturée")
     users = db.query(User).filter(
@@ -626,6 +640,7 @@ def cancel_meeting(
 ):
     meeting = _meeting_or_404(db, meeting_id)
     _require_manage(db, meeting, current_user)
+    _require_regular_meeting(db, meeting)
     if meeting.status == "ended":
         raise HTTPException(status_code=409, detail="Réunion déjà terminée")
     if meeting.status == "cancelled":
@@ -665,6 +680,7 @@ def delete_meeting(
     meeting = _meeting_or_404(db, meeting_id)
     if not _can_delete(db, meeting, current_user):
         raise HTTPException(status_code=403, detail="Suppression de la réunion non autorisée")
+    _require_regular_meeting(db, meeting)
     if meeting.status == "live":
         raise HTTPException(
             status_code=409,

@@ -139,7 +139,9 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           const SizedBox(height: 14),
           const Text('Les décisions préparées restent internes jusqu’à la publication du lot.'),
           const SizedBox(height: 8),
-          const Text('L’étude peut commencer dès les premiers dépôts. Les attributions aident à répartir le travail ; chaque juré peut aussi évaluer les autres dossiers de la campagne. Les candidatures avec le moins d’avis sont présentées en priorité.'),
+          Text(screening
+              ? 'L’étude peut commencer dès les premiers dépôts. Les attributions aident à répartir le travail. Chaque juré peut aussi évaluer les autres dossiers de la campagne. Les candidatures avec le moins d’avis sont présentées en priorité.'
+              : 'Chaque juré affecté à l’entretien doit renseigner sa grille avant la publication des résultats.'),
           const SizedBox(height: 12),
           if (report == null && _error == null) const LinearProgressIndicator(),
           if (screening && !completed) ...[

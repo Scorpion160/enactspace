@@ -109,10 +109,13 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
               closed: meeting.isClosed,
               live: meeting.isLive,
               canDelete: meeting.canDelete,
+              isRecruitmentInterview: meeting.isRecruitmentInterview,
               onInvite: _invite,
               onSettings: _openSettings,
               onEnd: meeting.isLive ? _end : null,
-              onCancel: meeting.isScheduled ? _cancel : null,
+              onCancel: meeting.isScheduled && !meeting.isRecruitmentInterview
+                  ? _cancel
+                  : null,
               onDelete: _delete,
             ),
           ],
@@ -463,6 +466,7 @@ class _HostActions extends StatelessWidget {
   final bool closed;
   final bool live;
   final bool canDelete;
+  final bool isRecruitmentInterview;
   final VoidCallback onInvite;
   final VoidCallback onSettings;
   final VoidCallback? onEnd;
@@ -474,6 +478,7 @@ class _HostActions extends StatelessWidget {
     required this.closed,
     required this.live,
     required this.canDelete,
+    required this.isRecruitmentInterview,
     required this.onInvite,
     required this.onSettings,
     required this.onEnd,
@@ -494,20 +499,26 @@ class _HostActions extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
+            if (isRecruitmentInterview) ...[
+              const Text('Le créneau et le jury se gèrent dans Recrutement.'),
+              if (onEnd != null) const SizedBox(height: 12),
+            ],
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
-                OutlinedButton.icon(
-                  onPressed: busy || closed ? null : onInvite,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Inviter'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: busy || closed ? null : onSettings,
-                  icon: const Icon(Icons.settings_rounded),
-                  label: const Text('Paramètres de la réunion'),
-                ),
+                if (!isRecruitmentInterview) ...[
+                  OutlinedButton.icon(
+                    onPressed: busy || closed ? null : onInvite,
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('Inviter'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: busy || closed ? null : onSettings,
+                    icon: const Icon(Icons.settings_rounded),
+                    label: const Text('Paramètres de la réunion'),
+                  ),
+                ],
                 if (onEnd != null)
                   FilledButton.tonalIcon(
                     onPressed: busy ? null : onEnd,
@@ -520,7 +531,7 @@ class _HostActions extends StatelessWidget {
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('Annuler'),
                   ),
-                if (canDelete)
+                if (canDelete && !isRecruitmentInterview)
                   Tooltip(
                     message: live
                         ? 'Terminez la réunion avant de la supprimer.'

@@ -5,10 +5,22 @@ from sqlalchemy import or_
 
 from app.core.time import utc_now
 from app.models.recruitment import (Application, ApplicationInterviewJuror, ApplicationInterviewTeam,
-                                    RecruitmentJuryMember, RecruitmentJuryTeam)
+                                    RecruitmentCampaign, RecruitmentJuryMember, RecruitmentJuryTeam)
 from app.models.user import User
 from app.services.operational_integrity import to_naive_utc
 from app.services.recruitment_access import eligible_juror
+
+
+def effective_interview_end(start, end):
+    return end if end is not None else start + timedelta(minutes=20)
+
+
+def interview_completed(application, now):
+    return (
+        application.status == "interview_scheduled"
+        and application.interview_at is not None
+        and effective_interview_end(application.interview_at, application.interview_end_at) <= now
+    )
 
 
 def interview_roster(db, application):
@@ -47,13 +59,15 @@ def assign_interview(db, application, payload):
     ).all() if selected else []
     if len(rows) != len(selected) or any(not member.is_active or not eligible_juror(user) for member, user in rows):
         raise HTTPException(409, "Le jury a changé. Choisis des membres disponibles dans cette campagne.")
+    if any(user.email.casefold() == application.email.casefold() for _, user in rows):
+        raise HTTPException(409, "Un membre du jury ne peut pas participer à son propre entretien de recrutement.")
     user_ids = [user.id for _, user in rows]
     if user_ids:
         db.query(User).filter(User.id.in_(user_ids)).order_by(User.id).populate_existing().with_for_update().all()
         if any(not eligible_juror(user) for _, user in rows):
             raise HTTPException(409, "Un membre du jury n’est plus disponible.")
     start = to_naive_utc(payload.interview_at)
-    end = to_naive_utc(payload.interview_end_at) if payload.interview_end_at else start + timedelta(minutes=20)
+    end = effective_interview_end(start, to_naive_utc(payload.interview_end_at) if payload.interview_end_at else None)
     # No noon/evening restriction: the chosen interval is authoritative.
     # Historical appointments without an end use the conservative legacy 20 min.
     candidates = db.query(Application).join(
@@ -65,7 +79,7 @@ def assign_interview(db, application, payload):
         Application.status.in_({"interview_scheduled", "interview"}),
         Application.interview_at < end,
     ).all() if user_ids else []
-    if any((other.interview_end_at or other.interview_at + timedelta(minutes=20)) > start for other in candidates):
+    if any(effective_interview_end(other.interview_at, other.interview_end_at) > start for other in candidates):
         raise HTTPException(409, "Un membre du jury a déjà un entretien sur ce créneau. Choisis une autre heure ou un autre jury.")
     if team is not None:
         appointments = db.query(Application).join(ApplicationInterviewTeam,
@@ -73,7 +87,7 @@ def assign_interview(db, application, payload):
             ApplicationInterviewTeam.team_id == team.id, Application.id != application.id,
             Application.status.in_({"interview_scheduled", "interview"}), Application.interview_at < end,
         ).all()
-        if any((other.interview_end_at or other.interview_at + timedelta(minutes=20)) > start for other in appointments):
+        if any(effective_interview_end(other.interview_at, other.interview_end_at) > start for other in appointments):
             raise HTTPException(409, "Cette équipe a déjà un entretien sur ce créneau. Choisis une autre équipe ou une autre heure.")
         if snapshot is None:
             snapshot = ApplicationInterviewTeam(application_id=application.id)
@@ -99,7 +113,12 @@ def affected_future_interviews(db, member):
     ).order_by(Application.interview_at).all()
 
 
-def interviews_needing_reassignment(db, campaign_id):
+def interviews_needing_reassignment(db, campaign_id, user):
+    from app.services.recruitment_selection import (
+        identity_is_visible, interview_candidate_label, uses_blind_selection,
+    )
+    campaign = db.get(RecruitmentCampaign, campaign_id)
+    anonymized = uses_blind_selection(campaign) and not identity_is_visible(db, user, campaign)
     rows = db.query(Application).join(ApplicationInterviewJuror,
         ApplicationInterviewJuror.application_id == Application.id).join(RecruitmentJuryMember,
         RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id).join(User,
@@ -119,6 +138,6 @@ def interviews_needing_reassignment(db, campaign_id):
         or_(RecruitmentJuryTeam.is_active.is_(False), RecruitmentJuryTeam.revision != ApplicationInterviewTeam.revision),
     ).all()
     unique = {row.id: row for row in [*rows, *stale_teams]}
-    return [{"application_id": str(row.id), "name": f"{row.first_name} {row.last_name}".strip(),
+    return [{"application_id": str(row.id), "name": interview_candidate_label(row, anonymized=anonymized),
              "interview_at": row.interview_at.isoformat() + "Z"}
             for row in sorted(unique.values(), key=lambda app: (app.interview_at, str(app.id)))]

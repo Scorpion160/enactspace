@@ -11,12 +11,15 @@ from app.api.deps import require_recruitment_access
 from app.core.time import utc_now
 from app.db.database import get_db
 from app.models.recruitment import (
-    Application, ApplicationInterviewTeam, RecruitmentJuryMember,
+    Application, ApplicationInterviewTeam, RecruitmentCampaign, RecruitmentJuryMember,
     RecruitmentJuryTeam, RecruitmentJuryTeamMember,
 )
 from app.models.user import User
 from app.services.audit_service import create_audit_log
 from app.services.recruitment_access import eligible_juror, require_campaign_access
+from app.services.recruitment_selection import (
+    identity_is_visible, interview_candidate_label, uses_blind_selection,
+)
 
 
 class JuryTeamSave(BaseModel):
@@ -69,7 +72,9 @@ def interview_team_details(db, application):
             "needs_update": not team or not team.is_active or team.revision != snapshot.revision}
 
 
-def team_payload(db, team):
+def team_payload(db, team, user):
+    campaign = db.get(RecruitmentCampaign, team.campaign_id)
+    anonymized = uses_blind_selection(campaign) and not identity_is_visible(db, user, campaign)
     rows = team_members(db, team)
     interviews = future_team_interviews(db, team.id)
     return {"id": str(team.id), "campaign_id": str(team.campaign_id), "name": team.name,
@@ -79,7 +84,7 @@ def team_payload(db, team):
             "members": [{"id": str(member.id), "name": f"{user.first_name} {user.last_name}".strip(),
                          "active": member.is_active and eligible_juror(user)} for member, user in rows],
             "interviews": [{"application_id": str(app.id),
-                            "name": f"{app.first_name} {app.last_name}".strip(),
+                            "name": interview_candidate_label(app, anonymized=anonymized),
                             "interview_at": app.interview_at.isoformat() + "Z",
                             "interview_end_at": app.interview_end_at.isoformat() + "Z" if app.interview_end_at else None,
                             "interview_mode": app.interview_mode,
@@ -87,8 +92,8 @@ def team_payload(db, team):
                            for app in interviews]}
 
 
-def campaign_teams(db, campaign_id):
-    return [team_payload(db, row) for row in db.query(RecruitmentJuryTeam).filter_by(
+def campaign_teams(db, campaign_id, user):
+    return [team_payload(db, row, user) for row in db.query(RecruitmentJuryTeam).filter_by(
         campaign_id=campaign_id).order_by(RecruitmentJuryTeam.name_key, RecruitmentJuryTeam.id)]
 
 
@@ -121,7 +126,7 @@ def save_team(db, campaign_id, payload, actor, team_id=None):
     else:
         old_members = {member.id for member, _ in team_members(db, team)}
         if team.name == payload.name and team.is_active == payload.active and old_members == set(payload.member_ids):
-            return team_payload(db, team)
+            return team_payload(db, team, actor)
         team.name, team.name_key, team.is_active = payload.name, key, payload.active
         team.revision += 1
         team.updated_at = utc_now()
@@ -133,14 +138,14 @@ def save_team(db, campaign_id, payload, actor, team_id=None):
                      new_value={"team_id": str(team.id), "name": team.name, "revision": team.revision,
                                 "active": team.is_active, "member_ids": [str(value) for value in payload.member_ids]})
     db.commit()
-    return team_payload(db, team)
+    return team_payload(db, team, actor)
 
 
 def register_jury_teams(router):
     @router.get("/campaigns/{campaign_id}/jury/teams")
     def teams(campaign_id: UUID, db: Session = Depends(get_db), user: User = Depends(require_recruitment_access)):
         require_campaign_access(db, user, campaign_id)
-        return campaign_teams(db, campaign_id)
+        return campaign_teams(db, campaign_id, user)
 
     @router.post("/campaigns/{campaign_id}/jury/teams")
     def create(campaign_id: UUID, payload: JuryTeamSave,

@@ -34,6 +34,13 @@ def department_label(value):
 
 
 LEVELS = {plain(level): level for values in ACADEMIC_LEVELS.values() for level in values}
+YEAR_BY_LEVEL = {
+    'DUT1': 1, 'Licence1': 1, 'DST1': 1,
+    'DUT2': 2, 'Licence2': 2,
+    'Licence3': 3, 'DIC1': 3, 'DIT1': 3, 'DESCAF1': 3,
+    'Master1': 4, 'DIC2': 4, 'DIT2': 4, 'DESCAF2': 4,
+    'Master2': 5, 'DIC3': 5, 'DESCAF3': 5,
+}
 
 
 def level_label(value):
@@ -42,10 +49,12 @@ def level_label(value):
 
 
 def year_label(value):
-    match = re.search(r'([1-5])$', level_label(value))
-    if not match:
+    level = level_label(value)
+    if level == UNKNOWN:
         return UNKNOWN
-    year = int(match[1])
+    year = YEAR_BY_LEVEL.get(level)
+    if year is None:
+        return 'Année à préciser'
     return '1re année' if year == 1 else f'{year}e année'
 
 
@@ -63,6 +72,8 @@ def discovery_label(value):
     for code, label in DISCOVERY_CHANNELS.items():
         if key == code or key == plain(label):
             return label
+    if key.partition(':')[0].strip() == 'autre':
+        return DISCOVERY_CHANNELS['other']
     if any(word in key for word in ('reseau', 'instagram', 'facebook', 'tiktok', 'whatsapp', 'linkedin')):
         return DISCOVERY_CHANNELS['social_media']
     if any(word in key for word in ('membre', 'enacteur', 'enactrice')):
@@ -100,6 +111,8 @@ def campaign_statistics(db, campaign_id):
     return {'total': total, 'breakdowns': {
         key: [{'label': label, 'count': count,
                'percentage': round(count * 100 / total, 1) if total else 0}
-              for label, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))]
+              for label, count in sorted(counter.items(), key=lambda item: (
+                  0 if key == 'study_year' else -item[1], item[0]
+              ))]
         for key, counter in counts.items()
     }}

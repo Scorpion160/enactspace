@@ -66,6 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : 24.0;
 
           return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
               20,
@@ -83,6 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         summary: _summary,
                         userExperience: _userExperience,
                         loading: _loading,
+                        unavailable: _error != null,
                         onRefresh: _loadDashboard,
                       ),
                       SizedBox(height: 20),
@@ -124,10 +126,8 @@ class _DashboardBody extends StatelessWidget {
         final isAdmin = summary.profile.canViewGlobal;
         final main = Column(
           children: [
-            if (isAdmin) ...[
-              _AttentionPanel(items: _attentionItems(summary)),
-              SizedBox(height: 18),
-            ],
+            _AttentionPanel(items: _attentionItems(summary)),
+            const SizedBox(height: 18),
             _SummaryGrid(cards: _metricCards(summary), compactMobile: !isAdmin),
             SizedBox(height: 18),
             _RoleCardsGrid(cards: _roleCards(summary, userExperience)),
@@ -140,10 +140,6 @@ class _DashboardBody extends StatelessWidget {
         );
         final side = Column(
           children: [
-            if (!isAdmin) ...[
-              _AttentionPanel(items: _attentionItems(summary)),
-              SizedBox(height: 18),
-            ],
             _RoleFocusPanel(summary: summary, userExperience: userExperience),
             SizedBox(height: 18),
             _ActivityPanel(items: summary.recentActivity),
@@ -171,12 +167,14 @@ class _DashboardHero extends StatelessWidget {
   final DashboardSummaryModel? summary;
   final UserExperience? userExperience;
   final bool loading;
+  final bool unavailable;
   final VoidCallback onRefresh;
 
   const _DashboardHero({
     required this.summary,
     required this.userExperience,
     required this.loading,
+    required this.unavailable,
     required this.onRefresh,
   });
 
@@ -189,11 +187,14 @@ class _DashboardHero extends StatelessWidget {
         userExperience?.dashboardSubtitle ?? _subtitleForProfile(profile);
     final unread = summary?.counts.integer('notifications_unread') ?? 0;
     final lateTasks = summary?.counts.integer('tasks_late') ?? 0;
+    final attentionCount = unread + lateTasks;
     final statusText = loading
-        ? 'Synchronisation des données...'
-        : unread + lateTasks == 0
+        ? 'Actualisation du tableau de bord…'
+        : unavailable
+        ? 'Les alertes sont momentanément indisponibles.'
+        : attentionCount == 0
         ? 'Aucune alerte urgente pour le moment.'
-        : '${unread + lateTasks} point(s) à suivre aujourd’hui.';
+        : '$attentionCount ${attentionCount == 1 ? 'point' : 'points'} à suivre aujourd’hui.';
     final isAdmin = profile?.canViewGlobal == true;
     return AppDataCard(
       padding: const EdgeInsets.all(18),
@@ -205,7 +206,7 @@ class _DashboardHero extends StatelessWidget {
             runSpacing: 10,
             children: [
               AppPrimaryButton(
-                label: isAdmin ? 'Voir les alertes' : 'Mes taches',
+                label: isAdmin ? 'Voir les alertes' : 'Mes tâches',
                 icon: isAdmin
                     ? Icons.priority_high_rounded
                     : Icons.task_alt_rounded,

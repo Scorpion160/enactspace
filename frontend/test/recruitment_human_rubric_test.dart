@@ -141,7 +141,12 @@ void main() {
         ),
       ),
     );
-    expect(find.text(rubric['guidance'] as String), findsOneWidget);
+    expect(
+      find.text(
+        'Choisis un niveau de 0 à 4 pour chaque critère et ajoute une observation tirée du dossier ou de l’entretien. Si un point reste flou, demande une précision avant de le noter.',
+      ),
+      findsOneWidget,
+    );
     expect(jsonEncode(savedRubric), snapshot);
     expect(find.text('Ton évaluation : 50/100'), findsOneWidget);
     final field = tester.widget<TextFormField>(

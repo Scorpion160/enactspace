@@ -9,13 +9,25 @@ from app.core.config import settings
 from app.core.time import utc_now
 from app.db.database import get_db
 from app.models.meeting import Meeting, MeetingMember
-from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
+from app.models.recruitment import ApplicationInterviewJuror, ApplicationPersonality, RecruitmentJuryMember
 from app.schemas.meeting import MeetingJoinRead
 from app.schemas.recruitment import ApplicationTrackingRequest
 from app.services.email_templates import app_link
 from app.services.request_rate_limit import protect_public_request
 from app.services.operational_integrity import to_naive_utc
 from app.services.recruitment_access import can_manage_jury
+
+
+def candidate_interview_released(campaign, application):
+    return bool(campaign.screening_published_at and campaign.identities_revealed_at
+                and application.screening_decision == "shortlisted")
+
+
+def candidate_interview_room(db, application):
+    if application.status != "interview_scheduled" or application.interview_meeting_id is None:
+        return None
+    meeting = db.get(Meeting, application.interview_meeting_id)
+    return meeting if meeting and meeting.status in {"scheduled", "live"} else None
 
 
 def require_private_meet():
@@ -37,6 +49,7 @@ def sync_interview_meeting(db, application, payload, actor):
     require_private_meet()
     if not can_manage_jury(db, actor):
         raise HTTPException(403, "La création des salles d’entretien est réservée aux responsables du recrutement.")
+    db.flush()  # The appointment's jury is staged in this transaction.
     jurors = db.query(RecruitmentJuryMember.user_id).join(
         ApplicationInterviewJuror, ApplicationInterviewJuror.jury_member_id == RecruitmentJuryMember.id
     ).filter(ApplicationInterviewJuror.application_id == application.id, RecruitmentJuryMember.is_active.is_(True)).all()
@@ -77,10 +90,13 @@ def register_recruitment_meetings(router):
         if application is None or not application.tracking_code or payload.application_id.strip().upper() != application.tracking_code.upper():
             raise HTTPException(404, "Aucun entretien ne correspond à ces informations.")
         campaign = campaign_for_application(db, application)
-        if not campaign.screening_published_at or not campaign.identities_revealed_at or application.screening_decision != "shortlisted":
+        if not candidate_interview_released(campaign, application):
             raise HTTPException(409, "L’équipe n’a pas encore ouvert cet entretien.")
-        meeting = db.get(Meeting, application.interview_meeting_id) if application.interview_meeting_id else None
-        if application.status != "interview_scheduled" or meeting is None or meeting.status in {"ended", "cancelled"}:
+        attempt = db.get(ApplicationPersonality, application.id)
+        if attempt is None or attempt.submitted_at is None:
+            raise HTTPException(409, "Complète le questionnaire obligatoire et confirme l’envoi de tes réponses pour rejoindre l’entretien.")
+        meeting = candidate_interview_room(db, application)
+        if meeting is None:
             raise HTTPException(409, "Cet entretien EnactMeet n’est pas disponible.")
         now = utc_now()
         start, end = application.interview_at, application.interview_end_at
