@@ -123,6 +123,10 @@ def _uuid(value: Any) -> UUID | None:
 
 
 def user_for_value(db: Session, value: Any) -> User | None:
+    # Role-based fallbacks already return an ORM User, not its UUID.
+    # Reusing that object avoids printing its Python representation in PVs.
+    if isinstance(value, User):
+        return value
     user_id = _uuid(value)
     if user_id is None:
         return None
