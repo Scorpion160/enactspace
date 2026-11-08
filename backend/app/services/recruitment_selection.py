@@ -336,6 +336,13 @@ def selection_overview(db, campaign):
     for row in reviews:
         grouped.setdefault(row.application_id, []).append(row)
     stage = review_stage(campaign)
+    panels = {}
+    if stage == "interview":
+        jurors = db.query(ApplicationInterviewJuror.application_id, RecruitmentJuryMember.user_id).join(
+            RecruitmentJuryMember, RecruitmentJuryMember.id == ApplicationInterviewJuror.jury_member_id
+        ).filter(RecruitmentJuryMember.campaign_id == campaign.id)
+        for application_id, juror_id in jurors:
+            panels.setdefault(application_id, set()).add(juror_id)
     rows = []
     for application in applications:
         if application.legacy_result_published:
@@ -344,8 +351,13 @@ def selection_overview(db, campaign):
             continue
         if stage == "interview" and application.screening_decision != "shortlisted":
             continue
-        summary = reviewed_summary(grouped.get(application.id, []), campaign, stage)
-        target = required_reviews(campaign, summary)
+        panel = panels.get(application.id)
+        assessments = grouped.get(application.id, [])
+        if panel is not None:
+            assessments = [review for review in assessments if review.reviewer_id in panel]
+        summary = reviewed_summary(assessments, campaign, stage)
+        # Appointments without a recorded panel retain the historical threshold.
+        target = len(panel) if panel is not None else required_reviews(campaign, summary)
         rows.append({
             "application_id": str(application.id),
             "anonymous_code": anonymous_code(application),

@@ -22,6 +22,7 @@ from app.db.database import Base
 from app.models.academic import UserAcademicHistory
 from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.audit import AuditLog
+from app.models.email_delivery import EmailDelivery
 from app.models.event import Event, EventParticipant
 from app.models.finance import ClubTransaction, Fee, FinancialAccount, Payment, PaymentAllocation
 from app.models.meeting import Meeting, MeetingMember
@@ -30,7 +31,7 @@ from app.models.notification import Notification
 from app.models.pole import Pole, PoleMember
 from app.models.project import Project, ProjectMember
 from app.models.recruitment import (
-    Application, ApplicationInterviewJuror, ApplicationInterviewTeam, ApplicationReview, RecruitmentCampaign,
+    Application, ApplicationInterviewJuror, ApplicationInterviewTeam, ApplicationPersonality, ApplicationReview, RecruitmentCampaign,
     RecruitmentJuryMember, RecruitmentJuryTeam, RecruitmentViewerAccess,
 )
 from app.models.role import Role, UserRole
@@ -46,12 +47,22 @@ from app.schemas.season import YearActivation
 from app.schemas.user import UserAdminUpdate, UserRoleAssign
 from app.services.operational_integrity import reconcile_user_lifecycle, to_naive_utc
 from app.services.payments import PaymentProviderResult
-from app.services import recruitment_selection
-from app.services.recruitment_selection import POLICY_VERSION, SelectionDecision, SelectionPublication, anonymous_code
+from app.services import recruitment_meetings, recruitment_selection
+from app.services.recruitment_personality import instrument
+from app.services.recruitment_rubric import CRITERION_IDS, VERSION
+from app.services.recruitment_selection import POLICY_VERSION, SelectionDecision, SelectionPublication, anonymous_code, selection_overview
 
 
 def _request() -> Request:
     return Request({"type": "http", "client": ("127.0.0.1", 12345), "headers": []})
+
+
+def _structured_review(application, user, stage, rating=3):
+    return ApplicationReview(application_id=application.id, reviewer_id=user.id, stage=stage,
+        criteria_assessment={"rubric_version": VERSION, "ratings": [
+            {"criterion_id": criterion, "rating": rating, "evidence": "Observation fictive"}
+            for criterion in sorted(CRITERION_IDS)
+        ]})
 
 
 class OperationalIntegrityTests(unittest.TestCase):
@@ -325,9 +336,29 @@ class OperationalIntegrityTests(unittest.TestCase):
         code = recruitment.ensure_tracking_code(self.db, application)
         self.db.commit()
         tracking = ApplicationTrackingRequest(application_id=code, email=application.email)
-        self.assertTrue(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        candidate_join = next(route.endpoint for route in recruitment.router.routes
+                              if route.path == "/recruitment/applications/interview/join")
+        self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        with self.assertRaises(HTTPException) as incomplete:
+            candidate_join(tracking, self.db)
+        self.assertIn("questionnaire obligatoire", incomplete.exception.detail)
+        snapshot = instrument()
+        attempt = ApplicationPersonality(application_id=application.id, instrument_version=snapshot["version"],
+                                         instrument_snapshot=snapshot, invited_by=manager.id)
+        self.db.add(attempt)
+        self.db.commit()
+        self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        attempt.submitted_at = to_naive_utc(now)
         meeting.status = "live"
         self.db.commit()
+        self.assertTrue(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        with patch.multiple(
+            settings, MEET_SERVER_URL="https://meet.example.invalid", MEET_REQUIRE_JWT=True,
+            MEET_JWT_APP_ID="enactspace-test", MEET_JWT_SECRET="local-test-secret-for-synthetic-rooms",
+        ), patch.object(recruitment_meetings, "utc_now", return_value=application.interview_at):
+            guest = candidate_join(tracking, self.db)
+        self.assertFalse(guest.moderator)
+        self.assertEqual(guest.meeting_id, meeting.id)
         meetings.end_meeting(meeting_id, self.db, manager)
         self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
 
@@ -470,6 +501,81 @@ class OperationalIntegrityTests(unittest.TestCase):
         with patch.object(recruitment_selection, "utc_now", return_value=end):
             decide(application.id, decision, self.db, manager)
         self.assertEqual(application.pending_final_decision, "rejected")
+
+    def test_interview_requires_the_grids_of_the_assigned_panel(self):
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+                                       screening_min_reviews=5, screening_published_at=datetime(2026, 11, 15))
+        self.db.add(campaign)
+        self.db.flush()
+        first, second, other = [self._user() for _ in range(3)]
+        panel = [RecruitmentJuryMember(campaign_id=campaign.id, user_id=user.id) for user in (first, second)]
+        application = Application(campaign_id=campaign.id, first_name="Test", last_name="Fictif",
+                                  email="candidate@example.test", screening_decision="shortlisted")
+        self.db.add_all([application, *panel])
+        self.db.flush()
+        self.db.add_all([ApplicationInterviewJuror(application_id=application.id, jury_member_id=member.id)
+                         for member in panel])
+        self.db.add_all([_structured_review(application, first, "interview", 4),
+                         _structured_review(application, other, "interview")])
+        self.db.commit()
+        incomplete = selection_overview(self.db, campaign)["rows"][0]
+        self.assertEqual(incomplete["required_reviews"], 2)
+        self.assertEqual(incomplete["review_count"], 1)
+        self.assertFalse(incomplete["ready"])
+        self.db.add(_structured_review(application, second, "interview", 2))
+        self.db.commit()
+        complete = selection_overview(self.db, campaign)["rows"][0]
+        self.assertEqual(complete["required_reviews"], 2)
+        self.assertEqual(complete["spread"], 50)
+        self.assertTrue(complete["ready"])
+
+    def test_screening_results_are_published_and_queued_together(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        now = datetime(2026, 11, 15, 10)
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+                                       start_date=date(2026, 11, 6), end_date=now.date(), is_active=True)
+        self.db.add(campaign)
+        self.db.flush()
+        applications = [Application(campaign_id=campaign.id, first_name="Test", last_name="Fictif",
+                        email=f"{decision}@example.org", screening_decision=decision)
+                        for decision in ("shortlisted", "not_shortlisted")]
+        self.db.add_all(applications)
+        self.db.flush()
+        jurors = [self._user() for _ in range(3)]
+        for application in applications:
+            self.db.add_all([_structured_review(application, user, "screening") for user in jurors])
+        self.db.commit()
+        report = selection_overview(self.db, campaign)
+        publication = SelectionPublication(stage="screening", revision=report["revision"])
+        publish = next(route.endpoint for route in recruitment.router.routes
+                       if route.path == "/recruitment/campaigns/{campaign_id}/selection/publish")
+        tracking = [ApplicationTrackingRequest(application_id=recruitment.ensure_tracking_code(self.db, row),
+                                              email=row.email) for row in applications]
+        self.db.commit()
+        with patch.object(recruitment_selection, "utc_now", return_value=now):
+            with self.assertRaises(HTTPException) as open_deposits:
+                publish(campaign.id, publication, self.db, manager)
+            self.assertIn("Clôture les dépôts", open_deposits.exception.detail)
+            self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+            self.assertTrue(all(recruitment.track_application(ref, self.db)["screening_result"] is None for ref in tracking))
+            campaign.end_date = date(2026, 11, 9)
+            self.db.commit()
+            with patch.multiple(settings, NOTIFICATION_EMAIL_ENABLED=True, SMTP_HOST="smtp.example.test",
+                                EMAIL_RESTRICT_TO_TEST_RECIPIENT=False):
+                result = publish(campaign.id, publication, self.db, manager)
+                self.assertEqual(result["count"], 2)
+                self.assertTrue(publish(campaign.id, publication, self.db, manager)["already_published"])
+        deliveries = self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).all()
+        self.assertEqual({row.recipient_email for row in deliveries}, {app.email for app in applications})
+        self.assertTrue(all(row.status == "pending" and row.next_attempt_at == now for row in deliveries))
+        accepted, rejected = [recruitment.track_application(ref, self.db) for ref in tracking]
+        self.assertEqual(accepted["screening_result"], "shortlisted")
+        self.assertEqual(accepted["personality_status"], "invited")
+        self.assertEqual(rejected["screening_result"], "not_shortlisted")
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertIsNone(rejected["personality_status"])
+        self.assertEqual(accepted["result_published_at"], rejected["result_published_at"])
 
     def test_member_lifecycle_removes_authority_without_restoring_memberships(self):
         member = self._user()

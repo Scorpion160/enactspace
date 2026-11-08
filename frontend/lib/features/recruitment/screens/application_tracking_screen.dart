@@ -135,7 +135,7 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                                         _tracking!.personalityStatus ==
                                                 'submitted'
                                             ? 'Tes réponses ont été partagées avec le jury. Tu peux retrouver ta synthèse.'
-                                            : 'Le questionnaire est obligatoire. Réponds à toutes les questions puis confirme leur envoi pour poursuivre la sélection.',
+                                            : 'Le questionnaire est obligatoire. Réponds à toutes les questions et confirme l’envoi de tes réponses avant ton entretien.',
                                       ),
                                       const SizedBox(height: 12),
                                       FilledButton.icon(

@@ -1097,6 +1097,7 @@ def track_application(
     enactmeet_available = (
         normalized_status == "interview_scheduled"
         and candidate_interview_released(campaign, application)
+        and attempt is not None and attempt.submitted_at is not None
         and candidate_interview_room(db, application) is not None
     )
     db.commit()

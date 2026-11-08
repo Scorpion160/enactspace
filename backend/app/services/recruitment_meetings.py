@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.time import utc_now
 from app.db.database import get_db
 from app.models.meeting import Meeting, MeetingMember
-from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
+from app.models.recruitment import ApplicationInterviewJuror, ApplicationPersonality, RecruitmentJuryMember
 from app.schemas.meeting import MeetingJoinRead
 from app.schemas.recruitment import ApplicationTrackingRequest
 from app.services.email_templates import app_link
@@ -92,6 +92,9 @@ def register_recruitment_meetings(router):
         campaign = campaign_for_application(db, application)
         if not candidate_interview_released(campaign, application):
             raise HTTPException(409, "L’équipe n’a pas encore ouvert cet entretien.")
+        attempt = db.get(ApplicationPersonality, application.id)
+        if attempt is None or attempt.submitted_at is None:
+            raise HTTPException(409, "Complète le questionnaire obligatoire et confirme l’envoi de tes réponses pour rejoindre l’entretien.")
         meeting = candidate_interview_room(db, application)
         if meeting is None:
             raise HTTPException(409, "Cet entretien EnactMeet n’est pas disponible.")

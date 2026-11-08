@@ -59,6 +59,8 @@ def assign_interview(db, application, payload):
     ).all() if selected else []
     if len(rows) != len(selected) or any(not member.is_active or not eligible_juror(user) for member, user in rows):
         raise HTTPException(409, "Le jury a changé. Choisis des membres disponibles dans cette campagne.")
+    if any(user.email.casefold() == application.email.casefold() for _, user in rows):
+        raise HTTPException(409, "Un membre du jury ne peut pas participer à son propre entretien de recrutement.")
     user_ids = [user.id for _, user in rows]
     if user_ids:
         db.query(User).filter(User.id.in_(user_ids)).order_by(User.id).populate_existing().with_for_update().all()
