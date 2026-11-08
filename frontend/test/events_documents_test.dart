@@ -387,7 +387,9 @@ void main() {
       expect(find.text('Expiration'), findsOneWidget);
     });
 
-    testWidgets('le détail évite le libellé technique download', (tester) async {
+    testWidgets('le détail évite le libellé technique download', (
+      tester,
+    ) async {
       final gateway = MemoryDocumentsGateway(
         documents: [_document(fileId: '00000000-0000-0000-0000-000000000123')],
       );
