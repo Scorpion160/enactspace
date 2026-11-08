@@ -17,6 +17,7 @@ import 'package:frontend/features/events/services/events_gateway.dart';
 import 'package:frontend/features/events/services/events_service.dart';
 import 'package:frontend/features/poles/models/pole_model.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -384,6 +385,24 @@ void main() {
       );
       expect(find.textContaining('Signature manquante'), findsOneWidget);
       expect(find.text('Expiration'), findsOneWidget);
+    });
+
+    testWidgets('PV stocké utilise la route API authentifiée', (tester) async {
+      const fileId = '00000000-0000-0000-0000-000000000123';
+      final gateway = MemoryDocumentsGateway(
+        documents: [_document(fileId: fileId)],
+      );
+      await _pump(
+        tester,
+        DocumentDetailScreen(documentId: 'doc-1', gateway: gateway),
+      );
+      await tester.scrollUntilVisible(find.byType(StoredAttachmentButton), 300);
+      final button = tester.widget<StoredAttachmentButton>(
+        find.byType(StoredAttachmentButton),
+      );
+      expect(button.url, '/api/files/$fileId/download');
+      expect(button.label, 'Télécharger');
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('route détail URL directe', (tester) async {
