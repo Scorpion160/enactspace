@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/interface-coherence-20261107
       - integration/enactspace-web-v3-20261107
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
@@ -11,6 +12,7 @@ on:
   push:
     branches:
       - main
+      - feature/recruitment-decision-workspace-20261110
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -170,6 +172,8 @@ jobs:
         run: >-
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
+          test/features/recruitment/recruitment_advisory_filters_test.dart
+          test/features/recruitment/recruitment_comparison_panel_test.dart
           test/enactmeet_quick_create_test.dart
           test/archives_hall_of_fame_test.dart
           test/archives_responsive_test.dart
