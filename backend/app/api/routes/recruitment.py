@@ -108,7 +108,7 @@ def recruitment_statistics(
             'reviews_recorded': sum(row['review_count'] for row in rows),
             'high_disagreement': sum(
                 row['spread'] is not None
-                and row['spread'] >= selected.screening_disagreement_threshold
+                and row['spread'] >= (selected.screening_disagreement_threshold or 20)
                 for row in rows
             ) if overview['stage'] == 'screening' else 0,
             'decisions_prepared': sum(row['decision'] is not None for row in rows),
