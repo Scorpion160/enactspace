@@ -227,20 +227,16 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             const SizedBox(height: 12),
             Card(
               margin: EdgeInsets.zero,
-              child: ExpansionTile(
-                title: const Text('Calendrier de la campagne'),
-                subtitle: const Text('Dates de présélection, entretiens et résultats'),
-                childrenPadding: const EdgeInsets.all(12),
-                children: [
-                  RecruitmentScheduleEditor(
-                    schedule: RecruitmentScheduleModel.fromJson(
-                      report['selection_schedule']),
-                    template: RecruitmentScheduleModel.fromJson(
-                      report['schedule_template']),
-                    enabled: !_busy,
-                    onSave: (value) => _act('planning', value.dates),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: RecruitmentScheduleEditor(
+                  schedule: RecruitmentScheduleModel.fromJson(
+                    report['selection_schedule']),
+                  template: RecruitmentScheduleModel.fromJson(
+                    report['schedule_template']),
+                  enabled: !_busy,
+                  onSave: (value) => _act('planning', value.dates),
+                ),
               ),
             ),
             if (screening && !completed) ...[
