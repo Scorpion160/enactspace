@@ -34,7 +34,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the team can load the November plan and correct invalid dates before saving', (tester) async {
+  testWidgets('the team can load a suggested calendar and correct invalid dates before saving', (tester) async {
     RecruitmentScheduleModel? saved;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
       child: RecruitmentScheduleEditor(
@@ -43,8 +43,8 @@ void main() {
     ))));
     await tester.tap(find.text('Calendrier de la campagne'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('load-november-schedule')));
-    await tester.tap(find.byKey(const Key('load-november-schedule')));
+    await tester.ensureVisible(find.byKey(const Key('load-suggested-schedule')));
+    await tester.tap(find.byKey(const Key('load-suggested-schedule')));
     await tester.pumpAndSettle();
     final firstResult = find.byKey(const Key('schedule-screening_results'));
     expect(tester.widget<TextFormField>(firstResult).controller!.text, '15/11/2026');
@@ -127,8 +127,8 @@ void main() {
     ));
     await tester.tap(find.text('Calendrier de la campagne'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('load-november-schedule')));
-    await tester.tap(find.byKey(const Key('load-november-schedule')));
+    await tester.ensureVisible(find.byKey(const Key('load-suggested-schedule')));
+    await tester.tap(find.byKey(const Key('load-suggested-schedule')));
     await tester.pumpAndSettle();
     final last = find.byKey(const Key('schedule-final_results'));
     await tester.ensureVisible(last);
