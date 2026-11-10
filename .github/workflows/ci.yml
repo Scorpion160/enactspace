@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/interface-coherence-20261107
+      - feature/recruitment-decision-workspace-20261110
       - integration/enactspace-web-v3-20261107
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
@@ -13,6 +14,7 @@ on:
     branches:
       - main
       - feature/recruitment-decision-workspace-20261110
+      - integration/recruitment-production-parity-20261110
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -132,6 +134,9 @@ jobs:
           fi
           python -m unittest discover -s tests -v
 
+      - name: Smoke-test production-mode Uvicorn startup on disposable CI database
+        run: python ops_checks/smoke_production_entrypoint.py
+
   flutter:
     name: Flutter 3.47.5 / analyze, test, web only
     runs-on: ubuntu-latest
@@ -159,6 +164,10 @@ jobs:
 
       - name: Verify dependency lock is unchanged
         run: git diff --exit-code -- pubspec.lock
+
+      - name: Check candidate release metadata consistency
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_web_release_metadata.py
 
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
@@ -214,7 +223,49 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Build release web application
+      - name: Build candidate Web against production API URL (no deployment)
         run: >-
           flutter build web --release --no-pub --no-tree-shake-icons
-          --dart-define=ENACTSPACE_API_URL=https://example.invalid
+          --dart-define=ENACTSPACE_API_URL=https://api-enactspace.kerunjombor.net
+
+      - name: Inspect Web candidate and write integrity manifest
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_web_release_metadata.py --built
+
+      - name: Recheck live fingerprints and recover exact public Firebase worker
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fingerprint_public_production.py production-fingerprint
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('production-fingerprint/public_fingerprint.json').read_text())
+          checks = report['results']
+          assert report['all_public_checks_ok']
+          assert checks['web_version']['public_fields']['version'] == '1.0.30'
+          assert str(checks['web_version']['public_fields']['build_number']) == '35'
+          assert checks['web_main']['sha256'] == '0edccbd6542c23c042a29164bcb64d22082ccc96b015269c9002beeb34fbec8e'
+          assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
+          assert checks['api_health']['public_fields']['ok'] is True
+          print('LIVE_RELEASE_FINGERPRINTS_PINNED')
+          PY
+          cp production-fingerprint/firebase-messaging-sw.js frontend/build/web/firebase-messaging-sw.js
+
+      - name: Assemble and self-check immutable Web candidate (no deployment)
+        working-directory: ${{ github.workspace }}
+        run: >-
+          python3 tools/assemble_web_release.py
+          --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
+          --live-main-sha256 0edccbd6542c23c042a29164bcb64d22082ccc96b015269c9002beeb34fbec8e
+          --live-version 1.0.30
+          --live-build 35
+
+      - name: Archive preflight-validated Web candidate (not deployed)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: enactspace-web-1.0.30-build36-PREFLIGHT-ONLY-${{ github.run_id }}
+          path: frontend/build/release-candidate/*
+          if-no-files-found: error
+          retention-days: 7
