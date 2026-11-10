@@ -3,7 +3,7 @@
 /// This estimate is deliberately independent of candidature eligibility and
 /// selection decisions. It never prevents a dossier from being evaluated.
 int? estimatedAcademicYearsRemaining(String? studyLevel) {
-  final normalized = (studyLevel ?? '').toUpperCase().replaceAll(RegExp(r'\\s+'), '');
+  final normalized = (studyLevel ?? '').toUpperCase().replaceAll(RegExp(r'\s+'), '');
   final match = RegExp(r'^(DUT|DIC|DST|DIT|LICENCE|MASTER|DESCAF)([1-3])$')
       .firstMatch(normalized);
   if (match == null) return null;
