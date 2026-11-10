@@ -108,12 +108,19 @@ class _RecruitmentComparisonPanelState
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: 245,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth >= 900
+                  ? (constraints.maxWidth - 24) / 3
+                  : constraints.maxWidth >= 600
+                      ? (constraints.maxWidth - 12) / 2
+                      : constraints.maxWidth;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: width,
                 child: DropdownButtonFormField<String>(
                   key: ValueKey('comparison-department-$department'),
                   isExpanded: true,
@@ -138,7 +145,7 @@ class _RecruitmentComparisonPanelState
                 ),
               ),
               SizedBox(
-                width: 220,
+                width: width,
                 child: DropdownButtonFormField<String>(
                   key: ValueKey('comparison-level-$level'),
                   isExpanded: true,
@@ -160,7 +167,7 @@ class _RecruitmentComparisonPanelState
                 ),
               ),
               SizedBox(
-                width: 230,
+                width: width,
                 child: DropdownButtonFormField<String>(
                   key: ValueKey('comparison-readiness-$_readiness'),
                   isExpanded: true,
@@ -183,7 +190,9 @@ class _RecruitmentComparisonPanelState
                   }),
                 ),
               ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Card(
@@ -240,6 +249,7 @@ class _RecruitmentComparisonPanelState
                 _level = 'all';
                 _readiness = 'ready';
                 _showAll = false;
+                _target.clear();
               }),
               icon: const Icon(Icons.filter_alt_off_outlined),
               label: const Text('Réinitialiser'),
