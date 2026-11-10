@@ -134,6 +134,9 @@ jobs:
           fi
           python -m unittest discover -s tests -v
 
+      - name: Smoke-test production-mode Uvicorn startup on disposable CI database
+        run: python ops_checks/smoke_production_entrypoint.py
+
   flutter:
     name: Flutter 3.47.5 / analyze, test, web only
     runs-on: ubuntu-latest
