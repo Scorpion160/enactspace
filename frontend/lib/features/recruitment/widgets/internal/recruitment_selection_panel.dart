@@ -43,7 +43,14 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
   @override
   void didUpdateWidget(RecruitmentSelectionPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.campaignId != widget.campaignId || oldWidget.refreshToken != widget.refreshToken) {
+    if (oldWidget.campaignId != widget.campaignId) {
+      // Prevent displaying the previous campaign's progress or publish button
+      // while the next campaign is loading.
+      _report = null;
+      _error = null;
+      _feedback = null;
+      _load();
+    } else if (oldWidget.refreshToken != widget.refreshToken) {
       _load();
     }
   }
