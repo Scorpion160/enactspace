@@ -170,6 +170,16 @@ void main() {
       ByteData.sublistView(file.readAsBytesSync()),
     ));
     await loader.load();
+    final icons = Platform.environment['ENACTSPACE_QA_ICON_FONT'];
+    if (icons != null) {
+      final iconFile = File(icons);
+      if (!iconFile.existsSync()) throw StateError('Material icons file missing');
+      final materialIcons = FontLoader('MaterialIcons');
+      materialIcons.addFont(Future<ByteData>.value(
+        ByteData.sublistView(iconFile.readAsBytesSync()),
+      ));
+      await materialIcons.load();
+    }
   });
 
   testWidgets('selection workspace screenshots for desktop and phone',
