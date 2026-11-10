@@ -229,12 +229,40 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: python3 tools/check_web_release_metadata.py --built
 
-      - name: Archive Web candidate for controlled staging (not deploy-ready)
+      - name: Recheck live fingerprints and recover exact public Firebase worker
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fingerprint_public_production.py production-fingerprint
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('production-fingerprint/public_fingerprint.json').read_text())
+          checks = report['results']
+          assert report['all_public_checks_ok']
+          assert checks['web_version']['public_fields']['version'] == '1.0.30'
+          assert str(checks['web_version']['public_fields']['build_number']) == '35'
+          assert checks['web_main']['sha256'] == '0edccbd6542c23c042a29164bcb64d22082ccc96b015269c9002beeb34fbec8e'
+          assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
+          assert checks['api_health']['public_fields']['ok'] is True
+          print('LIVE_RELEASE_FINGERPRINTS_PINNED')
+          PY
+          cp production-fingerprint/firebase-messaging-sw.js frontend/build/web/firebase-messaging-sw.js
+
+      - name: Assemble and self-check immutable Web candidate (no deployment)
+        working-directory: ${{ github.workspace }}
+        run: >-
+          python3 tools/assemble_web_release.py
+          --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
+          --live-main-sha256 0edccbd6542c23c042a29164bcb64d22082ccc96b015269c9002beeb34fbec8e
+          --live-version 1.0.30
+          --live-build 35
+
+      - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build36-NEEDS-VERIFIED-WORKER-${{ github.run_id }}
-          path: |
-            frontend/build/web/
-            frontend/build/web_candidate_manifest.json
+          name: enactspace-web-1.0.30-build36-PREFLIGHT-ONLY-${{ github.run_id }}
+          path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7
