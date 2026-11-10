@@ -12,12 +12,14 @@ class RecruitmentSelectionPanel extends StatefulWidget {
   final int refreshToken;
   final VoidCallback onChanged;
   final ValueChanged<String>? onOpenApplication;
+  final RecruitmentSelectionApi? api;
   const RecruitmentSelectionPanel({
     super.key,
     required this.campaignId,
     required this.refreshToken,
     required this.onChanged,
     this.onOpenApplication,
+    this.api,
   });
 
   @override
@@ -25,7 +27,7 @@ class RecruitmentSelectionPanel extends StatefulWidget {
 }
 
 class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
-  final _api = RecruitmentSelectionApi();
+  late final RecruitmentSelectionApi _api;
   Map<String, dynamic>? _report;
   String? _error;
   String? _feedback;
@@ -37,6 +39,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
   @override
   void initState() {
     super.initState();
+    _api = widget.api ?? RecruitmentSelectionApi();
     _load();
   }
 
