@@ -29,7 +29,7 @@ from app.services.recruitment_access import (
 )
 from app.services.recruitment_interviews import interview_completed
 from app.services.recruitment_rubric import VERSION, structured_summary
-from app.schemas.recruitment_schedule import RecruitmentSchedule, NOVEMBER_2026_SCHEDULE
+from app.schemas.recruitment_schedule import RecruitmentSchedule, suggested_recruitment_schedule
 
 POLICY_VERSION = "blind-selection-v1"
 
@@ -388,7 +388,7 @@ def selection_overview(db, campaign):
     return {
         "stage": stage, "rows": rows, "revision": revision,
         "selection_schedule": campaign.selection_schedule,
-        "schedule_template": NOVEMBER_2026_SCHEDULE,
+        "schedule_template": suggested_recruitment_schedule(campaign),
         "result_available_from": result_date,
         "can_publish_on_date": result_date is None or utc_now().date() >= result_date,
         "screening_published_at": campaign.screening_published_at,
