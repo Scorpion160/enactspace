@@ -95,7 +95,8 @@ Future<void> _saveScreenshot(WidgetTester tester, String filename) async {
     final image = await boundary.toImage(pixelRatio: 1);
     try {
       final encoded = await image.toByteData(format: ui.ImageByteFormat.png);
-      return encoded?.buffer.asUint8List();
+      if (encoded == null) throw StateError('Unable to encode synthetic screenshot');
+      return encoded.buffer.asUint8List();
     } finally {
       image.dispose();
     }
