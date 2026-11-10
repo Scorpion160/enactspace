@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/features/recruitment/screens/recruitment_statistics_screen.dart';
 import 'package:frontend/features/recruitment/widgets/internal/recruitment_comparison_panel.dart';
@@ -109,9 +110,14 @@ Future<void> _saveScreenshot(WidgetTester tester, String filename) async {
 
 Widget _comparisonFixture(ThemeMode mode) => MaterialApp(
   debugShowCheckedModeBanner: false,
-  theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xff007987)),
+  theme: ThemeData(
+    useMaterial3: true,
+    fontFamily: 'QaReadableSans',
+    colorSchemeSeed: const Color(0xff007987),
+  ),
   darkTheme: ThemeData(
     useMaterial3: true,
+    fontFamily: 'QaReadableSans',
     colorSchemeSeed: const Color(0xff007987),
     brightness: Brightness.dark,
   ),
@@ -146,9 +152,14 @@ Widget _comparisonFixture(ThemeMode mode) => MaterialApp(
 
 Widget _statisticsFixture(ThemeMode mode) => MaterialApp(
   debugShowCheckedModeBanner: false,
-  theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xff007987)),
+  theme: ThemeData(
+    useMaterial3: true,
+    fontFamily: 'QaReadableSans',
+    colorSchemeSeed: const Color(0xff007987),
+  ),
   darkTheme: ThemeData(
     useMaterial3: true,
+    fontFamily: 'QaReadableSans',
     colorSchemeSeed: const Color(0xff007987),
     brightness: Brightness.dark,
   ),
@@ -165,6 +176,20 @@ Widget _statisticsFixture(ThemeMode mode) => MaterialApp(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    // The default "Ahem" font draws rectangles in Flutter test screenshots.
+    // Load an open-source system font to make the images readable.
+    final file = File('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
+    if (!file.existsSync()) {
+      throw StateError('Required CI screenshot font is unavailable');
+    }
+    final loader = FontLoader('QaReadableSans');
+    loader.addFont(Future<ByteData>.value(
+      ByteData.sublistView(file.readAsBytesSync()),
+    ));
+    await loader.load();
+  });
 
   testWidgets('render anonymous comparison: desktop light and phone dark',
       (tester) async {
