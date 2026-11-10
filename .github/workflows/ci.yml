@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/interface-coherence-20261107
+      - feature/recruitment-decision-workspace-20261110
       - integration/enactspace-web-v3-20261107
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
@@ -13,6 +14,7 @@ on:
     branches:
       - main
       - feature/recruitment-decision-workspace-20261110
+      - integration/recruitment-production-parity-20261110
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -160,6 +162,10 @@ jobs:
       - name: Verify dependency lock is unchanged
         run: git diff --exit-code -- pubspec.lock
 
+      - name: Check candidate release metadata consistency
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_web_release_metadata.py
+
       - name: Analyze Flutter sources
         run: flutter analyze --no-pub
 
@@ -214,7 +220,21 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Build release web application
+      - name: Build candidate Web against production API URL (no deployment)
         run: >-
           flutter build web --release --no-pub --no-tree-shake-icons
-          --dart-define=ENACTSPACE_API_URL=https://example.invalid
+          --dart-define=ENACTSPACE_API_URL=https://api-enactspace.kerunjombor.net
+
+      - name: Inspect Web candidate and write integrity manifest
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_web_release_metadata.py --built
+
+      - name: Archive Web candidate for controlled staging (not deploy-ready)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: enactspace-web-1.0.30-build36-NEEDS-VERIFIED-WORKER-${{ github.run_id }}
+          path: |
+            frontend/build/web/
+            frontend/build/web_candidate_manifest.json
+          if-no-files-found: error
+          retention-days: 7
