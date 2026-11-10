@@ -191,6 +191,15 @@ jobs:
           test/member_join_requests_test.dart
           test/ui_final_acceptance_test.dart
 
+      - name: Load Material icon font for readable visual review
+        shell: bash
+        run: |
+          flutter_bin="$(readlink -f "$(command -v flutter)")"
+          sdk_root="$(dirname "$(dirname "$flutter_bin")")"
+          icon_path="$sdk_root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf"
+          test -f "$icon_path"
+          echo "ENACTSPACE_QA_ICON_FONT=$icon_path" >> "$GITHUB_ENV"
+
       - name: Capture synthetic recruitment visual acceptance views
         run: >-
           flutter test --no-pub
