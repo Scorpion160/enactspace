@@ -159,7 +159,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          '$ready/${rows.length} dossiers prêts · $decided décisions préparées',
+          '$ready/${rows.length} dossiers prêts · $decided ${decided == 1 ? 'décision préparée' : 'décisions préparées'}',
         ),
         childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
