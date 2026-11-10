@@ -244,6 +244,14 @@ class _RecruitmentStatisticsScreenState
                     ),
                   ),
                 ),
+                if (_stats?['selection_progress'] is Map) ...[
+                  const SizedBox(height: 22),
+                  _ScreeningProgressCard(
+                    progress: Map<String, dynamic>.from(
+                      _stats!['selection_progress'] as Map,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 22),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -307,6 +315,110 @@ class _RecruitmentStatisticsScreenState
       },
     ),
   );
+}
+
+/// Management-only aggregates; individual candidate notes are never exposed
+/// by the statistics endpoint.
+class _ScreeningProgressCard extends StatelessWidget {
+  final Map<String, dynamic> progress;
+
+  const _ScreeningProgressCard({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    int value(String key) => (progress[key] as num?)?.toInt() ?? 0;
+    final ready = value('ready');
+    final total = ready + value('not_ready');
+    final screening = progress['stage'] != 'interview';
+    final tiles = <({String label, int count, IconData icon})>[
+      (label: 'Dossiers prêts', count: ready, icon: Icons.task_alt_outlined),
+      (label: 'Dossiers à compléter', count: value('not_ready'), icon: Icons.pending_actions_outlined),
+      (label: 'Dossiers avec une note au moins', count: value('reviewed_at_least_once'), icon: Icons.fact_check_outlined),
+      (label: 'Dossiers sans note', count: value('not_reviewed'), icon: Icons.rate_review_outlined),
+      (label: 'Évaluations enregistrées', count: value('reviews_recorded'), icon: Icons.edit_note_outlined),
+      (label: 'Décisions préparées', count: value('decisions_prepared'), icon: Icons.how_to_vote_outlined),
+      (label: 'Avis encore nécessaires', count: value('additional_reviews'), icon: Icons.add_task_outlined),
+      if (screening)
+        (label: 'Écarts importants à examiner', count: value('high_disagreement'), icon: Icons.balance_outlined),
+    ];
+    return Card(
+      key: const Key('statistics-selection-progress'),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              screening ? 'Avancement de la présélection' : 'Avancement des entretiens',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Indicateurs agrégés réservés aux responsables du recrutement. '
+              'Les notes individuelles et les décisions restent confidentielles.',
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            Text('$ready dossiers prêts sur $total',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: total == 0 ? 0 : ready / total,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(builder: (context, constraints) {
+              final width = constraints.maxWidth >= 780
+                  ? (constraints.maxWidth - 24) / 3
+                  : constraints.maxWidth >= 460
+                      ? (constraints.maxWidth - 12) / 2
+                      : constraints.maxWidth;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final tile in tiles)
+                    SizedBox(
+                      width: width,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: colors.outlineVariant),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(children: [
+                            Icon(tile.icon, color: colors.primary),
+                            const SizedBox(width: 12),
+                            Expanded(child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${tile.count}',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    )),
+                                Text(tile.label,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    )),
+                              ],
+                            )),
+                          ]),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _StatisticsBreakdownCard extends StatelessWidget {
