@@ -68,6 +68,7 @@ from app.services.recruitment_selection import (
     require_application_access, require_review_assignment,
     redact_candidate_text, public_selection_state, reviewed_summary,
     distribute_assignments, can_review_application, valid_reviews_query,
+    required_reviews,
 )
 from app.services.recruitment_eligibility import eligibility_error
 
@@ -1024,6 +1025,11 @@ def application_payload(
         summary = structured_summary(stage_reviews, version)
         data.update(summary)
         if blind:
+            if stage == "screening":
+                # Campaign-specific thresholds, not hard-coded frontend rules.
+                needed = required_reviews(campaign, summary)
+                data["selection_required_reviews"] = needed
+                data["selection_ready"] = summary["screening_review_count"] >= needed
             data["final_score"] = _review_score(stage_reviews, summary)
         data["screening_rubric"] = rubric_payload(version)
         own_review = next((review for review in stage_reviews if review.reviewer_id == current_user.id), None)
