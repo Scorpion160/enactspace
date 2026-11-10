@@ -71,6 +71,17 @@ class InternalFilterBar extends StatelessWidget {
   final TextEditingController projectController;
   final TextEditingController departmentController;
   final TextEditingController classController;
+  final List<String> departmentOptions;
+  final List<String> studyLevelOptions;
+  final String departmentChoice;
+  final String studyLevelChoice;
+  final String academicHorizon;
+  final String sortMode;
+  final bool canManageJury;
+  final ValueChanged<String?>? onDepartmentChanged;
+  final ValueChanged<String?>? onStudyLevelChanged;
+  final ValueChanged<String?>? onAcademicHorizonChanged;
+  final ValueChanged<String?>? onSortModeChanged;
   final List<RecruitmentCampaignModel> campaigns;
   final String campaignId;
   final String status;
@@ -97,6 +108,17 @@ class InternalFilterBar extends StatelessWidget {
     required this.projectController,
     required this.departmentController,
     required this.classController,
+    this.departmentOptions = const [],
+    this.studyLevelOptions = const [],
+    this.departmentChoice = 'all',
+    this.studyLevelChoice = 'all',
+    this.academicHorizon = 'all',
+    this.sortMode = 'reviews_needed',
+    this.canManageJury = false,
+    this.onDepartmentChanged,
+    this.onStudyLevelChanged,
+    this.onAcademicHorizonChanged,
+    this.onSortModeChanged,
     required this.campaigns,
     required this.campaignId,
     required this.status,
@@ -184,11 +206,12 @@ class InternalFilterBar extends StatelessWidget {
         ),
       ],
       activeFilterCount:
-          [campaignId, status, gender].where((v) => v != 'all').length +
+          [campaignId, status, gender, departmentChoice, studyLevelChoice,
+           academicHorizon].where((v) => v != 'all').length +
+          (canManageJury && sortMode != 'reviews_needed' ? 1 : 0) +
           [
             poleController,
             projectController,
-            departmentController,
             classController,
           ].where((v) => v.text.trim().isNotEmpty).length +
           (submittedFrom == null ? 0 : 1) +
@@ -203,10 +226,83 @@ class InternalFilterBar extends StatelessWidget {
               filters: [
                 _TextFilter(controller: poleController, label: 'Pôle'),
                 _TextFilter(controller: projectController, label: 'Projet'),
-                _TextFilter(
-                  controller: departmentController,
-                  label: 'Département',
+                DropdownButtonFormField<String>(
+                  key: ValueKey('internal-department-$departmentChoice'),
+                  isExpanded: true,
+                  initialValue: departmentOptions.contains(departmentChoice)
+                      ? departmentChoice : 'all',
+                  decoration: const InputDecoration(
+                    labelText: 'Département',
+                    prefixIcon: Icon(Icons.school_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all', child: Text('Tous les départements')),
+                    for (final value in departmentOptions)
+                      DropdownMenuItem(value: value,
+                        child: Text(value, overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: onDepartmentChanged,
                 ),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('internal-study-level-$studyLevelChoice'),
+                  isExpanded: true,
+                  initialValue: studyLevelOptions.contains(studyLevelChoice)
+                      ? studyLevelChoice : 'all',
+                  decoration: const InputDecoration(
+                    labelText: 'Niveau d’études',
+                    prefixIcon: Icon(Icons.auto_stories_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all', child: Text('Tous les niveaux')),
+                    for (final value in studyLevelOptions)
+                      DropdownMenuItem(value: value, child: Text(value)),
+                  ],
+                  onChanged: onStudyLevelChanged,
+                ),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('internal-academic-horizon-$academicHorizon'),
+                  isExpanded: true,
+                  initialValue: academicHorizon,
+                  decoration: const InputDecoration(
+                    labelText: 'Poursuite du cursus (indicative)',
+                    prefixIcon: Icon(Icons.timelapse_outlined),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('Sans préférence')),
+                    DropdownMenuItem(value: 'two_plus',
+                      child: Text('Au moins deux années estimées')),
+                    DropdownMenuItem(value: 'last_year',
+                      child: Text('Dernière année du cycle')),
+                    DropdownMenuItem(value: 'unknown',
+                      child: Text('Parcours non classé')),
+                  ],
+                  onChanged: onAcademicHorizonChanged,
+                ),
+                if (canManageJury)
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('internal-review-sort-$sortMode'),
+                    isExpanded: true,
+                    initialValue: sortMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Trier les dossiers',
+                      prefixIcon: Icon(Icons.sort_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'reviews_needed',
+                        child: Text('Avis manquants en premier')),
+                      DropdownMenuItem(value: 'score_desc',
+                        child: Text('Notes décroissantes (indicatif)')),
+                      DropdownMenuItem(value: 'score_asc',
+                        child: Text('Notes croissantes (indicatif)')),
+                      DropdownMenuItem(value: 'name',
+                        child: Text('Nom ou référence')),
+                      DropdownMenuItem(value: 'newest',
+                        child: Text('Dépôts les plus récents')),
+                    ],
+                    onChanged: onSortModeChanged,
+                  ),
                 _TextFilter(controller: classController, label: 'Promotion'),
                 _DateFilter(
                   label: 'Soumise à partir du',

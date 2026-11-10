@@ -2,6 +2,7 @@ import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/internal/recruitment_interview_board.dart';
 import '../../widgets/internal/recruitment_selection_panel.dart';
+import '../../services/recruitment_advisory_filters.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import 'recruitment_jury_screen.dart';
 import 'recruitment_team_guide_screen.dart';
@@ -47,6 +48,10 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   String _campaignId = 'all';
   String _status = 'all';
   String _gender = 'all';
+  String _departmentChoice = 'all';
+  String _studyLevelChoice = 'all';
+  String _academicHorizon = 'all';
+  String _sortMode = 'reviews_needed';
   DateTime? _submittedFrom;
   DateTime? _submittedTo;
   int _page = 0;
@@ -131,7 +136,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
           (query.isEmpty || searchable.contains(query)) &&
           _matches(item.preferredPole, _pole.text) &&
           _matches(item.projectInterest, _project.text) &&
-          _matches(item.department, _department.text) &&
+          (_departmentChoice == 'all' ||
+              item.department == _departmentChoice) &&
+          (_studyLevelChoice == 'all' ||
+              item.studyLevel == _studyLevelChoice) &&
+          matchesAcademicHorizon(item.studyLevel, _academicHorizon) &&
           _matches(item.className, _className.text) &&
           _inDateRange(item.createdAt);
     }).toList();
@@ -140,8 +149,31 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
         ? (row.trackingCode ?? row.anonymousCode)
         : '${row.lastName} ${row.firstName}'.toLowerCase();
     final evaluator = _access['can_review_any'] == true;
+    final sortMode = _access['can_manage_jury'] == true
+        ? _sortMode : 'reviews_needed';
     result.sort((a, b) {
-      if (evaluator) {
+      if (sortMode == 'score_desc' || sortMode == 'score_asc') {
+        // Complete assessments must lead the ranking. The backend computes
+        // readiness from each campaign's own minimum and disagreement rules.
+        final aReady = a.selectionReady == true;
+        final bReady = b.selectionReady == true;
+        if (aReady != bReady) return aReady ? -1 : 1;
+        final aScore = a.screeningScore;
+        final bScore = b.screeningScore;
+        if (aScore == null && bScore != null) return 1;
+        if (aScore != null && bScore == null) return -1;
+        if (aScore != null && bScore != null) {
+          final comparison = sortMode == 'score_desc'
+              ? bScore.compareTo(aScore)
+              : aScore.compareTo(bScore);
+          if (comparison != 0) return comparison;
+        }
+      }
+      if (sortMode == 'newest') {
+        final comparison = (b.createdAt ?? '').compareTo(a.createdAt ?? '');
+        if (comparison != 0) return comparison;
+      }
+      if (sortMode == 'reviews_needed' && evaluator) {
         // Prioritize candidates missing assessments (0, 1, 2 before 3+).
         final countComparison = a.screeningReviewCount.compareTo(
           b.screeningReviewCount,
@@ -186,9 +218,12 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     _campaignId != 'all',
     _status != 'all',
     _gender != 'all',
+    _departmentChoice != 'all',
+    _studyLevelChoice != 'all',
+    _academicHorizon != 'all',
+    _access['can_manage_jury'] == true && _sortMode != 'reviews_needed',
     _pole.text.trim().isNotEmpty,
     _project.text.trim().isNotEmpty,
-    _department.text.trim().isNotEmpty,
     _className.text.trim().isNotEmpty,
     _anonymized,
     _submittedFrom != null,
@@ -215,6 +250,10 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     _campaignId = 'all';
     _status = 'all';
     _gender = 'all';
+    _departmentChoice = 'all';
+    _studyLevelChoice = 'all';
+    _academicHorizon = 'all';
+    _sortMode = 'reviews_needed';
     _anonymized = false;
     _submittedFrom = null;
     _submittedTo = null;
@@ -380,6 +419,17 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
         ? 'Toutes les campagnes'
         : _campaignTitle(_campaignId);
     final selectionCampaign = _campaigns.where((campaign) => campaign.id == _campaignId).firstOrNull;
+    final inCampaign = _applications.where(
+      (item) => _campaignId == 'all' || item.campaignId == _campaignId,
+    );
+    final departmentOptions = inCampaign
+        .map((item) => item.department?.trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toSet().toList()..sort();
+    final studyLevelOptions = inCampaign
+        .map((item) => item.studyLevel?.trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toSet().toList()..sort();
     final padding = MediaQuery.sizeOf(context).width < 560 ? 14.0 : 24.0;
     return RefreshIndicator(
       onRefresh: () => _load(initial: false),
@@ -485,6 +535,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               campaignId: _campaignId,
               refreshToken: _selectionRevision,
               onChanged: () => _load(initial: false),
+              onOpenApplication: (id) {
+                final candidate = _applications
+                    .where((item) => item.id == id).firstOrNull;
+                if (candidate != null) _openApplication(candidate);
+              },
             ),
           if (_section == RecruitmentSection.applications && _campaignId == 'all' && _access['can_manage_jury'] == true)
             const Padding(
@@ -498,6 +553,31 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             projectController: _project,
             departmentController: _department,
             classController: _className,
+            departmentOptions: departmentOptions,
+            studyLevelOptions: studyLevelOptions,
+            departmentChoice: _departmentChoice,
+            studyLevelChoice: _studyLevelChoice,
+            academicHorizon: _academicHorizon,
+            sortMode: _sortMode,
+            canManageJury: _access['can_manage_jury'] == true,
+            onDepartmentChanged: (value) => setState(() {
+              _departmentChoice = value ?? 'all';
+              _department.text = _departmentChoice == 'all'
+                  ? '' : _departmentChoice;
+              _page = 0;
+            }),
+            onStudyLevelChanged: (value) => setState(() {
+              _studyLevelChoice = value ?? 'all';
+              _page = 0;
+            }),
+            onAcademicHorizonChanged: (value) => setState(() {
+              _academicHorizon = value ?? 'all';
+              _page = 0;
+            }),
+            onSortModeChanged: (value) => setState(() {
+              _sortMode = value ?? 'reviews_needed';
+              _page = 0;
+            }),
             campaigns: _campaigns,
             campaignId: _campaignId,
             status: _status,
@@ -511,6 +591,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onSearchChanged: (_) => setState(() => _page = 0),
             onCampaignChanged: (value) => setState(() {
               _campaignId = value ?? 'all';
+              _departmentChoice = 'all';
+              _department.clear();
+              _studyLevelChoice = 'all';
+              _academicHorizon = 'all';
+              _sortMode = 'reviews_needed';
               _page = 0;
             }),
             onStatusChanged: (value) => setState(() {

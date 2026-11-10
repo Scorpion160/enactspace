@@ -29,7 +29,7 @@ from app.services.recruitment_access import (
 )
 from app.services.recruitment_interviews import interview_completed
 from app.services.recruitment_rubric import VERSION, structured_summary
-from app.schemas.recruitment_schedule import RecruitmentSchedule, NOVEMBER_2026_SCHEDULE
+from app.schemas.recruitment_schedule import RecruitmentSchedule, suggested_recruitment_schedule
 
 POLICY_VERSION = "blind-selection-v1"
 
@@ -361,6 +361,10 @@ def selection_overview(db, campaign):
         rows.append({
             "application_id": str(application.id),
             "anonymous_code": anonymous_code(application),
+            # Non-identifying attributes used only in the managers' comparison
+            # view. Never include names, email, phone or attachments here.
+            "department": application.department,
+            "study_level": application.study_level,
             "decision": application.screening_decision if stage == "screening" else application.pending_final_decision,
             "review_count": summary["screening_review_count"],
             "required_reviews": target,
@@ -384,7 +388,7 @@ def selection_overview(db, campaign):
     return {
         "stage": stage, "rows": rows, "revision": revision,
         "selection_schedule": campaign.selection_schedule,
-        "schedule_template": NOVEMBER_2026_SCHEDULE,
+        "schedule_template": suggested_recruitment_schedule(campaign),
         "result_available_from": result_date,
         "can_publish_on_date": result_date is None or utc_now().date() >= result_date,
         "screening_published_at": campaign.screening_published_at,

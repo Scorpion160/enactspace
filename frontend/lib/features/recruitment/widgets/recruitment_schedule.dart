@@ -83,7 +83,11 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
   @override
   void didUpdateWidget(RecruitmentScheduleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.schedule?.dates.toString() != widget.schedule?.dates.toString()) _fill(widget.schedule);
+    if (oldWidget.schedule?.dates.toString() != widget.schedule?.dates.toString() ||
+        oldWidget.template?.dates.toString() != widget.template?.dates.toString()) {
+      // Never carry calendar input from one recruitment campaign into another.
+      _fill(widget.schedule);
+    }
   }
 
   void _fill(RecruitmentScheduleModel? schedule) {
@@ -128,15 +132,15 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
     if (!widget.enabled && widget.schedule != null) return RecruitmentScheduleCard(schedule: widget.schedule!, showFullSchedule: true);
     return ExpansionTile(
       title: const Text('Calendrier de la campagne'),
-      subtitle: Text(widget.schedule == null ? 'À renseigner avant la diffusion' : 'Deux dates de résultats pour toute la campagne'),
+      subtitle: Text(widget.schedule == null ? 'À renseigner avant la diffusion' : 'Planning personnalisable de cette campagne'),
       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.template != null) ...[
           OutlinedButton.icon(
-            key: const Key('load-november-schedule'),
+            key: const Key('load-suggested-schedule'),
             onPressed: widget.enabled ? () => setState(() => _fill(widget.template)) : null,
             icon: const Icon(Icons.event_available_outlined),
-            label: const Text('Charger le planning de novembre 2026'),
+            label: const Text('Charger un calendrier indicatif'),
           ),
           const Text('Le modèle peut être ajusté selon les contraintes de la campagne. Toutes les dates restent modifiables.'),
           const SizedBox(height: 16),

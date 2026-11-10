@@ -1,5 +1,5 @@
 """Calendar dates are local dates in Dakar; publication remains a batch action."""
-from datetime import date
+from datetime import date, timedelta
 
 from pydantic import BaseModel, model_validator
 
@@ -32,3 +32,30 @@ NOVEMBER_2026_SCHEDULE = {
     "interviews_start": "2026-11-16", "interviews_end": "2026-11-21",
     "final_results": "2026-11-24",
 }
+
+
+def suggested_recruitment_schedule(campaign):
+    """Suggest a reusable, editable timeline from this campaign's own dates.
+
+    This is offered only as a form template. It never changes a saved schedule,
+    never publishes results, and never sends e-mails.
+    """
+    opening = campaign.start_date or date.today()
+    closing = campaign.end_date or (opening + timedelta(days=3))
+    if closing < opening:
+        closing = opening
+    screening_end = closing + timedelta(days=5)
+    results = screening_end + timedelta(days=1)
+    interviews_start = results + timedelta(days=1)
+    interviews_end = interviews_start + timedelta(days=5)
+    final_results = interviews_end + timedelta(days=3)
+    return {
+        "applications_open": opening.isoformat(),
+        "applications_close": closing.isoformat(),
+        "screening_start": opening.isoformat(),
+        "screening_end": screening_end.isoformat(),
+        "screening_results": results.isoformat(),
+        "interviews_start": interviews_start.isoformat(),
+        "interviews_end": interviews_end.isoformat(),
+        "final_results": final_results.isoformat(),
+    }
