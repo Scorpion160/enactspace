@@ -153,6 +153,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
         ? _sortMode : 'reviews_needed';
     result.sort((a, b) {
       if (sortMode == 'score_desc' || sortMode == 'score_asc') {
+        // Complete assessments must lead the ranking. The backend computes
+        // readiness from each campaign's own minimum and disagreement rules.
+        final aReady = a.selectionReady == true;
+        final bReady = b.selectionReady == true;
+        if (aReady != bReady) return aReady ? -1 : 1;
         final aScore = a.screeningScore;
         final bScore = b.screeningScore;
         if (aScore == null && bScore != null) return 1;
