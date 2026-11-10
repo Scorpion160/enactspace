@@ -478,7 +478,12 @@ void main() {
     await tester.tap(find.text('Candidature retenue').last);
     await tester.pumpAndSettle();
     expect(find.text('Aucun résultat'), findsOneWidget);
-    await tester.tap(find.text('Réinitialiser les filtres'));
+    // The advanced filters add height to the page. Simulate scrolling to the
+    // reset control instead of tapping an off-screen widget.
+    final reset = find.text('Réinitialiser les filtres');
+    await tester.ensureVisible(reset);
+    await tester.pumpAndSettle();
+    await tester.tap(reset);
     await tester.pumpAndSettle();
     expect(find.text('Ouvrir le dossier'), findsOneWidget);
   });
