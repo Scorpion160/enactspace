@@ -83,7 +83,11 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
   @override
   void didUpdateWidget(RecruitmentScheduleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.schedule?.dates.toString() != widget.schedule?.dates.toString()) _fill(widget.schedule);
+    if (oldWidget.schedule?.dates.toString() != widget.schedule?.dates.toString() ||
+        oldWidget.template?.dates.toString() != widget.template?.dates.toString()) {
+      // Never carry calendar input from one recruitment campaign into another.
+      _fill(widget.schedule);
+    }
   }
 
   void _fill(RecruitmentScheduleModel? schedule) {
