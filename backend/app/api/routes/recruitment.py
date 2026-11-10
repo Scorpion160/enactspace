@@ -91,10 +91,36 @@ def recruitment_statistics(
     selected = next((row for row in campaigns if row.id == campaign_id), None) if campaign_id else next(iter(campaigns), None)
     if campaign_id and selected is None:
         raise HTTPException(404, 'Campagne introuvable.')
+    # Only recruitment managers may inspect screening progress. Other members
+    # keep the anonymous participation breakdowns they already had.
+    progress = None
+    if selected and uses_blind_selection(selected) and can_manage_jury(db, current_user):
+        from app.services.recruitment_selection import selection_overview
+        overview = selection_overview(db, selected)
+        rows = overview['rows']
+        progress = {
+            'stage': overview['stage'],
+            'ready': sum(bool(row['ready']) for row in rows),
+            'not_ready': sum(not row['ready'] for row in rows),
+            'not_reviewed': sum(row['review_count'] == 0 for row in rows),
+            'reviewed_at_least_once': sum(row['review_count'] > 0 for row in rows),
+            'reviews_recorded': sum(row['review_count'] for row in rows),
+            'high_disagreement': sum(
+                row['spread'] is not None
+                and row['spread'] >= selected.screening_disagreement_threshold
+                for row in rows
+            ) if overview['stage'] == 'screening' else 0,
+            'decisions_prepared': sum(row['decision'] is not None for row in rows),
+            'additional_reviews': sum(max(0, row['required_reviews'] - row['review_count']) for row in rows),
+            'minimum_reviews': overview['minimum_reviews'],
+            'disagreement_threshold': overview['disagreement_threshold'],
+            'screening_published': overview['screening_published_at'] is not None,
+        }
     return {
         'campaigns': [{'id': str(row.id), 'title': row.title} for row in campaigns],
         'campaign_id': str(selected.id) if selected else None,
         'can_access_applications': can_access_recruitment(db, current_user),
+        'selection_progress': progress,
         **campaign_statistics(db, selected.id if selected else None),
     }
 
