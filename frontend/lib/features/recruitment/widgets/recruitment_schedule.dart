@@ -132,7 +132,7 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
     if (!widget.enabled && widget.schedule != null) return RecruitmentScheduleCard(schedule: widget.schedule!, showFullSchedule: true);
     return ExpansionTile(
       title: const Text('Calendrier de la campagne'),
-      subtitle: Text(widget.schedule == null ? 'À renseigner avant la diffusion' : 'Deux dates de résultats pour toute la campagne'),
+      subtitle: Text(widget.schedule == null ? 'À renseigner avant la diffusion' : 'Planning personnalisable de cette campagne'),
       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.template != null) ...[
