@@ -53,6 +53,8 @@ class ApplicationModel {
   final double? humanScreeningScore;
   final int screeningReviewCount;
   final double? screeningSpread;
+  final int? selectionRequiredReviews;
+  final bool? selectionReady;
   final Map<String, dynamic>? screeningRubric;
   final ApplicationReviewModel? myReview;
   final String? convertedUserId;
@@ -119,6 +121,8 @@ class ApplicationModel {
     this.humanScreeningScore,
     this.screeningReviewCount = 0,
     this.screeningSpread,
+    this.selectionRequiredReviews,
+    this.selectionReady,
     this.screeningRubric,
     this.myReview,
     this.convertedUserId,
@@ -217,6 +221,9 @@ class ApplicationModel {
       screeningSpread: double.tryParse(
         json['screening_spread']?.toString() ?? '',
       ),
+      selectionRequiredReviews:
+          (json['selection_required_reviews'] as num?)?.toInt(),
+      selectionReady: json['selection_ready'] as bool?,
       screeningRubric: json['screening_rubric'] is Map
           ? Map<String, dynamic>.from(json['screening_rubric'])
           : null,
