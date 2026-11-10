@@ -396,6 +396,8 @@ class ApplicationRead(BaseModel):
     screening_score: Optional[float] = None
     screening_review_count: int = 0
     screening_spread: Optional[float] = None
+    selection_required_reviews: Optional[int] = None
+    selection_ready: Optional[bool] = None
     assessment_stage: str = "screening"
     screening_decision: Optional[str] = None
     pending_final_decision: Optional[str] = None
