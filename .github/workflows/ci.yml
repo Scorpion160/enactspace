@@ -192,7 +192,10 @@ jobs:
           test/ui_final_acceptance_test.dart
 
       - name: Capture synthetic recruitment visual acceptance views
-        run: flutter test --no-pub test/recruitment_visual_review_test.dart
+        run: >-
+          flutter test --no-pub
+          test/recruitment_visual_review_test.dart
+          test/recruitment_selection_visual_test.dart
 
       - name: Archive synthetic desktop and phone screenshots
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
