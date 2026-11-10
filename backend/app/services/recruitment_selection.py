@@ -361,6 +361,10 @@ def selection_overview(db, campaign):
         rows.append({
             "application_id": str(application.id),
             "anonymous_code": anonymous_code(application),
+            # Non-identifying attributes used only in the managers' comparison
+            # view. Never include names, email, phone or attachments here.
+            "department": application.department,
+            "study_level": application.study_level,
             "decision": application.screening_decision if stage == "screening" else application.pending_final_decision,
             "review_count": summary["screening_review_count"],
             "required_reviews": target,
