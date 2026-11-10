@@ -28,6 +28,13 @@ class _RecruitmentComparisonPanelState
   String _level = 'all';
   String _readiness = 'ready';
   bool _showAll = false;
+  final _target = TextEditingController();
+
+  @override
+  void dispose() {
+    _target.dispose();
+    super.dispose();
+  }
 
   List<String> _options(String field) {
     final values = widget.rows
@@ -75,6 +82,8 @@ class _RecruitmentComparisonPanelState
     final department = departments.contains(_department) ? _department : 'all';
     final level = levels.contains(_level) ? _level : 'all';
     final visible = _showAll ? rows : rows.take(25).toList();
+    final readyCount = rows.where((row) => row['ready'] == true).length;
+    final target = int.tryParse(_target.text.trim());
     return Card(
       key: const Key('selection-comparison-panel'),
       margin: EdgeInsets.zero,
@@ -175,6 +184,47 @@ class _RecruitmentComparisonPanelState
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            margin: EdgeInsets.zero,
+            color: colors.surfaceContainerLow,
+            child: ExpansionTile(
+              title: const Text('Simuler un objectif par groupe'),
+              subtitle: const Text(
+                'Projection facultative · aucun quota ni décision enregistrés',
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+              children: [
+                Text(
+                  'Applique les filtres de département et de niveau puis saisis '
+                  'un effectif envisagé. Cette simulation ne retient ni '
+                  'n’exclut automatiquement aucun candidat.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('comparison-target-scenario'),
+                  controller: _target,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Effectif envisagé (facultatif)',
+                    hintText: 'Par exemple : 5',
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  target == null || target < 1
+                      ? '$readyCount dossier(s) suffisamment évalué(s) dans ce périmètre.'
+                      : '$readyCount dossier(s) suffisamment évalué(s) pour '
+                        'un objectif hypothétique de $target place(s). '
+                        'Écart de disponibilité : ${readyCount - target}.',
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Row(children: [
