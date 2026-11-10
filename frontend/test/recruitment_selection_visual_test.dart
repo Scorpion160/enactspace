@@ -184,7 +184,7 @@ void main() {
       await tester.pumpWidget(_fixture(scene.mode));
       await tester.pumpAndSettle();
       expect(find.text('Présélection des dossiers'), findsOneWidget);
-      expect(find.text('2/3 dossiers prêts · 1 décisions préparées'), findsOneWidget);
+      expect(find.text('2/3 dossiers prêts · 1 décision préparée'), findsOneWidget);
       expect(find.text('Publier les résultats et préparer les mails'), findsOneWidget);
       await _capture(tester, scene.file);
       expect(tester.takeException(), isNull);
