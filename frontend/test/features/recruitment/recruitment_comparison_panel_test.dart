@@ -56,4 +56,31 @@ void main() {
     await tester.tap(find.text('A003'));
     expect(opened, ['A003']);
   });
+
+  for (final darkMode in [false, true]) {
+    testWidgets('comparison responsive at 390 px (dark=$darkMode)', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(useMaterial3: true),
+        darkTheme: ThemeData.dark(useMaterial3: true),
+        themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
+        home: Scaffold(body: SingleChildScrollView(
+          child: RecruitmentComparisonPanel(
+            screening: true,
+            rows: [
+              dossier(code: 'A010', score: 78, ready: true,
+                  department: 'Génie électrique', level: 'DIC2'),
+              dossier(code: 'A011', score: 67, ready: true,
+                  department: 'Gestion', level: 'Licence2'),
+            ],
+          ),
+        )),
+      ));
+      await tester.tap(find.text('Classement indicatif des dossiers'));
+      await tester.pumpAndSettle();
+      expect(find.text('A010'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
