@@ -133,10 +133,10 @@ class _RecruitmentScheduleEditorState extends State<RecruitmentScheduleEditor> {
       children: [
         if (widget.template != null) ...[
           OutlinedButton.icon(
-            key: const Key('load-november-schedule'),
+            key: const Key('load-suggested-schedule'),
             onPressed: widget.enabled ? () => setState(() => _fill(widget.template)) : null,
             icon: const Icon(Icons.event_available_outlined),
-            label: const Text('Charger le planning de novembre 2026'),
+            label: const Text('Charger un calendrier indicatif'),
           ),
           const Text('Le modèle peut être ajusté selon les contraintes de la campagne. Toutes les dates restent modifiables.'),
           const SizedBox(height: 16),
