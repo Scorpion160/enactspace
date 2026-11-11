@@ -46,7 +46,9 @@ def get_mobile_money_readiness(config) -> dict:
         )
     )
     callback = config.PAYDUNYA_CALLBACK_URL
-    if not callback and config.PUBLIC_API_BASE_URL:
+    # A live callback must be explicitly configured, as required by the
+    # production Settings validator. Do not mark a guessed URL as ready.
+    if not callback and mode != "live" and config.PUBLIC_API_BASE_URL:
         callback = config.PUBLIC_API_BASE_URL.rstrip("/") + "/api/payments/paydunya/ipn"
     ipn_url_valid = _is_valid_ipn(callback, require_https=mode == "live")
     reconciliation_enabled = bool(config.PAYMENT_RECONCILIATION_ENABLED)
