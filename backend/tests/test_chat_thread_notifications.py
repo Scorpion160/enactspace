@@ -46,6 +46,7 @@ class ThreadNotificationTests(unittest.TestCase):
             self.assertIn('Sady vous a ajouté', call['message'])
             self.assertIn('Projet Dimbali', call['message'])
             self.assertEqual(call['user_ids'], [2])
+            self.assertIs(call['send_email'], False)
 
     @unittest.skipIf(Session is None, 'SQLAlchemy unavailable in this Python environment')
     def test_groups_visible_immediately_and_direct_only_after_message(self):

@@ -710,6 +710,7 @@ def mobile_money_public_payload(
         "transaction_id": transaction.id,
         "amount": transaction.amount,
         "currency": transaction.currency,
+        "channel": transaction.channel,
         "status": transaction.status,
         "checkout_url": transaction.checkout_url,
         "expires_at": transaction.expires_at,
@@ -1006,6 +1007,16 @@ async def initiate_mobile_money_payment(
     db.commit()
     db.refresh(transaction)
     return mobile_money_public_payload(transaction)
+
+
+@router.get("/mobile-money/admin/readiness")
+def mobile_money_admin_readiness(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    # No provider call, no invoice creation, no PII, no secret values.
+    from app.services.payments.readiness import get_mobile_money_readiness
+    return get_mobile_money_readiness(settings)
 
 
 @router.get("/mobile-money/admin/summary")

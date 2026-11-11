@@ -565,6 +565,7 @@ def notify_group_membership(db, thread, recipient_ids, actor, notification_type)
         message=f"{user_display_name(actor)} vous a ajouté au groupe « {thread_notification_name(thread)} ».",
         notification_type=notification_type,
         related_type="chat_thread", related_id=thread.id, dedupe=False,
+        send_email=False,
     )
 
 
@@ -995,6 +996,7 @@ def send_message(
             notification_type="chat_message",
             related_type="chat_thread",
             related_id=message.thread_id,
+            send_email=False,
         )
 
     db.commit()
@@ -1061,6 +1063,7 @@ def upsert_message_reaction(
             related_type="chat_thread",
             related_id=message.thread_id,
             dedupe=True,
+            send_email=False,
         )
 
     db.commit()
@@ -1275,6 +1278,7 @@ def create_poll(
             notification_type="chat_poll",
             related_type="chat_thread",
             related_id=message.thread_id,
+            send_email=False,
         )
 
     db.commit()

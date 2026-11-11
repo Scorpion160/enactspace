@@ -20,6 +20,7 @@ import '../models/mobile_money_admin_summary_model.dart';
 import '../models/payment_model.dart';
 import '../services/finance_service.dart';
 import '../widgets/mobile_money_payment_sheet.dart';
+import '../widgets/mobile_money_readiness_card.dart';
 
 class FinanceScreen extends StatefulWidget {
   static final ValueNotifier<int> incomingReceipts = ValueNotifier(0);
@@ -628,6 +629,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 totalDue: _totalDue,
                 unallocatedAmount: _validatedUnallocated,
               ),
+              SizedBox(height: 18),
+              MobileMoneyReadinessCard(financeService: _financeService),
               SizedBox(height: 18),
               if (_mobileMoneySummary != null) ...[
                 _MobileMoneyAdminCard(

@@ -263,6 +263,18 @@ class FinanceService {
     throw Exception('Réponse invalide lors de la vérification du paiement.');
   }
 
+  Future<Map<String, dynamic>> getMobileMoneyReadiness() async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Utilisateur non connecté.');
+
+    final response = await _apiClient.get(
+      '/finance/mobile-money/admin/readiness',
+      token: token,
+    );
+    if (response is Map<String, dynamic>) return response;
+    throw Exception('Diagnostic de paiement indisponible.');
+  }
+
   Future<MobileMoneyAdminSummaryModel> getMobileMoneyAdminSummary() async {
     final token = await _authService.getToken();
     if (token == null) throw Exception('Utilisateur non connecté.');

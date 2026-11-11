@@ -71,6 +71,7 @@ class MobileMoneyInitiationRead(BaseModel):
     transaction_id: UUID
     amount: int
     currency: str
+    channel: str | None = None
     status: str
     checkout_url: str | None
     expires_at: datetime | None

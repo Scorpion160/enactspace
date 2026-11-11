@@ -26,6 +26,11 @@ MAX_EMAIL_ATTEMPTS = 5
 PROCESSING_LEASE = timedelta(minutes=5)
 
 
+def is_chat_notification_type(notification_type: str | None) -> bool:
+    """Chat activity belongs in the app/push, never in the email outbox."""
+    return isinstance(notification_type, str) and notification_type.startswith("chat_")
+
+
 def _message_id(delivery: EmailDelivery) -> str:
     sender = settings.NOTIFICATION_EMAIL_FROM or "noreply@enactspace.local"
     domain = sender.rsplit("@", 1)[-1] if "@" in sender else "enactspace.local"
@@ -86,28 +91,21 @@ def enqueue_notification_email(
     *,
     user_id=None,
 ) -> EmailDelivery | None:
+    # A legacy caller must not be able to enqueue chat mail either.
+    if is_chat_notification_type(notification.type):
+        return None
     db.flush()
-    private_chat = notification.type in {
-        "chat_message", "chat_poll", "chat_reaction"
-    }
-    body = (
-        "Vous avez reçu une nouvelle notification dans votre conversation.\n\n"
-        "Ouvrez EnactSpace pour consulter le message et ses pièces jointes : "
-        + app_link("chat")
-        if private_chat else notification.message
-    )
-    if not private_chat:
-        if notification.type == "application_received":
-            route = "recruitment"
-        elif notification.type.startswith("meeting_"):
-            route = "meetings"
-        else:
-            route = "notifications"
-        body = f"{body}\n\nConsulter dans EnactSpace : {app_link(route)}"
+    if notification.type == "application_received":
+        route = "recruitment"
+    elif (notification.type or "").startswith("meeting_"):
+        route = "meetings"
+    else:
+        route = "notifications"
+    body = f"{notification.message}\n\nConsulter dans EnactSpace : {app_link(route)}"
     return enqueue_email_delivery(
         db,
         recipient_email=recipient_email,
-        subject="Nouveau message sur EnactSpace" if private_chat else notification.title,
+        subject=notification.title,
         text_body=body,
         user_id=user_id,
         notification_id=notification.id,
@@ -165,7 +163,8 @@ def _notification_delivery_still_allowed(
     notification = db.query(Notification).filter(
         Notification.id == delivery.notification_id
     ).first()
-    if notification is None:
+    if notification is None or is_chat_notification_type(notification.type):
+        # Also cancel chat messages queued before this change was deployed.
         return False
     if notification.type == 'application_received':
         from app.services.recruitment_access import is_recruitment_staff

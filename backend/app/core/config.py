@@ -185,6 +185,14 @@ class Settings(BaseSettings):
         if self.APP_ENV == "production" and self.MOBILE_MONEY_ENABLED:
             if self.MOBILE_MONEY_PROVIDER == "mock":
                 raise ValueError("Mock payment provider cannot be enabled in production")
+            if self.MOBILE_MONEY_PROVIDER == "paydunya" and self.PAYDUNYA_MODE != "live":
+                raise ValueError(
+                    "PayDunya sandbox must not credit production finance records"
+                )
+            if self.MOBILE_MONEY_PROVIDER == "paydunya" and not self.PAYMENT_RECONCILIATION_ENABLED:
+                raise ValueError(
+                    "PayDunya live payments require reconciliation in production"
+                )
             if self.PAYDUNYA_MODE == "live" and self.MOBILE_MONEY_PROVIDER == "paydunya":
                 required_keys = [
                     self.PAYDUNYA_MASTER_KEY,

@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.models.account import UserPreference
 from app.models.notification import Notification
 from app.models.user import User
-from app.services.email_delivery_service import enqueue_notification_email
+from app.services.email_delivery_service import enqueue_notification_email, is_chat_notification_type
 from app.services.push_lifecycle import enqueue_push_deliveries
 
 
@@ -22,7 +22,8 @@ def dispatch_notification_channels(
 ) -> dict[str, bool]:
     """Prepare durable external deliveries without making network calls."""
     return {
-        "email": send_email and _dispatch_email(db, notification, recipient, preference),
+        "email": bool(send_email and not is_chat_notification_type(notification.type)
+                      and _dispatch_email(db, notification, recipient, preference)),
         "push": bool(
             recipient is not None
             and enqueue_push_deliveries(db, notification, preference)

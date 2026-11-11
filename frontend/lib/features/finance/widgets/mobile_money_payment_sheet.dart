@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,8 +32,10 @@ class MobileMoneyPaymentSheet extends StatefulWidget {
       _MobileMoneyPaymentSheetState();
 }
 
-class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
+class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
+    with WidgetsBindingObserver {
   final Set<String> _selectedFeeIds = {};
+  Timer? _statusTimer;
   final TextEditingController _amountController = TextEditingController();
   String _channel = 'wave-senegal';
   bool _busy = false;
@@ -41,14 +45,76 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedFeeIds.add(widget.initialFee.id);
     _amountController.text = _selectedBalance.toString();
   }
 
   @override
   void dispose() {
+    _statusTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _amountController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _transaction != null && !_transaction!.isFinal && !_busy) {
+      unawaited(_refreshStatus());
+    }
+  }
+
+  void _startMonitoring() {
+    _statusTimer?.cancel();
+    if (_transaction?.isFinal != false) return;
+    _statusTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_pollStatus());
+    });
+  }
+
+  Future<void> _pollStatus() async {
+    final previous = _transaction;
+    if (!mounted || _busy || previous == null || previous.isFinal) return;
+    try {
+      final current = await widget.financeService
+          .getMobileMoneyTransaction(previous.transactionId);
+      if (!mounted || _transaction?.transactionId != previous.transactionId) return;
+      if (current.status != previous.status) {
+        setState(() => _transaction = current);
+        if (current.isFinal) {
+          _statusTimer?.cancel();
+          widget.onChanged();
+        }
+      }
+    } catch (_) {
+      // Passive polling failures must not reset or duplicate a transaction.
+    }
+  }
+
+  Future<void> _openCheckout() async {
+    final url = _transaction?.checkoutUrl;
+    if (_transaction?.isFinal != false || url == null) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' ||
+        uri.host.toLowerCase() != 'app.paydunya.com' ||
+        !RegExp(r'^/(sandbox-)?checkout/invoice/[^/]+$').hasMatch(uri.path)) {
+      setState(() => _error = 'Le lien de paiement PayDunya est invalide.');
+      return;
+    }
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        setState(() => _error = 'La page ne s’est pas ouverte. '
+            'Vous pouvez la réouvrir sans créer un deuxième paiement.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Impossible d’ouvrir PayDunya. '
+            'Réessayez avec le bouton « Réouvrir le paiement ».');
+      }
+    }
   }
 
   int get _selectedBalance {
@@ -104,6 +170,30 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
       });
       return;
     }
+    final channelName = _channel == 'wave-senegal' ? 'Wave' : 'Orange Money';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirmer le paiement'),
+        content: Text(
+          'Vous allez ouvrir PayDunya pour payer $amount FCFA par '
+          '$channelName. Vérifiez le destinataire et les frais éventuels '
+          'avant de confirmer le débit sur la page du prestataire. '
+          'EnactSpace confirme seulement les paiements vérifiés.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continuer vers PayDunya'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -117,14 +207,25 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
             memberId: widget.initialFee.userId,
           );
       if (!mounted) return;
-      setState(() => _transaction = transaction);
-      final checkoutUrl = transaction.checkoutUrl;
-      if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
-        final uri = Uri.tryParse(checkoutUrl);
-        if (uri == null || uri.scheme != 'https') {
-          throw Exception('Lien de paiement invalide.');
+      var reusedWithDifferentChannel = false;
+      setState(() {
+        _transaction = transaction;
+        final actualChannel = transaction.channel;
+        if (actualChannel == 'wave-senegal' ||
+            actualChannel == 'orange-money-senegal') {
+          if (actualChannel != _channel) {
+            reusedWithDifferentChannel = true;
+            _error = 'Une demande de paiement est déjà en cours par '
+                '${transaction.channelLabel}. Pour éviter un double paiement, '
+                'l’ancienne facture est conservée. Vérifiez le canal indiqué '
+                'avant de la réouvrir.';
+          }
+          _channel = actualChannel!;
         }
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      });
+      _startMonitoring();
+      if (!reusedWithDifferentChannel) {
+        await _openCheckout();
       }
     } catch (e) {
       if (!mounted) return;
@@ -165,6 +266,7 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
       if (!mounted) return;
       setState(() => _transaction = refreshed);
       if (refreshed.isFinal) {
+        _statusTimer?.cancel();
         widget.onChanged();
       }
     } catch (e) {
@@ -230,14 +332,14 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
                   ChoiceChip(
                     label: Text('Wave'),
                     selected: _channel == 'wave-senegal',
-                    onSelected: _busy
+                    onSelected: _busy || transaction != null
                         ? null
                         : (_) => setState(() => _channel = 'wave-senegal'),
                   ),
                   ChoiceChip(
                     label: Text('Orange Money'),
                     selected: _channel == 'orange-money-senegal',
-                    onSelected: _busy
+                    onSelected: _busy || transaction != null
                         ? null
                         : (_) =>
                               setState(() => _channel = 'orange-money-senegal'),
@@ -299,6 +401,16 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet> {
               if (transaction != null) ...[
                 SizedBox(height: 12),
                 _TransactionStatusCard(transaction: transaction),
+                if (!transaction.isFinal &&
+                    transaction.checkoutUrl?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('reopen-mobile-money-checkout'),
+                    onPressed: _busy ? null : _openCheckout,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: const Text('Réouvrir le paiement PayDunya'),
+                  ),
+                ],
               ],
               if (_error != null) ...[
                 SizedBox(height: 12),
@@ -396,6 +508,8 @@ class _TransactionStatusCard extends StatelessWidget {
                   transaction.statusLabel,
                   style: TextStyle(fontWeight: FontWeight.w900, color: _color),
                 ),
+                if (transaction.channel != null)
+                  Text('Canal : ${transaction.channelLabel}'),
                 Text(
                   transaction.message,
                   maxLines: 2,

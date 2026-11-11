@@ -17,10 +17,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
 import '../../projects/models/project_model.dart';
 import '../models/chat_models.dart';
+import '../services/chat_composer_drafts.dart';
 import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
 import '../services/chat_voice_recorder.dart';
 import '../widgets/chat_layout.dart';
+import '../widgets/chat_message_viewport.dart';
 import '../widgets/chat_states.dart';
 import '../widgets/composer.dart';
 import '../widgets/conversation_header.dart';
@@ -110,6 +112,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   late final ChatGateway _gateway;
   final TextEditingController _messageController = TextEditingController();
+  final ChatComposerDrafts _composerDrafts = ChatComposerDrafts();
+  String? _composerThreadId;
   final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
 
   bool _loading = true;
@@ -149,6 +153,7 @@ class _ChatScreenState extends State<ChatScreen> {
   ChatThreadModel? _selectedThread;
   String? _pendingThreadId;
   int _localMessageCounter = 0;
+  int _threadSelectionVersion = 0;
 
   @override
   void initState() {
@@ -353,10 +358,27 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingUsers.clear();
   }
 
+  void _switchComposerToThread(String? nextThreadId) {
+    if (_composerThreadId == nextThreadId) return;
+    final draft = _composerDrafts.switchThread(
+      previousThreadId: _composerThreadId,
+      nextThreadId: nextThreadId,
+      currentValue: _messageController.value,
+    );
+    _composerThreadId = nextThreadId;
+    _replyingToMessage = null; // Replies must not target another conversation.
+    _messageController.value = draft;
+  }
+
   void _leaveSelectedThread() {
+    ++_threadSelectionVersion;
     _stopTyping();
     _clearTypingIndicators();
-    setState(() => _selectedThread = null);
+    setState(() {
+      _selectedThread = null;
+      _messagesLoading = false;
+    });
+    _switchComposerToThread(null);
   }
 
   String? _normalizeThreadId(String? value) {
@@ -601,6 +623,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatThreadModel thread, {
     bool silent = false,
   }) async {
+    final selectionVersion = ++_threadSelectionVersion;
     _stopTyping();
     _clearTypingIndicators();
     if (!silent) {
@@ -608,12 +631,10 @@ class _ChatScreenState extends State<ChatScreen> {
         _selectedThread = thread;
         _messagesLoading = true;
       });
-    } else {
-      setState(() {
-        _messagesLoading = true;
-      });
+      _switchComposerToThread(thread.id);
     }
-
+    // A silent refresh must not destroy/recreate the message viewport:
+    // doing so resets the user's scroll position during every refresh.
     var displayedCachedMessages = false;
     var pinnedMessageIds = <String>{};
 
@@ -642,7 +663,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         final locallyAvailable = [...cached, ...pending]
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        if (mounted && locallyAvailable.isNotEmpty) {
+        if (mounted &&
+            selectionVersion == _threadSelectionVersion &&
+            locallyAvailable.isNotEmpty) {
           setState(() {
             _messages = locallyAvailable;
             _mergeServerReactions(cached);
@@ -653,10 +676,12 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       final messages = await _gateway.getMessages(thread.id);
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       await _gateway.markThreadAsRead(thread.id);
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       _sendReadReceipt(thread.id);
-      if (!mounted) return;
       setState(() {
         final displayedMessages = _mergeWithLocalMessages(thread.id, messages);
         if (!_threads.any((item) => item.id == thread.id)) {
@@ -685,7 +710,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _showError(e.toString().replaceAll('Exception: ', ''));
       }
     } finally {
-      if (mounted) {
+      if (mounted && selectionVersion == _threadSelectionVersion) {
         setState(() {
           _messagesLoading = false;
         });
@@ -747,15 +772,22 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localId, message);
-      });
-      if (_user != null) {
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localId, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        // Do not cache messages from the newly selected conversation under
+        // the old thread when an earlier send completes after switching.
+        _localMessageStatuses.remove(localId);
+        _pendingMessageDrafts.remove(localId);
       }
       await _refreshThreads();
     } catch (e) {
@@ -830,15 +862,22 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localId, message);
-      });
-      if (_user != null) {
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localId, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        // Do not cache messages from the newly selected conversation under
+        // the old thread when an earlier send completes after switching.
+        _localMessageStatuses.remove(localId);
+        _pendingMessageDrafts.remove(localId);
       }
       await _refreshThreads();
     } catch (e) {
@@ -895,20 +934,27 @@ class _ChatScreenState extends State<ChatScreen> {
         clientMessageId: localMessage.id,
       );
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localMessage.id, message);
-      });
       if (_user != null) {
         await _removeStoredPendingMessage(
           userId: _user!.id,
           threadId: thread.id,
           localId: localMessage.id,
         );
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      }
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localMessage.id, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        _localMessageStatuses.remove(localMessage.id);
+        _pendingMessageDrafts.remove(localMessage.id);
       }
       await _refreshThreads();
     } catch (e) {
@@ -1414,6 +1460,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final user = _user;
     final selectedId = _selectedThread?.id;
+    final selectionVersion = _threadSelectionVersion;
 
     setState(() {
       _backgroundSyncing = true;
@@ -1444,19 +1491,25 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
+      final sameSelection = selectionVersion == _threadSelectionVersion &&
+          selectedId == _selectedThread?.id;
       setState(() {
         _threads = _visibleSortedThreads(
           threads,
           _pinnedThreadIds,
           _hiddenThreadIds,
         );
-        _selectedThread = selectedId == null ? _selectedThread : selectedThread;
-        if (messages != null) {
-          _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
-          _mergeServerReactions(messages);
-          _markThreadLocallyRead(selectedThread.id);
-        } else if (selectedId != null && selectedThread == null) {
-          _messages = [];
+        // Ignore late responses for an earlier conversation. They used to
+        // replace the messages visible in a newly opened conversation.
+        if (sameSelection) {
+          _selectedThread = selectedId == null ? _selectedThread : selectedThread;
+          if (messages != null) {
+            _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
+            _mergeServerReactions(messages);
+            _markThreadLocallyRead(selectedThread.id);
+          } else if (selectedId != null && selectedThread == null) {
+            _messages = [];
+          }
         }
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
@@ -1764,6 +1817,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedThread = null;
       _messages = [];
     });
+    _switchComposerToThread(null);
+    _composerDrafts.forgetThread(thread.id);
     await _loadChat();
   }
 
@@ -1786,6 +1841,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedThread = null;
       _messages = [];
     });
+    _switchComposerToThread(null);
   }
 
   Future<void> _openConversationInfo() async {
@@ -1824,6 +1880,8 @@ class _ChatScreenState extends State<ChatScreen> {
             _selectedThread = null;
             _messages = [];
           });
+          _switchComposerToThread(null);
+          _composerDrafts.forgetThread(thread.id);
           await _loadChat();
           if (context.mounted) Navigator.of(context).pop();
         },
@@ -2574,21 +2632,23 @@ class _MessagesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
-      return Center(
+    return ChatMessageViewport(
+      key: ValueKey('chat-viewport-${thread.id}'),
+      conversationId: thread.id,
+      messageIds: messages.map((message) => message.id).toList(growable: false),
+      authoredMessageIds: messages
+          .where((message) => message.authorId == currentUserId)
+          .map((message) => message.id)
+          .toSet(),
+      emptyBuilder: Center(
         child: Text(
           'Aucun message. Lance la discussion.',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
+      ),
+      messageBuilder: (context, index) {
         final message = messages[index];
         final mine = message.authorId == currentUserId;
         final pinned = pinnedMessageIds.contains(message.id);
