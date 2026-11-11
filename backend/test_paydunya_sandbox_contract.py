@@ -144,6 +144,20 @@ class PayDunyaSandboxContractTests(IsolatedAsyncioTestCase):
 
 
 class PayDunyaReconciliationGuardTests(TestCase):
+    def test_reused_invoice_reports_original_checkout_channel(self):
+        from app.api.routes.finance import mobile_money_public_payload
+
+        transaction = SimpleNamespace(
+            id=UUID(TX_ID), amount=AMOUNT, currency="XOF",
+            channel="wave-senegal", status="pending",
+            checkout_url="https://app.paydunya.com/sandbox-checkout/invoice/" + TOKEN,
+            expires_at=None,
+        )
+        response = mobile_money_public_payload(transaction)
+        self.assertEqual(response["channel"], "wave-senegal")
+        self.assertEqual(response["amount"], AMOUNT)
+        self.assertEqual(response["status"], "pending")
+
     def test_accounting_rejects_wrong_amount_token_and_currency(self):
         tx = SimpleNamespace(
             id=UUID(TX_ID), provider="paydunya",
