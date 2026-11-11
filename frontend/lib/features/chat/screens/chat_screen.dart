@@ -17,6 +17,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../poles/models/pole_model.dart';
 import '../../projects/models/project_model.dart';
 import '../models/chat_models.dart';
+import '../services/chat_composer_drafts.dart';
 import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
 import '../services/chat_voice_recorder.dart';
@@ -111,6 +112,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   late final ChatGateway _gateway;
   final TextEditingController _messageController = TextEditingController();
+  final ChatComposerDrafts _composerDrafts = ChatComposerDrafts();
+  String? _composerThreadId;
   final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
 
   bool _loading = true;
@@ -355,6 +358,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingUsers.clear();
   }
 
+  void _switchComposerToThread(String? nextThreadId) {
+    if (_composerThreadId == nextThreadId) return;
+    final draft = _composerDrafts.switchThread(
+      previousThreadId: _composerThreadId,
+      nextThreadId: nextThreadId,
+      currentValue: _messageController.value,
+    );
+    _composerThreadId = nextThreadId;
+    _replyingToMessage = null; // Replies must not target another conversation.
+    _messageController.value = draft;
+  }
+
   void _leaveSelectedThread() {
     ++_threadSelectionVersion;
     _stopTyping();
@@ -363,6 +378,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedThread = null;
       _messagesLoading = false;
     });
+    _switchComposerToThread(null);
   }
 
   String? _normalizeThreadId(String? value) {
@@ -615,6 +631,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _selectedThread = thread;
         _messagesLoading = true;
       });
+      _switchComposerToThread(thread.id);
     }
     // A silent refresh must not destroy/recreate the message viewport:
     // doing so resets the user's scroll position during every refresh.
@@ -1800,6 +1817,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedThread = null;
       _messages = [];
     });
+    _switchComposerToThread(null);
+    _composerDrafts.forgetThread(thread.id);
     await _loadChat();
   }
 
@@ -1822,6 +1841,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedThread = null;
       _messages = [];
     });
+    _switchComposerToThread(null);
   }
 
   Future<void> _openConversationInfo() async {
