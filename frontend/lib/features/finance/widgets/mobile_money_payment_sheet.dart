@@ -154,6 +154,30 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
       });
       return;
     }
+    final channelName = _channel == 'wave-senegal' ? 'Wave' : 'Orange Money';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirmer le paiement'),
+        content: Text(
+          'Vous allez ouvrir PayDunya pour payer $amount FCFA par '
+          '$channelName. Vérifiez le destinataire et les frais éventuels '
+          'avant de confirmer le débit sur la page du prestataire. '
+          'EnactSpace confirme seulement les paiements vérifiés.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continuer vers PayDunya'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -168,14 +192,8 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
           );
       if (!mounted) return;
       setState(() => _transaction = transaction);
-      final checkoutUrl = transaction.checkoutUrl;
-      if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
-        final uri = Uri.tryParse(checkoutUrl);
-        if (uri == null || uri.scheme != 'https') {
-          throw Exception('Lien de paiement invalide.');
-        }
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      _startMonitoring();
+      await _openCheckout();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -215,6 +233,7 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
       if (!mounted) return;
       setState(() => _transaction = refreshed);
       if (refreshed.isFinal) {
+        _statusTimer?.cancel();
         widget.onChanged();
       }
     } catch (e) {
