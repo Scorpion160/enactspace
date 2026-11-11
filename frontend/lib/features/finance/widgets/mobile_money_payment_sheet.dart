@@ -220,7 +220,7 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
                 'l’ancienne facture est conservée. Vérifiez le canal indiqué '
                 'avant de la réouvrir.';
           }
-          _channel = actualChannel;
+          _channel = actualChannel!;
         }
       });
       _startMonitoring();
