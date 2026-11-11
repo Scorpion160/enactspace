@@ -32,6 +32,17 @@ class MobileMoneyTransactionModel {
     );
   }
 
+  String get channelLabel {
+    switch (channel) {
+      case 'wave-senegal':
+        return 'Wave';
+      case 'orange-money-senegal':
+        return 'Orange Money';
+      default:
+        return 'Mobile Money';
+    }
+  }
+
   bool get isFinal {
     return {
       'successful',
