@@ -1422,6 +1422,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final user = _user;
     final selectedId = _selectedThread?.id;
+    final selectionVersion = _threadSelectionVersion;
 
     setState(() {
       _backgroundSyncing = true;
@@ -1452,19 +1453,25 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
+      final sameSelection = selectionVersion == _threadSelectionVersion &&
+          selectedId == _selectedThread?.id;
       setState(() {
         _threads = _visibleSortedThreads(
           threads,
           _pinnedThreadIds,
           _hiddenThreadIds,
         );
-        _selectedThread = selectedId == null ? _selectedThread : selectedThread;
-        if (messages != null) {
-          _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
-          _mergeServerReactions(messages);
-          _markThreadLocallyRead(selectedThread.id);
-        } else if (selectedId != null && selectedThread == null) {
-          _messages = [];
+        // Ignore late responses for an earlier conversation. They used to
+        // replace the messages visible in a newly opened conversation.
+        if (sameSelection) {
+          _selectedThread = selectedId == null ? _selectedThread : selectedThread;
+          if (messages != null) {
+            _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
+            _mergeServerReactions(messages);
+            _markThreadLocallyRead(selectedThread.id);
+          } else if (selectedId != null && selectedThread == null) {
+            _messages = [];
+          }
         }
         _usingLocalCache = false;
         _lastSyncedAt = DateTime.now();
