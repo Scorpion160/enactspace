@@ -150,6 +150,7 @@ class _ChatScreenState extends State<ChatScreen> {
   ChatThreadModel? _selectedThread;
   String? _pendingThreadId;
   int _localMessageCounter = 0;
+  int _threadSelectionVersion = 0;
 
   @override
   void initState() {
@@ -355,9 +356,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _leaveSelectedThread() {
+    ++_threadSelectionVersion;
     _stopTyping();
     _clearTypingIndicators();
-    setState(() => _selectedThread = null);
+    setState(() {
+      _selectedThread = null;
+      _messagesLoading = false;
+    });
   }
 
   String? _normalizeThreadId(String? value) {
@@ -602,6 +607,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ChatThreadModel thread, {
     bool silent = false,
   }) async {
+    final selectionVersion = ++_threadSelectionVersion;
     _stopTyping();
     _clearTypingIndicators();
     if (!silent) {
@@ -609,12 +615,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _selectedThread = thread;
         _messagesLoading = true;
       });
-    } else {
-      setState(() {
-        _messagesLoading = true;
-      });
     }
-
+    // A silent refresh must not destroy/recreate the message viewport:
+    // doing so resets the user's scroll position during every refresh.
     var displayedCachedMessages = false;
     var pinnedMessageIds = <String>{};
 
@@ -643,7 +646,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         final locallyAvailable = [...cached, ...pending]
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        if (mounted && locallyAvailable.isNotEmpty) {
+        if (mounted &&
+            selectionVersion == _threadSelectionVersion &&
+            locallyAvailable.isNotEmpty) {
           setState(() {
             _messages = locallyAvailable;
             _mergeServerReactions(cached);
@@ -654,10 +659,12 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       final messages = await _gateway.getMessages(thread.id);
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       await _gateway.markThreadAsRead(thread.id);
+      if (!mounted || selectionVersion != _threadSelectionVersion) return;
       _sendReadReceipt(thread.id);
-      if (!mounted) return;
       setState(() {
         final displayedMessages = _mergeWithLocalMessages(thread.id, messages);
         if (!_threads.any((item) => item.id == thread.id)) {
@@ -686,7 +693,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _showError(e.toString().replaceAll('Exception: ', ''));
       }
     } finally {
-      if (mounted) {
+      if (mounted && selectionVersion == _threadSelectionVersion) {
         setState(() {
           _messagesLoading = false;
         });
