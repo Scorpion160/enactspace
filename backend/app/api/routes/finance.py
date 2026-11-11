@@ -710,6 +710,7 @@ def mobile_money_public_payload(
         "transaction_id": transaction.id,
         "amount": transaction.amount,
         "currency": transaction.currency,
+        "channel": transaction.channel,
         "status": transaction.status,
         "checkout_url": transaction.checkout_url,
         "expires_at": transaction.expires_at,
