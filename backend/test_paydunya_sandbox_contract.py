@@ -81,6 +81,8 @@ class PayDunyaSandboxContractTests(IsolatedAsyncioTestCase):
             "https://evil.example.org/checkout/invoice/" + TOKEN,
             "http://app.paydunya.com/sandbox-checkout/invoice/" + TOKEN,
             "https://app.paydunya.com/sandbox-checkout/invoice/DIFFERENT",
+            "https://app.paydunya.com/checkout/invoice/" + TOKEN,
+            "https://app.paydunya.com/sandbox-checkout/invoice/" + TOKEN + "?next=evil",
         ):
             with self.subTest(url=url):
                 self.provider._request.return_value = {
@@ -94,6 +96,28 @@ class PayDunyaSandboxContractTests(IsolatedAsyncioTestCase):
                             description="Test", customer_name="Fictif",
                         )
                     )
+
+    async def test_live_checkout_never_accepts_a_sandbox_link(self):
+        self.config.PAYDUNYA_MODE = "live"
+        request = PaymentProviderRequest(
+            transaction_id=TX_ID, amount=AMOUNT, currency="XOF",
+            description="Contrat simulé", customer_name="Test",
+        )
+        self.provider._request.return_value = {
+            "response_code": "00", "token": TOKEN,
+            "response_text": (
+                "https://app.paydunya.com/sandbox-checkout/invoice/" + TOKEN
+            ),
+        }
+        with self.assertRaises(PaymentProviderError):
+            await self.provider.create_payment(request)
+        self.provider._request.return_value["response_text"] = (
+            "https://app.paydunya.com/checkout/invoice/" + TOKEN
+        )
+        invoice = await self.provider.create_payment(request)
+        self.assertEqual(invoice.status, "pending")
+        self.assertEqual(self.provider._api_base_url,
+                         "https://app.paydunya.com/api/v1")
 
     async def test_success_requires_provider_confirm_and_matching_amount(self):
         self.provider._request.return_value = status_response("completed")
