@@ -87,11 +87,15 @@ def validated_checkout_url(value, token: str) -> str:
         raise PaymentProviderError("Invalid checkout URL", code="provider_invalid_response")
     try:
         url = urlsplit(value)
-        expected = {"/checkout/invoice/" + token, "/sandbox-checkout/invoice/" + token}
+        expected = (
+            "/sandbox-checkout/invoice/" + token
+            if settings.PAYDUNYA_MODE == "test"
+            else "/checkout/invoice/" + token
+        )
         valid = (
             url.scheme == "https" and url.hostname == "app.paydunya.com"
             and url.port in {None, 443} and url.username is None and url.password is None
-            and not url.fragment and unquote(url.path) in expected
+            and not url.fragment and not url.query and unquote(url.path) == expected
         )
     except ValueError:
         valid = False
