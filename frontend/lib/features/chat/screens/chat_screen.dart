@@ -755,15 +755,22 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localId, message);
-      });
-      if (_user != null) {
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localId, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        // Do not cache messages from the newly selected conversation under
+        // the old thread when an earlier send completes after switching.
+        _localMessageStatuses.remove(localId);
+        _pendingMessageDrafts.remove(localId);
       }
       await _refreshThreads();
     } catch (e) {
@@ -838,15 +845,22 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localId, message);
-      });
-      if (_user != null) {
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localId, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        // Do not cache messages from the newly selected conversation under
+        // the old thread when an earlier send completes after switching.
+        _localMessageStatuses.remove(localId);
+        _pendingMessageDrafts.remove(localId);
       }
       await _refreshThreads();
     } catch (e) {
@@ -903,20 +917,27 @@ class _ChatScreenState extends State<ChatScreen> {
         clientMessageId: localMessage.id,
       );
       if (!mounted) return;
-      setState(() {
-        _replaceLocalMessage(localMessage.id, message);
-      });
       if (_user != null) {
         await _removeStoredPendingMessage(
           userId: _user!.id,
           threadId: thread.id,
           localId: localMessage.id,
         );
-        await _gateway.cacheMessages(
-          userId: _user!.id,
-          threadId: thread.id,
-          messages: _cacheableMessages(_messages),
-        );
+      }
+      if (_selectedThread?.id == thread.id) {
+        setState(() {
+          _replaceLocalMessage(localMessage.id, message);
+        });
+        if (_user != null) {
+          await _gateway.cacheMessages(
+            userId: _user!.id,
+            threadId: thread.id,
+            messages: _cacheableMessages(_messages),
+          );
+        }
+      } else {
+        _localMessageStatuses.remove(localMessage.id);
+        _pendingMessageDrafts.remove(localMessage.id);
       }
       await _refreshThreads();
     } catch (e) {
