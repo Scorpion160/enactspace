@@ -62,6 +62,48 @@ void main() {
     expect(find.byKey(const Key('chat-scroll-to-latest')), findsNothing);
   });
 
+  testWidgets('loading older history keeps position without a false badge',
+      (tester) async {
+    final ids = List.generate(50, (i) => 'm$i');
+    await tester.pumpWidget(fixture(ids));
+    await tester.pumpAndSettle();
+    final scroll = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(const Key('chat-bottom-anchored-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    scroll.position.jumpTo(480);
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(fixture(['older-2', 'older-1', ...ids]));
+    await tester.pumpAndSettle();
+    expect(scroll.position.pixels, greaterThan(200));
+    expect(find.textContaining('nouveau'), findsNothing);
+    expect(find.text('Derniers messages'), findsOneWidget);
+  });
+
+  testWidgets('an incoming message shows a badge even at a short distance',
+      (tester) async {
+    final ids = List.generate(50, (i) => 'm$i');
+    await tester.pumpWidget(fixture(ids));
+    await tester.pumpAndSettle();
+    final scroll = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(const Key('chat-bottom-anchored-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    scroll.position.jumpTo(150);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-scroll-to-latest')), findsNothing);
+
+    await tester.pumpWidget(fixture([...ids, 'm50']));
+    await tester.pumpAndSettle();
+    expect(find.text('1 nouveau'), findsOneWidget);
+    expect(scroll.position.pixels, greaterThan(96));
+  });
+
   testWidgets('outgoing message comes into view even when reading history',
       (tester) async {
     final ids = List.generate(50, (i) => 'm$i');
