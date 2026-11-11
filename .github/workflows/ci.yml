@@ -184,6 +184,7 @@ jobs:
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
           test/chat_message_viewport_test.dart
+          test/chat_composer_drafts_test.dart
           test/mobile_money_readiness_card_test.dart
           test/features/recruitment/recruitment_advisory_filters_test.dart
           test/features/recruitment/recruitment_comparison_panel_test.dart
