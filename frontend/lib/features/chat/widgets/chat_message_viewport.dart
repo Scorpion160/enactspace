@@ -77,8 +77,22 @@ class _ChatMessageViewportState extends State<ChatMessageViewport> {
     }
 
     final existing = oldWidget.messageIds.toSet();
-    final newIds = widget.messageIds.where((id) => !existing.contains(id)).toList();
-    if (newIds.isEmpty) return; // Edits, status updates, read receipts.
+    // Only items newer than the previous latest message are incoming.
+    // Loading older history, restoring cache or reordering messages must not
+    // create a false unread counter or steal the reader's scroll position.
+    final lastSeenId =
+        oldWidget.messageIds.isEmpty ? null : oldWidget.messageIds.last;
+    final lastSeenIndex =
+        lastSeenId == null ? -1 : widget.messageIds.indexOf(lastSeenId);
+    final newIds = lastSeenId == null
+        ? widget.messageIds
+        : lastSeenIndex < 0
+            ? <String>[]
+            : widget.messageIds
+                .skip(lastSeenIndex + 1)
+                .where((id) => !existing.contains(id))
+                .toList();
+    if (newIds.isEmpty) return; // Backfill, edits or read receipts.
 
     final ownMessage = newIds.any(widget.authoredMessageIds.contains);
     if (ownMessage || _nearLatest) {
@@ -129,7 +143,7 @@ class _ChatMessageViewportState extends State<ChatMessageViewport> {
             );
           },
         ),
-        if (_showJumpButton)
+        if (_showJumpButton || (_unseenIncoming > 0 && !_nearLatest))
           Positioned(
             right: 14,
             bottom: 14,
