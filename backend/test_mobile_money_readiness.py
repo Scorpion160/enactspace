@@ -58,13 +58,19 @@ class MobileMoneyReadinessTests(unittest.TestCase):
         self.assertEqual(len(status["blocking_checks"]), 3)
 
     def test_missing_callback_can_be_derived_from_public_api(self):
-        status = get_mobile_money_readiness(settings(
+        sandbox = get_mobile_money_readiness(settings(
+            PAYDUNYA_MODE="test",
+            PAYDUNYA_CALLBACK_URL=None,
+            PUBLIC_API_BASE_URL="https://api.example.invalid",
+        ))
+        self.assertTrue(sandbox["ipn_url_valid"])
+        live = get_mobile_money_readiness(settings(
             PAYDUNYA_MODE="live",
             PAYDUNYA_CALLBACK_URL=None,
             PUBLIC_API_BASE_URL="https://api.example.invalid",
         ))
-        self.assertTrue(status["ipn_url_valid"])
-        self.assertTrue(status["ready_for_live_test"])
+        self.assertFalse(live["ipn_url_valid"])
+        self.assertFalse(live["ready_for_live_test"])
 
     def test_malicious_callback_is_rejected(self):
         for url in (
