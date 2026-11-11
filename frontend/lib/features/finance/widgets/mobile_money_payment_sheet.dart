@@ -299,14 +299,14 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
                   ChoiceChip(
                     label: Text('Wave'),
                     selected: _channel == 'wave-senegal',
-                    onSelected: _busy
+                    onSelected: _busy || transaction != null
                         ? null
                         : (_) => setState(() => _channel = 'wave-senegal'),
                   ),
                   ChoiceChip(
                     label: Text('Orange Money'),
                     selected: _channel == 'orange-money-senegal',
-                    onSelected: _busy
+                    onSelected: _busy || transaction != null
                         ? null
                         : (_) =>
                               setState(() => _channel = 'orange-money-senegal'),
@@ -368,6 +368,16 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
               if (transaction != null) ...[
                 SizedBox(height: 12),
                 _TransactionStatusCard(transaction: transaction),
+                if (!transaction.isFinal &&
+                    transaction.checkoutUrl?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('reopen-mobile-money-checkout'),
+                    onPressed: _busy ? null : _openCheckout,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: const Text('Réouvrir le paiement PayDunya'),
+                  ),
+                ],
               ],
               if (_error != null) ...[
                 SizedBox(height: 12),
