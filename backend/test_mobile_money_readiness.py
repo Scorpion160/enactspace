@@ -13,7 +13,7 @@ def settings(**overrides):
         PAYDUNYA_PUBLIC_KEY="dummy-public",
         PAYDUNYA_PRIVATE_KEY="dummy-private",
         PAYDUNYA_TOKEN="dummy-token",
-        PAYDUNYA_CALLBACK_URL="https://api.example.invalid/api/payments/paydunya/ipn",
+        PAYDUNYA_CALLBACK_URL="https://payments.school.org/api/payments/paydunya/ipn",
         PUBLIC_API_BASE_URL=None,
         PAYMENT_CURRENCY="XOF",
         PAYMENT_RECONCILIATION_ENABLED=True,
@@ -71,6 +71,25 @@ class MobileMoneyReadinessTests(unittest.TestCase):
         ))
         self.assertFalse(live["ipn_url_valid"])
         self.assertFalse(live["ready_for_live_test"])
+
+    def test_live_rejects_private_and_reserved_ipn_hosts(self):
+        for host in (
+            "127.0.0.1",
+            "10.0.0.1",
+            "192.168.1.10",
+            "localhost",
+            "payments.internal",
+            "api.example.invalid",
+        ):
+            with self.subTest(host=host):
+                status = get_mobile_money_readiness(settings(
+                    PAYDUNYA_MODE="live",
+                    PAYDUNYA_CALLBACK_URL=(
+                        f"https://{host}/api/payments/paydunya/ipn"
+                    ),
+                ))
+                self.assertFalse(status["ipn_url_valid"])
+                self.assertFalse(status["ready_for_live_test"])
 
     def test_malicious_callback_is_rejected(self):
         for url in (
