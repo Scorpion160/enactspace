@@ -217,7 +217,7 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
                 '${transaction.channelLabel}. La même facture est réouverte '
                 'pour éviter un double encaissement.';
           }
-          _channel = actualChannel!;
+          _channel = actualChannel;
         }
       });
       _startMonitoring();
