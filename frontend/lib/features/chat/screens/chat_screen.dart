@@ -1880,6 +1880,8 @@ class _ChatScreenState extends State<ChatScreen> {
             _selectedThread = null;
             _messages = [];
           });
+          _switchComposerToThread(null);
+          _composerDrafts.forgetThread(thread.id);
           await _loadChat();
           if (context.mounted) Navigator.of(context).pop();
         },
