@@ -1008,6 +1008,16 @@ async def initiate_mobile_money_payment(
     return mobile_money_public_payload(transaction)
 
 
+@router.get("/mobile-money/admin/readiness")
+def mobile_money_admin_readiness(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance_or_admin),
+):
+    # No provider call, no invoice creation, no PII, no secret values.
+    from app.services.payments.readiness import get_mobile_money_readiness
+    return get_mobile_money_readiness(settings)
+
+
 @router.get("/mobile-money/admin/summary")
 def mobile_money_admin_summary(
     db: Session = Depends(get_db),
