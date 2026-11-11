@@ -21,6 +21,7 @@ import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
 import '../services/chat_voice_recorder.dart';
 import '../widgets/chat_layout.dart';
+import '../widgets/chat_message_viewport.dart';
 import '../widgets/chat_states.dart';
 import '../widgets/composer.dart';
 import '../widgets/conversation_header.dart';
@@ -2574,21 +2575,23 @@ class _MessagesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
-      return Center(
+    return ChatMessageViewport(
+      key: ValueKey('chat-viewport-${thread.id}'),
+      conversationId: thread.id,
+      messageIds: messages.map((message) => message.id).toList(growable: false),
+      authoredMessageIds: messages
+          .where((message) => message.authorId == currentUserId)
+          .map((message) => message.id)
+          .toSet(),
+      emptyBuilder: Center(
         child: Text(
           'Aucun message. Lance la discussion.',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
+      ),
+      messageBuilder: (context, index) {
         final message = messages[index];
         final mine = message.authorId == currentUserId;
         final pinned = pinnedMessageIds.contains(message.id);
