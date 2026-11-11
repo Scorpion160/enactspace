@@ -3,6 +3,7 @@
 Never returns secrets, customer data, tokens, or provider credentials.
 A green configuration check does not prove PayDunya has enabled live payments.
 """
+from ipaddress import ip_address
 from urllib.parse import urlsplit
 
 
@@ -16,6 +17,22 @@ def _is_valid_ipn(url: str | None, *, require_https: bool) -> bool:
         parsed = urlsplit(url.strip())
     except ValueError:
         return False
+    if require_https and parsed.hostname:
+        hostname = parsed.hostname.lower()
+        if (
+            "." not in hostname
+            or hostname.endswith(
+                (".invalid", ".test", ".example", ".localhost", ".local", ".internal")
+            )
+            or hostname == "localhost"
+        ):
+            return False
+        try:
+            if not ip_address(hostname).is_global:
+                return False
+        except ValueError:
+            # A public-looking DNS name still requires a real connectivity check.
+            pass
     return (
         parsed.scheme == ("https" if require_https else parsed.scheme)
         and parsed.scheme in {"http", "https"}
