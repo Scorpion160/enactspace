@@ -34,6 +34,15 @@ class MobileMoneyReadinessTests(unittest.TestCase):
         self.assertNotIn("dummy-master", repr(status))
         self.assertNotIn("dummy-token", repr(status))
 
+    def test_production_never_accepts_sandbox_as_accounting_ready(self):
+        production = get_mobile_money_readiness(settings(APP_ENV="production"))
+        self.assertFalse(production["configuration_ready"])
+        self.assertFalse(production["ready_for_live_test"])
+        self.assertTrue(any("test" in reason.lower()
+                            for reason in production["blocking_checks"]))
+        standalone_test = get_mobile_money_readiness(settings(APP_ENV="test"))
+        self.assertTrue(standalone_test["configuration_ready"])
+
     def test_live_requires_https_valid_callback_and_reconciliation(self):
         live = get_mobile_money_readiness(settings(PAYDUNYA_MODE="live"))
         self.assertTrue(live["ready_for_live_test"])
