@@ -207,21 +207,26 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
             memberId: widget.initialFee.userId,
           );
       if (!mounted) return;
+      var reusedWithDifferentChannel = false;
       setState(() {
         _transaction = transaction;
         final actualChannel = transaction.channel;
         if (actualChannel == 'wave-senegal' ||
             actualChannel == 'orange-money-senegal') {
           if (actualChannel != _channel) {
+            reusedWithDifferentChannel = true;
             _error = 'Une demande de paiement est déjà en cours par '
-                '${transaction.channelLabel}. La même facture est réouverte '
-                'pour éviter un double encaissement.';
+                '${transaction.channelLabel}. Pour éviter un double paiement, '
+                'l’ancienne facture est conservée. Vérifiez le canal indiqué '
+                'avant de la réouvrir.';
           }
           _channel = actualChannel;
         }
       });
       _startMonitoring();
-      await _openCheckout();
+      if (!reusedWithDifferentChannel) {
+        await _openCheckout();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
