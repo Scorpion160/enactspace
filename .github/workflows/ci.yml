@@ -6,6 +6,7 @@ on:
       - main
       - feature/interface-coherence-20261107
       - feature/recruitment-decision-workspace-20261110
+      - integration/recruitment-production-parity-20261110
       - integration/enactspace-web-v3-20261107
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
@@ -15,6 +16,7 @@ on:
       - main
       - feature/recruitment-decision-workspace-20261110
       - integration/recruitment-production-parity-20261110
+      - fix/chat-scroll-and-payment-hardening-20261111
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -181,6 +183,7 @@ jobs:
         run: >-
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
+          test/chat_message_viewport_test.dart
           test/features/recruitment/recruitment_advisory_filters_test.dart
           test/features/recruitment/recruitment_comparison_panel_test.dart
           test/enactmeet_quick_create_test.dart
@@ -265,7 +268,7 @@ jobs:
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build36-PREFLIGHT-ONLY-${{ github.run_id }}
+          name: enactspace-web-1.0.30-build37-PREFLIGHT-ONLY-${{ github.run_id }}
           path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7
