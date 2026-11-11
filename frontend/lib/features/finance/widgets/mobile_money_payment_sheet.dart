@@ -207,7 +207,19 @@ class _MobileMoneyPaymentSheetState extends State<MobileMoneyPaymentSheet>
             memberId: widget.initialFee.userId,
           );
       if (!mounted) return;
-      setState(() => _transaction = transaction);
+      setState(() {
+        _transaction = transaction;
+        final actualChannel = transaction.channel;
+        if (actualChannel == 'wave-senegal' ||
+            actualChannel == 'orange-money-senegal') {
+          if (actualChannel != _channel) {
+            _error = 'Une demande de paiement est déjà en cours par '
+                '${transaction.channelLabel}. La même facture est réouverte '
+                'pour éviter un double encaissement.';
+          }
+          _channel = actualChannel!;
+        }
+      });
       _startMonitoring();
       await _openCheckout();
     } catch (e) {
@@ -491,6 +503,8 @@ class _TransactionStatusCard extends StatelessWidget {
                   transaction.statusLabel,
                   style: TextStyle(fontWeight: FontWeight.w900, color: _color),
                 ),
+                if (transaction.channel != null)
+                  Text('Canal : ${transaction.channelLabel}'),
                 Text(
                   transaction.message,
                   maxLines: 2,
