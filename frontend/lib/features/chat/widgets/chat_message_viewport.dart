@@ -143,7 +143,7 @@ class _ChatMessageViewportState extends State<ChatMessageViewport> {
                 },
                 icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
                 label: Text(_unseenIncoming > 0
-                    ? '${_unseenIncoming} nouveau${_unseenIncoming > 1 ? 'x' : ''}'
+                    ? '$_unseenIncoming nouveau${_unseenIncoming > 1 ? 'x' : ''}'
                     : 'Derniers messages'),
               ),
             ),
