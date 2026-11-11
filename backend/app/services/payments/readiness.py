@@ -72,6 +72,12 @@ def get_mobile_money_readiness(config) -> dict:
     currency_valid = config.PAYMENT_CURRENCY == "XOF"
 
     blockers = []
+    if (
+        getattr(config, "APP_ENV", "development") == "production"
+        and provider == "paydunya"
+        and mode != "live"
+    ):
+        blockers.append("Les paiements de test ne doivent jamais solder des cotisations en production")
     if not enabled:
         blockers.append("Activation Mobile Money non effectuée")
     if provider != "paydunya":
