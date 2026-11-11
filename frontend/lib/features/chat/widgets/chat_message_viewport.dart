@@ -87,7 +87,9 @@ class _ChatMessageViewportState extends State<ChatMessageViewport> {
     } else {
       final incoming = newIds.where((id) => !widget.authoredMessageIds.contains(id)).length;
       if (incoming > 0) {
-        setState(() => _unseenIncoming += incoming);
+        // didUpdateWidget is immediately followed by build; calling setState
+        // here would schedule a redundant rebuild during the parent's build.
+        _unseenIncoming += incoming;
       }
     }
   }
