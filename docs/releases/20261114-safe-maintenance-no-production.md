@@ -61,3 +61,15 @@ Au contrôle, **95 décisions préparées** : **64 shortlistées, 31 écartées*
 ## Risque Docker restant
 
 Le contrôle en lecture seule `verify_vps_compose_alignment.py` a confirmé que les quatre images de service correspondent à la configuration effective, **mais que la section `backend` comporte encore une instruction `build:`**. Ne pas lancer une reconstruction ou un `docker compose up` générique lors des futures livraisons. Il reste à normaliser la configuration de déploiement backend dans un chantier distinct avant une nouvelle mise à jour serveur.
+
+## Correction ciblée de la configuration de production (sans redémarrage)
+
+La configuration Docker **réellement utilisée sur le VPS** (156 lignes) est plus riche que l'ancien modèle du dépôt (90 lignes) : plusieurs paramètres et services présents en production n'y figurent pas. Un remplacement complet par le fichier du dépôt aurait supprimé ces réglages ; il a été **refusé** par les contrôles.
+
+La configuration active a ensuite été modifiée **uniquement** pour :
+- épingler `enactspace-backend:chat41-949575e` sur les quatre services concernés, au lieu de tags historiques différents ;
+- retirer `build:` du service backend pour empêcher toute reconstruction implicite.
+
+Avant application, la comparaison de la configuration Compose effective a renvoyé `CANDIDATE_DIFF_PATHS []` après suppression virtuelle de ce seul champ `build`. Le remplacement du fichier a été atomique, **sans commande `up`, `restart`, `down` ni modification des conteneurs**. Le garde-fou `verify_vps_compose_alignment.py` a ensuite confirmé `CONFORME — quatre services alignés`.
+
+Ancienne configuration préservée sous `/opt/enactspace/staging/web-cache42-20261114/docker-compose-vps.before42.yml`. Le fichier candidat temporaire a été retiré après validation. **Reste à faire** : rapprocher explicitement le modèle Docker du dépôt du fichier de production après revue des différences, avant toute prochaine livraison backend ; ne pas recopier le modèle ancien par-dessus le fichier serveur.
