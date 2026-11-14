@@ -1,6 +1,6 @@
 # EnactSpace — finition recrutement et membres, fluidité Web
 
-**Cible : 1.0.30+39.** Changement d'interface et d'optimisation sans modification de données métier.
+**Cible : 1.0.30+40.** Changement d'interface et d'optimisation sans modification de données métier.
 
 ## Recrutement
 - Retrait des textes de règles et des avertissements longs de l'interface ; remplacement par des intitulés courts.
@@ -32,3 +32,11 @@ Tests de composants Flutter, contrôles visuels, modes clair/sombre, zoom et ana
 La publication de 1.0.30+39 doit préserver les services API et la base : ce lot est essentiellement Web (le correctif Nginx étant déjà chargé sur le VPS). Ne pas envoyer d'e-mails aux candidats ni publier de décisions automatiquement.
 
 La version publique précédente est 1.0.30+38, et la configuration Nginx antérieure à la correction de cache est sauvegardée sur le serveur.
+
+## Chat — gestion des membres des groupes
+
+Le menu d'informations d'un groupe présente désormais la liste **complète** de ses membres (l'API de liste de discussions limite son aperçu à six personnes). Le propriétaire et les administrateurs du groupe peuvent y ajouter des personnes actives ou alumni, retirer un membre après confirmation, le promouvoir administrateur ou retirer ce rôle. Les droits sont vérifiés par l'API existante ; la gestion est indisponible dans une discussion privée.
+
+Le bouton d'ajout consulte la liste réelle des membres pour ne pas proposer de doublons, puis recharge le groupe. Après un retrait ou changement de rôle, la liste des membres et la conversation sont actualisées. Aucun e-mail n'est déclenché par l'ajout (notification interne seulement).
+
+Le serveur actuel expose déjà les endpoints de gestion des participants : aucun changement backend ni migration n'est nécessaire pour cette livraison. Les tests avec 9 à 10 membres vérifient l'affichage au-delà des six participants prévisualisés, la confirmation de retrait et la protection des membres non administrateurs.

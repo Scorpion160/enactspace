@@ -22,6 +22,7 @@ import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
 import '../services/chat_voice_recorder.dart';
 import '../widgets/chat_layout.dart';
+import '../widgets/chat_group_members_panel.dart';
 import '../widgets/chat_message_viewport.dart';
 import '../widgets/chat_states.dart';
 import '../widgets/composer.dart';
@@ -1491,7 +1492,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (!mounted) return;
-      final sameSelection = selectionVersion == _threadSelectionVersion &&
+      final sameSelection =
+          selectionVersion == _threadSelectionVersion &&
           selectedId == _selectedThread?.id;
       setState(() {
         _threads = _visibleSortedThreads(
@@ -1502,7 +1504,9 @@ class _ChatScreenState extends State<ChatScreen> {
         // Ignore late responses for an earlier conversation. They used to
         // replace the messages visible in a newly opened conversation.
         if (sameSelection) {
-          _selectedThread = selectedId == null ? _selectedThread : selectedThread;
+          _selectedThread = selectedId == null
+              ? _selectedThread
+              : selectedThread;
           if (messages != null) {
             _messages = _mergeWithLocalMessages(selectedThread!.id, messages);
             _mergeServerReactions(messages);
@@ -1891,11 +1895,15 @@ class _ChatScreenState extends State<ChatScreen> {
         },
         onAddMember: thread.canManageMembers && thread.threadType != 'direct'
             ? () async {
+                final existingMembers = await _gateway.getParticipants(
+                  thread.id,
+                );
+                if (!context.mounted) return;
                 final selectedIds = await showDialog<List<String>>(
                   context: context,
                   builder: (context) => _AddChatMembersDialog(
                     chatService: _gateway,
-                    existingUserIds: thread.participantsPreview
+                    existingUserIds: existingMembers
                         .map((participant) => participant.userId)
                         .toSet(),
                   ),
@@ -4351,12 +4359,6 @@ class _ConversationInfoDialog extends StatelessWidget {
                       ),
                     ] else ...[
                       _ConversationInfoTile(
-                        icon: Icons.admin_panel_settings_rounded,
-                        label: 'Admins',
-                        value:
-                            '${thread.participantsPreview.where((participant) => participant.participantRole == 'owner' || participant.participantRole == 'admin').length}',
-                      ),
-                      _ConversationInfoTile(
                         icon: Icons.hub_rounded,
                         label: 'Portée',
                         value: _conversationScopeLabel(thread),
@@ -4382,12 +4384,6 @@ class _ConversationInfoDialog extends StatelessWidget {
                           : Icons.push_pin_outlined,
                       label: pinned ? 'Désépingler' : 'Épingler',
                     ),
-                    if (onAddMember != null)
-                      _ConversationActionButton(
-                        onPressed: onAddMember,
-                        icon: Icons.person_add_alt_1_rounded,
-                        label: 'Ajouter',
-                      ),
                     if (thread.threadType != 'direct')
                       _ConversationActionButton(
                         onPressed: onLeave,
@@ -4409,38 +4405,13 @@ class _ConversationInfoDialog extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '${thread.participantsCount} participant(s)',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
+                ChatGroupMembersPanel(
+                  thread: thread,
+                  gateway: chatService,
+                  currentUserId: currentUserId,
+                  onAddMembers: onAddMember,
+                  onChanged: onChanged,
                 ),
-                const SizedBox(height: 8),
-                ...thread.participantsPreview.map((participant) {
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: _ChatAvatar(
-                      title: participant.displayName,
-                      imageUrl: _absoluteUrl(participant.photoUrl),
-                      selected: false,
-                      icon: Icons.person_rounded,
-                    ),
-                    title: Text(participant.displayName),
-                    subtitle: Text(
-                      _participantSubtitle(participant),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: _ParticipantManagementMenu(
-                      thread: thread,
-                      participant: participant,
-                      currentUserId: currentUserId,
-                      chatService: chatService,
-                      onChanged: onChanged,
-                    ),
-                  );
-                }),
               ],
             ),
           ),
@@ -4559,107 +4530,6 @@ class _ConversationActionButton extends StatelessWidget {
         onPressed: onPressed,
         icon: Icon(icon),
         label: Text(label),
-      ),
-    );
-  }
-}
-
-class _ParticipantManagementMenu extends StatelessWidget {
-  final ChatThreadModel thread;
-  final ChatThreadMemberModel participant;
-  final String? currentUserId;
-  final ChatGateway chatService;
-  final Future<void> Function() onChanged;
-
-  const _ParticipantManagementMenu({
-    required this.thread,
-    required this.participant,
-    required this.currentUserId,
-    required this.chatService,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final role = participant.participantRole;
-    final canManage =
-        thread.canManageMembers &&
-        thread.threadType != 'direct' &&
-        participant.userId != currentUserId &&
-        role != 'owner';
-
-    if (!canManage) {
-      return role == 'member'
-          ? const SizedBox.shrink()
-          : Chip(label: Text(role));
-    }
-
-    return PopupMenuButton<String>(
-      tooltip: 'Gérer ce membre',
-      onSelected: (value) async {
-        try {
-          if (value == 'admin' || value == 'member') {
-            await chatService.updateParticipantRole(
-              threadId: thread.id,
-              userId: participant.userId,
-              participantRole: value,
-            );
-          }
-          if (value == 'remove') {
-            await chatService.removeParticipant(
-              threadId: thread.id,
-              userId: participant.userId,
-            );
-          }
-          await onChanged();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Conversation mise à jour.')),
-            );
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                backgroundColor: Colors.red.shade700,
-                content: Text(e.toString().replaceAll('Exception: ', '')),
-              ),
-            );
-          }
-        }
-      },
-      itemBuilder: (context) => [
-        if (role != 'admin')
-          const PopupMenuItem(
-            value: 'admin',
-            child: ListTile(
-              leading: Icon(Icons.admin_panel_settings_rounded),
-              title: Text('Promouvoir admin'),
-            ),
-          ),
-        if (role == 'admin')
-          const PopupMenuItem(
-            value: 'member',
-            child: ListTile(
-              leading: Icon(Icons.person_rounded),
-              title: Text('Retirer admin'),
-            ),
-          ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: 'remove',
-          child: ListTile(
-            leading: Icon(Icons.person_remove_alt_1_rounded),
-            title: Text('Retirer du groupe'),
-          ),
-        ),
-      ],
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (role != 'member') Chip(label: Text(role)),
-          Icon(Icons.more_vert_rounded),
-        ],
       ),
     );
   }
@@ -5899,16 +5769,6 @@ String _memberStatusLabel(String status) {
     default:
       return 'Non renseigné';
   }
-}
-
-String _participantSubtitle(ChatThreadMemberModel participant) {
-  final details = <String>[
-    if (participant.email.trim().isNotEmpty) participant.email.trim(),
-    _memberStatusLabel(participant.status),
-    _participantRoleLabel(participant.participantRole),
-  ];
-
-  return details.join(' · ');
 }
 
 String _messagePreview(ChatMessageModel message) {
