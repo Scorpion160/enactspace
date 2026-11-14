@@ -3,7 +3,7 @@
 import asyncio
 import unittest
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -15,30 +15,54 @@ from starlette.requests import Request
 from unittest.mock import patch
 
 import app.models.base  # noqa: F401
-from app.api.routes import attendance, events, finance, projects, recruitment, tasks, users
+from app.api.routes import academic, attendance, events, files, finance, meetings, projects, recruitment, seasons, tasks, users
+from app.core.config import settings
 from app.core.roles import RECRUITMENT_ACCESS_ROLES
 from app.db.database import Base
+from app.models.academic import UserAcademicHistory
 from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.audit import AuditLog
+from app.models.email_delivery import EmailDelivery
 from app.models.event import Event, EventParticipant
 from app.models.finance import ClubTransaction, Fee, FinancialAccount, Payment, PaymentAllocation
+from app.models.meeting import Meeting, MeetingMember
 from app.models.mobile_money import MobileMoneyTransaction
 from app.models.notification import Notification
 from app.models.pole import Pole, PoleMember
 from app.models.project import Project, ProjectMember
-from app.models.recruitment import Application, RecruitmentCampaign
+from app.models.recruitment import (
+    Application, ApplicationInterviewJuror, ApplicationInterviewTeam, ApplicationPersonality, ApplicationReview, RecruitmentCampaign,
+    RecruitmentJuryMember, RecruitmentJuryTeam, RecruitmentViewerAccess,
+)
 from app.models.role import Role, UserRole
+from app.models.season import Season
+from app.models.stored_file import StoredFile
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.recruitment import ConvertApplicationToUserRequest
+from app.schemas.meeting import MeetingCreate, MeetingInviteRequest, MeetingUpdate
+from app.schemas.recruitment import ApplicationInterviewSchedule, ApplicationReviewCreate, ApplicationTrackingRequest, ConvertApplicationToUserRequest
+from app.schemas.recruitment_schedule import NOVEMBER_2026_SCHEDULE
 from app.schemas.mobile_money import MobileMoneyInitiateRequest
+from app.schemas.season import YearActivation
 from app.schemas.user import UserAdminUpdate, UserRoleAssign
 from app.services.operational_integrity import reconcile_user_lifecycle, to_naive_utc
 from app.services.payments import PaymentProviderResult
+from app.services import recruitment_meetings, recruitment_selection
+from app.services.recruitment_personality import instrument
+from app.services.recruitment_rubric import CRITERION_IDS, VERSION
+from app.services.recruitment_selection import POLICY_VERSION, SelectionDecision, SelectionPublication, anonymous_code, selection_overview
 
 
 def _request() -> Request:
     return Request({"type": "http", "client": ("127.0.0.1", 12345), "headers": []})
+
+
+def _structured_review(application, user, stage, rating=3):
+    return ApplicationReview(application_id=application.id, reviewer_id=user.id, stage=stage,
+        criteria_assessment={"rubric_version": VERSION, "ratings": [
+            {"criterion_id": criterion, "rating": rating, "evidence": "Observation fictive"}
+            for criterion in sorted(CRITERION_IDS)
+        ]})
 
 
 class OperationalIntegrityTests(unittest.TestCase):
@@ -126,6 +150,435 @@ class OperationalIntegrityTests(unittest.TestCase):
             .filter(Notification.user_id == user.id)
             .count(),
         }
+
+    def test_open_year_preserves_existing_work_and_academic_confirmations(self):
+        admin = self._user()
+        self._role(admin, "administrateur")
+        member = self._user()
+        previous = Season(
+            name="2025–2026", start_date=date(2025, 10, 1),
+            end_date=date(2026, 9, 30), is_current=True,
+        )
+        upcoming = Season(
+            name="2026–2027", start_date=date(2026, 10, 1),
+            end_date=date(2027, 9, 30),
+        )
+        self.db.add_all([previous, upcoming])
+        self.db.flush()
+        member.study_level = "DIC2"
+        member.academic_confirmed_season_id = previous.id
+        history = UserAcademicHistory(
+            user_id=member.id, season_id=previous.id, department="Génie électrique",
+            cursus="DIC", study_level="DIC2",
+        )
+        project = Project(name="Projet en cours", season_id=previous.id)
+        campaign = RecruitmentCampaign(
+            title="Campagne en cours", season_id=previous.id, is_active=True,
+            start_date=date(2026, 11, 6), end_date=date(2026, 11, 9),
+        )
+        self.db.add_all([history, project, campaign])
+        self.db.flush()
+        task = Task(title="Tâche en cours", project_id=project.id, status="en_cours")
+        self.db.add(task)
+        self.db.commit()
+
+        with self.assertRaises(HTTPException) as stale:
+            seasons.activate_season(upcoming.id, YearActivation(), self.db, admin)
+        self.assertEqual(stale.exception.status_code, 409)
+        self.db.rollback()
+        self.assertTrue(previous.is_current)
+        self.assertFalse(upcoming.is_current)
+
+        activation = YearActivation(expected_current_id=previous.id)
+        for _ in range(2):
+            opened = seasons.activate_season(upcoming.id, activation, self.db, admin)
+            self.assertTrue(opened.is_current)
+        self.assertFalse(previous.is_current)
+        self.assertTrue(previous.archived)
+        self.assertEqual(project.season_id, previous.id)
+        self.assertEqual(task.project_id, project.id)
+        self.assertEqual(task.status, "en_cours")
+        self.assertEqual(campaign.season_id, previous.id)
+        self.assertTrue(campaign.is_active)
+        self.assertEqual(campaign.end_date, date(2026, 11, 9))
+        self.assertEqual(member.study_level, "DIC2")
+        self.assertEqual(history.season_id, previous.id)
+        profile = academic.read_profile(self.db, member)
+        self.assertEqual(profile.current_season_id, upcoming.id)
+        self.assertEqual(profile.confirmed_season_id, previous.id)
+        self.assertFalse(profile.confirmed_current_season)
+        self.assertEqual(self.db.query(AuditLog).filter_by(action="activation_annee").count(), 1)
+        self.assertEqual(self.db.query(Notification).filter_by(user_id=member.id).count(), 1)
+
+    def test_blind_recruitment_keeps_answers_and_seals_candidate_documents(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        juror = self._user()
+        reader = self._user(status="alumni", profile_type="alumni")
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION)
+        self.db.add(campaign)
+        self.db.flush()
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", phone="+221 77 123 45 67",
+            department="Génie électrique", study_level="DIC2",
+            class_name="2025-2026 (emilie@example.com)",
+            questionnaire_answers=[{"id": "motivation", "question": "Pourquoi ?", "answer": "Je suis Emilie et je souhaite agir."}],
+        )
+        self.db.add_all([
+            application,
+            RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id),
+            RecruitmentViewerAccess(campaign_id=campaign.id, user_id=reader.id),
+        ])
+        self.db.flush()
+        cv = StoredFile(
+            original_filename="cv-emilie.pdf", stored_filename="fake.pdf",
+            storage_path="recruitment/fake.pdf", file_size=5, visibility="private",
+            storage_scope="recruitment", entity_type="application", entity_id=application.id,
+        )
+        self.db.add(cv)
+        self.db.flush()
+        application.cv_url = f"/api/files/{cv.id}/download"
+        self.db.commit()
+        reveal = next(
+            route.endpoint for route in recruitment.router.routes
+            if route.path == "/recruitment/campaigns/{campaign_id}/selection/reveal"
+        )
+
+        for user in (manager, juror, reader):
+            with self.subTest(user=user.id):
+                dossier = recruitment.get_application(str(application.id), False, self.db, user)
+                self.assertTrue(dossier["is_anonymized"])
+                self.assertEqual(dossier["department"], "Génie électrique")
+                self.assertEqual(dossier["study_level"], "DIC2")
+                self.assertEqual(dossier["class_name"], "2025-2026 ([identité masquée])")
+                self.assertEqual(dossier["questionnaire_answers"][0]["answer"], "Je suis [identité masquée] et je souhaite agir.")
+                self.assertEqual(dossier["permissions"]["can_review"], user.id == juror.id)
+                self.assertIsNone(dossier["cv_url"])
+                for read_file in (files.get_file_metadata, files.preview_file, files.download_file):
+                    with self.assertRaises(HTTPException) as hidden:
+                        read_file(str(cv.id), self.db, user)
+                    self.assertEqual(hidden.exception.status_code, 403)
+
+        with self.assertRaises(HTTPException) as early:
+            reveal(campaign.id, self.db, manager)
+        self.assertEqual(early.exception.status_code, 409)
+        campaign.screening_published_at = datetime(2026, 11, 15)
+        self.db.commit()
+        with self.assertRaises(HTTPException) as unauthorized:
+            reveal(campaign.id, self.db, juror)
+        self.assertEqual(unauthorized.exception.status_code, 403)
+        self.assertIsNone(recruitment.get_application(str(application.id), False, self.db, juror)["cv_url"])
+
+        reveal(campaign.id, self.db, manager)
+        dossier = recruitment.get_application(str(application.id), False, self.db, juror)
+        self.assertEqual(dossier["first_name"], "Émilie")
+        self.assertEqual(dossier["cv_url"], application.cv_url)
+        self.assertEqual(files.get_file_metadata(str(cv.id), self.db, juror)["original_filename"], "cv-emilie.pdf")
+        with self.assertRaises(HTTPException) as reader_denied:
+            files.get_file_metadata(str(cv.id), self.db, reader)
+        self.assertEqual(reader_denied.exception.status_code, 403)
+
+    def test_enactmeet_interview_uses_the_jury_selected_in_the_same_request(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        juror = self._user()
+        now = datetime.now(timezone.utc)
+        campaign = RecruitmentCampaign(
+            title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+            screening_published_at=to_naive_utc(now), identities_revealed_at=to_naive_utc(now),
+        )
+        self.db.add(campaign)
+        self.db.flush()
+        appointment = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id)
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", status="under_review", screening_decision="shortlisted",
+        )
+        self.db.add_all([appointment, application])
+        self.db.commit()
+
+        payload = ApplicationInterviewSchedule(
+            interview_at=now + timedelta(hours=1), interview_mode="online",
+            use_enactmeet=True, jury_member_ids=[appointment.id],
+        )
+        with patch.multiple(
+            settings, MEET_SERVER_URL="https://meet.example.invalid", MEET_REQUIRE_JWT=True,
+            MEET_JWT_APP_ID="enactspace-test", MEET_JWT_SECRET="local-test-secret",
+        ):
+            result = recruitment.schedule_application_interview(
+                str(application.id), payload, _request(), self.db, manager,
+            )
+        meeting = self.db.get(Meeting, result["interview_meeting_id"])
+        self.assertTrue(meeting.lobby_enabled)
+        self.assertFalse(meeting.recording_enabled)
+        members = self.db.query(MeetingMember).filter_by(meeting_id=meeting.id).all()
+        self.assertEqual({member.user_id: member.role for member in members}, {manager.id: "host", juror.id: "cohost"})
+
+        meeting_id = str(meeting.id)
+        detail = meetings.get_meeting(meeting_id, self.db, manager)
+        self.assertTrue(detail.is_recruitment_interview)
+        self.assertTrue(detail.can_manage)
+        self.assertFalse(detail.can_delete)
+        operations = (
+            lambda: meetings.update_meeting(meeting_id, MeetingUpdate(lobby_enabled=False), self.db, juror),
+            lambda: meetings.invite_members(meeting_id, MeetingInviteRequest(user_ids=[manager.id]), self.db, juror),
+            lambda: meetings.cancel_meeting(meeting_id, self.db, manager),
+            lambda: meetings.delete_meeting(meeting_id, self.db, manager),
+        )
+        for operation in operations:
+            with self.assertRaises(HTTPException) as protected:
+                operation()
+            self.assertEqual(protected.exception.status_code, 409)
+        self.assertTrue(meeting.lobby_enabled)
+        self.assertEqual(meeting.status, "scheduled")
+
+        code = recruitment.ensure_tracking_code(self.db, application)
+        self.db.commit()
+        tracking = ApplicationTrackingRequest(application_id=code, email=application.email)
+        candidate_join = next(route.endpoint for route in recruitment.router.routes
+                              if route.path == "/recruitment/applications/interview/join")
+        self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        with self.assertRaises(HTTPException) as incomplete:
+            candidate_join(tracking, self.db)
+        self.assertIn("questionnaire obligatoire", incomplete.exception.detail)
+        snapshot = instrument()
+        attempt = ApplicationPersonality(application_id=application.id, instrument_version=snapshot["version"],
+                                         instrument_snapshot=snapshot, invited_by=manager.id)
+        self.db.add(attempt)
+        self.db.commit()
+        self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        attempt.submitted_at = to_naive_utc(now)
+        meeting.status = "live"
+        self.db.commit()
+        self.assertTrue(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+        with patch.multiple(
+            settings, MEET_SERVER_URL="https://meet.example.invalid", MEET_REQUIRE_JWT=True,
+            MEET_JWT_APP_ID="enactspace-test", MEET_JWT_SECRET="local-test-secret-for-synthetic-rooms",
+        ), patch.object(recruitment_meetings, "utc_now", return_value=application.interview_at):
+            guest = candidate_join(tracking, self.db)
+        self.assertFalse(guest.moderator)
+        self.assertEqual(guest.meeting_id, meeting.id)
+        meetings.end_meeting(meeting_id, self.db, manager)
+        self.assertFalse(recruitment.track_application(tracking, self.db)["enactmeet_available"])
+
+        regular = meetings.create_meeting(MeetingCreate(title="Réunion fictive"), self.db, manager)
+        updated = meetings.update_meeting(str(regular.id), MeetingUpdate(lobby_enabled=False), self.db, manager)
+        self.assertFalse(updated.lobby_enabled)
+        self.assertFalse(updated.is_recruitment_interview)
+
+    def test_interview_lists_keep_the_same_anonymity_as_the_dossier(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        juror = self._user()
+        reader = self._user(status="alumni", profile_type="alumni")
+        now = to_naive_utc(datetime.now(timezone.utc))
+        campaign = RecruitmentCampaign(
+            title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+            screening_published_at=now,
+        )
+        self.db.add(campaign)
+        self.db.flush()
+        team = RecruitmentJuryTeam(campaign_id=campaign.id, name="Équipe A", name_key="équipe a")
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", status="interview_scheduled", screening_decision="shortlisted",
+            interview_at=now + timedelta(hours=1),
+        )
+        self.db.add_all([
+            team, application, RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id),
+            RecruitmentViewerAccess(campaign_id=campaign.id, user_id=reader.id),
+        ])
+        self.db.flush()
+        self.db.add(ApplicationInterviewTeam(
+            application_id=application.id, team_id=team.id, name=team.name, revision=team.revision,
+        ))
+        team.revision += 1  # The existing appointment needs reassignment.
+        self.db.commit()
+        endpoints = {route.path: route.endpoint for route in recruitment.router.routes if "GET" in route.methods}
+        teams = endpoints["/recruitment/campaigns/{campaign_id}/jury/teams"]
+        jury = endpoints["/recruitment/campaigns/{campaign_id}/jury"]
+
+        for user in (manager, juror, reader):
+            self.assertEqual(teams(campaign.id, self.db, user)[0]["interviews"][0]["name"], anonymous_code(application))
+        self.assertEqual(jury(campaign.id, self.db, manager)["interviews_needing_reassignment"][0]["name"], anonymous_code(application))
+
+        campaign.identities_revealed_at = now
+        self.db.commit()
+        for user in (manager, juror):
+            self.assertEqual(teams(campaign.id, self.db, user)[0]["interviews"][0]["name"], "Émilie Exemple")
+        self.assertEqual(teams(campaign.id, self.db, reader)[0]["interviews"][0]["name"], anonymous_code(application))
+        self.assertEqual(jury(campaign.id, self.db, manager)["interviews_needing_reassignment"][0]["name"], "Émilie Exemple")
+
+    def test_interview_juror_cannot_review_their_own_application(self):
+        applicant = self._user(email="candidate@example.com")
+        other = self._user()
+        now = to_naive_utc(datetime.now(timezone.utc))
+        campaign = RecruitmentCampaign(
+            title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+            screening_published_at=now, identities_revealed_at=now,
+        )
+        self.db.add(campaign)
+        self.db.flush()
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="Candidate@example.com", status="interview_scheduled", screening_decision="shortlisted",
+        )
+        members = [RecruitmentJuryMember(campaign_id=campaign.id, user_id=user.id) for user in (applicant, other)]
+        self.db.add_all([application, *members])
+        self.db.flush()
+        self.db.add_all(ApplicationInterviewJuror(application_id=application.id, jury_member_id=member.id) for member in members)
+        self.db.add_all([
+            ApplicationReview(application_id=application.id, reviewer_id=applicant.id, stage="interview", score=20),
+            ApplicationReview(application_id=application.id, reviewer_id=other.id, stage="interview", score=12),
+        ])
+        application.final_score = 16
+        self.db.commit()
+
+        own_dossier = recruitment.get_application(str(application.id), False, self.db, applicant)
+        self.assertFalse(own_dossier["permissions"]["can_review"])
+        self.assertIsNone(own_dossier["my_review"])
+        other_dossier = recruitment.get_application(str(application.id), False, self.db, other)
+        self.assertTrue(other_dossier["permissions"]["can_review"])
+        self.assertEqual(other_dossier["final_score"], 12)
+        with self.assertRaises(HTTPException) as forbidden:
+            recruitment.create_or_update_review(ApplicationReviewCreate(application_id=application.id), self.db, applicant)
+        self.assertEqual(forbidden.exception.status_code, 403)
+
+    def test_interview_end_controls_the_calendar_and_final_publication(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        campaign = RecruitmentCampaign(
+            title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+            selection_schedule=NOVEMBER_2026_SCHEDULE, is_active=False,
+            screening_published_at=datetime(2026, 11, 15), identities_revealed_at=datetime(2026, 11, 15),
+        )
+        self.db.add(campaign)
+        self.db.flush()
+        application = Application(
+            campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
+            email="emilie@example.com", status="under_review", screening_decision="shortlisted",
+        )
+        self.db.add(application)
+        self.db.commit()
+
+        start = datetime(2026, 11, 21, 23, 40)
+        end = datetime(2026, 11, 22)
+        with self.assertRaises(HTTPException) as too_late:
+            recruitment.schedule_application_interview(
+                str(application.id), ApplicationInterviewSchedule(interview_at=start + timedelta(minutes=1)),
+                _request(), self.db, manager,
+            )
+        self.assertEqual(too_late.exception.status_code, 422)
+        self.db.rollback()
+        recruitment.schedule_application_interview(
+            str(application.id), ApplicationInterviewSchedule(interview_at=start), _request(), self.db, manager,
+        )
+        self.assertEqual(application.interview_end_at, end)
+
+        campaign.selection_schedule = None
+        application.pending_final_decision = "rejected"  # A decision prepared by an older version.
+        self.db.commit()
+        endpoints = {route.path: route.endpoint for route in recruitment.router.routes if "POST" in route.methods}
+        decide = endpoints["/recruitment/applications/{application_id}/selection-decision"]
+        publish = endpoints["/recruitment/campaigns/{campaign_id}/selection/publish"]
+        decision = SelectionDecision(stage="interview", decision="rejected")
+        publication = SelectionPublication(stage="interview", revision="r" * 64)
+        report = {"stage": "interview", "revision": publication.revision, "rows": [
+            {"application_id": str(application.id), "ready": True, "decision": "rejected"},
+        ]}
+        with patch.object(recruitment_selection, "utc_now", return_value=end - timedelta(minutes=1)), \
+             patch.object(recruitment_selection, "selection_overview", return_value=report):
+            with self.assertRaises(HTTPException) as early_decision:
+                decide(application.id, decision, self.db, manager)
+            self.assertIn("réalise l’entretien", early_decision.exception.detail)
+            with self.assertRaises(HTTPException) as early_publication:
+                publish(campaign.id, publication, self.db, manager)
+            self.assertIn("entretien doit être réalisé", early_publication.exception.detail)
+        self.assertIsNone(campaign.final_published_at)
+        self.assertEqual(application.status, "interview_scheduled")
+
+        with patch.object(recruitment_selection, "utc_now", return_value=end):
+            decide(application.id, decision, self.db, manager)
+        self.assertEqual(application.pending_final_decision, "rejected")
+
+    def test_interview_requires_the_grids_of_the_assigned_panel(self):
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+                                       screening_min_reviews=5, screening_published_at=datetime(2026, 11, 15))
+        self.db.add(campaign)
+        self.db.flush()
+        first, second, other = [self._user() for _ in range(3)]
+        panel = [RecruitmentJuryMember(campaign_id=campaign.id, user_id=user.id) for user in (first, second)]
+        application = Application(campaign_id=campaign.id, first_name="Test", last_name="Fictif",
+                                  email="candidate@example.test", screening_decision="shortlisted")
+        self.db.add_all([application, *panel])
+        self.db.flush()
+        self.db.add_all([ApplicationInterviewJuror(application_id=application.id, jury_member_id=member.id)
+                         for member in panel])
+        self.db.add_all([_structured_review(application, first, "interview", 4),
+                         _structured_review(application, other, "interview")])
+        self.db.commit()
+        incomplete = selection_overview(self.db, campaign)["rows"][0]
+        self.assertEqual(incomplete["required_reviews"], 2)
+        self.assertEqual(incomplete["review_count"], 1)
+        self.assertFalse(incomplete["ready"])
+        self.db.add(_structured_review(application, second, "interview", 2))
+        self.db.commit()
+        complete = selection_overview(self.db, campaign)["rows"][0]
+        self.assertEqual(complete["required_reviews"], 2)
+        self.assertEqual(complete["spread"], 50)
+        self.assertEqual(complete["jury_average_20"], 15)
+        self.assertEqual(complete["jury_spread_20"], 10)
+        self.assertEqual(complete["jury_score_source"], "rubric")
+        self.assertTrue(complete["ready"])
+
+    def test_screening_results_are_published_and_queued_together(self):
+        manager = self._user()
+        self._role(manager, "administrateur")
+        now = datetime(2026, 11, 15, 10)
+        campaign = RecruitmentCampaign(title="Campagne fictive", selection_policy_version=POLICY_VERSION,
+                                       start_date=date(2026, 11, 6), end_date=now.date(), is_active=True)
+        self.db.add(campaign)
+        self.db.flush()
+        applications = [Application(campaign_id=campaign.id, first_name="Test", last_name="Fictif",
+                        email=f"{decision}@example.org", screening_decision=decision)
+                        for decision in ("shortlisted", "not_shortlisted")]
+        self.db.add_all(applications)
+        self.db.flush()
+        jurors = [self._user() for _ in range(3)]
+        for application in applications:
+            self.db.add_all([_structured_review(application, user, "screening") for user in jurors])
+        self.db.commit()
+        report = selection_overview(self.db, campaign)
+        publication = SelectionPublication(stage="screening", revision=report["revision"])
+        publish = next(route.endpoint for route in recruitment.router.routes
+                       if route.path == "/recruitment/campaigns/{campaign_id}/selection/publish")
+        tracking = [ApplicationTrackingRequest(application_id=recruitment.ensure_tracking_code(self.db, row),
+                                              email=row.email) for row in applications]
+        self.db.commit()
+        with patch.object(recruitment_selection, "utc_now", return_value=now):
+            with self.assertRaises(HTTPException) as open_deposits:
+                publish(campaign.id, publication, self.db, manager)
+            self.assertIn("Clôture les dépôts", open_deposits.exception.detail)
+            self.assertEqual(self.db.query(EmailDelivery).count(), 0)
+            self.assertTrue(all(recruitment.track_application(ref, self.db)["screening_result"] is None for ref in tracking))
+            campaign.end_date = date(2026, 11, 9)
+            self.db.commit()
+            with patch.multiple(settings, NOTIFICATION_EMAIL_ENABLED=True, SMTP_HOST="smtp.example.test",
+                                EMAIL_RESTRICT_TO_TEST_RECIPIENT=False):
+                result = publish(campaign.id, publication, self.db, manager)
+                self.assertEqual(result["count"], 2)
+                self.assertTrue(publish(campaign.id, publication, self.db, manager)["already_published"])
+        deliveries = self.db.query(EmailDelivery).filter(EmailDelivery.dedupe_key.like("recruitment-results:%")).all()
+        self.assertEqual({row.recipient_email for row in deliveries}, {app.email for app in applications})
+        self.assertTrue(all(row.status == "pending" and row.next_attempt_at == now for row in deliveries))
+        accepted, rejected = [recruitment.track_application(ref, self.db) for ref in tracking]
+        self.assertEqual(accepted["screening_result"], "shortlisted")
+        self.assertEqual(accepted["personality_status"], "invited")
+        self.assertEqual(rejected["screening_result"], "not_shortlisted")
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertIsNone(rejected["personality_status"])
+        self.assertEqual(accepted["result_published_at"], rejected["result_published_at"])
 
     def test_member_lifecycle_removes_authority_without_restoring_memberships(self):
         member = self._user()
@@ -403,6 +856,7 @@ class OperationalIntegrityTests(unittest.TestCase):
     def test_generic_admin_patch_cannot_bypass_lifecycle(self):
         target = self._user()
         admin = self._user()
+        self._role(admin, "administrateur")
         with self.assertRaises(HTTPException) as caught:
             users.admin_update_user(
                 str(target.id),
@@ -597,6 +1051,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_rejects_incompatible_user_and_preserves_active_user(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Campaign")
         self.db.add(campaign)
         self.db.flush()
@@ -624,6 +1079,7 @@ class OperationalIntegrityTests(unittest.TestCase):
 
     def test_conversion_profile_type_is_operational_and_existing_identity_is_preserved(self):
         admin = self._user()
+        self._role(admin, "administrateur")
         campaign = RecruitmentCampaign(title="Profile conversion")
         core_pole = Pole(name="Existing conversion core", type="core")
         support_pole = Pole(name="Existing conversion support", type="support")

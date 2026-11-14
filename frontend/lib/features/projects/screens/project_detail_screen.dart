@@ -136,6 +136,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       teamUnavailable: members.error != null,
       tasksUnavailable: tasks.error != null,
       impactUnavailable: impact.error != null,
+      impactRestricted: _user != null && !_user!.canViewImpact,
     );
   }
 

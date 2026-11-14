@@ -1,7 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:frontend/core/storage/session_private_data.dart';
 import 'package:frontend/features/chat/models/chat_models.dart';
+import 'package:frontend/features/chat/services/chat_offline_cache.dart';
 import 'package:frontend/features/chat/services/chat_service.dart';
+
+class _MemoryChatOfflineCache implements ChatOfflineCacheStore {
+  String? value;
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String next) async => value = next;
+
+  @override
+  Future<void> delete() async => value = null;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,9 +31,10 @@ void main() {
   });
 
   test(
-    'message bodies use memory only and legacy persisted caches are purged',
+    'message bodies persist only in the encrypted cache and legacy caches are purged',
     () async {
-      final service = ChatService();
+      final cache = _MemoryChatOfflineCache();
+      final service = ChatService(offlineCache: cache);
       final message = ChatMessageModel.fromJson({
         'id': 'message-1',
         'thread_id': 'thread-1',
@@ -41,6 +57,17 @@ void main() {
         )).single.content,
         'private message body',
       );
+      expect(cache.value, contains('private message body'));
+      purgePrivateSessionMemory();
+      final restartedService = ChatService(offlineCache: cache);
+      expect(
+        (await restartedService.getCachedMessages(
+          userId: 'member-1',
+          threadId: 'thread-1',
+        )).single.content,
+        'private message body',
+      );
+
       final preferences = await SharedPreferences.getInstance();
       expect(
         preferences.getKeys().where(

@@ -1,3 +1,5 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,6 +11,7 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/appearance_controller.dart';
 import '../../../core/push/push_lifecycle_controller.dart';
 import '../../../core/push/push_platform.dart';
+import '../../../shared/ui/app_components.dart';
 import '../controllers/settings_controller.dart';
 import '../models/settings_models.dart';
 import '../services/settings_gateway.dart';
@@ -177,6 +180,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _logout({required bool all}) async {
+    if (PreviewModeScope.active(context)) {
+      context.go('/login');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -230,14 +237,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Réglages',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Personnalisez EnactSpace et gérez votre compte.',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                    const AppModuleHeader(
+                      title: 'Réglages',
+                      subtitle: 'Retrouvez vos préférences, votre profil et les options de sécurité du compte.',
+                      icon: Icons.settings_outlined,
                     ),
                     if (_controller.error != null) ...[
                       const SizedBox(height: 12),
@@ -256,29 +259,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             const Text('Thème'),
                             const SizedBox(height: 10),
-                            SegmentedButton<AppAppearance>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: AppAppearance.system,
-                                  icon: Icon(Icons.brightness_auto_rounded),
-                                  label: Text('Système'),
-                                ),
-                                ButtonSegment(
-                                  value: AppAppearance.light,
-                                  icon: Icon(Icons.light_mode_rounded),
-                                  label: Text('Clair'),
-                                ),
-                                ButtonSegment(
-                                  value: AppAppearance.dark,
-                                  icon: Icon(Icons.dark_mode_rounded),
-                                  label: Text('Sombre'),
-                                ),
-                              ],
-                              selected: {_controller.appearance.appearance},
-                              onSelectionChanged: _controller.saving
-                                  ? null
-                                  : (values) =>
-                                        _controller.setTheme(values.first),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final compact = constraints.maxWidth < 520;
+                                Widget oneLineLabel(String value) => FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    value,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                  ),
+                                );
+                                return SegmentedButton<AppAppearance>(
+                                  key: const Key(
+                                    'appearance-segmented-control',
+                                  ),
+                                  expandedInsets: EdgeInsets.zero,
+                                  showSelectedIcon: !compact,
+                                  segments: [
+                                    ButtonSegment(
+                                      value: AppAppearance.system,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(
+                                              Icons.brightness_auto_rounded,
+                                            ),
+                                      label: oneLineLabel('Système'),
+                                    ),
+                                    ButtonSegment(
+                                      value: AppAppearance.light,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(
+                                              Icons.light_mode_rounded,
+                                            ),
+                                      label: oneLineLabel('Clair'),
+                                    ),
+                                    ButtonSegment(
+                                      value: AppAppearance.dark,
+                                      icon: compact
+                                          ? null
+                                          : const Icon(Icons.dark_mode_rounded),
+                                      label: oneLineLabel('Sombre'),
+                                    ),
+                                  ],
+                                  selected: {_controller.appearance.appearance},
+                                  onSelectionChanged: _controller.saving
+                                      ? null
+                                      : (values) =>
+                                            _controller.setTheme(values.first),
+                                );
+                              },
                             ),
                             const Divider(height: 32),
                             const ListTile(
@@ -288,6 +319,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               subtitle: Text('Français'),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.school_outlined),
+                          title: const Text('Profil académique'),
+                          subtitle: const Text(
+                            'Confirmer mon cursus pour l’année',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.go('/settings/academic'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.calendar_month_outlined),
+                          title: const Text('Années de l’équipe'),
+                          subtitle: const Text(
+                            'Année courante, préparation et historique',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => context.go('/settings/years'),
                         ),
                       ),
                       const SizedBox(height: 16),

@@ -2,12 +2,14 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from app.services.public_uploads import PublicUploadsStaticFiles
+from app.services.public_request_protection import PublicRequestProtectionMiddleware
 
 from app.core.config import settings
 from app.db.database import ensure_compatibility_columns
 from app.api.routes import (
     auth,
+    first_access,
     users,
     seasons,
     poles,
@@ -28,10 +30,12 @@ from app.api.routes import (
     alumni,
     notifications,
     gamification,
+    games,
     impact,
     members_import,
     dashboard,
     academy,
+    academic,
     archives,
     institutional_memory,
     audit,
@@ -41,6 +45,8 @@ from app.api.routes import (
     account,
     legal,
     product_services,
+    meetings,
+    veille,
 )
 
 
@@ -70,6 +76,10 @@ app = FastAPI(
     debug=settings.APP_DEBUG,
 )
 
+from fastapi.exceptions import RequestValidationError
+from app.core.http_errors import safe_validation_error
+app.add_exception_handler(RequestValidationError, safe_validation_error)
+
 
 @app.on_event("startup")
 def ensure_database_compatibility() -> None:
@@ -83,8 +93,10 @@ UPLOADS_DIR = (
     else Path(__file__).resolve().parents[1] / configured_storage_path
 )
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+app.mount("/uploads", PublicUploadsStaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
+
+app.add_middleware(PublicRequestProtectionMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -116,6 +128,8 @@ def health():
 
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(first_access.public_router, prefix="/api")
+app.include_router(first_access.router, prefix="/api")
 app.include_router(account.router, prefix="/api")
 app.include_router(account.admin_router, prefix="/api")
 app.include_router(legal.router, prefix="/api")
@@ -142,17 +156,22 @@ app.include_router(institutional_documents.router, prefix="/api")
 app.include_router(institutional_document_generation.router, prefix="/api")
 app.include_router(posts.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(meetings.router, prefix="/api")
 app.include_router(recruitment.router, prefix="/api")
 app.include_router(alumni.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(gamification.router, prefix="/api")
+app.include_router(games.router, prefix="/api")
 app.include_router(impact.router, prefix="/api")
 app.include_router(members_import.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(academy.router, prefix="/api")
+app.include_router(academic.router, prefix="/api")
 app.include_router(archives.router, prefix="/api")
 app.include_router(institutional_memory.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 seed.register_seed_routes(app)
 app.include_router(system.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
+
+app.include_router(veille.router, prefix="/api")

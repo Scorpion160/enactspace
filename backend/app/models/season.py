@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, Date, Boolean, DateTime
+from sqlalchemy import String, Date, Boolean, DateTime, Index, text
 
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,4 +26,10 @@ class Season(Base):
     is_current: Mapped[bool] = mapped_column(Boolean, default=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+    __table_args__ = (
+        Index("ux_seasons_current", "is_current", unique=True,
+              postgresql_where=text("is_current = true"),
+              sqlite_where=text("is_current = 1")),
+    )

@@ -26,6 +26,7 @@ Future<InstitutionalRequestFormResult?> showInstitutionalRequestFormDialog(
   required InstitutionalDocumentsGateway gateway,
   required InstitutionalTemplateModel template,
   InstitutionalDocumentRequestModel? request,
+  InstitutionalRequestFormResult? initialDraft,
 }) {
   return showDialog<InstitutionalRequestFormResult>(
     context: context,
@@ -38,6 +39,7 @@ Future<InstitutionalRequestFormResult?> showInstitutionalRequestFormDialog(
           gateway: gateway,
           template: template,
           request: request,
+          initialDraft: initialDraft,
         ),
       ),
     ),
@@ -48,12 +50,14 @@ class InstitutionalRequestForm extends StatefulWidget {
   final InstitutionalDocumentsGateway gateway;
   final InstitutionalTemplateModel template;
   final InstitutionalDocumentRequestModel? request;
+  final InstitutionalRequestFormResult? initialDraft;
 
   const InstitutionalRequestForm({
     super.key,
     required this.gateway,
     required this.template,
     this.request,
+    this.initialDraft,
   });
 
   @override
@@ -81,10 +85,18 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   void initState() {
     super.initState();
     final request = widget.request;
-    _poleId = request?.poleId;
-    _projectId = request?.projectId;
-    _eventId = request?.eventId;
-    _seasonId = request?.seasonId;
+    _poleId = widget.initialDraft != null
+        ? widget.initialDraft!.poleId
+        : request?.poleId;
+    _projectId = widget.initialDraft != null
+        ? widget.initialDraft!.projectId
+        : request?.projectId;
+    _eventId = widget.initialDraft != null
+        ? widget.initialDraft!.eventId
+        : request?.eventId;
+    _seasonId = widget.initialDraft != null
+        ? widget.initialDraft!.seasonId
+        : request?.seasonId;
     if (_poleId != null) {
       _optionalScope = 'pole';
     } else if (_projectId != null) {
@@ -95,7 +107,10 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   }
 
   void _initializeFieldValues() {
-    final payload = widget.request?.payload ?? const <String, dynamic>{};
+    final payload =
+        widget.initialDraft?.payload ??
+        widget.request?.payload ??
+        const <String, dynamic>{};
     for (final field in widget.template.fields) {
       final value = payload[field.name];
       if (field.type == 'user') {
@@ -220,7 +235,9 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
               FilledButton.icon(
                 onPressed: _loading ? null : _save,
                 icon: const Icon(Icons.save_outlined),
-                label: Text(widget.request == null ? 'Créer le brouillon' : 'Enregistrer'),
+                label: Text(
+                  widget.request == null ? 'Créer le brouillon' : 'Enregistrer',
+                ),
               ),
             ],
           ),
@@ -247,10 +264,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         ),
         items: veillePoles
             .map(
-              (pole) => DropdownMenuItem(
-                value: pole.id,
-                child: Text(pole.name),
-              ),
+              (pole) =>
+                  DropdownMenuItem(value: pole.id, child: Text(pole.name)),
             )
             .toList(),
         onChanged: (value) => setState(() => _poleId = value),
@@ -287,12 +302,14 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         children: [
           Text(
             'Périmètre du document',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           SegmentedButton<String>(
+            expandedInsets: EdgeInsets.zero,
+            showSelectedIcon: false,
             segments: const [
               ButtonSegment(value: 'none', label: Text('Club')),
               ButtonSegment(value: 'pole', label: Text('Pôle')),
@@ -325,8 +342,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _poleId = value),
-              validator: (value) =>
-                  _optionalScope == 'pole' && value == null
+              validator: (value) => _optionalScope == 'pole' && value == null
                   ? 'Sélectionnez un pôle.'
                   : null,
             ),
@@ -346,8 +362,7 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _projectId = value),
-              validator: (value) =>
-                  _optionalScope == 'project' && value == null
+              validator: (value) => _optionalScope == 'project' && value == null
                   ? 'Sélectionnez un projet.'
                   : null,
             ),
@@ -379,7 +394,8 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
                 ),
               )
               .toList(),
-          onChanged: (value) => setState(() => _singleUsers[field.name] = value),
+          onChanged: (value) =>
+              setState(() => _singleUsers[field.name] = value),
           validator: (value) => field.required && value == null
               ? 'Ce champ est obligatoire.'
               : null,
@@ -452,9 +468,24 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
           icon: const Icon(Icons.clear_rounded),
         ),
       ),
-      validator: (value) => field.required && (value == null || value.trim().isEmpty)
-          ? 'Ce champ est obligatoire.'
-          : null,
+      validator: (value) {
+        final raw = value?.trim() ?? '';
+        if (field.required && raw.isEmpty) return 'Ce champ est obligatoire.';
+        if (raw.isEmpty) return null;
+        if (field.type == 'number') {
+          final number = num.tryParse(raw);
+          if (number == null || !number.isFinite || number < 0) {
+            return 'Saisissez un nombre valide et positif.';
+          }
+          if (field.name == 'passenger_count' ||
+              field.name == 'requested_capacity') {
+            if (number <= 0 || number != number.roundToDouble()) {
+              return 'Saisissez un nombre entier supérieur à zéro.';
+            }
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -486,9 +517,24 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
         alignLabelWithHint: rich,
         helperText: _helper(field.type),
       ),
-      validator: (value) => field.required && (value == null || value.trim().isEmpty)
-          ? 'Ce champ est obligatoire.'
-          : null,
+      validator: (value) {
+        final raw = value?.trim() ?? '';
+        if (field.required && raw.isEmpty) return 'Ce champ est obligatoire.';
+        if (raw.isEmpty) return null;
+        if (field.type == 'number') {
+          final number = num.tryParse(raw);
+          if (number == null || !number.isFinite || number < 0) {
+            return 'Saisissez un nombre valide et positif.';
+          }
+          if (field.name == 'passenger_count' ||
+              field.name == 'requested_capacity') {
+            if (number <= 0 || number != number.roundToDouble()) {
+              return 'Saisissez un nombre entier supérieur à zéro.';
+            }
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -535,7 +581,10 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
             minute: int.tryParse(parts[1]) ?? TimeOfDay.now().minute,
           )
         : TimeOfDay.now();
-    final selected = await showTimePicker(context: context, initialTime: initial);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
     if (selected != null && mounted) {
       _controllers[field.name]?.text =
           '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
@@ -569,7 +618,9 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
   }
 
   Future<void> _chooseMembers(InstitutionalFieldModel field) async {
-    final selected = Set<String>.from(_multiUsers[field.name] ?? const <String>{});
+    final selected = Set<String>.from(
+      _multiUsers[field.name] ?? const <String>{},
+    );
     final result = await showDialog<Set<String>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -630,8 +681,13 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
       return;
     }
 
-    final payload = <String, dynamic>{};
+    final original =
+        widget.initialDraft?.payload ??
+        widget.request?.payload ??
+        const <String, dynamic>{};
+    final payload = Map<String, dynamic>.from(original);
     for (final field in widget.template.fields) {
+      payload.remove(field.name);
       if (field.type == 'user') {
         final value = _singleUsers[field.name];
         if (value != null && value.isNotEmpty) payload[field.name] = value;
@@ -641,7 +697,12 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
       } else {
         final raw = _controllers[field.name]?.text.trim() ?? '';
         if (raw.isNotEmpty) {
-          payload[field.name] = _parseFieldValue(field.type, raw);
+          // Keep structured data exactly as stored when the field was not edited.
+          payload[field.name] =
+              raw ==
+                  _serializeFieldValue(field.type, original[field.name]).trim()
+              ? original[field.name]
+              : _parseFieldValue(field.type, raw);
         }
       }
     }
@@ -712,25 +773,33 @@ class _InstitutionalRequestFormState extends State<InstitutionalRequestForm> {
     switch (type) {
       case 'structured_list':
       case 'decision_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['title'] ?? item['name'] ?? item['label'] ?? ''} | ${item['details'] ?? item['description'] ?? item['decision'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['title'] ?? item['name'] ?? item['label'] ?? ''} | ${item['details'] ?? item['description'] ?? item['decision'] ?? ''}';
+            })
+            .join('\n');
       case 'action_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['action'] ?? item['title'] ?? ''} | ${item['responsible'] ?? item['owner'] ?? ''} | ${item['deadline'] ?? item['due_date'] ?? ''} | ${item['status'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['action'] ?? item['title'] ?? ''} | ${item['responsible'] ?? item['owner'] ?? ''} | ${item['deadline'] ?? item['due_date'] ?? ''} | ${item['status'] ?? ''}';
+            })
+            .join('\n');
       case 'vote_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['title'] ?? item['resolution'] ?? ''} | ${item['for'] ?? 0} | ${item['against'] ?? 0} | ${item['abstain'] ?? 0}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['title'] ?? item['resolution'] ?? ''} | ${item['for'] ?? 0} | ${item['against'] ?? 0} | ${item['abstain'] ?? 0}';
+            })
+            .join('\n');
       case 'route_list':
-        return value.map((item) {
-          if (item is! Map) return item.toString();
-          return '${item['from'] ?? ''} | ${item['to'] ?? ''} | ${item['distance'] ?? ''}';
-        }).join('\n');
+        return value
+            .map((item) {
+              if (item is! Map) return item.toString();
+              return '${item['from'] ?? ''} | ${item['to'] ?? ''} | ${item['distance'] ?? ''}';
+            })
+            .join('\n');
       default:
         return value.map((item) => item.toString()).join('\n');
     }

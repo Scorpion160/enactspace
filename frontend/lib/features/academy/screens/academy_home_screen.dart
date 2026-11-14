@@ -1,11 +1,16 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/academy_models.dart';
 import '../services/academy_gateway.dart';
+import '../widgets/academy_quiz_dialog.dart';
+import '../widgets/academy_artwork.dart';
+import '../widgets/academy_style.dart';
 
 class AcademyHomeScreen extends StatefulWidget {
   final AcademyGateway? gateway;
@@ -58,67 +63,50 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
     }
   }
 
-  Future<void> _completeNextLesson(AcademyCourseModel course) async {
-    final pendingLessons = course.lessons
-        .where((lesson) => !lesson.completed)
-        .toList();
-    if (pendingLessons.isEmpty) {
-      _showRewardSnack(
-        const AcademyRewardResult(
-          points: 0,
-          label: 'Toutes les leçons sont déjà terminées',
-          syncedWithGamification: true,
-        ),
-      );
-      return;
-    }
-
-    final lesson = pendingLessons.first;
-    final actionId = 'lesson-${course.id}';
-    setState(() => _rewardingActionId = actionId);
-
-    final result = await _gateway.completeLesson(lesson.id);
-    final data = await _gateway.loadHome();
-
-    if (!mounted) return;
-    setState(() {
-      _data = data;
-      _rewardingActionId = null;
-    });
-    _showRewardSnack(result);
+  void _completeNextLesson(AcademyCourseModel course) {
+    context.go(
+      '/academy/courses/${course.id}${course.isLocked || course.isMastered ? '' : '?resume=true'}',
+      extra: _gateway,
+    );
   }
 
-  Future<void> _passQuiz(
-    AcademyCourseModel course, {
-    List<int>? answers,
-  }) async {
-    final actionId = 'quiz-${course.id}';
-    setState(() => _rewardingActionId = actionId);
-
-    final result = await _gateway.submitQuiz(
-      course.quiz.id,
-      answers ?? const [],
+  void _continueLearning() {
+    final courses = _data?.courses ?? [];
+    final inProgress = courses.where(
+      (c) => !c.isLocked && c.lessons.any((l) => l.started && !l.completed),
     );
-    final data = await _gateway.loadHome();
-
-    if (!mounted) return;
-    setState(() {
-      _data = data;
-      _rewardingActionId = null;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${result.passed ? 'Quiz réussi' : 'Quiz à reprendre'} · score ${result.score.toStringAsFixed(0)} · ${result.points} point(s)${result.attemptNumber == null ? '' : ' · tentative ${result.attemptNumber}'}',
-        ),
-      ),
-    );
+    final paths =
+        _data?.paths.where((p) => p.id == 'new-enacteur').toList() ?? [];
+    final ordered = paths.isEmpty
+        ? courses
+        : [
+            for (final id in paths.first.courseIds)
+              ...courses.where((c) => c.id == id),
+            ...courses.where((c) => !paths.first.courseIds.contains(c.id)),
+          ];
+    final remaining = ordered.where((c) => !c.isLocked && !c.isMastered);
+    final course = inProgress.isNotEmpty
+        ? inProgress.first
+        : remaining.isNotEmpty
+        ? remaining.first
+        : null;
+    if (course != null) _completeNextLesson(course);
   }
 
   Future<void> _openQuiz(AcademyCourseModel course) async {
-    AcademyQuizModel quiz;
+    if (_rewardingActionId != null || !course.canTakeQuiz) return;
+    setState(() => _rewardingActionId = 'quiz-${course.id}');
     try {
-      quiz = await _gateway.getQuiz(course.quiz.id);
+      final quiz = await _gateway.getQuiz(course.quiz.id);
+      if (!mounted) return;
+      await showDialog<AcademyQuizResult>(
+        context: context,
+        builder: (_) => AcademyQuizDialog(
+          quiz: quiz,
+          submit: (answers) => _gateway.submitQuiz(quiz.id, answers),
+        ),
+      );
+      if (mounted) await _loadAcademy();
     } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
@@ -126,191 +114,219 @@ class _AcademyHomeScreenState extends State<AcademyHomeScreen> {
             content: Text(error.toString().replaceFirst('Exception: ', '')),
           ),
         );
-      return;
+    } finally {
+      if (mounted) setState(() => _rewardingActionId = null);
     }
-    final backendCourse = AcademyCourseModel(
-      id: course.id,
-      title: course.title,
-      category: course.category,
-      level: course.level,
-      description: course.description,
-      durationMinutes: course.durationMinutes,
-      points: course.points,
-      isRequired: course.isRequired,
-      targetRoles: course.targetRoles,
-      isPublished: course.isPublished,
-      poleId: course.poleId,
-      projectId: course.projectId,
-      lessons: course.lessons,
-      quiz: quiz,
-    );
-    final attempt = await showDialog<_AcademyQuizAttemptResult>(
-      context: context,
-      builder: (context) => _AcademyQuizDialog(course: backendCourse),
-    );
-
-    if (!mounted || attempt == null) return;
-    await _passQuiz(backendCourse, answers: attempt.answers);
-  }
-
-  void _showRewardSnack(AcademyRewardResult result) {
-    final suffix = result.syncedWithGamification
-        ? 'Synchronisé avec Gamification.'
-        : 'Résultat enregistré par Academy.';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result.points > 0
-              ? '${result.label}: +${result.points} points. $suffix'
-              : '${result.label}. $suffix',
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadAcademy,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const _AcademyHeader(),
-          const SizedBox(height: 18),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(42),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_error != null)
-            _AcademyErrorCard(message: _error!, onRetry: _loadAcademy)
-          else
-            _AcademyContent(
-              data: _data!,
-              searchController: _searchController,
-              courseFilter: _courseFilter,
-              levelFilter: _levelFilter,
-              categoryFilter: _categoryFilter,
-              onFiltersChanged: () => setState(() {}),
-              onCourseFilterChanged: (value) {
-                setState(() => _courseFilter = value);
-              },
-              onLevelChanged: (value) => setState(() => _levelFilter = value),
-              onCategoryChanged: (value) {
-                setState(() => _categoryFilter = value);
-              },
-              rewardingActionId: _rewardingActionId,
-              onCompleteNextLesson: _completeNextLesson,
-              onPassQuiz: _openQuiz,
+    return AcademyStyle(
+      child: Builder(
+        builder: (context) => RefreshIndicator(
+          onRefresh: _loadAcademy,
+          child: ListView(
+            padding: EdgeInsets.all(
+              MediaQuery.sizeOf(context).width < 700 ? 12 : 18,
             ),
-        ],
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final hero = _AcademyHeader(
+                    onContinue:
+                        _loading ||
+                            _data == null ||
+                            !_data!.courses.any(
+                              (c) => !c.isLocked && !c.isMastered,
+                            )
+                        ? null
+                        : _continueLearning,
+                  );
+                  if (_data == null || _loading || _error != null) return hero;
+                  final progress = _ProgressPanel(progress: _data!.progress);
+                  if (constraints.maxWidth >= 850 &&
+                      MediaQuery.textScalerOf(context).scale(16) <= 24) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: hero),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 2, child: progress),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [hero, const SizedBox(height: 16), progress],
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              if (_data?.offline == true && !_loading && _error == null) ...[
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.offline_bolt_outlined),
+                    title: Text('Cours disponibles hors connexion'),
+                    subtitle: Text(
+                      'Tu peux lire les contenus conservés et poursuivre les leçons. Tes réponses et ta progression seront synchronisées au retour de la connexion.',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if ((_data?.pendingActions ?? 0) > 0 && !_loading)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: const Text('Tes progrès sont conservés'),
+                    subtitle: Text(
+                      'Ils seront envoyés dès que la connexion sera rétablie.',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Réessayer',
+                      onPressed: _loadAcademy,
+                      icon: const Icon(Icons.sync),
+                    ),
+                  ),
+                ),
+              if (_loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(42),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_error != null)
+                _AcademyErrorCard(message: _error!, onRetry: _loadAcademy)
+              else
+                _AcademyContent(
+                  gateway: _gateway,
+                  data: _data!,
+                  searchController: _searchController,
+                  courseFilter: _courseFilter,
+                  levelFilter: _levelFilter,
+                  categoryFilter: _categoryFilter,
+                  onFiltersChanged: () => setState(() {}),
+                  onCourseFilterChanged: (value) {
+                    setState(() => _courseFilter = value);
+                  },
+                  onLevelChanged: (value) =>
+                      setState(() => _levelFilter = value),
+                  onCategoryChanged: (value) {
+                    setState(() => _categoryFilter = value);
+                  },
+                  rewardingActionId: _rewardingActionId,
+                  onCompleteNextLesson: _completeNextLesson,
+                  onPassQuiz: _openQuiz,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _AcademyHeader extends StatelessWidget {
-  const _AcademyHeader();
-
+  final VoidCallback? onContinue;
+  const _AcademyHeader({this.onContinue});
   @override
-  Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 760;
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF102B36), Color(0xFF061B28)],
       ),
-      child: wide
-          ? Row(
-              children: [
-                const _HeaderIcon(),
-                const SizedBox(width: 18),
-                const Expanded(child: _HeaderCopy()),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Continuer'),
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    _HeaderIcon(),
-                    SizedBox(width: 18),
-                    Expanded(child: _HeaderCopy()),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Continuer'),
-                  ),
-                ),
-              ],
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: const Color(0xFF31515D)),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+        final wide =
+            MediaQuery.sizeOf(context).width >= 900 &&
+            constraints.maxWidth >= 400;
+        final sideArt = constraints.maxWidth >= 280 && scale <= 1.3;
+        final copy = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              wide ? 'APPRENDRE POUR AGIR' : 'ENACTSPACE ACADEMY',
+              style: const TextStyle(
+                color: Color(0xFFFFD34D),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
             ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Icon(
-        Icons.school_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
-      ),
-    );
-  }
-}
-
-class _HeaderCopy extends StatelessWidget {
-  const _HeaderCopy();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'EnactSpace Academy',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
+            const SizedBox(height: 12),
+            Text(
+              wide ? 'Fais grandir ton impact.' : 'Apprendre pour agir.',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: wide ? 32 : 26,
+                fontWeight: FontWeight.w900,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              wide
+                  ? 'Des leçons, des projets et de la pratique pour avancer à ton rythme.'
+                  : 'Avance à ton rythme, fais grandir ton impact.',
+              style: const TextStyle(color: Color(0xFFD2E2E8), height: 1.5),
+            ),
+          ],
+        );
+        final button = ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFFD34D),
+            foregroundColor: const Color(0xFF151D24),
+            disabledBackgroundColor: const Color(0xFF344A54),
+            disabledForegroundColor: const Color(0xFFCBDAE0),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           ),
-        ),
-        SizedBox(height: 6),
-        Text(
-          'Cours courts, quiz, badges et parcours pour maîtriser la culture Enactus et préparer la compétition.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
-        ),
-      ],
-    );
-  }
+          onPressed: onContinue,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text(
+            'Continuer mon apprentissage',
+            textAlign: TextAlign.center,
+          ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (sideArt)
+              Row(
+                children: [
+                  Expanded(flex: 3, child: copy),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: AcademyArtwork(
+                      name: 'hero_learning',
+                      height: wide ? 178 : 156,
+                    ),
+                  ),
+                ],
+              )
+            else
+              copy,
+            if (!sideArt)
+              const AcademyArtwork(name: 'hero_learning', height: 100),
+            const SizedBox(height: 18),
+            if (wide)
+              Align(alignment: Alignment.centerLeft, child: button)
+            else
+              button,
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _AcademyContent extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyHomeData data;
   final TextEditingController searchController;
   final String courseFilter;
@@ -325,6 +341,7 @@ class _AcademyContent extends StatelessWidget {
   final ValueChanged<AcademyCourseModel> onPassQuiz;
 
   const _AcademyContent({
+    required this.gateway,
     required this.data,
     required this.searchController,
     required this.courseFilter,
@@ -346,7 +363,7 @@ class _AcademyContent extends StatelessWidget {
       final searchable = [
         course.title,
         course.description,
-        course.category,
+        course.categoryLabel,
         course.level,
         ...course.lessons.map((lesson) => lesson.title),
         ...course.lessons.map((lesson) => lesson.summary),
@@ -360,7 +377,7 @@ class _AcademyContent extends StatelessWidget {
       final matchesCourseFilter = switch (courseFilter) {
         'required' => course.isRequired,
         'in_progress' => course.isInProgress,
-        'completed' => course.isCompleted,
+        'completed' => course.isMastered,
         _ => true,
       };
 
@@ -396,8 +413,21 @@ class _AcademyContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ProgressPanel(progress: data.progress),
         const SizedBox(height: 22),
+        const _SectionTitle(
+          title: 'Ton parcours recommandé',
+          subtitle:
+              'Des chemins courts pour intégrer, progresser et préparer les temps forts.',
+        ),
+        const SizedBox(height: 12),
+        _PathGrid(paths: data.paths, gateway: gateway),
+        const SizedBox(height: 22),
+        const _SectionTitle(
+          title: 'Explore les formations',
+          subtitle:
+              'Des leçons expliquées, des exemples et des exercices pour apprendre en agissant.',
+        ),
+        const SizedBox(height: 12),
         _AcademyFiltersCard(
           controller: searchController,
           courseFilter: courseFilter,
@@ -407,26 +437,16 @@ class _AcademyContent extends StatelessWidget {
           onCourseFilterChanged: onCourseFilterChanged,
           onLevelChanged: onLevelChanged,
           onCategoryChanged: onCategoryChanged,
-        ),
-        const SizedBox(height: 22),
-        const _SectionTitle(
-          title: 'Parcours recommandés',
-          subtitle:
-              'Des chemins courts pour intégrer, progresser et préparer les temps forts.',
-        ),
-        const SizedBox(height: 12),
-        _PathGrid(paths: data.paths),
-        const SizedBox(height: 22),
-        const _SectionTitle(
-          title: 'Catalogue de cours',
-          subtitle:
-              'Leçons courtes, quiz et points Academy connectables à la gamification.',
+          categories: data.courses.map((c) => c.category).toSet().toList()
+            ..sort(),
         ),
         const SizedBox(height: 12),
         _CourseGrid(
+          gateway: gateway,
           courses: _filteredCourses,
           rewardingActionId: rewardingActionId,
           onCompleteNextLesson: onCompleteNextLesson,
+          onPassQuiz: onPassQuiz,
         ),
         const SizedBox(height: 22),
         const _SectionTitle(
@@ -435,7 +455,22 @@ class _AcademyContent extends StatelessWidget {
               'Apprendre à partir des anciens projets, de leurs impacts et de leurs difficultés.',
         ),
         const SizedBox(height: 12),
-        _CaseStudiesGrid(caseStudies: _filteredCaseStudies),
+        if (data.caseStudies.isNotEmpty)
+          _CaseStudiesGrid(caseStudies: _filteredCaseStudies)
+        else
+          _CourseGrid(
+            gateway: gateway,
+            courses: _filteredCourses
+                .where(
+                  (c) =>
+                      c.title.startsWith('Étude') ||
+                      c.title.startsWith('Histoire'),
+                )
+                .toList(),
+            rewardingActionId: rewardingActionId,
+            onCompleteNextLesson: onCompleteNextLesson,
+            onPassQuiz: onPassQuiz,
+          ),
         const SizedBox(height: 22),
         const _SectionTitle(
           title: 'Quiz rapides',
@@ -443,18 +478,19 @@ class _AcademyContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _QuizStrip(
-          courses: data.courses,
+          courses: data.courses.where((c) => c.quiz.id.isNotEmpty).toList(),
           rewardingActionId: rewardingActionId,
           onPassQuiz: onPassQuiz,
         ),
         const SizedBox(height: 22),
-        const _SectionTitle(
-          title: 'Badges Academy',
-          subtitle:
-              'Récompenser les apprentissages positifs sans exposer les difficultés.',
-        ),
+        if (data.badges.isNotEmpty)
+          const _SectionTitle(
+            title: 'Badges Academy',
+            subtitle:
+                'Récompenser les apprentissages positifs sans exposer les difficultés.',
+          ),
         const SizedBox(height: 12),
-        _BadgeGrid(badges: data.badges),
+        if (data.badges.isNotEmpty) _BadgeGrid(badges: data.badges),
       ],
     );
   }
@@ -462,124 +498,211 @@ class _AcademyContent extends StatelessWidget {
 
 class _ProgressPanel extends StatelessWidget {
   final AcademyProgressModel progress;
-
   const _ProgressPanel({required this.progress});
-
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final colors = Theme.of(context).colorScheme;
+    final ratio = progress.lessonsProgress.clamp(0.0, 1.0);
+    final expandedPanel = Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 720;
-            final summary = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                const Text(
-                  'Ma progression Academy',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                Icon(Icons.bar_chart_rounded, color: colors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ma progression',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Un suivi personnel et positif: leçons terminées, quiz réussis, points et badges.',
-                  style: TextStyle(color: Colors.black54, height: 1.4),
-                ),
-                const SizedBox(height: 14),
-                Wrap(
+              ],
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked =
+                    constraints.maxWidth < 210 ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                final width = stacked
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 16) / 3;
+                return Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    Chip(label: Text('${progress.points} points')),
-                    Chip(label: Text('Rang positif #${progress.rank}')),
-                    Chip(
-                      label: Text(
-                        '${progress.monthlyProgress.toStringAsFixed(0)}% ce mois',
+                    for (final stat in [
+                      (
+                        '${progress.completedLessons}/${progress.totalLessons}',
+                        'Leçons',
+                        Icons.menu_book_rounded,
+                      ),
+                      (
+                        '${progress.passedQuizzes}/${progress.totalQuizzes}',
+                        'Quiz réussis',
+                        Icons.task_alt_rounded,
+                      ),
+                      ('${progress.points}', 'Points', Icons.star_rounded),
+                    ])
+                      SizedBox(
+                        width: width,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerLow,
+                            border: Border.all(color: colors.outlineVariant),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                stat.$3,
+                                color: stat.$2 == 'Points'
+                                    ? academyYellow
+                                    : colors.primary,
+                              ),
+                              const SizedBox(height: 9),
+                              Text(
+                                stat.$1,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(stat.$2, textAlign: TextAlign.center),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            AcademyProgressBar(value: ratio),
+            const SizedBox(height: 9),
+            Text(
+              '${(ratio * 100).round()} % des leçons terminées',
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 440 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3)
+          return expandedPanel;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Ma progression',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final stat in [
+                                (
+                                  '${progress.completedLessons}/${progress.totalLessons}',
+                                  'Leçons',
+                                ),
+                                (
+                                  '${progress.passedQuizzes}/${progress.totalQuizzes}',
+                                  'Quiz réussis',
+                                ),
+                                ('${progress.points}', 'Points'),
+                              ])
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        stat.$1,
+                                        style: const TextStyle(
+                                          fontSize: 21,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        stat.$2,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ExcludeSemantics(
+                      child: Image.asset(
+                        'assets/img/academy_mobile_progression.webp',
+                        width: constraints.maxWidth < 310 ? 52 : 68,
+                        height: 85,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ],
                 ),
-              ],
-            );
-            final meters = Column(
-              children: [
-                _ProgressMeter(
-                  label: 'Leçons',
-                  value: progress.lessonsProgress,
-                  detail:
-                      '${progress.completedLessons}/${progress.totalLessons}',
-                ),
-                const SizedBox(height: 12),
-                _ProgressMeter(
-                  label: 'Quiz',
-                  value: progress.quizProgress,
-                  detail: '${progress.passedQuizzes}/${progress.totalQuizzes}',
+                const SizedBox(height: 16),
+                AcademyProgressBar(value: ratio),
+                const SizedBox(height: 7),
+                Text(
+                  '${(ratio * 100).round()} % des leçons terminées',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ],
-            );
-
-            if (wide) {
-              return Row(
-                children: [
-                  Expanded(child: summary),
-                  const SizedBox(width: 22),
-                  SizedBox(width: 280, child: meters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [summary, const SizedBox(height: 18), meters],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressMeter extends StatelessWidget {
-  final String label;
-  final double value;
-  final String detail;
-
-  const _ProgressMeter({
-    required this.label,
-    required this.value,
-    required this.detail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
             ),
-            Text(detail, style: const TextStyle(color: Colors.black54)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: value.clamp(0.0, 1.0),
-          minHeight: 9,
-          borderRadius: BorderRadius.circular(99),
-          color: AppTheme.enactusYellow,
-          backgroundColor: Colors.black.withValues(alpha: 0.08),
-        ),
-      ],
+          ),
+        );
+      },
     );
   }
 }
 
 class _AcademyFiltersCard extends StatelessWidget {
+  final List<String> categories;
   final TextEditingController controller;
   final String courseFilter;
   final String levelFilter;
@@ -590,6 +713,7 @@ class _AcademyFiltersCard extends StatelessWidget {
   final ValueChanged<String> onCategoryChanged;
 
   const _AcademyFiltersCard({
+    this.categories = const [],
     required this.controller,
     required this.courseFilter,
     required this.levelFilter,
@@ -602,122 +726,96 @@ class _AcademyFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 820;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: InputDecoration(
-                labelText: 'Rechercher cours, quiz, cas pratique',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: controller.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          controller.clear();
-                          onChanged();
-                        },
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Effacer',
-                      ),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _AcademyChoiceChip(
-                  label: 'Tous',
-                  selected: courseFilter == 'all',
-                  onSelected: () => onCourseFilterChanged('all'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Obligatoires',
-                  selected: courseFilter == 'required',
-                  onSelected: () => onCourseFilterChanged('required'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'En cours',
-                  selected: courseFilter == 'in_progress',
-                  onSelected: () => onCourseFilterChanged('in_progress'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Termines',
-                  selected: courseFilter == 'completed',
-                  onSelected: () => onCourseFilterChanged('completed'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Tous niveaux',
-                  selected: levelFilter == 'all',
-                  onSelected: () => onLevelChanged('all'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Débutant',
-                  selected: levelFilter == 'debutant',
-                  onSelected: () => onLevelChanged('debutant'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Intermédiaire',
-                  selected: levelFilter == 'intermediaire',
-                  onSelected: () => onLevelChanged('intermediaire'),
-                ),
-                _AcademyChoiceChip(
-                  label: 'Avancé',
-                  selected: levelFilter == 'avance',
-                  onSelected: () => onLevelChanged('avance'),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Catégorie',
-                  onSelected: onCategoryChanged,
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'all', child: Text('Toutes')),
-                    PopupMenuItem(
-                      value: 'culture_enactus',
-                      child: Text('Culture Enactus'),
-                    ),
-                    PopupMenuItem(value: 'impact', child: Text('Impact')),
-                    PopupMenuItem(
-                      value: 'business_principles',
-                      child: Text('Business Principles'),
-                    ),
-                    PopupMenuItem(
-                      value: 'competition',
-                      child: Text('Compétition'),
-                    ),
-                    PopupMenuItem(
-                      value: 'leadership',
-                      child: Text('Leadership'),
-                    ),
-                  ],
-                  child: Chip(
-                    avatar: const Icon(Icons.tune_rounded, size: 16),
-                    label: Text(_academyCategoryLabel(categoryFilter)),
-                  ),
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, const SizedBox(height: 12), filters],
-            );
-          },
+    final colors = Theme.of(context).colorScheme;
+    Widget menu(
+      String label,
+      List<(String, String)> values,
+      ValueChanged<String> changed,
+    ) => PopupMenuButton<String>(
+      tooltip: label,
+      onSelected: changed,
+      itemBuilder: (_) => [
+        for (final value in values)
+          PopupMenuItem(value: value.$1, child: Text(value.$2)),
+      ],
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLow,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+          ],
         ),
       ),
+    );
+    final levels = <(String, String)>[
+      ('all', 'Tous niveaux'),
+      ('debutant', 'Débutant'),
+      ('intermediaire', 'Intermédiaire'),
+      ('avance', 'Avancé'),
+      ('responsable', 'Responsable'),
+    ];
+    final levelLabel =
+        levels.where((v) => v.$1 == levelFilter).firstOrNull?.$2 ??
+        'Tous niveaux';
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          hintText: 'Rechercher une formation…',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Effacer',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged();
+                  },
+                ),
+        ),
+      ),
+      quickFilters: [
+        for (final item in [
+          ('all', 'Tous'),
+          ('required', 'Obligatoires'),
+          ('in_progress', 'En cours'),
+          ('completed', 'Terminés'),
+        ])
+          _AcademyChoiceChip(
+            label: item.$2,
+            selected: courseFilter == item.$1,
+            onSelected: () => onCourseFilterChanged(item.$1),
+          ),
+      ],
+      filters: [
+        menu(levelLabel, levels, onLevelChanged),
+        menu(_academyCategoryLabel(categoryFilter), [
+          ('all', 'Toutes les catégories'),
+          for (final c in categories) (_academyKey(c), academyCategoryLabel(c)),
+        ], onCategoryChanged),
+      ],
+      actions: const [],
+      activeFilterCount: [
+        courseFilter,
+        levelFilter,
+        categoryFilter,
+      ].where((v) => v != 'all').length,
+      onReset: () {
+        onCourseFilterChanged('all');
+        onLevelChanged('all');
+        onCategoryChanged('all');
+      },
     );
   }
 }
@@ -738,77 +836,136 @@ class _AcademyChoiceChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
+      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: selected
+            ? const Color(0xFF17212A)
+            : Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
+      showCheckmark: false,
       onSelected: (_) => onSelected(),
     );
   }
 }
 
 class _PathGrid extends StatelessWidget {
+  final AcademyGateway gateway;
   final List<AcademyPathModel> paths;
-
-  const _PathGrid({required this.paths});
-
+  const _PathGrid({required this.paths, required this.gateway});
   @override
   Widget build(BuildContext context) {
-    return _ResponsiveWrap(
-      minWidth: 280,
-      children: [for (final path in paths) _PathCard(path: path)],
+    if (paths.isEmpty) return const SizedBox.shrink();
+    final recommended =
+        paths.where((p) => p.id == 'new-enacteur').firstOrNull ?? paths.first;
+    final others = paths.where((p) => p.id != recommended.id).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PathCard(path: recommended, gateway: gateway),
+        if (others.isNotEmpty)
+          ExpansionTile(
+            title: const Text('Autres parcours'),
+            children: [
+              for (final path in others)
+                _PathCard(path: path, gateway: gateway),
+            ],
+          ),
+      ],
     );
   }
 }
 
 class _PathCard extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyPathModel path;
-
-  const _PathCard({required this.path});
-
+  const _PathCard({required this.path, required this.gateway});
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              path.title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 700;
+          final sideArt =
+              constraints.maxWidth >= 270 &&
+              MediaQuery.textScalerOf(context).scale(16) <= 24;
+          final action = OutlinedButton.icon(
+            onPressed: path.courseIds.isEmpty
+                ? null
+                : () => context.go('/academy/paths/${path.id}', extra: gateway),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            label: const Text(
+              'Explorer le parcours',
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              path.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, height: 1.35),
-            ),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(
-              value: (path.progress / 100).clamp(0.0, 1.0),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(99),
-              color: AppTheme.enactusYellow,
-              backgroundColor: Colors.black.withValues(alpha: 0.08),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '${path.progress.toStringAsFixed(0)}% complété',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                path.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (wide) ...[Text(path.description), const SizedBox(height: 8)],
+              Text(
+                '${path.courseIds.length} ${path.courseIds.length == 1 ? 'formation' : 'formations'} · ${path.progress.toStringAsFixed(0)} % complété',
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: (path.progress / 100).clamp(0.0, 1.0),
+                minHeight: 6,
+                color: AppTheme.enactusYellow,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              if (!wide) ...[const SizedBox(height: 10), action],
+            ],
+          );
+          if (!sideArt)
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AcademyArtwork(name: 'recommended_path', height: 85),
+                const SizedBox(height: 8),
+                copy,
+              ],
+            );
+          return Row(
+            children: [
+              SizedBox(
+                width: wide ? 150 : 88,
+                child: const AcademyArtwork(
+                  name: 'recommended_path',
+                  height: 100,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: copy),
+              if (wide) ...[const SizedBox(width: 20), action],
+            ],
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _CourseGrid extends StatelessWidget {
+  final AcademyGateway gateway;
   final List<AcademyCourseModel> courses;
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
   final String? rewardingActionId;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
 
   const _CourseGrid({
+    required this.gateway,
     required this.courses,
+    required this.onPassQuiz,
     required this.rewardingActionId,
     required this.onCompleteNextLesson,
   });
@@ -826,7 +983,9 @@ class _CourseGrid extends StatelessWidget {
       children: [
         for (final course in courses)
           _CourseCard(
+            gateway: gateway,
             course: course,
+            onPassQuiz: onPassQuiz,
             busy: rewardingActionId == 'lesson-${course.id}',
             onCompleteNextLesson: onCompleteNextLesson,
           ),
@@ -836,102 +995,176 @@ class _CourseGrid extends StatelessWidget {
 }
 
 class _CourseCard extends StatelessWidget {
+  final AcademyGateway gateway;
   final AcademyCourseModel course;
   final bool busy;
   final ValueChanged<AcademyCourseModel> onCompleteNextLesson;
-
+  final ValueChanged<AcademyCourseModel> onPassQuiz;
   const _CourseCard({
+    required this.gateway,
     required this.course,
     required this.busy,
     required this.onCompleteNextLesson,
+    required this.onPassQuiz,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final completed = course.lessons.where((lesson) => lesson.completed).length;
-    final done = completed == course.lessonCount;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text(course.levelLabel)),
-                Chip(label: Text(course.category)),
-                if (course.isRequired) const Chip(label: Text('Obligatoire')),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              course.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              course.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, height: 1.35),
-            ),
-            const SizedBox(height: 14),
-            LinearProgressIndicator(
-              value: course.progress.clamp(0.0, 1.0),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(99),
-              color: AppTheme.enactusYellow,
-              backgroundColor: Colors.black.withValues(alpha: 0.08),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text('${course.lessonCount} leçons')),
-                Chip(label: Text('${course.durationMinutes} min')),
-                Chip(label: Text('+${course.points} pts')),
-                Chip(label: Text('$completed/${course.lessonCount} fait')),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: () => context.go('/academy/courses/${course.id}'),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Ouvrir la formation'),
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final mobile = MediaQuery.sizeOf(context).width < 700;
+          final compact =
+              mobile &&
+              constraints.maxWidth >= 270 &&
+              MediaQuery.textScalerOf(context).scale(16) <= 24;
+          final colors = Theme.of(context).colorScheme;
+          final started = course.lessons.any((l) => l.started || l.completed);
+          final label = course.isLocked
+              ? 'Voir les prérequis'
+              : course.isMastered
+              ? 'Relire'
+              : course.canTakeQuiz
+              ? 'Passer le quiz'
+              : started
+              ? 'Reprendre'
+              : 'Commencer';
+          final title = Text(
+            course.title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          );
+          final chips = Wrap(
+            spacing: 6,
+            runSpacing: 5,
+            children: [
+              for (final text in [
+                course.levelLabel,
+                course.categoryLabel,
+                if (course.isRequired) 'Obligatoire',
+              ])
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+            ],
+          );
+          final progress = Column(
+            children: [
+              LinearProgressIndicator(
+                value: course.progress.clamp(0.0, 1.0),
+                minHeight: 6,
+                color: AppTheme.enactusYellow,
+                borderRadius: BorderRadius.circular(99),
               ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: busy || done
-                    ? null
-                    : () => onCompleteNextLesson(course),
-                icon: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        done ? Icons.check_rounded : Icons.play_arrow_rounded,
-                      ),
-                label: Text(done ? 'Cours terminé' : 'Terminer une leçon'),
+              const SizedBox(height: 5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${course.completedLessonCount}/${course.lessonCount} fait',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
               ),
+            ],
+          );
+          final action = FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: course.isLocked
+                  ? colors.secondaryContainer
+                  : AppTheme.enactusYellow,
+              foregroundColor: course.isLocked
+                  ? colors.onSecondaryContainer
+                  : const Color(0xFF17212A),
             ),
-          ],
-        ),
+            onPressed: busy
+                ? null
+                : () {
+                    if (course.isLocked || course.isMastered) {
+                      context.go(
+                        '/academy/courses/${course.id}',
+                        extra: gateway,
+                      );
+                    } else if (course.canTakeQuiz) {
+                      onPassQuiz(course);
+                    } else {
+                      onCompleteNextLesson(course);
+                    }
+                  },
+            icon: Icon(
+              course.isLocked
+                  ? Icons.lock_outline_rounded
+                  : Icons.arrow_forward_rounded,
+              size: 17,
+            ),
+            label: Text(label, textAlign: TextAlign.center),
+          );
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              chips,
+              const SizedBox(height: 8),
+              title,
+              const SizedBox(height: 6),
+              if (!compact) ...[
+                Text(
+                  course.description,
+                  style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                '${course.lessonCount} leçons · ${course.durationMinutes} min${compact ? '' : ' · +${course.points} pts'}',
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              progress,
+              const SizedBox(height: 8),
+              action,
+            ],
+          );
+          final image = Container(
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: AcademyArtwork(
+              name: academyCourseArtwork(course.title, course.category),
+              height: compact ? 130 : 110,
+            ),
+          );
+          if (compact)
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 88, child: image),
+                const SizedBox(width: 12),
+                Expanded(child: details),
+              ],
+            );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [image, const SizedBox(height: 12), details],
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _QuizStrip extends StatelessWidget {
@@ -954,17 +1187,17 @@ class _QuizStrip extends StatelessWidget {
             ListTile(
               leading: CircleAvatar(
                 backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.24),
-                foregroundColor: AppTheme.softBlack,
-                child: const Icon(Icons.quiz_rounded),
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                child: Icon(Icons.quiz_rounded),
               ),
               title: Text(
                 course.quiz.title,
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(fontWeight: FontWeight.w900),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                '${course.quiz.level} • ${course.quiz.questions.length} question(s) • ${course.quiz.timeLimitMinutes} min',
+                '${course.levelLabel} • ${course.quiz.timeLimitMinutes} min${course.quizPassed ? ' • Réussi' : ''}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -978,358 +1211,18 @@ class _QuizStrip extends StatelessWidget {
                       ),
                     )
                   : IconButton(
-                      onPressed: () => onPassQuiz(course),
-                      icon: const Icon(Icons.play_circle_fill_rounded),
-                      tooltip: 'Commencer le quiz',
+                      onPressed: course.canTakeQuiz
+                          ? () => onPassQuiz(course)
+                          : null,
+                      icon: Icon(Icons.play_circle_fill_rounded),
+                      tooltip: course.isLocked
+                          ? 'Terminer les formations prérequises'
+                          : !course.isCompleted
+                          ? 'Terminer les leçons avant le quiz'
+                          : 'Commencer le quiz',
                     ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _AcademyQuizDialog extends StatefulWidget {
-  final AcademyCourseModel course;
-
-  const _AcademyQuizDialog({required this.course});
-
-  @override
-  State<_AcademyQuizDialog> createState() => _AcademyQuizDialogState();
-}
-
-class _AcademyQuizAttemptResult {
-  final bool passed;
-  final List<int> answers;
-
-  const _AcademyQuizAttemptResult({
-    required this.passed,
-    required this.answers,
-  });
-}
-
-class _AcademyQuizDialogState extends State<_AcademyQuizDialog> {
-  final Map<int, int> _answers = {};
-  bool _submitted = false;
-
-  int get _correctAnswers {
-    var total = 0;
-    final questions = widget.course.quiz.questions;
-    for (var index = 0; index < questions.length; index++) {
-      if (_answers[index] == questions[index].correctIndex) {
-        total++;
-      }
-    }
-    return total;
-  }
-
-  int get _score {
-    final total = widget.course.quiz.questions.length;
-    if (total == 0) return 0;
-    return ((_correctAnswers / total) * 100).round();
-  }
-
-  bool get _passed => _score >= 60;
-
-  void _submit() {
-    if (_answers.length < widget.course.quiz.questions.length) return;
-    Navigator.of(context).pop(_result());
-  }
-
-  void _retry() {
-    setState(() {
-      _answers.clear();
-      _submitted = false;
-    });
-  }
-
-  _AcademyQuizAttemptResult _result() {
-    final answers = [
-      for (var index = 0; index < widget.course.quiz.questions.length; index++)
-        _answers[index] ?? -1,
-    ];
-
-    return _AcademyQuizAttemptResult(passed: true, answers: answers);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final quiz = widget.course.quiz;
-    final canSubmit = _answers.length == quiz.questions.length;
-
-    return AlertDialog(
-      insetPadding: const EdgeInsets.all(16),
-      titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      title: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.24),
-            foregroundColor: AppTheme.softBlack,
-            child: const Icon(Icons.quiz_rounded),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              quiz.title,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${quiz.level} • ${quiz.questions.length} question(s) • ${quiz.timeLimitMinutes} min',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w700,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              if (_submitted) _QuizResultBanner(score: _score, passed: _passed),
-              if (_submitted) const SizedBox(height: 14),
-              for (var index = 0; index < quiz.questions.length; index++)
-                _QuizQuestionBlock(
-                  index: index,
-                  question: quiz.questions[index],
-                  selectedIndex: _answers[index],
-                  submitted: _submitted,
-                  onChanged: (value) {
-                    if (_submitted || value == null) return;
-                    setState(() => _answers[index] = value);
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
-        ),
-        if (_submitted && !_passed)
-          TextButton.icon(
-            onPressed: _retry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Reprendre'),
-          ),
-        if (_submitted)
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(_result()),
-            icon: Icon(_passed ? Icons.check_rounded : Icons.close_rounded),
-            label: Text(_passed ? 'Terminer' : 'Quitter'),
-          )
-        else
-          FilledButton.icon(
-            onPressed: canSubmit ? _submit : null,
-            icon: const Icon(Icons.check_rounded),
-            label: const Text('Valider'),
-          ),
-      ],
-    );
-  }
-}
-
-class _QuizResultBanner extends StatelessWidget {
-  final int score;
-  final bool passed;
-
-  const _QuizResultBanner({required this.score, required this.passed});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = passed ? Colors.green.shade700 : Colors.orange.shade800;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            passed ? Icons.verified_rounded : Icons.school_rounded,
-            color: color,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              passed
-                  ? 'Score $score%. Quiz reussi, les points vont etre ajoutes.'
-                  : 'Score $score%. Relis les corrections puis retente.',
-              style: TextStyle(color: color, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuizQuestionBlock extends StatelessWidget {
-  final int index;
-  final AcademyQuestionModel question;
-  final int? selectedIndex;
-  final bool submitted;
-  final ValueChanged<int?> onChanged;
-
-  const _QuizQuestionBlock({
-    required this.index,
-    required this.question,
-    required this.selectedIndex,
-    required this.submitted,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedCorrect = selectedIndex == question.correctIndex;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${index + 1}. ${question.question}',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          for (
-            var choiceIndex = 0;
-            choiceIndex < question.choices.length;
-            choiceIndex++
-          )
-            _QuizChoiceTile(
-              label: question.choices[choiceIndex],
-              value: choiceIndex,
-              groupValue: selectedIndex,
-              submitted: submitted,
-              correctIndex: question.correctIndex,
-              onChanged: onChanged,
-            ),
-          if (submitted) ...[
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  selectedCorrect
-                      ? Icons.check_circle_rounded
-                      : Icons.info_rounded,
-                  color: selectedCorrect
-                      ? Colors.green.shade700
-                      : Colors.orange.shade800,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    question.explanation,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _QuizChoiceTile extends StatelessWidget {
-  final String label;
-  final int value;
-  final int? groupValue;
-  final bool submitted;
-  final int correctIndex;
-  final ValueChanged<int?> onChanged;
-
-  const _QuizChoiceTile({
-    required this.label,
-    required this.value,
-    required this.groupValue,
-    required this.submitted,
-    required this.correctIndex,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = groupValue == value;
-    final correct = correctIndex == value;
-    final color = submitted && correct
-        ? Colors.green.shade700
-        : submitted && selected
-        ? Colors.orange.shade800
-        : AppTheme.softBlack;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: submitted ? null : () => onChanged(value),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected || (submitted && correct)
-                ? color.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.02),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected || (submitted && correct)
-                  ? color.withValues(alpha: 0.45)
-                  : Colors.black.withValues(alpha: 0.08),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                submitted && correct
-                    ? Icons.check_circle_rounded
-                    : selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: color,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: selected || (submitted && correct)
-                        ? FontWeight.w800
-                        : FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1380,7 +1273,7 @@ class _CaseStudyCard extends StatelessWidget {
                     foregroundColor: AppTheme.softBlack,
                     child: Text(
                       caseStudy.projectName.characters.first,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1388,13 +1281,13 @@ class _CaseStudyCard extends StatelessWidget {
                     child: Text(
                       caseStudy.projectName,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded),
+                  Icon(Icons.chevron_right_rounded),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1402,14 +1295,17 @@ class _CaseStudyCard extends StatelessWidget {
                 caseStudy.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Text(
                 caseStudy.context,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black54, height: 1.35),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -1418,7 +1314,7 @@ class _CaseStudyCard extends StatelessWidget {
                 children: [
                   Chip(label: Text('${caseStudy.lessons.length} leçons')),
                   Chip(label: Text('${caseStudy.quiz.questions.length} quiz')),
-                  const Chip(label: Text('Cas pratique')),
+                  Chip(label: Text('Cas pratique')),
                 ],
               ),
             ],
@@ -1465,7 +1361,7 @@ class _CaseStudyDetails extends StatelessWidget {
                       width: 42,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.black26,
+                        color: Theme.of(context).colorScheme.outlineVariant,
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -1473,15 +1369,15 @@ class _CaseStudyDetails extends StatelessWidget {
                   const SizedBox(height: 18),
                   Text(
                     caseStudy.title,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     caseStudy.context,
-                    style: const TextStyle(color: Colors.black54, height: 1.4),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   _CaseDetailTile(
@@ -1524,8 +1420,8 @@ class _CaseStudyDetails extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('Compris'),
+                      icon: Icon(Icons.check_rounded),
+                      label: Text('Compris'),
                     ),
                   ),
                 ],
@@ -1555,12 +1451,12 @@ class _CaseDetailTile extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: AppTheme.enactusYellow.withValues(alpha: 0.22),
-          foregroundColor: AppTheme.softBlack,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
           child: Icon(icon),
         ),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w900),
+          style: TextStyle(fontWeight: FontWeight.w900),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1583,7 +1479,7 @@ class _CaseChipBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -1638,19 +1534,26 @@ class _BadgeCard extends StatelessWidget {
             CircleAvatar(
               backgroundColor: badge.unlocked
                   ? AppTheme.enactusYellow
-                  : Colors.black.withValues(alpha: 0.08),
-              foregroundColor: AppTheme.softBlack,
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.08),
+              foregroundColor: badge.unlocked
+                  ? AppTheme.softBlack
+                  : Theme.of(context).colorScheme.onSurface,
               child: Icon(_badgeIcon(badge.iconName)),
             ),
             const SizedBox(height: 12),
             Text(
               badge.label,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 6),
             Text(
               badge.description,
-              style: const TextStyle(color: Colors.black54, height: 1.35),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 10),
             Chip(label: Text(badge.unlocked ? 'Débloqué' : 'À gagner')),
@@ -1671,7 +1574,11 @@ class _ResponsiveWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final count = (constraints.maxWidth / minWidth).floor().clamp(1, 4);
+        final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+        final count =
+            (constraints.maxWidth / (minWidth * scale.clamp(1.0, 2.0)))
+                .floor()
+                .clamp(1, 3);
         const spacing = 12.0;
         final width = (constraints.maxWidth - spacing * (count - 1)) / count;
 
@@ -1700,10 +1607,15 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 4),
-        Text(subtitle, style: const TextStyle(color: Colors.black54)),
+        Text(
+          subtitle,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -1720,7 +1632,12 @@ class _AcademyEmptyCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Text(message, style: const TextStyle(color: Colors.black54)),
+          child: Text(
+            message,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       ),
     );
@@ -1746,7 +1663,7 @@ class _AcademyErrorCard extends StatelessWidget {
               size: 44,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Academy indisponible',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
@@ -1755,8 +1672,8 @@ class _AcademyErrorCard extends StatelessWidget {
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1787,13 +1704,15 @@ String _academyCategoryLabel(String value) {
     case 'impact':
       return 'Impact';
     case 'business_principles':
-      return 'Business Principles';
+      return 'Principes entrepreneuriaux';
     case 'competition':
       return 'Compétition';
     case 'leadership':
       return 'Leadership';
-    default:
+    case 'all':
       return 'Toutes catégories';
+    default:
+      return value;
   }
 }
 

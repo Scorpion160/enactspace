@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/features/archives/models/archive_models.dart';
 import 'package:frontend/features/archives/models/memory_timeline_models.dart';
@@ -8,6 +10,7 @@ import 'package:frontend/features/archives/screens/archive_detail_screens.dart';
 import 'package:frontend/features/archives/screens/archives_center_screen.dart';
 import 'package:frontend/features/archives/services/archives_api_service.dart';
 import 'package:frontend/features/archives/services/archives_gateway.dart';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 
 const persistedId = '123e4567-e89b-12d3-a456-426614174000';
 const persistedId2 = '223e4567-e89b-12d3-a456-426614174001';
@@ -223,6 +226,19 @@ void main() {
       expect(find.textContaining('Source non accessible'), findsOneWidget);
     });
 
+    testWidgets('chronologie vide conserve le centre Archives moderne', (
+      tester,
+    ) async {
+      final gateway = _MemoryArchivesGateway(emptyTimeline: true);
+      await _pumpCenter(tester, gateway);
+      expect(find.text('Mémoire Enactus ESP'), findsOneWidget);
+      expect(find.text('L’histoire du club'), findsOneWidget);
+      expect(find.text('L’aventure Enactus ESP'), findsOneWidget);
+      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+      expect(find.text('Mémoire historique Enactus ESP'), findsNothing);
+      expect(gateway.homeLoads, 1);
+    });
+
     testWidgets('erreur timeline propose une relance explicite', (
       tester,
     ) async {
@@ -248,26 +264,27 @@ void main() {
       expect(gateway.timelineLoads, 2);
     });
 
-    testWidgets('mode révision et héritage restent réservés au curateur', (
-      tester,
-    ) async {
-      final curator = _MemoryArchivesGateway();
-      await _pumpCenter(tester, curator);
-      expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
-      expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
-      expect(curator.homeLoads, 0);
-      await tester.tap(find.byKey(const Key('memory_review_mode')));
-      await tester.pumpAndSettle();
-      expect(curator.lastTimelineFilters?.review, isTrue);
-      await tester.tap(find.byKey(const Key('memory_legacy_area')));
-      await tester.pumpAndSettle();
-      expect(curator.homeLoads, 1);
-      expect(find.text('Archives héritées à vérifier'), findsWidgets);
+    testWidgets(
+      'mode révision reste curateur mais mémoire validée est accessible',
+      (tester) async {
+        final curator = _MemoryArchivesGateway();
+        await _pumpCenter(tester, curator);
+        expect(find.byKey(const Key('memory_review_mode')), findsOneWidget);
+        expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+        expect(curator.homeLoads, 0);
+        await tester.tap(find.byKey(const Key('memory_review_mode')));
+        await tester.pumpAndSettle();
+        expect(curator.lastTimelineFilters?.review, isTrue);
+        await tester.tap(find.byKey(const Key('memory_legacy_area')));
+        await tester.pumpAndSettle();
+        expect(curator.homeLoads, 1);
+        expect(find.text('Mémoire historique Enactus ESP'), findsWidgets);
 
-      await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
-      expect(find.byKey(const Key('memory_review_mode')), findsNothing);
-      expect(find.byKey(const Key('memory_legacy_area')), findsNothing);
-    });
+        await _pumpCenter(tester, _MemoryArchivesGateway(canValidate: false));
+        expect(find.byKey(const Key('memory_review_mode')), findsNothing);
+        expect(find.byKey(const Key('memory_legacy_area')), findsOneWidget);
+      },
+    );
 
     testWidgets('pagination curseur ajoute sans doublon', (tester) async {
       final gateway = _MemoryArchivesGateway(paginated: true);
@@ -342,6 +359,8 @@ void main() {
     testWidgets('fichier protégé ne déclenche aucun lancement externe', (
       tester,
     ) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
       const channel = MethodChannel('plugins.flutter.io/url_launcher');
       final launchedUrls = <String>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -367,11 +386,18 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.textContaining('Ouvrir la source'));
+      final sourceAction = find.textContaining('Ouvrir la source');
+      final attachment = find.byType(StoredAttachmentButton);
+      expect(attachment, findsOneWidget);
+      expect(tester.widget<StoredAttachmentButton>(attachment).url,
+          '/api/files/protected-file/preview');
+      await tester.ensureVisible(sourceAction);
+      await tester.pumpAndSettle();
+      expect(sourceAction.hitTestable(), findsOneWidget);
+      await tester.tap(sourceAction);
       await tester.pumpAndSettle();
 
       expect(launchedUrls, isEmpty);
-      expect(find.text('Source non accessible'), findsOneWidget);
     });
 
     testWidgets('URL externe autorisée reste lancée sans jeton', (
@@ -402,7 +428,11 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.textContaining('Ouvrir la source'));
+      final sourceAction = find.textContaining('Ouvrir la source');
+      await tester.ensureVisible(sourceAction);
+      await tester.pumpAndSettle();
+      expect(sourceAction.hitTestable(), findsOneWidget);
+      await tester.tap(sourceAction);
       await tester.pumpAndSettle();
 
       expect(launchedUrls, ['https://example.test/source-publique']);
@@ -452,6 +482,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Rapport sourcé'), findsOneWidget);
       expect(find.text('Ouvrir la source'), findsOneWidget);
+      await tester.scrollUntilVisible(find.textContaining('Télécharger'), 150);
       expect(find.textContaining('Télécharger'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Motif du rejet'), 300);
       expect(find.text('Motif du rejet'), findsOneWidget);
@@ -519,13 +550,17 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Récompenses'), 300);
-      expect(find.text('Contexte'), findsOneWidget);
-      expect(find.text('Le problème'), findsOneWidget);
-      expect(find.text('La réponse'), findsOneWidget);
-      expect(find.text('Impact et héritage'), findsOneWidget);
-      expect(find.text('Équipe'), findsOneWidget);
-      expect(find.text('Récompenses'), findsOneWidget);
+      for (final title in [
+        'Contexte',
+        'Le problème',
+        'La réponse',
+        'Impact et héritage',
+        'Équipe',
+        'Récompenses',
+      ]) {
+        await tester.scrollUntilVisible(find.text(title), 150);
+        expect(find.text(title), findsOneWidget);
+      }
       expect(find.text('Revenus'), findsNothing);
       expect(find.text('Bénéfices'), findsNothing);
       expect(find.text('Emplois'), findsNothing);
@@ -546,7 +581,8 @@ void main() {
       expect(gateway.hallListLoads, 1);
       expect(find.text('Moment serveur'), findsOneWidget);
       expect(find.textContaining('92'), findsNothing);
-      expect(find.text('Pourquoi il compte'), findsOneWidget);
+      expect(find.text('Pourquoi il compte'), findsNothing);
+      expect(find.text('Le moment'), findsOneWidget);
       expect(find.text('Trace / média'), findsOneWidget);
     });
 
@@ -1031,7 +1067,9 @@ class _RecordingStatisticsService extends ArchivesService {
 
 class _OrderingService extends ArchivesService {
   @override
-  Future<List<HallOfFameEntryModel>> getHallOfFame() async {
+  Future<List<HallOfFameEntryModel>> getHallOfFame({
+    bool includeStatic = false,
+  }) async {
     final values = <HallOfFameEntryModel>[
       const HallOfFameEntryModel(
         id: 'old',

@@ -25,6 +25,11 @@ def make_settings(*, app_env: str, enable_seed: bool) -> Settings:
         ENABLE_SEED=enable_seed,
         ATTENDANCE_QR_ENABLED=False,
         ATTENDANCE_NFC_ENABLED=False,
+        MEET_SERVER_URL="https://meet.example.test",
+        MEET_REQUIRE_JWT=True,
+        MEET_JWT_APP_ID="enactspace-test",
+        MEET_JWT_SECRET="unit-test-meet-key-distinct",
+        MEET_JWT_SUBJECT="meet.example.test",
     )
 
 

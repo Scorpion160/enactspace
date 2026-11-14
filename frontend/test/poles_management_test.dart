@@ -430,7 +430,7 @@ void main() {
         ),
       );
       expect(
-        find.text('Aucun remplacement automatique ne sera effectué.'),
+        find.text('Nommez un nouveau responsable pour assurer le relais.'),
         findsOneWidget,
       );
       var button = tester.widget<FilledButton>(

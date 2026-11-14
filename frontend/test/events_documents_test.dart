@@ -17,6 +17,7 @@ import 'package:frontend/features/events/services/events_gateway.dart';
 import 'package:frontend/features/events/services/events_service.dart';
 import 'package:frontend/features/poles/models/pole_model.dart';
 import 'package:frontend/features/projects/models/project_model.dart';
+import 'package:frontend/shared/attachments/attachment_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -313,6 +314,8 @@ void main() {
       await _pump(tester, DocumentsScreen(gateway: gateway));
       expect(find.text('Rapport annuel'), findsOneWidget);
       expect(find.text('En attente de validation'), findsOneWidget);
+      await tester.tap(find.byTooltip('Afficher les filtres'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Tous les statuts'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Validé').last);
@@ -384,6 +387,40 @@ void main() {
       expect(find.text('Expiration'), findsOneWidget);
     });
 
+    testWidgets('le détail évite le libellé technique download', (
+      tester,
+    ) async {
+      final gateway = MemoryDocumentsGateway(
+        documents: [_document(fileId: '00000000-0000-0000-0000-000000000123')],
+      );
+      await _pump(
+        tester,
+        DocumentDetailScreen(documentId: 'doc-1', gateway: gateway),
+      );
+      await tester.scrollUntilVisible(find.text('Document PDF'), 300);
+      expect(find.text('Document PDF'), findsOneWidget);
+      expect(find.text('download'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('PV stocké utilise la route API authentifiée', (tester) async {
+      const fileId = '00000000-0000-0000-0000-000000000123';
+      final gateway = MemoryDocumentsGateway(
+        documents: [_document(fileId: fileId)],
+      );
+      await _pump(
+        tester,
+        DocumentDetailScreen(documentId: 'doc-1', gateway: gateway),
+      );
+      await tester.scrollUntilVisible(find.byType(StoredAttachmentButton), 300);
+      final button = tester.widget<StoredAttachmentButton>(
+        find.byType(StoredAttachmentButton),
+      );
+      expect(button.url, '/api/files/$fileId/download');
+      expect(button.label, 'Télécharger');
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('route détail URL directe', (tester) async {
       final gateway = MemoryDocumentsGateway(documents: [_document()]);
       final router = GoRouter(
@@ -415,7 +452,7 @@ void main() {
           gateway: MemoryDocumentsGateway(documents: [_document()]),
         ),
       );
-      expect(find.text('Filtres'), findsOneWidget);
+      expect(find.byTooltip('Afficher les filtres'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

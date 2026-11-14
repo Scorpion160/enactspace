@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Index, String, Text, Date, DateTime, ForeignKey, Boolean, Numeric, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, Index, String, Text, Date, DateTime, ForeignKey, Boolean, Integer, JSON, Numeric, UniqueConstraint, func
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +30,25 @@ class RecruitmentCampaign(Base):
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Internal recruitment preparation. These fields never belong to the public campaign payload.
+    target_headcount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    positions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    target_profiles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    communication_actions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    interview_questions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+
+    application_questions: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    screening_rubric_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    selection_policy_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    selection_schedule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    screening_min_reviews: Mapped[int] = mapped_column(Integer, nullable=False, default=3, server_default="3")
+    screening_disagreement_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=20, server_default="20")
+    screening_published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    final_published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    identities_revealed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    identities_revealed_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -37,8 +57,8 @@ class RecruitmentCampaign(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class Application(Base):
@@ -71,6 +91,10 @@ class Application(Base):
     known_enactus_from: Mapped[str | None] = mapped_column(Text, nullable=True)
     enactus_knowledge: Mapped[str | None] = mapped_column(Text, nullable=True)
     other_clubs: Mapped[str | None] = mapped_column(Text, nullable=True)
+    other_clubs_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    screening_decision: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    legacy_result_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    pending_final_decision: Mapped[str | None] = mapped_column(String(24), nullable=True)
     contribution: Mapped[str | None] = mapped_column(Text, nullable=True)
     project_ideas: Mapped[str | None] = mapped_column(Text, nullable=True)
     leadership_profile: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -79,11 +103,21 @@ class Application(Base):
     associative_experience: Mapped[str | None] = mapped_column(Text, nullable=True)
     availability: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    questionnaire_answers: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     interview_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     interview_location: Mapped[str | None] = mapped_column(String(180), nullable=True)
     interview_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     interview_jury: Mapped[str | None] = mapped_column(Text, nullable=True)
     interview_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    campus_resident: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    interview_preferences: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    interview_availability: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_end_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    interview_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     cv_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     motivation_letter_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -104,8 +138,8 @@ class Application(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint(
@@ -144,14 +178,129 @@ class ApplicationReview(Base):
     )
 
     score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    criteria_assessment: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    stage: Mapped[str] = mapped_column(String(20), nullable=False, default="screening", server_default="screening")
 
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     recommendation: Mapped[str] = mapped_column(String(50), default="reserve")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
-        UniqueConstraint("application_id", "reviewer_id", name="uq_application_reviewer"),
+        UniqueConstraint("application_id", "reviewer_id", "stage", name="uq_application_reviewer_stage"),
+    )
+
+
+class RecruitmentJuryMember(Base):
+    __tablename__ = "recruitment_jury_members"
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_campaigns.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    appointed_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (UniqueConstraint("campaign_id", "user_id", name="uq_recruitment_jury_campaign_user"), Index("ix_recruitment_jury_active_user", "user_id", "is_active"))
+
+
+class ApplicationInterviewJuror(Base):
+    __tablename__ = "application_interview_jurors"
+    application_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True)
+    jury_member_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_members.id", ondelete="CASCADE"), primary_key=True)
+
+
+class RecruitmentJuryTeam(Base):
+    __tablename__ = "recruitment_jury_teams"
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_campaigns.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(240), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    __table_args__ = (UniqueConstraint("campaign_id", "name_key", name="uq_recruitment_team_name"),)
+
+
+class RecruitmentJuryTeamMember(Base):
+    __tablename__ = "recruitment_jury_team_members"
+    team_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_teams.id", ondelete="CASCADE"), primary_key=True)
+    jury_member_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_members.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ApplicationInterviewTeam(Base):
+    __tablename__ = "application_interview_teams"
+    application_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True)
+    team_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("recruitment_jury_teams.id", ondelete="CASCADE"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    __table_args__ = (Index("ix_application_interview_team", "team_id"),)
+
+
+class ApplicationPersonality(Base):
+    __tablename__ = "application_personality"
+    application_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True)
+    instrument_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    instrument_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    scenario_answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    results: Mapped[dict | None] = mapped_column(JSON)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
+    invited_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    declined_at: Mapped[datetime | None] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class ApplicationScreeningAssignment(Base):
+    __tablename__ = "application_screening_assignments"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("applications.id", ondelete="CASCADE"), primary_key=True
+    )
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    declined_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decline_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class RecruitmentViewerAccess(Base):
+    """Revocable read-only access to a single recruitment campaign.
+
+    This appointment is independent of the jury and never grants scoring rights.
+    """
+    __tablename__ = "recruitment_viewer_access"
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("recruitment_campaigns.id", ondelete="CASCADE"), nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    granted_by: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    granted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__ = (
+        UniqueConstraint("campaign_id","user_id",name="uq_recruitment_viewer_campaign_user"),
+        Index("ix_recruitment_viewer_active_user","user_id","is_active"),
     )

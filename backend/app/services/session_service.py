@@ -57,6 +57,7 @@ def _eligible(user: User | None) -> bool:
     return bool(
         user is not None
         and user.is_active
+        and not user.credential_setup_required
         and user.email_verified
         and user.status in {"active", "alumni"}
     )

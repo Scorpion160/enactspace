@@ -1,7 +1,10 @@
+from app.core.time import utc_now
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import and_, or_
+from fastapi import APIRouter, Depends, HTTPException, Request, status, File, UploadFile
+from sqlalchemy import and_, or_, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -78,6 +81,10 @@ PROJECT_LEAD_POSITIONS = {"chef_projet", "adjoint_chef_projet"}
 
 
 def get_task_or_404(db: Session, task_id: str) -> Task:
+    try:
+        task_id = UUID(str(task_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail="Tâche introuvable")
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
@@ -96,7 +103,7 @@ def task_is_late(task: Task) -> bool:
     if task.status in {"termine", "valide", "annule"}:
         return False
 
-    return datetime.utcnow() > task.due_date
+    return utc_now() > task.due_date
 
 
 def task_assignee_user_ids(db: Session, task: Task) -> list:
@@ -106,6 +113,17 @@ def task_assignee_user_ids(db: Session, task: Task) -> list:
         .filter(TaskAssignee.task_id == task.id)
         .all()
     ]
+
+
+def task_status_label(status: str) -> str:
+    return {
+        "a_faire": "à faire",
+        "en_cours": "en cours",
+        "bloque": "bloquée",
+        "termine": "terminée, en attente de validation",
+        "valide": "validée",
+        "annule": "annulée",
+    }.get(status, "mise à jour")
 
 
 def notify_task_assignees(
@@ -118,6 +136,15 @@ def notify_task_assignees(
     actor_id=None,
     dedupe: bool = False,
 ) -> None:
+    reviewer_id = task.assigned_by or task.creator_id
+    if task.status == "termine" and reviewer_id and reviewer_id != actor_id:
+        notify_users(
+            db, user_ids=[reviewer_id],
+            title="Travail remis · validation attendue",
+            message=f"Le travail pour « {task.title} » est terminé. Consultez le justificatif et validez ou demandez une reprise.",
+            notification_type="task_review_requested", related_type="task",
+            related_id=task.id, dedupe=True,
+        )
     user_ids = [
         user_id for user_id in task_assignee_user_ids(db, task) if user_id != actor_id
     ]
@@ -136,18 +163,23 @@ def notify_task_assignees(
 
 
 def notify_task_due_soon(db: Session, task: Task, *, actor_id=None) -> None:
+    # Once configured, Veille owns scheduled alerts, including their pause switch.
+    # Keep the legacy fallback only for databases that have not activated Veille.
+    from app.models.veille import VeilleSettings
+    if inspect(db.connection()).has_table("veille_settings") and db.get(VeilleSettings,1) is not None:
+        return
     if not task.due_date or task.status in {"termine", "valide", "annule"}:
         return
 
-    now = datetime.utcnow()
+    now = utc_now()
     if not now <= task.due_date <= now + timedelta(hours=48):
         return
 
     notify_task_assignees(
         db,
         task,
-        title="Echeance proche",
-        message=f"La tache {task.title} arrive bientot a echeance.",
+        title="Échéance proche",
+        message=f"La tâche {task.title} arrive bientôt à échéance.",
         notification_type="task_due_soon",
         actor_id=actor_id,
         dedupe=True,
@@ -155,6 +187,8 @@ def notify_task_due_soon(db: Session, task: Task, *, actor_id=None) -> None:
 
 
 def user_can_manage_task(db: Session, task: Task, user: User) -> bool:
+    if user.status != "active" or not user.is_active:
+        return False
     if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
         return True
     if task.creator_id == user.id:
@@ -203,11 +237,17 @@ def user_is_assigned(db: Session, task: Task, user: User) -> bool:
 def task_payload(db: Session, task: Task, user: User) -> dict:
     data = TaskRead.model_validate(task).model_dump()
     data["can_manage"] = user_can_manage_task(db, task, user)
-    data["current_user_assigned"] = user_is_assigned(db, task, user)
+    data["can_validate"] = data["can_manage"] and not user_is_assigned(db, task, user) and (user.id == (task.assigned_by or task.creator_id) or user_has_any_role(db, user.id, {"administrateur", "team_leader"}))
+    data["current_user_assigned"] = user.status == "active" and user_is_assigned(db, task, user)
+    from app.models.stored_file import StoredFile
+    stored = db.query(StoredFile).filter(StoredFile.entity_type == "task", StoredFile.entity_id == task.id).all()
+    attachment = next((f for f in stored if task.proof_url == f"/api/files/{f.id}/download"), None)
+    data["proof_filename"] = attachment.original_filename if attachment else None
     return data
 
 
 def ensure_task_manager(db: Session, task: Task, user: User) -> None:
+    assert_active_operational_member(user)
     if not user_can_manage_task(db, task, user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -216,6 +256,7 @@ def ensure_task_manager(db: Session, task: Task, user: User) -> None:
 
 
 def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
+    assert_active_operational_member(user)
     is_manager = user_can_manage_task(db, task, user)
     is_assignee = user_is_assigned(db, task, user)
 
@@ -225,6 +266,26 @@ def ensure_task_actor(db: Session, task: Task, user: User) -> bool:
             detail="Action réservée aux responsables et aux membres assignés",
         )
     return is_manager
+
+
+def ensure_task_viewer(db: Session, task: Task, user: User) -> None:
+    if user_can_manage_task(db, task, user) or user_is_assigned(db, task, user) or task.creator_id == user.id:
+        return
+    from app.services.veille_service import VeilleAccess
+    if not VeilleAccess(db, user).veille:
+        raise HTTPException(403, "Cette tâche ne vous est pas accessible.")
+
+
+def ensure_independent_reviewer(db: Session, task: Task, user: User) -> None:
+    if user.id != (task.assigned_by or task.creator_id) and not user_has_any_role(db, user.id, {"administrateur", "team_leader"}):
+        raise HTTPException(403, "La validation revient à la personne qui a confié la tâche ou à la direction en cas de relais.")
+    if user_is_assigned(db, task, user):
+        raise HTTPException(403, "Un autre responsable doit relire votre livrable.")
+
+
+def ensure_task_work_editable(task: Task) -> None:
+    if task.status in {"termine", "valide", "annule"}:
+        raise HTTPException(409, "Le livrable est remis ou clôturé. Demandez une reprise avant de modifier ses étapes ou affectations.")
 
 
 def apply_task_status(
@@ -262,7 +323,7 @@ def apply_task_status(
 
     previous = task.status
     task.status = next_status
-    now = datetime.utcnow()
+    now = utc_now()
     if next_status == "termine":
         task.completed_at = now
         task.validated_at = None
@@ -282,7 +343,11 @@ def apply_task_status(
 
 def visible_tasks_query(db: Session, user: User):
     query = db.query(Task)
-    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
+    if user.status != "active" or not user.is_active:
+        own_tasks = db.query(TaskAssignee.task_id).filter(TaskAssignee.user_id == user.id)
+        return query.filter(or_(Task.id.in_(own_tasks), Task.creator_id == user.id))
+    from app.services.veille_service import VeilleAccess
+    if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES) or VeilleAccess(db, user).veille:
         return query
 
     assigned_task_ids = db.query(TaskAssignee.task_id).filter(
@@ -318,6 +383,9 @@ def ensure_task_creation_scope(
     user: User,
     payload: TaskCreate,
 ) -> None:
+    assert_active_operational_member(user)
+    if payload.pole_id is not None and payload.project_id is not None:
+        raise HTTPException(400, "Choisissez un seul périmètre : pôle ou projet.")
     if user_has_any_role(db, user.id, GLOBAL_TASK_MANAGER_ROLES):
         return
     if payload.pole_id is not None:
@@ -453,8 +521,8 @@ def create_task(
     notify_task_assignees(
         db,
         task,
-        title="Nouvelle tache assignee",
-        message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
+        title="Nouvelle tâche attribuée",
+        message=f"Une nouvelle tâche vous a été attribuée : {task.title}.",
         notification_type="task_assigned",
         actor_id=current_user.id,
         dedupe=True,
@@ -512,7 +580,7 @@ def list_late_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     tasks = (
         visible_tasks_query(db, current_user)
@@ -529,7 +597,7 @@ def list_late_tasks(
 
 @router.get("/project/{project_id}", response_model=list[TaskRead])
 def list_project_tasks(
-    project_id: str,
+    project_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -544,7 +612,7 @@ def list_project_tasks(
 
 @router.get("/pole/{pole_id}", response_model=list[TaskRead])
 def list_pole_tasks(
-    pole_id: str,
+    pole_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -559,18 +627,18 @@ def list_pole_tasks(
 
 @router.get("/{task_id}", response_model=TaskRead)
 def get_task(
-    task_id: str,
+    task_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
-    ensure_task_actor(db, task, current_user)
+    ensure_task_viewer(db, task, current_user)
     return task_payload(db, task, current_user)
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
 def update_task(
-    task_id: str,
+    task_id: UUID,
     payload: TaskUpdate,
     request: Request,
     db: Session = Depends(get_db),
@@ -597,18 +665,33 @@ def update_task(
         task.description = payload.description
 
     if payload.due_date is not None:
-        task.due_date = to_naive_utc(payload.due_date)
+        due = to_naive_utc(payload.due_date)
+        if due != task.due_date:
+            ensure_task_work_editable(task)
+            reason = (payload.deadline_change_reason or "").strip()
+            if len(reason) < 6:
+                raise HTTPException(400, "Expliquez le changement d’échéance.")
+            from app.services.veille_service import event_log, json_value
+            event_log(db, current_user, "task", task.id, "deadline_changed", reason,
+                {"previous_due_date": json_value(task.due_date), "due_date": json_value(due)})
+            task.due_date = due
+            task.is_late_alert_sent = False
 
     if payload.proof_required is not None:
+        if payload.proof_required != task.proof_required:
+            ensure_task_work_editable(task)
         task.proof_required = payload.proof_required
 
-    if payload.proof_url is not None:
-        if task.status in {"valide", "annule"}:
-            raise HTTPException(status_code=409, detail="La preuve d'une tâche terminale est immuable")
+    if payload.proof_url is not None and payload.proof_url != task.proof_url:
+        if task.status in {"termine", "valide", "annule"}:
+            raise HTTPException(status_code=409, detail="La preuve d’un livrable remis est immuable avant une demande de reprise.")
+        validate_task_proof_reference(db, task, payload.proof_url)
         task.proof_url = payload.proof_url
 
     status_changed = False
     if payload.status is not None:
+        if payload.status == "valide":
+            ensure_independent_reviewer(db, task, current_user)
         status_changed = apply_task_status(
             task,
             payload.status,
@@ -616,14 +699,14 @@ def update_task(
             actor_id=current_user.id,
         )
 
-    task.updated_at = datetime.utcnow()
+    task.updated_at = utc_now()
 
     if status_changed:
         notify_task_assignees(
             db,
             task,
-            title="Statut de tache modifie",
-            message=f"La tache {task.title} est maintenant {task.status}.",
+            title="Statut de tâche modifié",
+            message=f"La tâche {task.title} est maintenant {task_status_label(task.status)}.",
             notification_type="task_updated",
             actor_id=current_user.id,
         )
@@ -631,8 +714,8 @@ def update_task(
         notify_task_assignees(
             db,
             task,
-            title="Tache mise a jour",
-            message=f"La tache {task.title} a ete modifiee.",
+            title="Tâche mise à jour",
+            message=f"La tâche {task.title} a été modifiée.",
             notification_type="task_updated",
             actor_id=current_user.id,
         )
@@ -657,7 +740,7 @@ def update_task(
 
 @router.post("/{task_id}/status", response_model=TaskRead)
 def change_task_status(
-    task_id: str,
+    task_id: UUID,
     payload: TaskStatusChange,
     request: Request,
     db: Session = Depends(get_db),
@@ -668,6 +751,8 @@ def change_task_status(
         raise HTTPException(status_code=404, detail="Tâche introuvable")
     is_manager = ensure_task_actor(db, task, current_user)
     old_status = task.status
+    if payload.status == "valide":
+        ensure_independent_reviewer(db, task, current_user)
     changed = apply_task_status(
         task,
         payload.status,
@@ -679,8 +764,8 @@ def change_task_status(
         notify_task_assignees(
             db,
             task,
-            title="Statut de tache modifie",
-            message=f"La tache {task.title} est maintenant {task.status}.",
+            title="Statut de tâche modifié",
+            message=f"La tâche {task.title} est maintenant {task_status_label(task.status)}.",
             notification_type="task_updated",
             actor_id=current_user.id,
             dedupe=True,
@@ -703,9 +788,26 @@ def change_task_status(
     return task_payload(db, task, current_user)
 
 
+def validate_task_proof_reference(db: Session, task: Task, value: str) -> None:
+    """Keep historical web links, but prevent copying another dossier's private file."""
+    from app.models.stored_file import StoredFile
+    parsed = urlsplit(value)
+    if parsed.path.startswith("/api/files/"):
+        parts = parsed.path.strip("/").split("/")
+        try:
+            file_id = UUID(parts[2])
+        except (ValueError, IndexError):
+            raise HTTPException(400, "Pièce jointe invalide.")
+        stored = db.get(StoredFile, file_id)
+        if len(parts) != 4 or parts[3] != "download" or not stored or stored.entity_type != "task" or stored.entity_id != task.id:
+            raise HTTPException(400, "Joignez le justificatif depuis cette tâche.")
+    elif parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(400, "Justificatif invalide.")
+
+
 @router.post("/{task_id}/proof", response_model=TaskRead)
 def submit_task_proof(
-    task_id: str,
+    task_id: UUID,
     payload: TaskProofSubmit,
     request: Request,
     db: Session = Depends(get_db),
@@ -716,11 +818,12 @@ def submit_task_proof(
         raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_actor(db, task, current_user)
 
-    if task.status in {"valide", "annule"}:
-        raise HTTPException(status_code=409, detail="La preuve d'une tâche terminale est immuable")
+    if task.status in {"termine", "valide", "annule"}:
+        raise HTTPException(status_code=409, detail="La preuve d’un livrable remis est immuable avant une demande de reprise.")
 
+    validate_task_proof_reference(db, task, payload.proof_url)
     task.proof_url = payload.proof_url
-    task.updated_at = datetime.utcnow()
+    task.updated_at = utc_now()
     create_audit_log(
         db=db,
         action="preuve_tache",
@@ -737,9 +840,43 @@ def submit_task_proof(
     return task_payload(db, task, current_user)
 
 
+@router.post("/{task_id}/proof-file", response_model=TaskRead)
+async def attach_task_proof(
+    task_id: UUID, request: Request, file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_validated_user),
+):
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
+    ensure_task_actor(db, task, current_user)
+    if task.status in {"termine", "valide", "annule"}:
+        raise HTTPException(409, "Un livrable remis ne peut plus être remplacé avant une demande de reprise.")
+    from app.services.attachment_service import read_attachment
+    from app.services.file_storage_service import store_bytes, delete_physical_file
+    name, data = await read_attachment(file)
+    stored = None
+    try:
+        stored = store_bytes(db, data=data, original_filename=name, uploaded_by=current_user,
+            storage_scope="document", visibility="private", entity_type="task", entity_id=task.id,
+            is_temporary=False)
+        task.proof_url = f"/api/files/{stored.id}/download"
+        task.updated_at = utc_now()
+        create_audit_log(db, action="preuve_tache", user_id=current_user.id, entity_type="task",
+            entity_id=task.id, new_value={"file_id": str(stored.id)}, ip_address=get_client_ip(request))
+        db.commit()
+    except Exception:
+        db.rollback()
+        if stored is not None:
+            delete_physical_file(stored)
+        raise
+    db.refresh(task)
+    return task_payload(db, task, current_user)
+
+
 @router.post("/{task_id}/validate", response_model=TaskRead)
 def validate_task(
-    task_id: str,
+    task_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
@@ -749,13 +886,14 @@ def validate_task(
         raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_manager(db, task, current_user)
     old_status = task.status
+    ensure_independent_reviewer(db, task, current_user)
     apply_task_status(task, "valide", is_manager=True, actor_id=current_user.id)
 
     notify_task_assignees(
         db,
         task,
-        title="Tache validee",
-        message=f"La tache {task.title} a ete validee.",
+        title="Tâche validée",
+        message=f"La tâche {task.title} a été validée.",
         notification_type="task_validated",
         actor_id=current_user.id,
         dedupe=True,
@@ -779,7 +917,7 @@ def validate_task(
 
 @router.delete("/{task_id}")
 def delete_task(
-    task_id: str,
+    task_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -806,8 +944,7 @@ def add_task_assignees(
     if task is None:
         raise HTTPException(status_code=404, detail="Tâche introuvable")
     ensure_task_manager(db, task, current_user)
-    if task.status in {"valide", "annule"}:
-        raise HTTPException(status_code=409, detail="Aucun assigné ne peut être ajouté à une tâche terminale")
+    ensure_task_work_editable(task)
     ensure_assignees_in_scope(
         db,
         current_user,
@@ -844,8 +981,8 @@ def add_task_assignees(
             notify_user(
                 db,
                 user_id=user_id,
-                title="Nouvelle tache assignee",
-                message=f"Une nouvelle tache vous a ete assignee : {task.title}.",
+                title="Nouvelle tâche attribuée",
+                message=f"Une nouvelle tâche vous a été attribuée : {task.title}.",
                 notification_type="task_assigned",
                 related_type="task",
                 related_id=task.id,
@@ -875,12 +1012,12 @@ def add_task_assignees(
 
 @router.get("/{task_id}/assignees", response_model=list[TaskAssigneeRead])
 def list_task_assignees(
-    task_id: str,
+    task_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
     task = get_task_or_404(db, task_id)
-    ensure_task_actor(db, task, current_user)
+    ensure_task_viewer(db, task, current_user)
 
     return db.query(TaskAssignee).filter(
         TaskAssignee.task_id == task_id
@@ -889,13 +1026,16 @@ def list_task_assignees(
 
 @router.delete("/{task_id}/assignees/{user_id}")
 def remove_task_assignee(
-    task_id: str,
-    user_id: str,
+    task_id: UUID,
+    user_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
     ensure_task_manager(db, task, current_user)
+    ensure_task_work_editable(task)
     assignee = db.query(TaskAssignee).filter(
         TaskAssignee.task_id == task_id,
         TaskAssignee.user_id == user_id,
@@ -922,8 +1062,11 @@ def create_checklist_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, str(payload.task_id))
+    task = lock_row(db, Task, payload.task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
     ensure_task_manager(db, task, current_user)
+    ensure_task_work_editable(task)
 
     item = TaskChecklistItem(
         task_id=payload.task_id,
@@ -940,12 +1083,14 @@ def create_checklist_item(
 
 @router.get("/{task_id}/checklist", response_model=list[TaskChecklistItemRead])
 def list_checklist_items(
-    task_id: str,
+    task_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
-    ensure_task_actor(db, task, current_user)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
+    ensure_task_viewer(db, task, current_user)
 
     return db.query(TaskChecklistItem).filter(
         TaskChecklistItem.task_id == task_id
@@ -954,7 +1099,7 @@ def list_checklist_items(
 
 @router.patch("/checklist/{item_id}", response_model=TaskChecklistItemRead)
 def update_checklist_item(
-    item_id: str,
+    item_id: UUID,
     payload: TaskChecklistItemUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
@@ -968,8 +1113,15 @@ def update_checklist_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Élément de checklist introuvable",
         )
-    task = get_task_or_404(db, str(item.task_id))
-    ensure_task_manager(db, task, current_user)
+    task = lock_row(db, Task, item.task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
+    if task.status in {"termine","valide","annule"}:
+        raise HTTPException(status_code=409,detail="Les étapes d’un livrable remis ou clôturé ne peuvent plus être modifiées.")
+    if payload.title is not None:
+        ensure_task_manager(db, task, current_user)
+    else:
+        ensure_task_actor(db, task, current_user)
 
     if payload.title is not None:
         item.title = payload.title
@@ -977,7 +1129,7 @@ def update_checklist_item(
     if payload.is_done is not None:
         item.is_done = payload.is_done
 
-    item.updated_at = datetime.utcnow()
+    item.updated_at = utc_now()
 
     db.commit()
     db.refresh(item)
@@ -987,7 +1139,7 @@ def update_checklist_item(
 
 @router.delete("/checklist/{item_id}")
 def delete_checklist_item(
-    item_id: str,
+    item_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
@@ -1000,8 +1152,11 @@ def delete_checklist_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Élément de checklist introuvable",
         )
-    task = get_task_or_404(db, str(item.task_id))
+    task = lock_row(db, Task, item.task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
     ensure_task_manager(db, task, current_user)
+    ensure_task_work_editable(task)
 
     db.delete(item)
     db.commit()
@@ -1018,8 +1173,10 @@ def create_task_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, str(payload.task_id))
-    ensure_task_actor(db, task, current_user)
+    task = lock_row(db, Task, payload.task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
+    ensure_task_viewer(db, task, current_user)
 
     comment = TaskComment(
         task_id=payload.task_id,
@@ -1036,12 +1193,14 @@ def create_task_comment(
 
 @router.get("/{task_id}/comments", response_model=list[TaskCommentRead])
 def list_task_comments(
-    task_id: str,
+    task_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_validated_user),
 ):
-    task = get_task_or_404(db, task_id)
-    ensure_task_actor(db, task, current_user)
+    task = lock_row(db, Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Tâche introuvable")
+    ensure_task_viewer(db, task, current_user)
 
     return db.query(TaskComment).filter(
         TaskComment.task_id == task_id
