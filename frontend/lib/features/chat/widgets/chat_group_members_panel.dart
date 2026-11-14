@@ -64,6 +64,31 @@ class _ChatGroupMembersPanelState extends State<ChatGroupMembersPanel> {
 
   Future<void> _changeRole(ChatThreadMemberModel member, String role) async {
     if (_working) return;
+    final promote = role == 'admin';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          promote ? 'Nommer administrateur ?' : 'Retirer les droits admin ?',
+        ),
+        content: Text(
+          promote
+              ? '${member.displayName} pourra ajouter ou retirer des participants et gérer les rôles.'
+              : '${member.displayName} restera membre du groupe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(promote ? 'Nommer administrateur' : 'Confirmer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _working = true);
     try {
       await widget.gateway.updateParticipantRole(
@@ -141,8 +166,8 @@ class _ChatGroupMembersPanelState extends State<ChatGroupMembersPanel> {
                 Expanded(
                   child: Text(
                     members == null
-                        ? 'Membres du groupe'
-                        : 'Membres du groupe (${members.length})',
+                        ? 'Participants'
+                        : 'Participants (${members.length})',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),

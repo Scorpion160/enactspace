@@ -20,6 +20,7 @@ import '../models/chat_models.dart';
 import '../services/chat_composer_drafts.dart';
 import '../services/chat_gateway.dart';
 import '../services/chat_service.dart';
+import '../services/chat_search_filters.dart';
 import '../services/chat_voice_recorder.dart';
 import '../widgets/chat_layout.dart';
 import '../widgets/chat_group_members_panel.dart';
@@ -1457,7 +1458,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _syncActiveChat() async {
-    if (_backgroundSyncing) return;
+    if (_backgroundSyncing || !mounted) return;
+    // Avoid continuous network polling and cache writes in background tabs.
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle == AppLifecycleState.hidden ||
+        lifecycle == AppLifecycleState.paused ||
+        lifecycle == AppLifecycleState.detached) {
+      return;
+    }
 
     final user = _user;
     final selectedId = _selectedThread?.id;
@@ -2223,9 +2231,10 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
   @override
   Widget build(BuildContext context) {
     final filteredThreads = widget.threads.where((thread) {
-      final query = _query.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return _threadSearchText(thread, widget.currentUserId).contains(query);
+      return chatTextMatches(
+        _threadSearchText(thread, widget.currentUserId),
+        _query,
+      );
     }).toList();
 
     final content = Padding(
@@ -2243,9 +2252,19 @@ class _ThreadsPanelState extends State<_ThreadsPanel> {
           AppFilterToolbar(
             search: TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Rechercher une discussion',
                 prefixIcon: Icon(Icons.search_rounded),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Effacer la recherche',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
               ),
               onChanged: (value) => setState(() => _query = value),
             ),
@@ -2541,28 +2560,42 @@ class _ConversationHeader extends StatelessWidget {
             ),
       trailing: thread == null
           ? null
-          : PopupMenuButton<String>(
-              tooltip: 'Options',
-              onSelected: (value) {
-                if (value == 'pin') onTogglePin();
-                if (value == 'info') onInfo();
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'pin',
-                  child: ListTile(
-                    leading: Icon(
-                      pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (thread!.threadType != 'direct' && thread!.canManageMembers)
+                  IconButton(
+                    key: const Key('chat-manage-group-members'),
+                    tooltip: 'Gérer les membres et les administrateurs',
+                    onPressed: onInfo,
+                    icon: const Icon(Icons.manage_accounts_outlined),
+                  ),
+                PopupMenuButton<String>(
+                  tooltip: 'Options',
+                  onSelected: (value) {
+                    if (value == 'pin') onTogglePin();
+                    if (value == 'info') onInfo();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'pin',
+                      child: ListTile(
+                        leading: Icon(
+                          pinned
+                              ? Icons.push_pin_rounded
+                              : Icons.push_pin_outlined,
+                        ),
+                        title: Text(pinned ? 'Désépingler' : 'Épingler'),
+                      ),
                     ),
-                    title: Text(pinned ? 'Désépingler' : 'Épingler'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'info',
-                  child: ListTile(
-                    leading: Icon(Icons.info_outline_rounded),
-                    title: Text('Infos'),
-                  ),
+                    const PopupMenuItem(
+                      value: 'info',
+                      child: ListTile(
+                        leading: Icon(Icons.info_outline_rounded),
+                        title: Text('Infos'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -4550,6 +4583,8 @@ class _AddChatMembersDialog extends StatefulWidget {
 
 class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  int _requestId = 0;
   final Set<String> _selectedIds = {};
   bool _loading = true;
   String? _error;
@@ -4563,11 +4598,18 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 320), _loadContacts);
+  }
+
   Future<void> _loadContacts() async {
+    final requestId = ++_requestId;
     setState(() {
       _loading = true;
       _error = null;
@@ -4577,19 +4619,19 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
       final contacts = await widget.chatService.getContacts(
         search: _searchController.text,
       );
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
       setState(() {
         _contacts = contacts
             .where((contact) => !widget.existingUserIds.contains(contact.id))
             .toList();
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
-      if (mounted) {
+      if (mounted && requestId == _requestId) {
         setState(() {
           _loading = false;
         });
@@ -4623,7 +4665,11 @@ class _AddChatMembersDialogState extends State<_AddChatMembersDialog> {
                   icon: Icon(Icons.arrow_forward_rounded),
                 ),
               ),
-              onSubmitted: (_) => _loadContacts(),
+              onChanged: _onSearchChanged,
+              onSubmitted: (_) {
+                _searchDebounce?.cancel();
+                _loadContacts();
+              },
             ),
             const SizedBox(height: 12),
             Expanded(
@@ -5141,6 +5187,9 @@ class NewChatThreadDialog extends StatefulWidget {
 class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  int _contactRequestId = 0;
+  bool _scopesLoaded = false;
   bool _loading = true;
   bool _creating = false;
   String? _error;
@@ -5160,36 +5209,53 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
   @override
   void dispose() {
     _titleController.dispose();
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 320), _loadContacts);
+  }
+
   Future<void> _loadContacts() async {
+    final requestId = ++_contactRequestId;
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final results = await Future.wait<dynamic>([
-        widget.chatService.getContacts(search: _searchController.text),
-        widget.chatService.getPoles(),
-        widget.chatService.getProjects(),
-      ]);
-      if (!mounted) return;
+      final contacts = await widget.chatService.getContacts(
+        search: _searchController.text,
+      );
+      if (!mounted || requestId != _contactRequestId) return;
       setState(() {
-        _contacts = (results[0] as List<ChatContactModel>)
+        _contacts = contacts
             .where((contact) => contact.id != widget.currentUserId)
             .toList();
-        _poles = results[1] as List<PoleModel>;
-        _projects = results[2] as List<ProjectModel>;
       });
+      if (!_scopesLoaded) {
+        final scopes = await Future.wait<dynamic>([
+          widget.chatService.getPoles(),
+          widget.chatService.getProjects(),
+        ]);
+        if (!mounted || requestId != _contactRequestId) return;
+        setState(() {
+          _poles = scopes[0] as List<PoleModel>;
+          _projects = scopes[1] as List<ProjectModel>;
+          _scopesLoaded = true;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (mounted && requestId == _contactRequestId) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
-      if (mounted) {
+      if (mounted && requestId == _contactRequestId) {
         setState(() {
           _loading = false;
         });
@@ -5389,7 +5455,11 @@ class _NewChatThreadDialogState extends State<NewChatThreadDialog> {
                     icon: Icon(Icons.arrow_forward_rounded),
                   ),
                 ),
-                onSubmitted: (_) => _loadContacts(),
+                onChanged: _onSearchChanged,
+                onSubmitted: (_) {
+                  _searchDebounce?.cancel();
+                  _loadContacts();
+                },
               ),
               const SizedBox(height: 12),
               Expanded(

@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import func, or_, exists
+from sqlalchemy import func, or_, and_, exists
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_validated_user
@@ -504,13 +504,20 @@ def list_chat_contacts(
             ProjectMember.is_active.is_(True),
         )
 
-    if search:
-        like = f"%{search.strip()}%"
-        query = query.filter(
-            (User.first_name.ilike(like))
-            | (User.last_name.ilike(like))
-            | (User.email.ilike(like))
-        )
+    if search and search.strip():
+        # Match all typed words regardless of first-name/last-name order.
+        # Escape SQL wildcard characters supplied by the search field.
+        words = search.strip().split()[:6]
+        conditions = []
+        for word in words:
+            cleaned = word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            like = f"%{cleaned}%"
+            conditions.append(or_(
+                User.first_name.ilike(like, escape="\\"),
+                User.last_name.ilike(like, escape="\\"),
+                User.email.ilike(like, escape="\\"),
+            ))
+        query = query.filter(and_(*conditions))
 
     return query.distinct().order_by(User.first_name.asc(), User.last_name.asc()).limit(80).all()
 

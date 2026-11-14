@@ -86,11 +86,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Membres du groupe (9)'), findsOneWidget);
+    expect(find.text('Participants (9)'), findsOneWidget);
     expect(find.byKey(const Key('chat-group-member-user-8')), findsOneWidget);
     await tester.tap(find.byKey(const Key('chat-group-add-members')));
     await tester.pumpAndSettle();
-    expect(find.text('Membres du groupe (10)'), findsOneWidget);
+    expect(find.text('Participants (10)'), findsOneWidget);
     expect(find.byKey(const Key('chat-group-member-user-9')), findsOneWidget);
 
     await tester.ensureVisible(
@@ -114,8 +114,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(gateway.removedId, 'user-1');
     expect(changes, 1);
-    expect(find.text('Membres du groupe (9)'), findsOneWidget);
+    expect(find.text('Participants (9)'), findsOneWidget);
     expect(find.byKey(const Key('chat-group-member-user-1')), findsNothing);
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('an owner confirms the promotion and demotion of an admin', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(680, 1050));
+    final gateway = _GroupGateway();
+    var changes = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ChatGroupMembersPanel(
+              thread: _thread(),
+              gateway: gateway,
+              currentUserId: 'user-0',
+              onChanged: () async => changes++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-group-manage-user-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nommer administrateur').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Nommer administrateur ?'), findsOneWidget);
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+    expect(gateway.members[1].participantRole, 'member');
+    await tester.tap(find.byKey(const Key('chat-group-manage-user-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nommer administrateur').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nommer administrateur').last);
+    await tester.pumpAndSettle();
+    expect(gateway.members[1].participantRole, 'admin');
+    expect(changes, 1);
+    await tester.tap(find.byKey(const Key('chat-group-manage-user-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Retirer le rôle admin').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmer'));
+    await tester.pumpAndSettle();
+    expect(gateway.members[1].participantRole, 'member');
+    expect(changes, 2);
     await tester.binding.setSurfaceSize(null);
   });
 

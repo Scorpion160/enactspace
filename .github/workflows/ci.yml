@@ -190,6 +190,7 @@ jobs:
           test/chat_message_viewport_test.dart
           test/chat_composer_drafts_test.dart
           test/chat_group_members_panel_test.dart
+          test/chat_search_filters_test.dart
           test/mobile_money_transaction_model_test.dart
           test/mobile_money_readiness_card_test.dart
           test/features/recruitment/recruitment_advisory_filters_test.dart
@@ -258,8 +259,8 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          assert str(checks['web_version']['public_fields']['build_number']) == '38'
-          assert checks['web_main']['sha256'] == '715905333a600cd802fc324301c38dc4d9576b5ed6718f41b2f6c7a40908d66b'
+          assert str(checks['web_version']['public_fields']['build_number']) == '40'
+          assert checks['web_main']['sha256'] == 'e69c3282ec8c365756e13969da1e7b79b9f20053e76b7d309f9723acecc23f1e'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -271,14 +272,14 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 715905333a600cd802fc324301c38dc4d9576b5ed6718f41b2f6c7a40908d66b
+          --live-main-sha256 e69c3282ec8c365756e13969da1e7b79b9f20053e76b7d309f9723acecc23f1e
           --live-version 1.0.30
-          --live-build 38
+          --live-build 40
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build40-PREFLIGHT-ONLY-${{ github.run_id }}
+          name: enactspace-web-1.0.30-build41-PREFLIGHT-ONLY-${{ github.run_id }}
           path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7
