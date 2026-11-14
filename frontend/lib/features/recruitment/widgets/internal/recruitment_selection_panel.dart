@@ -219,10 +219,8 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             const SizedBox(height: 8),
             Text(
               screening
-                  ? 'Les notes guident la délibération, sans sélectionner automatiquement '
-                      'les candidats. Les dossiers incomplets restent prioritaires.'
-                  : 'Chaque membre du jury prévu pour un entretien doit renseigner '
-                      'son évaluation avant la publication.',
+                  ? 'Consultez les dossiers prêts et ceux à compléter.'
+                  : 'Suivi des évaluations des entretiens.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -261,15 +259,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                   childrenPadding: const EdgeInsets.all(14),
                   expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Ces paramètres s’appliquent uniquement à cette campagne. '
-                      'Ne change pas les règles pendant la délibération sans accord '
-                      'préalable du jury. Les notes existantes sont conservées.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
                       key: ValueKey('selection-minimum-$_minimum'),
                       initialValue: _minimum,

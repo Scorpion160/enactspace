@@ -20,12 +20,36 @@ Fonctionne avec chaque campagne créée dans EnactSpace. Les vues d'analyse ne m
 
 Les valeurs des filtres ne changent ni la campagne ni le contenu de la base de données.
 
+## Délibération et règles internes
+
+### Préparation du tri
+
+1. Choisir la campagne, puis consulter **À étudier** pour les dossiers de la tranche intermédiaire sans décision.
+2. Contrôler les dossiers **Avis à compléter** : le nombre minimal d'évaluations peut être augmenté lorsqu'un désaccord nécessite une nouvelle appréciation.
+3. Repérer les écarts importants, puis lire les motivations, disponibilités et avis associés à chaque dossier, dans l'espace accessible aux responsables.
+4. Délibérer dossier par dossier, y compris sur les exceptions. Une note ou un filtre n'enregistre jamais une décision à la place du jury.
+5. Vérifier les décisions préparées avant toute publication des résultats. L'envoi d'invitations aux entretiens reste une opération distincte.
+
+### Repères retenus pour le tri 2026–2027
+
+- **Note strictement inférieure à 10/20** : dossier non retenu pour un entretien selon la décision du jury.
+- **Note de 10 inclus à 15 exclu** : examen complémentaire en délibération.
+- **Note supérieure ou égale à 15/20** : dossier retenu pour un entretien selon la décision du jury.
+
+Ces repères **décrivent la méthode de la présente délibération**. Ils ne constituent ni une décision automatique ni une règle à reprendre sans adaptation lors des campagnes ultérieures. Les deux seuils peuvent être ajustés dans l'affichage des prochaines campagnes. Les candidats proches d'un seuil ou faisant l'objet d'avis divergents méritent une lecture détaillée.
+
+Les dossiers sont affichés par défaut avec leurs évaluations complètes. Utiliser le filtre **Tous les dossiers** ou l'action **À étudier** pour voir aussi les évaluations en attente. Le filtre **Écart entre jurés** repère les divergences d'au moins cinq points sur vingt, sans changer le seuil métier qui impose des avis complémentaires.
+
+### Affichage de la note
+
+En présence de notes numériques du jury, la moyenne est sur 20. Pour une campagne utilisant uniquement une grille structurée sur 100, le tableau peut afficher l'équivalent sur 20, signalé dans le dossier. Un résultat provisoire doit être confirmé par les évaluations prévues avant la décision.
+
 ## Comparaison anonymisée
 - Les noms, adresses e-mail, téléphones et documents confidentiels ne sont pas intégrés au tableau de classement.
 - Les dossiers avec évaluations complètes apparaissent avant les dossiers provisoires.
 - Le classement ne publie rien et ne prépare aucune décision. Les notes provisoires ne doivent jamais servir seules à décider.
 - Les filtres facultatifs département/niveau permettent d'examiner différents besoins de l'équipe ; le classement reste indépendant de ces catégories.
-- Le champ **Simuler un objectif par groupe** sert uniquement à comparer un effectif hypothétique au nombre de dossiers suffisamment évalués dans le filtre courant. Il ne crée aucun quota et n'est pas sauvegardé.
+- Le champ **Estimer un effectif** sert uniquement à comparer un effectif hypothétique au nombre de dossiers suffisamment évalués dans le filtre courant. Il ne crée aucun quota et n'est pas sauvegardé.
 
 ## Statistiques et confidentialité
 La page **Campagne en chiffres** conserve ses répartitions globales. Seuls les responsables habilités à gérer le jury voient également :

@@ -51,6 +51,7 @@ class _MembersScreenState extends State<MembersScreen> {
   List<MemberModel> _transitionMembers = [];
   UserExperience? _userExperience;
   String _search = '';
+  int _visibleMembersCount = 24;
   String _statusFilter = 'all';
   String _roleFilter = 'all';
   String _poleFilter = 'all';
@@ -637,6 +638,7 @@ class _MembersScreenState extends State<MembersScreen> {
   void _resetFilters() {
     setState(() {
       _search = '';
+      _visibleMembersCount = 24;
       _statusFilter = 'all';
       _roleFilter = 'all';
       _poleFilter = 'all';
@@ -721,7 +723,9 @@ class _MembersScreenState extends State<MembersScreen> {
                   const _EmptyMembersCard()
                 else
                   _MembersList(
-                    members: filteredMembers,
+                    members: filteredMembers
+                        .take(_visibleMembersCount)
+                        .toList(),
                     canManageMembers: canManageMembers,
                     canReviewJoinRequests: canReviewJoinRequests,
                     canManageLifecycle: canManageLifecycle,
@@ -735,6 +739,24 @@ class _MembersScreenState extends State<MembersScreen> {
                     onEdit: _openEditMemberDialog,
                     onAssignDepartment: _openAssignDepartmentDialog,
                     onAssignPlacement: _openMemberAssignmentSheet,
+                  ),
+                if (!_loading &&
+                    _error == null &&
+                    filteredMembers.length > _visibleMembersCount)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Center(
+                      child: OutlinedButton.icon(
+                        key: const Key('members-show-more'),
+                        onPressed: () =>
+                            setState(() => _visibleMembersCount += 24),
+                        icon: const Icon(Icons.expand_more_rounded),
+                        label: Text(
+                          'Afficher d’autres membres '
+                          '(${filteredMembers.length - _visibleMembersCount})',
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -1388,237 +1410,399 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isCompact = MediaQuery.sizeOf(context).width < 700;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.55);
+    final statusActive =
+        member.status == 'active' &&
+        member.isActive == true &&
+        !member.isAlumni;
+    final statusColor = statusActive
+        ? AppTheme.success
+        : member.status == 'pending'
+        ? AppTheme.warning
+        : scheme.onSurfaceVariant;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _Avatar(name: member.displayName, photoUrl: member.photoUrl),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        member.displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        member.email,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isCompact)
-                  PopupMenuButton<_MemberAction>(
-                    tooltip: 'Actions du membre',
-                    onSelected: (action) {
-                      switch (action) {
-                        case _MemberAction.details:
-                          onDetails();
-                          break;
-                        case _MemberAction.assignRole:
-                          onAssignRole();
-                          break;
-                        case _MemberAction.assignDepartment:
-                          onAssignDepartment();
-                          break;
-                        case _MemberAction.assignPlacement:
-                          onAssignPlacement();
-                          break;
-                        case _MemberAction.approve:
-                          onApprove?.call();
-                          break;
-                        case _MemberAction.reject:
-                          onReject?.call();
-                          break;
-                        case _MemberAction.manageLifecycle:
-                          onManageLifecycle();
-                          break;
-                        case _MemberAction.deleteAccount:
-                          onDelete();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: _MemberAction.details,
-                        child: ListTile(
-                          leading: Icon(Icons.visibility_rounded),
-                          title: Text('Voir le profil'),
-                        ),
-                      ),
-                      if (canManageMembers) ...[
-                        const PopupMenuItem(
-                          value: _MemberAction.assignRole,
-                          child: ListTile(
-                            leading: Icon(Icons.admin_panel_settings_rounded),
-                            title: Text('Assigner un rôle'),
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: _MemberAction.assignDepartment,
-                          child: ListTile(
-                            leading: Icon(Icons.account_balance_outlined),
-                            title: Text('Assigner le département ESP'),
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: _MemberAction.assignPlacement,
-                          child: ListTile(
-                            leading: Icon(Icons.hub_rounded),
-                            title: Text('Affecter pôle/projet'),
-                          ),
-                        ),
-                      ],
-                      if (canReviewJoinRequests && onApprove != null) ...[
-                        const PopupMenuItem(
-                          value: _MemberAction.approve,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.verified_user_rounded,
-                              color: Colors.green,
-                            ),
-                            title: Text('Approuver'),
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: _MemberAction.reject,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.cancel_outlined,
-                              color: Colors.red,
-                            ),
-                            title: Text('Rejeter'),
-                          ),
-                        ),
-                      ],
-                      if (canManageLifecycle)
-                        const PopupMenuItem(
-                          value: _MemberAction.manageLifecycle,
-                          child: ListTile(
-                            leading: Icon(Icons.manage_accounts_outlined),
-                            title: Text('Gérer le compte'),
-                          ),
-                        ),
-                      if (canDeleteAccount)
-                        const PopupMenuItem(
-                          value: _MemberAction.deleteAccount,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.delete_forever_outlined,
-                              color: Colors.red,
-                            ),
-                            title: Text('Supprimer le compte'),
-                          ),
-                        ),
-                    ],
-                  ),
-              ],
-            ),
-            SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _StatusChip(member: member),
-                _SoftInfoChip(
-                  icon: Icons.badge_rounded,
-                  label: member.primaryRoleLabel,
-                ),
-                _DepartmentChip(department: member.departmentLabel),
-              ],
-            ),
-            SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton.icon(
-                  onPressed: onDetails,
-                  icon: Icon(Icons.visibility_rounded),
-                  label: Text('Voir le profil'),
-                ),
-                if (canManageMembers)
-                  TextButton.icon(
-                    onPressed: () => onEdit(member),
-                    icon: Icon(Icons.edit_outlined),
-                    label: Text('Modifier'),
-                  ),
-              ],
-            ),
-            SizedBox(height: 12),
-            if (!isCompact) ...[
-              const Divider(height: 20),
-              Wrap(
-                spacing: 4,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (canManageMembers) ...[
-                    IconButton(
-                      onPressed: onAssignRole,
-                      icon: Icon(Icons.admin_panel_settings_rounded),
-                      tooltip: 'Assigner rôle',
+      key: ValueKey('member-card-${member.id}'),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: (isCompact ? 218 : 268) * scale,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 58 * scale,
+                child: Row(
+                  children: [
+                    _Avatar(
+                      name: member.displayName,
+                      photoUrl: member.photoUrl,
                     ),
-                    IconButton(
-                      onPressed: onAssignDepartment,
-                      icon: Icon(Icons.account_tree_rounded),
-                      tooltip: 'Assigner le département ESP',
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _MemberScrollingText(
+                            text: member.displayName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          _MemberScrollingText(
+                            text: member.email,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    IconButton(
-                      onPressed: onAssignPlacement,
-                      icon: Icon(Icons.hub_rounded),
-                      tooltip: 'Affecter pôle/projet',
-                    ),
+                    if (isCompact)
+                      PopupMenuButton<_MemberAction>(
+                        tooltip: 'Actions du membre',
+                        onSelected: (action) {
+                          switch (action) {
+                            case _MemberAction.details:
+                              onDetails();
+                              break;
+                            case _MemberAction.assignRole:
+                              onAssignRole();
+                              break;
+                            case _MemberAction.assignDepartment:
+                              onAssignDepartment();
+                              break;
+                            case _MemberAction.assignPlacement:
+                              onAssignPlacement();
+                              break;
+                            case _MemberAction.approve:
+                              onApprove?.call();
+                              break;
+                            case _MemberAction.reject:
+                              onReject?.call();
+                              break;
+                            case _MemberAction.manageLifecycle:
+                              onManageLifecycle();
+                              break;
+                            case _MemberAction.deleteAccount:
+                              onDelete();
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: _MemberAction.details,
+                            child: ListTile(
+                              leading: Icon(Icons.visibility_rounded),
+                              title: Text('Voir le profil'),
+                            ),
+                          ),
+                          if (canManageMembers) ...[
+                            const PopupMenuItem(
+                              value: _MemberAction.assignRole,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.admin_panel_settings_rounded,
+                                ),
+                                title: Text('Assigner un rôle'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: _MemberAction.assignDepartment,
+                              child: ListTile(
+                                leading: Icon(Icons.account_balance_outlined),
+                                title: Text('Assigner le département ESP'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: _MemberAction.assignPlacement,
+                              child: ListTile(
+                                leading: Icon(Icons.hub_rounded),
+                                title: Text('Affecter pôle/projet'),
+                              ),
+                            ),
+                          ],
+                          if (canReviewJoinRequests && onApprove != null) ...[
+                            const PopupMenuItem(
+                              value: _MemberAction.approve,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.verified_user_rounded,
+                                  color: Colors.green,
+                                ),
+                                title: Text('Approuver'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: _MemberAction.reject,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.cancel_outlined,
+                                  color: Colors.red,
+                                ),
+                                title: Text('Rejeter'),
+                              ),
+                            ),
+                          ],
+                          if (canManageLifecycle)
+                            const PopupMenuItem(
+                              value: _MemberAction.manageLifecycle,
+                              child: ListTile(
+                                leading: Icon(Icons.manage_accounts_outlined),
+                                title: Text('Gérer le compte'),
+                              ),
+                            ),
+                          if (canDeleteAccount)
+                            const PopupMenuItem(
+                              value: _MemberAction.deleteAccount,
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.delete_forever_outlined,
+                                  color: Colors.red,
+                                ),
+                                title: Text('Supprimer le compte'),
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
-                  if (canReviewJoinRequests && onApprove != null) ...[
-                    FilledButton.icon(
-                      onPressed: onApprove,
-                      icon: Icon(Icons.verified_user_rounded),
-                      label: Text('Approuver'),
-                    ),
-                    IconButton(
-                      onPressed: onReject,
-                      icon: Icon(Icons.cancel_outlined),
-                      color: Colors.red,
-                      tooltip: 'Rejeter',
-                    ),
-                  ],
-                  if (canManageLifecycle)
-                    IconButton(
-                      onPressed: onManageLifecycle,
-                      icon: Icon(Icons.manage_accounts_outlined),
-                      tooltip: 'Gérer le compte',
-                    ),
-                  if (canDeleteAccount)
-                    IconButton(
-                      onPressed: onDelete,
-                      icon: const Icon(Icons.delete_forever_outlined),
-                      color: Theme.of(context).colorScheme.error,
-                      tooltip: 'Supprimer définitivement le compte',
-                    ),
-                ],
+                ),
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 42 * scale,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _UniformMemberBadge(
+                        label: member.statusLabel,
+                        color: statusColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _UniformMemberBadge(
+                        label: member.primaryRoleLabel,
+                        color: scheme.onSurfaceVariant,
+                        icon: Icons.badge_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _UniformMemberBadge(
+                        label: member.departmentLabel,
+                        color: scheme.onSecondaryContainer,
+                        background: scheme.secondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 44 * scale,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: onDetails,
+                          icon: const Icon(Icons.visibility_outlined, size: 19),
+                          label: const Text('Voir le profil'),
+                        ),
+                        if (canManageMembers)
+                          TextButton.icon(
+                            onPressed: () => onEdit(member),
+                            icon: const Icon(Icons.edit_outlined, size: 19),
+                            label: const Text('Modifier'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (!isCompact) ...[
+                Divider(height: 12, color: scheme.outlineVariant),
+                SizedBox(
+                  height: 48 * scale,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (canManageMembers) ...[
+                          IconButton(
+                            tooltip: 'Assigner un rôle',
+                            onPressed: onAssignRole,
+                            icon: const Icon(
+                              Icons.admin_panel_settings_outlined,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Département ESP',
+                            onPressed: onAssignDepartment,
+                            icon: const Icon(Icons.account_tree_outlined),
+                          ),
+                          IconButton(
+                            tooltip: 'Affecter à un pôle ou un projet',
+                            onPressed: onAssignPlacement,
+                            icon: const Icon(Icons.hub_outlined),
+                          ),
+                        ],
+                        if (canReviewJoinRequests && onApprove != null) ...[
+                          IconButton(
+                            tooltip: 'Approuver',
+                            onPressed: onApprove,
+                            icon: const Icon(Icons.verified_user_outlined),
+                          ),
+                          IconButton(
+                            tooltip: 'Rejeter',
+                            onPressed: onReject,
+                            icon: const Icon(Icons.cancel_outlined),
+                            color: scheme.error,
+                          ),
+                        ],
+                        if (canManageLifecycle)
+                          IconButton(
+                            tooltip: 'Gérer le compte',
+                            onPressed: onManageLifecycle,
+                            icon: const Icon(Icons.manage_accounts_outlined),
+                          ),
+                        if (canDeleteAccount)
+                          IconButton(
+                            tooltip: 'Supprimer le compte',
+                            onPressed: onDelete,
+                            icon: const Icon(Icons.delete_forever_outlined),
+                            color: scheme.error,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// All cards use the same badge geometry. Long labels can be read in full
+/// on hover, focus or tap without enlarging their card.
+class _UniformMemberBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color? background;
+  final IconData? icon;
+  const _UniformMemberBadge({
+    required this.label,
+    required this.color,
+    this.background,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: background ?? color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: _MemberScrollingText(
+              text: label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberScrollingText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  const _MemberScrollingText({required this.text, this.style});
+
+  @override
+  State<_MemberScrollingText> createState() => _MemberScrollingTextState();
+}
+
+class _MemberScrollingTextState extends State<_MemberScrollingText> {
+  final ScrollController _scroll = ScrollController();
+
+  void _scrollTo(bool end) {
+    if (!_scroll.hasClients) return;
+    final target = end ? _scroll.position.maxScrollExtent : 0.0;
+    if (target <= 0 && end) return;
+    _scroll.animateTo(
+      target,
+      duration: Duration(milliseconds: end ? 1300 : 250),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_MemberScrollingText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text && _scroll.hasClients) {
+      _scroll.jumpTo(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: widget.text,
+    child: MouseRegion(
+      onEnter: (_) => _scrollTo(true),
+      onExit: (_) => _scrollTo(false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => _scrollTo(true),
+        child: SingleChildScrollView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Text(
+            widget.text,
+            maxLines: 1,
+            softWrap: false,
+            style: widget.style,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Avatar extends StatelessWidget {
@@ -2004,35 +2188,6 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   }
 }
 
-class _SoftInfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _SoftInfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Chip(
-      avatar: Icon(icon, size: 16, color: scheme.onSurfaceVariant),
-      label: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 150),
-        child: Text(
-          label,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ),
-      backgroundColor: scheme.surfaceContainerHighest,
-      labelStyle: TextStyle(
-        color: scheme.onSurfaceVariant,
-        fontWeight: FontWeight.w700,
-      ),
-      side: BorderSide(color: scheme.outlineVariant),
-    );
-  }
-}
-
 class AssignRoleDialog extends StatefulWidget {
   final MemberModel member;
   final UserExperience? userExperience;
@@ -2261,40 +2416,6 @@ class _AssignRoleDialogState extends State<AssignRoleDialog> {
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],
-    );
-  }
-}
-
-class _DepartmentChip extends StatelessWidget {
-  final String department;
-
-  const _DepartmentChip({required this.department});
-
-  @override
-  Widget build(BuildContext context) {
-    final defined =
-        department.trim().isNotEmpty &&
-        !department.toLowerCase().contains('non ');
-
-    final scheme = Theme.of(context).colorScheme;
-    final background = defined
-        ? scheme.secondaryContainer
-        : scheme.surfaceContainerHighest;
-    final foreground = defined
-        ? scheme.onSecondaryContainer
-        : scheme.onSurfaceVariant;
-    return Chip(
-      label: SizedBox(
-        width: 120,
-        child: Text(
-          department,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ),
-      backgroundColor: background,
-      labelStyle: TextStyle(color: foreground, fontWeight: FontWeight.w700),
-      side: BorderSide(color: scheme.outlineVariant),
     );
   }
 }

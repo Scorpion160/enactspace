@@ -38,6 +38,8 @@ class _RecruitmentComparisonPanelState
   final _upperController = TextEditingController(text: '15');
   bool _showAll = false;
   final _target = TextEditingController();
+  int? _sortCacheKey;
+  List<Map<String, dynamic>>? _sortCache;
 
   @override
   void dispose() {
@@ -87,6 +89,22 @@ class _RecruitmentComparisonPanelState
   }
 
   List<Map<String, dynamic>> get _sorted {
+    // Input and filter changes invalidate the cache; opening details or
+    // editing the optional target no longer re-sorts the complete list.
+    final key = Object.hash(
+      identityHashCode(widget.rows),
+      _department,
+      _level,
+      _readiness,
+      _scoreBand,
+      _decision,
+      _disagreement,
+      _lowerCutoff,
+      _upperCutoff,
+    );
+    if (_sortCacheKey == key && _sortCache != null) {
+      return _sortCache!;
+    }
     final rows = widget.rows.where((row) {
       final ready = row['ready'] == true;
       return (_department == 'all' || row['department'] == _department) &&
@@ -116,6 +134,8 @@ class _RecruitmentComparisonPanelState
         b['anonymous_code']?.toString() ?? '',
       );
     });
+    _sortCacheKey = key;
+    _sortCache = rows;
     return rows;
   }
 
@@ -171,21 +191,10 @@ class _RecruitmentComparisonPanelState
               ? 'Classement indicatif des dossiers'
               : 'Comparaison des évaluations d’entretien',
         ),
-        subtitle: const Text(
-          'Notes décroissantes et filtres facultatifs · aucune décision automatique',
-        ),
+        subtitle: const Text('Retrouvez et comparez les dossiers facilement.'),
         childrenPadding: const EdgeInsets.all(16),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Seuls les dossiers avec toutes leurs évaluations sont affichés '
-            'par défaut. Une note encore provisoire ne doit pas déterminer '
-            'une décision. Les filtres ne modifient ni les notes ni les '
-            'règles d’éligibilité. Les identités restent masquées.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
-            ),
-          ),
           if (widget.screening) ...[
             Card(
               margin: EdgeInsets.zero,
@@ -200,8 +209,11 @@ class _RecruitmentComparisonPanelState
                       style: theme.textTheme.titleMedium,
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Tranches sur 20 : notes du jury ou équivalent du barème. Aucune décision automatique.',
+                    Text(
+                      'Sélectionnez une tranche pour retrouver les dossiers.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -213,14 +225,12 @@ class _RecruitmentComparisonPanelState
                           onPressed: () =>
                               _selectBand('middle', pendingOnly: true),
                           icon: const Icon(Icons.fact_check_outlined),
-                          label: Text(
-                            'À étudier sans décision ($pendingMiddleCount)',
-                          ),
+                          label: Text('À étudier ($pendingMiddleCount)'),
                         ),
                         ChoiceChip(
                           key: const Key('comparison-band-below'),
                           label: Text(
-                            'Moins de ${_lowerCutoff.toStringAsFixed(1)} ($belowCount)',
+                            'Sous ${_lowerCutoff.toStringAsFixed(0)} ($belowCount)',
                           ),
                           selected: _scoreBand == 'below',
                           onSelected: (_) => _selectBand('below'),
@@ -228,7 +238,7 @@ class _RecruitmentComparisonPanelState
                         ChoiceChip(
                           key: const Key('comparison-band-middle'),
                           label: Text(
-                            'De ${_lowerCutoff.toStringAsFixed(1)} à moins de ${_upperCutoff.toStringAsFixed(1)} ($middleCount)',
+                            '${_lowerCutoff.toStringAsFixed(0)} à moins de ${_upperCutoff.toStringAsFixed(0)} ($middleCount)',
                           ),
                           selected: _scoreBand == 'middle',
                           onSelected: (_) => _selectBand('middle'),
@@ -236,7 +246,7 @@ class _RecruitmentComparisonPanelState
                         ChoiceChip(
                           key: const Key('comparison-band-above'),
                           label: Text(
-                            '${_upperCutoff.toStringAsFixed(1)} ou plus ($aboveCount)',
+                            '${_upperCutoff.toStringAsFixed(0)} et plus ($aboveCount)',
                           ),
                           selected: _scoreBand == 'above',
                           onSelected: (_) => _selectBand('above'),
@@ -245,12 +255,11 @@ class _RecruitmentComparisonPanelState
                     ),
                     ExpansionTile(
                       key: const Key('comparison-cutoffs-editor'),
-                      title: const Text(
-                        'Modifier les seuils pour cette consultation',
-                      ),
-                      subtitle: const Text(
-                        'Valeurs par défaut : 10 et 15 sur 20',
-                      ),
+                      initiallyExpanded: false,
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(bottom: 12),
+                      title: const Text('Ajuster les seuils'),
+                      subtitle: const Text('Deux repères sur 20'),
                       children: [
                         Wrap(
                           spacing: 12,
@@ -266,7 +275,12 @@ class _RecruitmentComparisonPanelState
                                       decimal: true,
                                     ),
                                 decoration: const InputDecoration(
-                                  labelText: 'Limite basse /20',
+                                  labelText: 'Premier seuil',
+                                  hintText: '10',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14,
+                                  ),
                                 ),
                                 onChanged: (_) => _updateCutoffs(),
                               ),
@@ -281,7 +295,12 @@ class _RecruitmentComparisonPanelState
                                       decimal: true,
                                     ),
                                 decoration: const InputDecoration(
-                                  labelText: 'Limite haute /20',
+                                  labelText: 'Second seuil',
+                                  hintText: '15',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14,
+                                  ),
                                 ),
                                 onChanged: (_) => _updateCutoffs(),
                               ),
@@ -301,7 +320,6 @@ class _RecruitmentComparisonPanelState
             ),
             const SizedBox(height: 16),
           ],
-          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth >= 900
@@ -371,7 +389,7 @@ class _RecruitmentComparisonPanelState
                       isExpanded: true,
                       initialValue: _readiness,
                       decoration: const InputDecoration(
-                        labelText: 'Avancement du dossier',
+                        labelText: 'Évaluations',
                         prefixIcon: Icon(Icons.fact_check_outlined),
                       ),
                       items: const [
@@ -402,7 +420,7 @@ class _RecruitmentComparisonPanelState
                         initialValue: _decision,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Décision préparée',
+                          labelText: 'Décision',
                         ),
                         items: const [
                           DropdownMenuItem(
@@ -435,7 +453,7 @@ class _RecruitmentComparisonPanelState
                         initialValue: _disagreement,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Écart entre jurés /20',
+                          labelText: 'Écart entre jurés',
                         ),
                         items: const [
                           DropdownMenuItem(
@@ -467,27 +485,20 @@ class _RecruitmentComparisonPanelState
             margin: EdgeInsets.zero,
             color: colors.surfaceContainerLow,
             child: ExpansionTile(
-              title: const Text('Simuler un objectif par groupe'),
+              initiallyExpanded: false,
+              title: const Text('Estimer un effectif'),
               subtitle: const Text(
-                'Projection facultative · aucun quota ni décision enregistrés',
+                'Pour le département et le niveau sélectionnés',
               ),
               childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
               children: [
-                Text(
-                  'Applique les filtres de département et de niveau puis saisis '
-                  'un effectif envisagé. Cette simulation ne retient ni '
-                  'n’exclut automatiquement aucun candidat.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
                 const SizedBox(height: 12),
                 TextField(
                   key: const Key('comparison-target-scenario'),
                   controller: _target,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'Effectif envisagé (facultatif)',
+                    labelText: 'Nombre de places envisagé',
                     hintText: 'Par exemple : 5',
                   ),
                   onChanged: (_) => setState(() {}),
@@ -495,10 +506,9 @@ class _RecruitmentComparisonPanelState
                 const SizedBox(height: 10),
                 Text(
                   target == null || target < 1
-                      ? '$readyCount dossier(s) suffisamment évalué(s) dans ce périmètre.'
-                      : '$readyCount dossier(s) suffisamment évalué(s) pour '
-                            'un objectif hypothétique de $target place(s). '
-                            'Écart de disponibilité : ${readyCount - target}.',
+                      ? '$readyCount dossiers avec évaluations complètes.'
+                      : '$readyCount dossiers évalués · objectif de $target places '
+                            '· différence : ${readyCount - target}.',
                 ),
               ],
             ),
@@ -508,7 +518,7 @@ class _RecruitmentComparisonPanelState
             children: [
               Expanded(
                 child: Text(
-                  '${rows.length} dossier(s) · moyenne du jury /20',
+                  '${rows.length} dossier(s) · classement par note',
                   style: theme.textTheme.titleSmall,
                 ),
               ),
@@ -595,13 +605,13 @@ class _ComparisonRow extends StatelessWidget {
       level,
       '$reviewCount/$requiredCount avis',
       if (score != null) 'Barème ${score.toStringAsFixed(1)}/100',
-      if (row['jury_score_source'] == 'rubric') 'Note /20 issue du barème',
+      if (row['jury_score_source'] == 'rubric') 'Grille d’évaluation',
       if (row['jury_spread_20'] is num)
         'Écart ${((row['jury_spread_20'] as num).toDouble()).toStringAsFixed(1)}/20',
       if (row['decision'] == 'shortlisted') 'Présélectionné',
       if (row['decision'] == 'not_shortlisted') 'Non présélectionné',
       if (row['decision'] == null) 'Sans décision',
-      ready ? 'Complet' : 'Provisoire',
+      ready ? 'Évalué' : 'Avis à compléter',
     ].join(' · ');
 
     return ListTile(
