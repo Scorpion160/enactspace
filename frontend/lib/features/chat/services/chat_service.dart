@@ -105,9 +105,12 @@ class ChatService {
       List<ChatThreadModel>.of(threads),
     );
     final payload = await _readOfflineCache();
-    payload[_threadsCacheKey(userId)] = threads
-        .map((item) => item.toJson())
-        .toList();
+    final cacheKey = _threadsCacheKey(userId);
+    final items = threads.map((item) => item.toJson()).toList();
+    // Polling must not rewrite encrypted storage for identical conversations.
+    // Update the in-memory snapshot above, but preserve the offline timestamp.
+    if (jsonEncode(payload[cacheKey]) == jsonEncode(items)) return;
+    payload[cacheKey] = items;
     await _writeOfflineCache(payload);
   }
 
@@ -272,7 +275,9 @@ class ChatService {
     final key = _messagesCacheKey(userId, threadId);
     sessionPrivateMemoryCache.write(key, List<ChatMessageModel>.of(messages));
     final payload = await _readOfflineCache();
-    payload[key] = messages.map((item) => item.toJson()).toList();
+    final items = messages.map((item) => item.toJson()).toList();
+    if (jsonEncode(payload[key]) == jsonEncode(items)) return;
+    payload[key] = items;
     await _writeOfflineCache(payload);
   }
 

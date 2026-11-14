@@ -72,6 +72,9 @@ jobs:
       - name: Verify Web release preserves icon-font directory permissions
         run: python ../tools/test_publish_web_release_icons.py
 
+      - name: Verify safe Compose configuration checks (synthetic only)
+        run: python ../tools/test_verify_vps_compose_alignment.py
+
       - name: Install LaTeX renderer
         run: |
           sudo apt-get update
