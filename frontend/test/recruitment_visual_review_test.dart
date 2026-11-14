@@ -26,6 +26,9 @@ Map<String, dynamic> _syntheticCandidate(
   'application_id': code,
   'anonymous_code': code,
   'score': score,
+  'jury_average_20': score == null ? null : score / 5,
+  'jury_spread_20': spread == null ? null : spread / 5,
+  'jury_score_source': 'rubric',
   'ready': ready,
   'department': department,
   'study_level': level,
@@ -293,7 +296,7 @@ void main() {
       await tester.pumpAndSettle();
       final section = find.text('Classement indicatif des dossiers');
       await tester.ensureVisible(section);
-      await tester.tap(section);
+      // The screening comparison is open by default to aid deliberation.
       await tester.pumpAndSettle();
       expect(find.text('Candidat #A001'), findsOneWidget);
       expect(find.text('Candidat #A005'), findsNothing);
