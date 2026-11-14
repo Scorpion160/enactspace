@@ -14,7 +14,9 @@ import uuid
 
 MAIN_SHA = '2ae134b2f47a5bb05b3856d80d841d96fbf471112d3a383609078137d030daad'
 DEFAULT_RELEASE = ('1.0.23', '26', MAIN_SHA)
-REQUIRED = ('index.html','main.dart.js','flutter_bootstrap.js','firebase-messaging-sw.js','version.json')
+REQUIRED = ('index.html','main.dart.js','flutter_bootstrap.js','firebase-messaging-sw.js','version.json',
+            'assets/FontManifest.json','assets/fonts/MaterialIcons-Regular.otf',
+            'assets/packages/cupertino_icons/assets/CupertinoIcons.ttf')
 
 def sha(path):
     digest=hashlib.sha256()
@@ -53,6 +55,11 @@ def extract_bundle(archive,target,release=DEFAULT_RELEASE):
                     import shutil
                     shutil.copyfileobj(source,dest)
                 path.chmod(0o644)
+    # Parent directories created implicitly under umask 077 can remain mode
+    # 0700, preventing the unprivileged Nginx worker from loading icon fonts.
+    # Normalize all extracted directories, not just explicit tar entries.
+    for directory in (target, *[p for p in target.rglob('*') if p.is_dir()]):
+        directory.chmod(0o755)
     for name in REQUIRED:
         if not (target/name).is_file():raise RuntimeError('Missing_bundle_file_'+name.replace('.','_'))
     version = check_release(target, release)
