@@ -17,6 +17,7 @@ on:
       - feature/recruitment-decision-workspace-20261110
       - integration/recruitment-production-parity-20261110
       - fix/chat-scroll-and-payment-hardening-20261111
+      - integration/consolidated-20261113
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -183,6 +184,9 @@ jobs:
         run: >-
           flutter test --no-pub
           test/recruitment_statistics_screen_test.dart
+          test/recruitment_evaluation_dashboard_test.dart
+          test/recruitment_human_rubric_test.dart
+          test/project_presentations_test.dart
           test/chat_message_viewport_test.dart
           test/chat_composer_drafts_test.dart
           test/mobile_money_transaction_model_test.dart

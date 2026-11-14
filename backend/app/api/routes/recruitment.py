@@ -122,7 +122,10 @@ def recruitment_statistics(
         'campaign_id': str(selected.id) if selected else None,
         'can_access_applications': can_access_recruitment(db, current_user),
         'selection_progress': progress,
-        **campaign_statistics(db, selected.id if selected else None),
+        **campaign_statistics(
+            db, selected.id if selected else None,
+            campaign=selected if selected and can_manage_jury(db, current_user) else None,
+        ),
     }
 
 

@@ -36,12 +36,66 @@ Map<String, dynamic> _syntheticCandidate(
 };
 
 final _syntheticRows = <Map<String, dynamic>>[
-  _syntheticCandidate('Candidat #A001', 92, true, 'Génie électrique', 'DIC2', 4, 4, 25),
-  _syntheticCandidate('Candidat #A002', 86, true, 'Génie civil', 'DIC1', 3, 3, 8),
-  _syntheticCandidate('Candidat #A003', 79, true, 'Gestion', 'Licence2', 3, 3, 12),
-  _syntheticCandidate('Candidat #A004', 74, true, 'Génie informatique', 'DIC2', 3, 3, 7),
-  _syntheticCandidate('Candidat #A005', 88, false, 'Gestion', 'Licence1', 2, 3, 15),
-  _syntheticCandidate('Candidat #A006', null, false, 'GCBA', 'DUT1', 0, 3, null),
+  _syntheticCandidate(
+    'Candidat #A001',
+    92,
+    true,
+    'Génie électrique',
+    'DIC2',
+    4,
+    4,
+    25,
+  ),
+  _syntheticCandidate(
+    'Candidat #A002',
+    86,
+    true,
+    'Génie civil',
+    'DIC1',
+    3,
+    3,
+    8,
+  ),
+  _syntheticCandidate(
+    'Candidat #A003',
+    79,
+    true,
+    'Gestion',
+    'Licence2',
+    3,
+    3,
+    12,
+  ),
+  _syntheticCandidate(
+    'Candidat #A004',
+    74,
+    true,
+    'Génie informatique',
+    'DIC2',
+    3,
+    3,
+    7,
+  ),
+  _syntheticCandidate(
+    'Candidat #A005',
+    88,
+    false,
+    'Gestion',
+    'Licence1',
+    2,
+    3,
+    15,
+  ),
+  _syntheticCandidate(
+    'Candidat #A006',
+    null,
+    false,
+    'GCBA',
+    'DUT1',
+    0,
+    3,
+    null,
+  ),
 ];
 
 class _SyntheticRecruitmentStatistics implements RecruitmentStatisticsGateway {
@@ -69,15 +123,15 @@ class _SyntheticRecruitmentStatistics implements RecruitmentStatisticsGateway {
     },
     'breakdowns': {
       'department': [
-        {'label':'Génie électrique', 'count':4, 'percentage':33.3},
-        {'label':'Gestion', 'count':3, 'percentage':25.0},
-        {'label':'Génie civil', 'count':3, 'percentage':25.0},
-        {'label':'Génie informatique', 'count':2, 'percentage':16.7},
+        {'label': 'Génie électrique', 'count': 4, 'percentage': 33.3},
+        {'label': 'Gestion', 'count': 3, 'percentage': 25.0},
+        {'label': 'Génie civil', 'count': 3, 'percentage': 25.0},
+        {'label': 'Génie informatique', 'count': 2, 'percentage': 16.7},
       ],
       'study_level': [
-        {'label':'DIC1', 'count':5, 'percentage':41.7},
-        {'label':'DIC2', 'count':4, 'percentage':33.3},
-        {'label':'Licence2', 'count':3, 'percentage':25.0},
+        {'label': 'DIC1', 'count': 5, 'percentage': 41.7},
+        {'label': 'DIC2', 'count': 4, 'percentage': 33.3},
+        {'label': 'Licence2', 'count': 3, 'percentage': 25.0},
       ],
       'study_year': [],
       'promotion': [],
@@ -96,7 +150,9 @@ Future<void> _saveScreenshot(WidgetTester tester, String filename) async {
     final image = await boundary.toImage(pixelRatio: 1);
     try {
       final encoded = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (encoded == null) throw StateError('Unable to encode synthetic screenshot');
+      if (encoded == null) {
+        throw StateError('Unable to encode synthetic screenshot');
+      }
       return encoded.buffer.asUint8List();
     } finally {
       image.dispose();
@@ -126,25 +182,27 @@ Widget _comparisonFixture(ThemeMode mode) => MaterialApp(
     key: _captureKey,
     child: Scaffold(
       body: SafeArea(
-        child: Column(children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'RECETTE VISUELLE — DONNÉES FICTIVES (AUCUN CANDIDAT RÉEL)',
-              style: TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: RecruitmentComparisonPanel(
-                screening: true,
-                rows: _syntheticRows,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'RECETTE VISUELLE — DONNÉES FICTIVES (AUCUN CANDIDAT RÉEL)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
             ),
-          ),
-        ]),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: RecruitmentComparisonPanel(
+                  screening: true,
+                  rows: _syntheticRows,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   ),
@@ -180,36 +238,55 @@ void main() {
   setUpAll(() async {
     // The default "Ahem" font draws rectangles in Flutter test screenshots.
     // Load an open-source system font to make the images readable.
-    final file = File('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
+    final overriddenPath = Platform.environment['ENACTSPACE_QA_TEXT_FONT'];
+    final file = File(
+      overriddenPath != null && overriddenPath.isNotEmpty
+          ? overriddenPath
+          : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    );
     if (!file.existsSync()) {
       throw StateError('Required CI screenshot font is unavailable');
     }
     final loader = FontLoader('QaReadableSans');
-    loader.addFont(Future<ByteData>.value(
-      ByteData.sublistView(file.readAsBytesSync()),
-    ));
+    loader.addFont(
+      Future<ByteData>.value(ByteData.sublistView(file.readAsBytesSync())),
+    );
     await loader.load();
     final icons = Platform.environment['ENACTSPACE_QA_ICON_FONT'];
     if (icons != null) {
       final iconFile = File(icons);
-      if (!iconFile.existsSync()) throw StateError('Material icons file missing');
+      if (!iconFile.existsSync()) {
+        throw StateError('Material icons file missing');
+      }
       final materialIcons = FontLoader('MaterialIcons');
-      materialIcons.addFont(Future<ByteData>.value(
-        ByteData.sublistView(iconFile.readAsBytesSync()),
-      ));
+      materialIcons.addFont(
+        Future<ByteData>.value(
+          ByteData.sublistView(iconFile.readAsBytesSync()),
+        ),
+      );
       await materialIcons.load();
     }
   });
 
-  testWidgets('render anonymous comparison: desktop light and phone dark',
-      (tester) async {
+  testWidgets('render anonymous comparison: desktop light and phone dark', (
+    tester,
+  ) async {
     for (final variant in [
-      (size: const Size(1440, 900), mode: ThemeMode.light,
-          filename:'comparison-desktop-light'),
-      (size: const Size(390, 844), mode: ThemeMode.dark,
-          filename:'comparison-phone-dark'),
-      (size: const Size(390, 844), mode: ThemeMode.light,
-          filename:'comparison-phone-light'),
+      (
+        size: const Size(1440, 900),
+        mode: ThemeMode.light,
+        filename: 'comparison-desktop-light',
+      ),
+      (
+        size: const Size(390, 844),
+        mode: ThemeMode.dark,
+        filename: 'comparison-phone-dark',
+      ),
+      (
+        size: const Size(390, 844),
+        mode: ThemeMode.light,
+        filename: 'comparison-phone-light',
+      ),
     ]) {
       await tester.binding.setSurfaceSize(variant.size);
       await tester.pumpWidget(_comparisonFixture(variant.mode));
@@ -227,13 +304,20 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('render manager statistics: desktop light and phone dark',
-      (tester) async {
+  testWidgets('render manager statistics: desktop light and phone dark', (
+    tester,
+  ) async {
     for (final variant in [
-      (size: const Size(1440, 900), mode: ThemeMode.light,
-          filename:'statistics-desktop-light'),
-      (size: const Size(390, 844), mode: ThemeMode.dark,
-          filename:'statistics-phone-dark'),
+      (
+        size: const Size(1440, 900),
+        mode: ThemeMode.light,
+        filename: 'statistics-desktop-light',
+      ),
+      (
+        size: const Size(390, 844),
+        mode: ThemeMode.dark,
+        filename: 'statistics-phone-dark',
+      ),
     ]) {
       await tester.binding.setSurfaceSize(variant.size);
       await tester.pumpWidget(_statisticsFixture(variant.mode));

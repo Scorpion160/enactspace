@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - integration/consolidated-20261113
       - feat/product-readiness-v1
   schedule:
     - cron: "17 6 * * 1"

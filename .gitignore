@@ -49,3 +49,6 @@ build/
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
+
+/backend/app/services/project_presentations.json
+/backend/app/services/recruitment_rubric.json

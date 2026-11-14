@@ -94,10 +94,7 @@ class _SyntheticSelectionApi extends RecruitmentSelectionApi {
 
 Widget _fixture(ThemeMode mode) => MaterialApp(
   debugShowCheckedModeBanner: false,
-  theme: ThemeData(
-    useMaterial3: true,
-    fontFamily: 'QaReadableSans',
-  ),
+  theme: ThemeData(useMaterial3: true, fontFamily: 'QaReadableSans'),
   darkTheme: ThemeData(
     useMaterial3: true,
     fontFamily: 'QaReadableSans',
@@ -163,39 +160,63 @@ Future<void> _capture(WidgetTester tester, String name) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    final file = File('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
-    if (!file.existsSync()) throw StateError('Readable screenshot font missing');
+    final overriddenPath = Platform.environment['ENACTSPACE_QA_TEXT_FONT'];
+    final file = File(
+      overriddenPath != null && overriddenPath.isNotEmpty
+          ? overriddenPath
+          : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    );
+    if (!file.existsSync()) {
+      throw StateError('Readable screenshot font missing');
+    }
     final loader = FontLoader('QaReadableSans');
-    loader.addFont(Future<ByteData>.value(
-      ByteData.sublistView(file.readAsBytesSync()),
-    ));
+    loader.addFont(
+      Future<ByteData>.value(ByteData.sublistView(file.readAsBytesSync())),
+    );
     await loader.load();
     final icons = Platform.environment['ENACTSPACE_QA_ICON_FONT'];
     if (icons != null) {
       final iconFile = File(icons);
-      if (!iconFile.existsSync()) throw StateError('Material icons file missing');
+      if (!iconFile.existsSync()) {
+        throw StateError('Material icons file missing');
+      }
       final materialIcons = FontLoader('MaterialIcons');
-      materialIcons.addFont(Future<ByteData>.value(
-        ByteData.sublistView(iconFile.readAsBytesSync()),
-      ));
+      materialIcons.addFont(
+        Future<ByteData>.value(
+          ByteData.sublistView(iconFile.readAsBytesSync()),
+        ),
+      );
       await materialIcons.load();
     }
   });
 
-  testWidgets('selection workspace screenshots for desktop and phone',
-      (tester) async {
+  testWidgets('selection workspace screenshots for desktop and phone', (
+    tester,
+  ) async {
     for (final scene in [
-      (size: const Size(1440, 900), mode: ThemeMode.light,
-       file:'selection-workspace-desktop-light'),
-      (size: const Size(390, 844), mode: ThemeMode.dark,
-       file:'selection-workspace-phone-dark'),
+      (
+        size: const Size(1440, 900),
+        mode: ThemeMode.light,
+        file: 'selection-workspace-desktop-light',
+      ),
+      (
+        size: const Size(390, 844),
+        mode: ThemeMode.dark,
+        file: 'selection-workspace-phone-dark',
+      ),
     ]) {
       await tester.binding.setSurfaceSize(scene.size);
       await tester.pumpWidget(_fixture(scene.mode));
       await tester.pumpAndSettle();
       expect(find.text('Présélection des dossiers'), findsOneWidget);
-      expect(find.text('2/3 dossiers prêts · 1 décision préparée'), findsOneWidget);
-      expect(find.text('Publier les résultats et préparer les mails'), findsOneWidget);
+      expect(
+        find.text('2/3 dossiers prêts · 1 décision préparée'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Publier les résultats et préparer les mails'),
+        findsOneWidget,
+      );
       await _capture(tester, scene.file);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -203,8 +224,9 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('calendar, evaluation settings and publication remain separate',
-      (tester) async {
+  testWidgets('calendar, evaluation settings and publication remain separate', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     await tester.pumpWidget(_fixture(ThemeMode.light));
     await tester.pumpAndSettle();
@@ -213,13 +235,17 @@ void main() {
     await tester.tap(calendar);
     await tester.pumpAndSettle();
     expect(find.text('Charger un calendrier indicatif'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('schedule-screening_results')));
+    await tester.ensureVisible(
+      find.byKey(const Key('schedule-screening_results')),
+    );
     await _capture(tester, 'selection-calendar-desktop-light');
     final settings = find.text('Paramètres des évaluations');
     await tester.ensureVisible(settings);
     await tester.tap(settings);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Répartir ou compléter les attributions'));
+    await tester.ensureVisible(
+      find.text('Répartir ou compléter les attributions'),
+    );
     await _capture(tester, 'selection-settings-desktop-light');
     await tester.ensureVisible(find.text('Publication des décisions'));
     await _capture(tester, 'selection-publication-desktop-light');
