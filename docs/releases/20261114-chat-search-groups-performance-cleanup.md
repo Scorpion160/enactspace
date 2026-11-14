@@ -27,4 +27,14 @@ La simulation transactionnelle a confirmé que les notifications, les historique
 - Base Web constatée : `1.0.30+40`, empreinte SHA-256 de `main.dart.js` `e69c3282ec8c365756e13969da1e7b79b9f20053e76b7d309f9723acecc23f1e`.
 - Version cible `1.0.30+41`. Aucun paiement réel ni message aux candidats ; conserver les données et la version précédente pour retour arrière.
 
+## Mise en production vérifiée — 14 novembre 2026
+
+La suite CI et la sécurité GitHub du commit `949575e` sont réussies. Publication coordonnée API et workers puis Web `1.0.30+41`. Image backend installée : `sha256:558192d97d5b53d47469cbb9b3061f38b9a9999e78f180a203525a2b7408b2c3`. Empreinte Web installée : `6e4c52d8b69ade6b772c83d14311e3d05545df073a10feeb16dd211e4f3cdcad`.
+
+Une première tentative a été automatiquement annulée après échec des contrôles Nginx, et la version `+40` a été rétablie. Diagnostic isolé : un `umask 077` héritée de la procédure de sauvegarde abaissait les droits du répertoire Web extrait à `0700`. Correction du script `tools/publish_web_release.py` : application explicite des permissions `0755` sur le répertoire servi. Une recette Nginx en conteneur isolé a confirmé les fichiers de la candidate et leurs empreintes, puis la deuxième publication a réussi : `CHAT41_RELEASE_SUCCESS`, `WEB_DEPLOYED_LOCAL_CHECKS_PASSED`, API HTTPS saine et version Web publique `+41`.
+
+Après bascule, contrôle SQL en lecture seule : 47 comptes, une seule identité précédemment dupliquée, 95 candidatures, 301 évaluations et 56 décisions de présélection enregistrées. La recherche de contacts par prénom-nom et dans l'ordre inverse renvoie le même profil attendu. Aucun résultat du recrutement n'a été publié, aucun paiement réel ni courrier candidat déclenché.
+
+Les sauvegardes avant version `+41` ainsi que les anciennes images des quatre services sont conservées sous `/opt/enactspace/staging/chat-search-20261114/backups/`. La dernière sauvegarde PostgreSQL antérieure à la fusion d'identité reste dans `/opt/enactspace/backups/account-consolidation-20261114/`.
+
 **Éléments qui demandent encore une mesure en conditions réelles** : performance perçue de l'ouverture des fils, stabilité sur réseau mobile instable, échanges multimédias lourds, tests multiutilisateurs d'EnactMeet. Les tests de santé API et la charge CPU/mémoire ne démontrent pas à eux seuls l'absence de latence côté navigateur.

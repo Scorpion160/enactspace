@@ -123,6 +123,8 @@ def main(argv=None):
         releases=Path('/opt/enactspace/releases');releases.mkdir(exist_ok=True)
         identity=uuid.uuid4().hex
         stage=releases/('web-candidate-'+identity);stage.mkdir(mode=0o755)
+        # Restrictive umask on release scripts must not deny Nginx access.
+        stage.chmod(0o755)
         version=extract_bundle(args.archive,stage,args.release)
         report.update(status='WEB_PUBLICATION_PREPARED',version=version,main_sha256=args.release[2])
         if not args.execute:
