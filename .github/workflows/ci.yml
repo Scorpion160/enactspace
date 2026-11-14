@@ -266,8 +266,8 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          assert str(checks['web_version']['public_fields']['build_number']) == '41'
-          assert checks['web_main']['sha256'] == '6e4c52d8b69ade6b772c83d14311e3d05545df073a10feeb16dd211e4f3cdcad'
+          assert str(checks['web_version']['public_fields']['build_number']) == '42'
+          assert checks['web_main']['sha256'] == 'a01de565a9c2ffe950ff052c430859cf63ef5c0897a71d7f33b0b8a8a4c280cf'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -279,14 +279,14 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 6e4c52d8b69ade6b772c83d14311e3d05545df073a10feeb16dd211e4f3cdcad
+          --live-main-sha256 a01de565a9c2ffe950ff052c430859cf63ef5c0897a71d7f33b0b8a8a4c280cf
           --live-version 1.0.30
-          --live-build 41
+          --live-build 42
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build42-PREFLIGHT-ONLY-${{ github.run_id }}
+          name: enactspace-web-1.0.30-build43-PREFLIGHT-ONLY-${{ github.run_id }}
           path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7
