@@ -193,6 +193,7 @@ jobs:
           test/mobile_money_readiness_card_test.dart
           test/features/recruitment/recruitment_advisory_filters_test.dart
           test/features/recruitment/recruitment_comparison_panel_test.dart
+          test/features/recruitment/recruitment_review_filters_test.dart
           test/enactmeet_quick_create_test.dart
           test/archives_hall_of_fame_test.dart
           test/archives_responsive_test.dart

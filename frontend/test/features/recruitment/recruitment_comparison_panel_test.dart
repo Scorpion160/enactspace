@@ -14,6 +14,8 @@ Map<String, dynamic> dossier({
   'department': department,
   'study_level': level,
   'score': score,
+  'jury_average_20': score / 5,
+  'jury_spread_20': 1.0,
   'ready': ready,
   'review_count': ready ? 3 : 2,
   'required_reviews': 3,
@@ -22,35 +24,54 @@ Map<String, dynamic> dossier({
 };
 
 void main() {
-  testWidgets('shows only ready candidates ranked by score by default',
-      (tester) async {
+  testWidgets('shows only ready candidates ranked by score by default', (
+    tester,
+  ) async {
     final opened = <String>[];
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(
-          child: RecruitmentComparisonPanel(
-            screening: true,
-            onOpen: opened.add,
-            rows: [
-              dossier(code: 'A001', score: 50, ready: true,
-                  department: 'Gestion', level: 'Licence2'),
-              dossier(code: 'A002', score: 99, ready: false,
-                  department: 'Gestion', level: 'Licence3'),
-              dossier(code: 'A003', score: 90, ready: true,
-                  department: 'Génie Civil', level: 'DIC1'),
-            ],
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RecruitmentComparisonPanel(
+              screening: true,
+              onOpen: opened.add,
+              rows: [
+                dossier(
+                  code: 'A001',
+                  score: 50,
+                  ready: true,
+                  department: 'Gestion',
+                  level: 'Licence2',
+                ),
+                dossier(
+                  code: 'A002',
+                  score: 99,
+                  ready: false,
+                  department: 'Gestion',
+                  level: 'Licence3',
+                ),
+                dossier(
+                  code: 'A003',
+                  score: 90,
+                  ready: true,
+                  department: 'Génie Civil',
+                  level: 'DIC1',
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ));
-    await tester.tap(find.text('Classement indicatif des dossiers'));
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('A001'), findsOneWidget);
     expect(find.text('A003'), findsOneWidget);
     expect(find.text('A002'), findsNothing);
-    expect(tester.getTopLeft(find.text('A003')).dy,
-        lessThan(tester.getTopLeft(find.text('A001')).dy));
+    expect(
+      tester.getTopLeft(find.text('A003')).dy,
+      lessThan(tester.getTopLeft(find.text('A001')).dy),
+    );
 
     await tester.ensureVisible(find.text('A003'));
     await tester.tap(find.text('A003'));
@@ -58,26 +79,41 @@ void main() {
   });
 
   for (final darkMode in [false, true]) {
-    testWidgets('comparison responsive at 390 px (dark=$darkMode)', (tester) async {
+    testWidgets('comparison responsive at 390 px (dark=$darkMode)', (
+      tester,
+    ) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(MaterialApp(
-        theme: ThemeData(useMaterial3: true),
-        darkTheme: ThemeData.dark(useMaterial3: true),
-        themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
-        home: Scaffold(body: SingleChildScrollView(
-          child: RecruitmentComparisonPanel(
-            screening: true,
-            rows: [
-              dossier(code: 'A010', score: 78, ready: true,
-                  department: 'Génie électrique', level: 'DIC2'),
-              dossier(code: 'A011', score: 67, ready: true,
-                  department: 'Gestion', level: 'Licence2'),
-            ],
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          darkTheme: ThemeData.dark(useMaterial3: true),
+          themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: RecruitmentComparisonPanel(
+                screening: true,
+                rows: [
+                  dossier(
+                    code: 'A010',
+                    score: 78,
+                    ready: true,
+                    department: 'Génie électrique',
+                    level: 'DIC2',
+                  ),
+                  dossier(
+                    code: 'A011',
+                    score: 67,
+                    ready: true,
+                    department: 'Gestion',
+                    level: 'Licence2',
+                  ),
+                ],
+              ),
+            ),
           ),
-        )),
-      ));
-      await tester.tap(find.text('Classement indicatif des dossiers'));
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('A010'), findsOneWidget);
       expect(tester.takeException(), isNull);

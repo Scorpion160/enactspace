@@ -356,6 +356,31 @@ def selection_overview(db, campaign):
         if panel is not None:
             assessments = [review for review in assessments if review.reviewer_id in panel]
         summary = reviewed_summary(assessments, campaign, stage)
+        # The jury's mean on 20 is not the structured rubric score on 100.
+        # Keep both for comparisons; never make a decision from either score.
+        stage_scores = [
+            float(review.score) for review in assessments
+            if review.stage == stage and review.score is not None
+        ]
+        # Newer campaigns may record only the structured rubric (/100).
+        # In that case, expose its equivalent /20 without inventing a raw note.
+        rubric_score = summary["screening_score"]
+        rubric_spread = summary["screening_spread"]
+        jury_average_20 = (
+            round(sum(stage_scores) / len(stage_scores), 4)
+            if stage_scores else
+            round(float(rubric_score) / 5, 4)
+            if rubric_score is not None else None
+        )
+        jury_spread_20 = (
+            round(max(stage_scores) - min(stage_scores), 4)
+            if len(stage_scores) >= 2 else
+            round(float(rubric_spread) / 5, 4)
+            if not stage_scores and rubric_spread is not None else None
+        )
+        jury_score_source = "jury_notes" if stage_scores else (
+            "rubric" if rubric_score is not None else None
+        )
         # Appointments without a recorded panel retain the historical threshold.
         target = len(panel) if panel is not None else required_reviews(campaign, summary)
         rows.append({
@@ -370,6 +395,9 @@ def selection_overview(db, campaign):
             "required_reviews": target,
             "score": summary["screening_score"],
             "spread": summary["screening_spread"],
+            "jury_average_20": jury_average_20,
+            "jury_spread_20": jury_spread_20,
+            "jury_score_source": jury_score_source,
             "ready": summary["screening_review_count"] >= target,
         })
     revision_data = {

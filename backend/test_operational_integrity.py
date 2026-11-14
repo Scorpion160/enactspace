@@ -527,6 +527,9 @@ class OperationalIntegrityTests(unittest.TestCase):
         complete = selection_overview(self.db, campaign)["rows"][0]
         self.assertEqual(complete["required_reviews"], 2)
         self.assertEqual(complete["spread"], 50)
+        self.assertEqual(complete["jury_average_20"], 15)
+        self.assertEqual(complete["jury_spread_20"], 10)
+        self.assertEqual(complete["jury_score_source"], "rubric")
         self.assertTrue(complete["ready"])
 
     def test_screening_results_are_published_and_queued_together(self):

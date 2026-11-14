@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/recruitment_review_filters.dart';
 
 /// A read-only, anonymous comparison for recruitment managers.
 ///
@@ -27,22 +28,62 @@ class _RecruitmentComparisonPanelState
   String _department = 'all';
   String _level = 'all';
   String _readiness = 'ready';
+  String _scoreBand = 'all';
+  String _decision = 'all';
+  String _disagreement = 'all';
+  double _lowerCutoff = 10;
+  double _upperCutoff = 15;
+  String? _cutoffError;
+  final _lowerController = TextEditingController(text: '10');
+  final _upperController = TextEditingController(text: '15');
   bool _showAll = false;
   final _target = TextEditingController();
 
   @override
   void dispose() {
     _target.dispose();
+    _lowerController.dispose();
+    _upperController.dispose();
     super.dispose();
   }
 
   List<String> _options(String field) {
-    final values = widget.rows
-        .map((row) => row[field]?.toString().trim() ?? '')
-        .where((value) => value.isNotEmpty)
-        .toSet()
-        .toList()..sort();
+    final values =
+        widget.rows
+            .map((row) => row[field]?.toString().trim() ?? '')
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     return values;
+  }
+
+  void _updateCutoffs() {
+    final lower = double.tryParse(_lowerController.text.replaceAll(',', '.'));
+    final upper = double.tryParse(_upperController.text.replaceAll(',', '.'));
+    setState(() {
+      if (lower == null ||
+          upper == null ||
+          lower < 0 ||
+          upper > 20 ||
+          lower >= upper) {
+        _cutoffError = 'Indique deux limites valides entre 0 et 20.';
+      } else {
+        _lowerCutoff = lower;
+        _upperCutoff = upper;
+        _cutoffError = null;
+        _showAll = false;
+      }
+    });
+  }
+
+  void _selectBand(String band, {bool pendingOnly = false}) {
+    setState(() {
+      _scoreBand = band;
+      _decision = pendingOnly ? 'pending' : 'all';
+      _readiness = 'all';
+      _showAll = false;
+    });
   }
 
   List<Map<String, dynamic>> get _sorted {
@@ -50,24 +91,30 @@ class _RecruitmentComparisonPanelState
       final ready = row['ready'] == true;
       return (_department == 'all' || row['department'] == _department) &&
           (_level == 'all' || row['study_level'] == _level) &&
-          (_readiness == 'all' ||
-              (_readiness == 'ready' ? ready : !ready));
+          (_readiness == 'all' || (_readiness == 'ready' ? ready : !ready)) &&
+          reviewScoreBandMatches(row, _scoreBand, _lowerCutoff, _upperCutoff) &&
+          reviewDecisionMatches(row, _decision) &&
+          reviewDisagreementMatches(row, _disagreement);
     }).toList();
     rows.sort((a, b) {
-      // Never rank an unfinished dossier above a complete one.
       final readyA = a['ready'] == true;
       final readyB = b['ready'] == true;
-      if (readyA != readyB) return readyA ? -1 : 1;
-      final aScore = (a['score'] as num?)?.toDouble();
-      final bScore = (b['score'] as num?)?.toDouble();
+      // In today's pending queue, cases needing an extra jury review lead.
+      final missingFirst = _scoreBand == 'middle' && _decision == 'pending';
+      if (readyA != readyB) {
+        return missingFirst ? (readyA ? 1 : -1) : (readyA ? -1 : 1);
+      }
+      final aScore = reviewJuryMean20(a);
+      final bScore = reviewJuryMean20(b);
       if (aScore == null && bScore != null) return 1;
       if (aScore != null && bScore == null) return -1;
       if (aScore != null && bScore != null) {
         final comparison = bScore.compareTo(aScore);
         if (comparison != 0) return comparison;
       }
-      return (a['anonymous_code']?.toString() ?? '')
-          .compareTo(b['anonymous_code']?.toString() ?? '');
+      return (a['anonymous_code']?.toString() ?? '').compareTo(
+        b['anonymous_code']?.toString() ?? '',
+      );
     });
     return rows;
   }
@@ -84,14 +131,46 @@ class _RecruitmentComparisonPanelState
     final visible = _showAll ? rows : rows.take(25).toList();
     final readyCount = rows.where((row) => row['ready'] == true).length;
     final target = int.tryParse(_target.text.trim());
+    final belowCount = widget.rows
+        .where(
+          (row) =>
+              reviewScoreBandMatches(row, 'below', _lowerCutoff, _upperCutoff),
+        )
+        .length;
+    final middleCount = widget.rows
+        .where(
+          (row) =>
+              reviewScoreBandMatches(row, 'middle', _lowerCutoff, _upperCutoff),
+        )
+        .length;
+    final aboveCount = widget.rows
+        .where(
+          (row) =>
+              reviewScoreBandMatches(row, 'above', _lowerCutoff, _upperCutoff),
+        )
+        .length;
+    final pendingMiddleCount = widget.rows
+        .where(
+          (row) =>
+              reviewScoreBandMatches(
+                row,
+                'middle',
+                _lowerCutoff,
+                _upperCutoff,
+              ) &&
+              reviewDecisionMatches(row, 'pending'),
+        )
+        .length;
     return Card(
       key: const Key('selection-comparison-panel'),
       margin: EdgeInsets.zero,
       child: ExpansionTile(
-        initiallyExpanded: false,
-        title: Text(widget.screening
-            ? 'Classement indicatif des dossiers'
-            : 'Comparaison des évaluations d’entretien'),
+        initiallyExpanded: widget.screening,
+        title: Text(
+          widget.screening
+              ? 'Classement indicatif des dossiers'
+              : 'Comparaison des évaluations d’entretien',
+        ),
         subtitle: const Text(
           'Notes décroissantes et filtres facultatifs · aucune décision automatique',
         ),
@@ -107,89 +186,278 @@ class _RecruitmentComparisonPanelState
               color: colors.onSurfaceVariant,
             ),
           ),
+          if (widget.screening) ...[
+            Card(
+              margin: EdgeInsets.zero,
+              color: colors.surfaceContainerLow,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Préparer le tri des dossiers',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Tranches sur 20 : notes du jury ou équivalent du barème. Aucune décision automatique.',
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          key: const Key('comparison-review-pending'),
+                          onPressed: () =>
+                              _selectBand('middle', pendingOnly: true),
+                          icon: const Icon(Icons.fact_check_outlined),
+                          label: Text(
+                            'À étudier sans décision ($pendingMiddleCount)',
+                          ),
+                        ),
+                        ChoiceChip(
+                          key: const Key('comparison-band-below'),
+                          label: Text(
+                            'Moins de ${_lowerCutoff.toStringAsFixed(1)} ($belowCount)',
+                          ),
+                          selected: _scoreBand == 'below',
+                          onSelected: (_) => _selectBand('below'),
+                        ),
+                        ChoiceChip(
+                          key: const Key('comparison-band-middle'),
+                          label: Text(
+                            'De ${_lowerCutoff.toStringAsFixed(1)} à moins de ${_upperCutoff.toStringAsFixed(1)} ($middleCount)',
+                          ),
+                          selected: _scoreBand == 'middle',
+                          onSelected: (_) => _selectBand('middle'),
+                        ),
+                        ChoiceChip(
+                          key: const Key('comparison-band-above'),
+                          label: Text(
+                            '${_upperCutoff.toStringAsFixed(1)} ou plus ($aboveCount)',
+                          ),
+                          selected: _scoreBand == 'above',
+                          onSelected: (_) => _selectBand('above'),
+                        ),
+                      ],
+                    ),
+                    ExpansionTile(
+                      key: const Key('comparison-cutoffs-editor'),
+                      title: const Text(
+                        'Modifier les seuils pour cette consultation',
+                      ),
+                      subtitle: const Text(
+                        'Valeurs par défaut : 10 et 15 sur 20',
+                      ),
+                      children: [
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            SizedBox(
+                              width: 150,
+                              child: TextField(
+                                key: const Key('comparison-cutoff-low'),
+                                controller: _lowerController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Limite basse /20',
+                                ),
+                                onChanged: (_) => _updateCutoffs(),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 150,
+                              child: TextField(
+                                key: const Key('comparison-cutoff-high'),
+                                controller: _upperController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Limite haute /20',
+                                ),
+                                onChanged: (_) => _updateCutoffs(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_cutoffError != null)
+                          Text(
+                            _cutoffError!,
+                            style: TextStyle(color: colors.error),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth >= 900
                   ? (constraints.maxWidth - 24) / 3
                   : constraints.maxWidth >= 600
-                      ? (constraints.maxWidth - 12) / 2
-                      : constraints.maxWidth;
+                  ? (constraints.maxWidth - 12) / 2
+                  : constraints.maxWidth;
               return Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
                   SizedBox(
                     width: width,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('comparison-department-$department'),
-                  isExpanded: true,
-                  initialValue: department,
-                  decoration: const InputDecoration(
-                    labelText: 'Département',
-                    prefixIcon: Icon(Icons.school_outlined),
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('Tous les départements')),
-                    for (final name in departments)
-                      DropdownMenuItem(
-                        value: name,
-                        child: Text(name, overflow: TextOverflow.ellipsis),
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('comparison-department-$department'),
+                      isExpanded: true,
+                      initialValue: department,
+                      decoration: const InputDecoration(
+                        labelText: 'Département',
+                        prefixIcon: Icon(Icons.school_outlined),
                       ),
-                  ],
-                  onChanged: (value) => setState(() {
-                    _department = value ?? 'all';
-                    _showAll = false;
-                  }),
-                ),
-              ),
-              SizedBox(
-                width: width,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('comparison-level-$level'),
-                  isExpanded: true,
-                  initialValue: level,
-                  decoration: const InputDecoration(
-                    labelText: 'Niveau d’études',
-                    prefixIcon: Icon(Icons.auto_stories_outlined),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'all',
+                          child: Text('Tous les départements'),
+                        ),
+                        for (final name in departments)
+                          DropdownMenuItem(
+                            value: name,
+                            child: Text(name, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _department = value ?? 'all';
+                        _showAll = false;
+                      }),
+                    ),
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                        value: 'all', child: Text('Tous les niveaux')),
-                    for (final name in levels)
-                      DropdownMenuItem(value: name, child: Text(name)),
-                  ],
-                  onChanged: (value) => setState(() {
-                    _level = value ?? 'all';
-                    _showAll = false;
-                  }),
-                ),
-              ),
-              SizedBox(
-                width: width,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('comparison-readiness-$_readiness'),
-                  isExpanded: true,
-                  initialValue: _readiness,
-                  decoration: const InputDecoration(
-                    labelText: 'Avancement du dossier',
-                    prefixIcon: Icon(Icons.fact_check_outlined),
+                  SizedBox(
+                    width: width,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('comparison-level-$level'),
+                      isExpanded: true,
+                      initialValue: level,
+                      decoration: const InputDecoration(
+                        labelText: 'Niveau d’études',
+                        prefixIcon: Icon(Icons.auto_stories_outlined),
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'all',
+                          child: Text('Tous les niveaux'),
+                        ),
+                        for (final name in levels)
+                          DropdownMenuItem(value: name, child: Text(name)),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _level = value ?? 'all';
+                        _showAll = false;
+                      }),
+                    ),
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'ready', child: Text('Évaluations complètes')),
-                    DropdownMenuItem(
-                        value: 'not_ready', child: Text('Avis à compléter')),
-                    DropdownMenuItem(
-                        value: 'all', child: Text('Tous les dossiers')),
+                  SizedBox(
+                    width: width,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('comparison-readiness-$_readiness'),
+                      isExpanded: true,
+                      initialValue: _readiness,
+                      decoration: const InputDecoration(
+                        labelText: 'Avancement du dossier',
+                        prefixIcon: Icon(Icons.fact_check_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'ready',
+                          child: Text('Évaluations complètes'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'not_ready',
+                          child: Text('Avis à compléter'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text('Tous les dossiers'),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _readiness = value ?? 'ready';
+                        _showAll = false;
+                      }),
+                    ),
+                  ),
+                  if (widget.screening) ...[
+                    SizedBox(
+                      width: width,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('comparison-decision-$_decision'),
+                        initialValue: _decision,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Décision préparée',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Toutes les décisions'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'pending',
+                            child: Text('Sans décision'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'shortlisted',
+                            child: Text('Présélectionnés'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'not_shortlisted',
+                            child: Text('Non présélectionnés'),
+                          ),
+                        ],
+                        onChanged: (value) => setState(() {
+                          _decision = value ?? 'all';
+                          _showAll = false;
+                        }),
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('comparison-disagreement-$_disagreement'),
+                        initialValue: _disagreement,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Écart entre jurés /20',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Tous les écarts'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'high',
+                            child: Text('5 points ou plus'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'low',
+                            child: Text('Moins de 5 points'),
+                          ),
+                        ],
+                        onChanged: (value) => setState(() {
+                          _disagreement = value ?? 'all';
+                          _showAll = false;
+                        }),
+                      ),
+                    ),
                   ],
-                  onChanged: (value) => setState(() {
-                    _readiness = value ?? 'ready';
-                    _showAll = false;
-                  }),
-                ),
-              ),
                 ],
               );
             },
@@ -229,32 +497,37 @@ class _RecruitmentComparisonPanelState
                   target == null || target < 1
                       ? '$readyCount dossier(s) suffisamment évalué(s) dans ce périmètre.'
                       : '$readyCount dossier(s) suffisamment évalué(s) pour '
-                        'un objectif hypothétique de $target place(s). '
-                        'Écart de disponibilité : ${readyCount - target}.',
+                            'un objectif hypothétique de $target place(s). '
+                            'Écart de disponibilité : ${readyCount - target}.',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-              child: Text(
-                '${rows.length} dossier(s) · tri par note décroissante',
-                style: theme.textTheme.titleSmall,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${rows.length} dossier(s) · moyenne du jury /20',
+                  style: theme.textTheme.titleSmall,
+                ),
               ),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(() {
-                _department = 'all';
-                _level = 'all';
-                _readiness = 'ready';
-                _showAll = false;
-                _target.clear();
-              }),
-              icon: const Icon(Icons.filter_alt_off_outlined),
-              label: const Text('Réinitialiser'),
-            ),
-          ]),
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _department = 'all';
+                  _level = 'all';
+                  _readiness = 'ready';
+                  _scoreBand = 'all';
+                  _decision = 'all';
+                  _disagreement = 'all';
+                  _showAll = false;
+                  _target.clear();
+                }),
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Réinitialiser'),
+              ),
+            ],
+          ),
           if (rows.isEmpty)
             Padding(
               padding: const EdgeInsets.all(20),
@@ -309,16 +582,25 @@ class _ComparisonRow extends StatelessWidget {
     final score = (row['score'] as num?)?.toDouble();
     final reviewCount = (row['review_count'] as num?)?.toInt() ?? 0;
     final requiredCount = (row['required_reviews'] as num?)?.toInt() ?? 3;
-    final spread = (row['spread'] as num?)?.toDouble();
-    final department = row['department']?.toString() ?? 'Département non précisé';
+    final department =
+        row['department']?.toString() ?? 'Département non précisé';
     final level = row['study_level']?.toString() ?? 'Niveau non précisé';
     final applicationId = row['application_id']?.toString() ?? '';
-    final scoreText = score == null ? 'Sans note' : '${score.toStringAsFixed(1)}/100';
+    final juryScore = reviewJuryMean20(row);
+    final scoreText = juryScore == null
+        ? 'Sans note /20'
+        : '${juryScore.toStringAsFixed(2)}/20';
     final details = [
       department,
       level,
       '$reviewCount/$requiredCount avis',
-      if (spread != null) 'Écart ${spread.toStringAsFixed(0)} points',
+      if (score != null) 'Barème ${score.toStringAsFixed(1)}/100',
+      if (row['jury_score_source'] == 'rubric') 'Note /20 issue du barème',
+      if (row['jury_spread_20'] is num)
+        'Écart ${((row['jury_spread_20'] as num).toDouble()).toStringAsFixed(1)}/20',
+      if (row['decision'] == 'shortlisted') 'Présélectionné',
+      if (row['decision'] == 'not_shortlisted') 'Non présélectionné',
+      if (row['decision'] == null) 'Sans décision',
       ready ? 'Complet' : 'Provisoire',
     ].join(' · ');
 
@@ -336,8 +618,10 @@ class _ComparisonRow extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(scoreText, style: const TextStyle(fontWeight: FontWeight.w700)),
-          Text(ready ? 'Avis complets' : 'À compléter',
-              style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
+          Text(
+            ready ? 'Avis complets' : 'À compléter',
+            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+          ),
         ],
       ),
       onTap: onOpen == null || applicationId.isEmpty
