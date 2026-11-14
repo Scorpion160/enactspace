@@ -31,14 +31,12 @@ class _MembersFixture extends MembersService {
 List<MemberModel> _syntheticMembers(int count) => List.generate(
   count,
   (i) => MemberModel(
-    id: 'sample-' + i.toString(),
+    id: 'sample-$i',
     email: i.isEven
-        ? 'prenom.extremement.long.numero' +
-              i.toString() +
-              '@exemple-universitaire.test'
-        : 'court' + i.toString() + '@example.test',
+        ? 'prenom.extremement.long.numero$i@exemple-universitaire.test'
+        : 'court$i@example.test',
     firstName: i.isEven ? 'Amadou-Alexandre-Abdoulaye' : 'Awa',
-    lastName: 'CANDIDAT' + i.toString().padLeft(3, '0'),
+    lastName: 'CANDIDAT${i.toString().padLeft(3, '0')}',
     roles: i.isEven ? ['chef_projet'] : ['enacteur'],
     department: i.isEven ? 'Génie informatique et réseaux' : 'Gestion',
     status: 'active',
