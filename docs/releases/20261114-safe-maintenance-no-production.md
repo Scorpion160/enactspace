@@ -1,6 +1,6 @@
 # EnactSpace — préparation de maintenance sans interruption de production
 
-**État : correctifs préparés dans la branche `feature/safe-maintenance-20261114`. Pas de déploiement.**
+**Préparation initiale :** branche `feature/safe-maintenance-20261114`. **Mise en service ultérieure :** Web `1.0.30+42`, le 14 novembre 2026, après sauvegardes et validation CI complète. Ce lot n'a modifié ni l'API, ni les travailleurs, ni les candidatures.
 
 La production est utilisée par les membres. **Interdictions pour ce lot de préparation :** pas de `docker compose up`, `down`, `restart`, `build` sur le VPS ; pas de mise à jour de `/opt/enactspace/web`, pas de migration, écriture SQL, fusion de comptes, envoi de courriels ou activation de paiement.
 
@@ -45,3 +45,19 @@ La synchronisation réseau elle-même reste inchangée. Il ne faut pas considér
 - Tests de confidentialité et des commandes de groupe Chat existants.
 
 **Recommandation de livraison :** fusionner cette branche uniquement après validation de la CI et planifier une fenêtre d'intervention lorsque personne n'utilise la plateforme. Vérifier ensuite le nouveau commit sur un environnement de recette, puis préparer les sauvegardes et un plan de retour arrière indépendants de la production.
+
+## Livraison Web confirmée
+
+- La CI applicative `43652505175` et les contrôles de sécurité `43652505194` ont tous réussi pour le commit `69fe2b9`.
+- Archive Web officielle `1.0.30+42` : SHA du JavaScript `a01de565a9c2ffe950ff052c430859cf63ef5c0897a71d7f33b0b8a8a4c280cf`.
+- Publication `WEB_DEPLOYED_LOCAL_CHECKS_PASSED`, puis vérification HTTPS de `version.json`, `main.dart.js`, Material Icons et Cupertino Icons : OK.
+- Sauvegardes prépublication vérifiées : `/opt/enactspace/staging/web-cache42-20261114/backups/`. Retour arrière Web sous `/opt/enactspace/releases/web-previous-eb6b06ba14a34acdbd3a0098bcbe9b6c`.
+- Aucun nouveau conteneur backend, aucune migration SQL ni notification aux candidats pendant cette livraison.
+
+## État distinct du recrutement
+
+Au contrôle, **95 décisions préparées** : **64 shortlistées, 31 écartées** ; **301 notes**. Après la publication Web, le même total et les mêmes décisions sont restés enregistrés. **33 dossiers (20 shortlistés, 13 écartés) n'ont que 3 avis contre 4 exigés par la règle de désaccord** : la procédure de publication des résultats reste donc **non prête**. Ce contrôle ne doit pas être assimilé à une autorisation de notifier les candidats. Voir `docs/recruitment/audit-tri-20261114.md`.
+
+## Risque Docker restant
+
+Le contrôle en lecture seule `verify_vps_compose_alignment.py` a confirmé que les quatre images de service correspondent à la configuration effective, **mais que la section `backend` comporte encore une instruction `build:`**. Ne pas lancer une reconstruction ou un `docker compose up` générique lors des futures livraisons. Il reste à normaliser la configuration de déploiement backend dans un chantier distinct avant une nouvelle mise à jour serveur.
