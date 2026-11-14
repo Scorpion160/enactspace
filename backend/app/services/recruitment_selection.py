@@ -20,6 +20,7 @@ from app.models.recruitment import (
 )
 from app.models.user import User
 from app.models.email_delivery import EmailDelivery
+from app.models.audit import AuditLog
 from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row
 from app.services.recruitment_application_metadata import academic_year
@@ -220,6 +221,49 @@ def required_reviews(campaign, summary):
     return minimum + (1 if spread is not None and spread >= (campaign.screening_disagreement_threshold or 20) else 0)
 
 
+def review_fingerprint(reviews):
+    """Detect changes to the independent screening opinions after deliberation."""
+    material = [
+        {
+            "id": str(row.id),
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "score": str(row.score) if row.score is not None else None,
+            "criteria_assessment": row.criteria_assessment,
+            "recommendation": row.recommendation,
+        }
+        for row in reviews if row.stage == "screening"
+    ]
+    material.sort(key=lambda value: value["id"])
+    return hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def collective_decisions(db, campaign_id, application_ids=None):
+    """Use append-only, attributed jury approvals; keep prior notes unchanged."""
+    query = db.query(AuditLog).filter(
+        AuditLog.action == "validation_deliberation_collegiale_recrutement",
+        AuditLog.entity_type == "application",
+    )
+    if application_ids is not None:
+        query = query.filter(AuditLog.entity_id.in_(application_ids))
+    logs = query.order_by(AuditLog.created_at, AuditLog.id).all()
+    decisions = {}
+    for log in logs:
+        record = log.new_value or {}
+        if record.get("campaign_id") == str(campaign_id) and log.user_id is not None:
+            decisions[str(log.entity_id)] = record
+    return decisions
+
+
+def is_collectively_resolved(campaign, application, reviews, summary, target, recorded):
+    return (
+        summary["screening_review_count"] >= (campaign.screening_min_reviews or 3)
+        and summary["screening_review_count"] < target
+        and recorded.get("decision") == application.screening_decision
+        and recorded.get("review_fingerprint") == review_fingerprint(reviews)
+        and recorded.get("reason") == "jury_collective"
+    )
+
+
 def distribute_assignments(db, campaign, actor=None):
     """Top up missing assignments, keeping reviews and existing appointments."""
     if campaign.screening_published_at:
@@ -310,6 +354,12 @@ class SelectionPublication(BaseModel):
     revision: str = Field(min_length=64, max_length=64)
 
 
+class CollectiveDeliberation(BaseModel):
+    revision: str = Field(min_length=64, max_length=64)
+    confirmation: Literal[True]
+    reason: Literal["jury_collective"]
+
+
 class AssignmentDecline(BaseModel):
     reason: Literal["recognition", "conflict_of_interest", "unavailable"]
 
@@ -336,6 +386,7 @@ def selection_overview(db, campaign):
     for row in reviews:
         grouped.setdefault(row.application_id, []).append(row)
     stage = review_stage(campaign)
+    deliberations = collective_decisions(db, campaign.id, [app.id for app in applications]) if stage == 'screening' else {}
     panels = {}
     if stage == "interview":
         jurors = db.query(ApplicationInterviewJuror.application_id, RecruitmentJuryMember.user_id).join(
@@ -381,8 +432,15 @@ def selection_overview(db, campaign):
         jury_score_source = "jury_notes" if stage_scores else (
             "rubric" if rubric_score is not None else None
         )
-        # Appointments without a recorded panel retain the historical threshold.
+        # Individual reviews are mandatory. Collective deliberation only
+        # resolves the extra review demanded by a disagreement.
         target = len(panel) if panel is not None else required_reviews(campaign, summary)
+        fingerprint = review_fingerprint(assessments)
+        recorded = deliberations.get(str(application.id), {})
+        collectively_resolved = (
+            stage == "screening"
+            and is_collectively_resolved(campaign, application, assessments, summary, target, recorded)
+        )
         rows.append({
             "application_id": str(application.id),
             "anonymous_code": anonymous_code(application),
@@ -398,7 +456,9 @@ def selection_overview(db, campaign):
             "jury_average_20": jury_average_20,
             "jury_spread_20": jury_spread_20,
             "jury_score_source": jury_score_source,
-            "ready": summary["screening_review_count"] >= target,
+            "collectively_resolved": collectively_resolved,
+            "review_fingerprint": fingerprint,
+            "ready": summary["screening_review_count"] >= target or collectively_resolved,
         })
     revision_data = {
         "stage": stage, "rows": rows,
@@ -509,6 +569,40 @@ def register_recruitment_selection(router):
                          new_value={"stage": stage, "decision": payload.decision})
         db.commit()
         return application_payload(db, user, application)
+
+    @router.post("/campaigns/{campaign_id}/selection/collective-deliberation")
+    def confirm_collective_deliberation(campaign_id: UUID, payload: CollectiveDeliberation,
+                                        db=Depends(get_db), user=Depends(require_recruitment_access)):
+        campaign = _manager_campaign(db, user, campaign_id)
+        if campaign.screening_published_at or review_stage(campaign) != "screening":
+            raise HTTPException(409, "La délibération de présélection est close.")
+        report = selection_overview(db, campaign)
+        if payload.revision != report["revision"]:
+            raise HTTPException(409, "Le bilan a changé. Recharge les décisions du jury.")
+        rows = report["rows"]
+        minimum = campaign.screening_min_reviews or 3
+        if not rows or any(not row["decision"] or row["review_count"] < minimum for row in rows):
+            raise HTTPException(409, "Chaque dossier doit avoir une décision et le minimum d'avis individuels.")
+        targets = [row for row in rows if (
+            not row["ready"] and row["review_count"] < row["required_reviews"]
+            and row["decision"] in {"shortlisted", "not_shortlisted"}
+        )]
+        if not targets:
+            raise HTTPException(409, "Aucun désaccord en attente de validation collégiale.")
+        for row in targets:
+            create_audit_log(
+                db, "validation_deliberation_collegiale_recrutement",
+                user.id, "application", UUID(row["application_id"]),
+                new_value={
+                    "campaign_id": str(campaign.id), "decision": row["decision"],
+                    "review_fingerprint": row["review_fingerprint"],
+                    "review_count": row["review_count"],
+                    "required_reviews": row["required_reviews"],
+                    "reason": payload.reason,
+                },
+            )
+        db.commit()
+        return {"resolved": len(targets), "published": False, "emails_sent": 0}
 
     @router.post("/campaigns/{campaign_id}/selection/publish")
     def publish(campaign_id: UUID, payload: SelectionPublication, db=Depends(get_db), user=Depends(require_recruitment_access)):

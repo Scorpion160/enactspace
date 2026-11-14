@@ -7,6 +7,17 @@ import 'recruitment_comparison_panel.dart';
 import '../../models/recruitment_schedule_model.dart';
 import '../recruitment_schedule.dart';
 
+int screeningPendingCount(List<Map<String, dynamic>> rows, int minimum) => rows
+    .where(
+      (row) =>
+          row['ready'] != true &&
+          row['decision'] != null &&
+          (row['review_count'] as num? ?? 0) >= minimum &&
+          (row['review_count'] as num? ?? 0) <
+              (row['required_reviews'] as num? ?? 0),
+    )
+    .length;
+
 class RecruitmentSelectionPanel extends StatefulWidget {
   final String campaignId;
   final int refreshToken;
@@ -23,7 +34,8 @@ class RecruitmentSelectionPanel extends StatefulWidget {
   });
 
   @override
-  State<RecruitmentSelectionPanel> createState() => _RecruitmentSelectionPanelState();
+  State<RecruitmentSelectionPanel> createState() =>
+      _RecruitmentSelectionPanelState();
 }
 
 class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
@@ -61,17 +73,26 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
   Future<void> _load() async {
     final generation = ++_generation;
     try {
-      final report = await _api.request('campaigns/${widget.campaignId}/selection');
+      final report = await _api.request(
+        'campaigns/${widget.campaignId}/selection',
+      );
       if (!mounted || generation != _generation) return;
       setState(() {
         _report = report;
-        _minimum = ((report['minimum_reviews'] as num?)?.toInt() ?? 3).clamp(3, 5).toInt();
+        _minimum = ((report['minimum_reviews'] as num?)?.toInt() ?? 3)
+            .clamp(3, 5)
+            .toInt();
         _threshold = (report['disagreement_threshold'] as num?)?.toInt() ?? 20;
         _error = null;
       });
     } catch (error) {
       if (mounted && generation == _generation) {
-        setState(() => _error = recruitmentMessage(error, fallback: 'Impossible de charger le bilan de sélection.'));
+        setState(
+          () => _error = recruitmentMessage(
+            error,
+            fallback: 'Impossible de charger le bilan de sélection.',
+          ),
+        );
       }
     }
   }
@@ -83,23 +104,69 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
       _error = null;
     });
     try {
-      final result = await _api.request('campaigns/${widget.campaignId}/selection/$action', body: body);
+      final result = await _api.request(
+        'campaigns/${widget.campaignId}/selection/$action',
+        body: body,
+      );
       if (!mounted) return;
       setState(() {
         _feedback = action == 'assign'
             ? '${result['created']} attribution(s) ajoutée(s). ${result['unfilled']} attribution(s) restent à pourvoir.'
             : action == 'reveal'
-                ? 'Les identités et les documents sont accessibles au jury de cette campagne.'
-                : action == 'planning'
-                    ? 'Le calendrier de la campagne a été enregistré.'
-                    : 'Les résultats ont été publiés et les mails ont été préparés pour tout le lot.';
+            ? 'Les identités et les documents sont accessibles au jury de cette campagne.'
+            : action == 'collective-deliberation'
+            ? '${result['resolved']} délibérations collégiales enregistrées. Les décisions restent internes.'
+            : action == 'planning'
+            ? 'Le calendrier de la campagne a été enregistré.'
+            : 'Les résultats ont été publiés et les mails ont été préparés pour tout le lot.';
       });
       await _load();
       widget.onChanged();
     } catch (error) {
-      if (mounted) setState(() => _error = recruitmentMessage(error, fallback: 'Cette opération n’a pas abouti.'));
+      if (mounted) {
+        setState(
+          () => _error = recruitmentMessage(
+            error,
+            fallback: 'Cette opération n’a pas abouti.',
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmCollectiveDeliberation(int count) async {
+    final report = _report;
+    if (report == null || _busy) return;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Valider la délibération du jury ?'),
+        content: Text(
+          '$count dossiers ont une décision et au moins trois avis. '
+          'Le jury a étudié collectivement leurs divergences et confirmé '
+          'les décisions enregistrées. Cette validation est tracée et '
+          'n’envoie aucun résultat aux candidats.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmer la délibération'),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true && mounted) {
+      await _act('collective-deliberation', {
+        'revision': report['revision'],
+        'confirmation': true,
+        'reason': 'jury_collective',
+      });
     }
   }
 
@@ -116,13 +183,22 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           'Leurs mails seront préparés ensemble. Relis les décisions avant de confirmer.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Relire')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Publier le lot')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Relire'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Publier le lot'),
+          ),
         ],
       ),
     );
     if (confirmed == true && mounted) {
-      await _act('publish', {'stage': report['stage'], 'revision': report['revision']});
+      await _act('publish', {
+        'stage': report['stage'],
+        'revision': report['revision'],
+      });
     }
   }
 
@@ -136,11 +212,23 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
     final ready = rows.where((row) => row['ready'] == true).length;
     final pending = rows.length - ready;
     final decided = rows.where((row) => row['decision'] != null).length;
-    final reviews = rows.fold<int>(0, (sum, row) =>
-        sum + ((row['review_count'] as num?)?.toInt() ?? 0));
+    final minimumReviews = (report?['minimum_reviews'] as num?)?.toInt() ?? 3;
+    final consensusPending = screeningPendingCount(rows, minimumReviews);
+    final consensusEligible =
+        report?['stage'] == 'screening' &&
+        report?['screening_published_at'] == null &&
+        decided == rows.length &&
+        rows.every(
+          (row) => (row['review_count'] as num? ?? 0) >= minimumReviews,
+        );
+    final reviews = rows.fold<int>(
+      0,
+      (sum, row) => sum + ((row['review_count'] as num?)?.toInt() ?? 0),
+    );
     final screening = report?['stage'] != 'interview';
     final completed = report?['final_published_at'] != null;
-    final canPublish = rows.isNotEmpty &&
+    final canPublish =
+        rows.isNotEmpty &&
         ready == rows.length &&
         decided == rows.length &&
         !completed &&
@@ -155,8 +243,12 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
         initiallyExpanded: true,
         tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         title: Text(
-          screening ? 'Présélection des dossiers' : 'Sélection après les entretiens',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          screening
+              ? 'Présélection des dossiers'
+              : 'Sélection après les entretiens',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
         subtitle: Text(
           '$ready/${rows.length} dossiers prêts · $decided ${decided == 1 ? 'décision préparée' : 'décisions préparées'}',
@@ -168,48 +260,82 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
             const LinearProgressIndicator()
           else if (report != null) ...[
             const SizedBox(height: 6),
-            LayoutBuilder(builder: (context, constraints) {
-              final width = constraints.maxWidth >= 820
-                  ? (constraints.maxWidth - 36) / 4
-                  : constraints.maxWidth >= 430
-                      ? (constraints.maxWidth - 12) / 2
-                      : constraints.maxWidth;
-              final metrics = <({String title, int value, IconData icon})>[
-                (title: 'Dossiers prêts', value: ready, icon: Icons.task_alt_outlined),
-                (title: 'À compléter', value: pending, icon: Icons.pending_actions_outlined),
-                (title: 'Avis enregistrés', value: reviews, icon: Icons.edit_note_outlined),
-                (title: 'Décisions préparées', value: decided, icon: Icons.fact_check_outlined),
-              ];
-              return Wrap(spacing: 12, runSpacing: 12, children: [
-                for (final metric in metrics)
-                  SizedBox(
-                    width: width,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerLow,
-                        border: Border.all(color: colors.outlineVariant),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(children: [
-                          Icon(metric.icon, color: colors.primary),
-                          const SizedBox(width: 12),
-                          Expanded(child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${metric.value}',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800)),
-                              Text(metric.title, style: theme.textTheme.bodySmall),
-                            ],
-                          )),
-                        ]),
-                      ),
-                    ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth >= 820
+                    ? (constraints.maxWidth - 36) / 4
+                    : constraints.maxWidth >= 430
+                    ? (constraints.maxWidth - 12) / 2
+                    : constraints.maxWidth;
+                final metrics = <({String title, int value, IconData icon})>[
+                  (
+                    title: 'Dossiers prêts',
+                    value: ready,
+                    icon: Icons.task_alt_outlined,
                   ),
-              ]);
-            }),
+                  (
+                    title: 'À compléter',
+                    value: pending,
+                    icon: Icons.pending_actions_outlined,
+                  ),
+                  (
+                    title: 'Avis enregistrés',
+                    value: reviews,
+                    icon: Icons.edit_note_outlined,
+                  ),
+                  (
+                    title: 'Décisions préparées',
+                    value: decided,
+                    icon: Icons.fact_check_outlined,
+                  ),
+                ];
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final metric in metrics)
+                      SizedBox(
+                        width: width,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerLow,
+                            border: Border.all(color: colors.outlineVariant),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: [
+                                Icon(metric.icon, color: colors.primary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${metric.value}',
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      Text(
+                                        metric.title,
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: rows.isEmpty ? 0 : ready / rows.length,
@@ -239,9 +365,11 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: RecruitmentScheduleEditor(
                   schedule: RecruitmentScheduleModel.fromJson(
-                    report['selection_schedule']),
+                    report['selection_schedule'],
+                  ),
                   template: RecruitmentScheduleModel.fromJson(
-                    report['schedule_template']),
+                    report['schedule_template'],
+                  ),
                   enabled: !_busy,
                   onSave: (value) => _act('planning', value.dates),
                 ),
@@ -274,8 +402,9 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                             child: Text('$count évaluations'),
                           ),
                       ],
-                      onChanged: _busy ? null : (value) =>
-                          setState(() => _minimum = value ?? 3),
+                      onChanged: _busy
+                          ? null
+                          : (value) => setState(() => _minimum = value ?? 3),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
@@ -286,15 +415,22 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                         labelText: 'Écart imposant un avis supplémentaire',
                       ),
                       items: [
-                        for (final points in
-                            ({10, 15, 20, 25, 30, _threshold}.toList()..sort()))
+                        for (final points in ({
+                          10,
+                          15,
+                          20,
+                          25,
+                          30,
+                          _threshold,
+                        }.toList()..sort()))
                           DropdownMenuItem(
                             value: points,
                             child: Text('$points points sur 100'),
                           ),
                       ],
-                      onChanged: _busy ? null : (value) =>
-                          setState(() => _threshold = value ?? 20),
+                      onChanged: _busy
+                          ? null
+                          : (value) => setState(() => _threshold = value ?? 20),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -303,14 +439,30 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _act('assign', {
-                        'minimum_reviews': _minimum,
-                        'disagreement_threshold': _threshold,
-                      }),
+                      onPressed: _busy
+                          ? null
+                          : () => _act('assign', {
+                              'minimum_reviews': _minimum,
+                              'disagreement_threshold': _threshold,
+                            }),
                       icon: const Icon(Icons.shuffle_outlined),
-                      label: const Text('Répartir ou compléter les attributions'),
+                      label: const Text(
+                        'Répartir ou compléter les attributions',
+                      ),
                     ),
                   ],
+                ),
+              ),
+            ],
+            if (screening && consensusPending > 0 && consensusEligible) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _confirmCollectiveDeliberation(consensusPending),
+                icon: const Icon(Icons.groups_2_outlined),
+                label: Text(
+                  'Valider la délibération du jury ($consensusPending)',
                 ),
               ),
             ],
@@ -322,9 +474,12 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Publication des décisions',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700)),
+                    Text(
+                      'Publication des décisions',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     const Text(
                       'Les décisions préparées restent internes. La publication '
@@ -348,13 +503,17 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
                       FilledButton.icon(
                         onPressed: _busy || !canPublish ? null : _publish,
                         icon: const Icon(Icons.mark_email_read_outlined),
-                        label: const Text('Publier les résultats et préparer les mails'),
+                        label: const Text(
+                          'Publier les résultats et préparer les mails',
+                        ),
                       ),
                     ],
                     if ((emails['total'] as num? ?? 0) > 0)
-                      Text('Mails envoyés ${emails['sent'] ?? 0}/${emails['total']}. '
-                          '${emails['retry'] ?? 0} en nouvelle tentative, '
-                          '${emails['dead'] ?? 0} en échec.'),
+                      Text(
+                        'Mails envoyés ${emails['sent'] ?? 0}/${emails['total']}. '
+                        '${emails['retry'] ?? 0} en nouvelle tentative, '
+                        '${emails['dead'] ?? 0} en échec.',
+                      ),
                     if (report['screening_published_at'] != null &&
                         report['identities_revealed_at'] == null)
                       OutlinedButton.icon(
@@ -375,8 +534,7 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Text(_error!,
-                  style: TextStyle(color: colors.error)),
+              child: Text(_error!, style: TextStyle(color: colors.error)),
             ),
           TextButton.icon(
             onPressed: _busy ? null : _load,
@@ -387,21 +545,24 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
       ),
     );
   }
-
 }
 
 class RecruitmentSelectionDecisionCard extends StatefulWidget {
   final ApplicationModel application;
   final VoidCallback onSaved;
   const RecruitmentSelectionDecisionCard({
-    super.key, required this.application, required this.onSaved,
+    super.key,
+    required this.application,
+    required this.onSaved,
   });
 
   @override
-  State<RecruitmentSelectionDecisionCard> createState() => _RecruitmentSelectionDecisionCardState();
+  State<RecruitmentSelectionDecisionCard> createState() =>
+      _RecruitmentSelectionDecisionCardState();
 }
 
-class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionDecisionCard> {
+class _RecruitmentSelectionDecisionCardState
+    extends State<RecruitmentSelectionDecisionCard> {
   final _api = RecruitmentSelectionApi();
   String? _decision;
   String? _error;
@@ -411,7 +572,8 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
   void initState() {
     super.initState();
     _decision = widget.application.assessmentStage == 'screening'
-        ? widget.application.screeningDecision : widget.application.pendingFinalDecision;
+        ? widget.application.screeningDecision
+        : widget.application.pendingFinalDecision;
   }
 
   Future<void> _save() async {
@@ -419,13 +581,23 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
     if (decision == null || _busy) return;
     setState(() => _busy = true);
     try {
-      await _api.request('applications/${widget.application.id}/selection-decision', body: {
-        'stage': widget.application.assessmentStage,
-        'decision': decision,
-      });
+      await _api.request(
+        'applications/${widget.application.id}/selection-decision',
+        body: {
+          'stage': widget.application.assessmentStage,
+          'decision': decision,
+        },
+      );
       if (mounted) widget.onSaved();
     } catch (error) {
-      if (mounted) setState(() => _error = recruitmentMessage(error, fallback: 'La décision n’a pas été enregistrée.'));
+      if (mounted) {
+        setState(
+          () => _error = recruitmentMessage(
+            error,
+            fallback: 'La décision n’a pas été enregistrée.',
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -435,12 +607,21 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
   Widget build(BuildContext context) {
     final screening = widget.application.assessmentStage == 'screening';
     final options = screening
-        ? const {'shortlisted': 'Dossier retenu pour un entretien', 'not_shortlisted': 'Dossier non retenu'}
-        : const {'accepted': 'Candidature retenue', 'rejected': 'Candidature non retenue', 'waiting_list': 'Liste d’attente'};
+        ? const {
+            'shortlisted': 'Dossier retenu pour un entretien',
+            'not_shortlisted': 'Dossier non retenu',
+          }
+        : const {
+            'accepted': 'Candidature retenue',
+            'rejected': 'Candidature non retenue',
+            'waiting_list': 'Liste d’attente',
+          };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Prépare la décision de ce dossier. Elle sera communiquée lors de la publication de toute la sélection.'),
+        const Text(
+          'Prépare la décision de ce dossier. Elle sera communiquée lors de la publication de toute la sélection.',
+        ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _decision,
@@ -451,7 +632,9 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
             for (final entry in options.entries)
               DropdownMenuItem(value: entry.key, child: Text(entry.value)),
           ],
-          onChanged: _busy ? null : (value) => setState(() => _decision = value),
+          onChanged: _busy
+              ? null
+              : (value) => setState(() => _decision = value),
         ),
         const SizedBox(height: 12),
         FilledButton(
@@ -459,7 +642,10 @@ class _RecruitmentSelectionDecisionCardState extends State<RecruitmentSelectionD
           child: Text(_busy ? 'Enregistrement…' : 'Enregistrer pour le lot'),
         ),
         if (_error != null)
-          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          Text(
+            _error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
       ],
     );
   }
