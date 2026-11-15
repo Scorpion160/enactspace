@@ -36,6 +36,85 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
   bool _useEnactMeet = true;
   bool _loading = true, _sending = false;
   String? _error;
+  String? _proposalFeedback;
+  int _proposalSize = 3;
+
+  String _departmentCode(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    final compact = normalized
+        .replaceAll(RegExp(r'[éèêë]'), 'e')
+        .replaceAll(RegExp(r'[àâä]'), 'a')
+        .replaceAll(RegExp(r'[îï]'), 'i')
+        .replaceAll(RegExp(r'[ôö]'), 'o')
+        .replaceAll(RegExp(r'[ûü]'), 'u')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    const aliases = {
+      'gc': 'geniecivil',
+      'ge': 'genieelectrique',
+      'gi': 'genieinformatique',
+      'gm': 'geniemecanique',
+    };
+    return aliases[compact] ?? compact;
+  }
+
+  bool _matchesDepartment(Map<String, dynamic> member) =>
+      _departmentCode(widget.application.department).isNotEmpty &&
+      _departmentCode(member['department']?.toString()) ==
+          _departmentCode(widget.application.department);
+
+  bool get _hasDepartmentJuror => _members.any(
+    (member) => _selected.contains(member['id']) && _matchesDepartment(member),
+  );
+
+  Future<void> _proposeRandomJury() async {
+    final start = _start();
+    final duration = int.tryParse(_duration.text.trim());
+    if (start == null || duration == null || duration < 5 || duration > 180) {
+      setState(
+        () => _error = 'Précise une date, une heure et une durée valides.',
+      );
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _error = null;
+      _proposalFeedback = null;
+    });
+    try {
+      final result = await widget.tools.proposeJury(
+        widget.application.id,
+        start,
+        start.add(Duration(minutes: duration)),
+        size: _proposalSize,
+      );
+      if (!mounted) return;
+      final ids = (result['member_ids'] as List? ?? const [])
+          .map((value) => value.toString())
+          .toSet();
+      setState(() {
+        _teamId = '';
+        _selected
+          ..clear()
+          ..addAll(ids);
+        _needsTeamChoice = false;
+        _proposalFeedback =
+            'Proposition de ${ids.length} juré(s), dont un du département. '
+            'Tu peux modifier cette composition avant de confirmer.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = recruitmentMessage(
+            error,
+            fallback: 'Aucune composition disponible pour ce créneau.',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -55,7 +134,8 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
         (app.interviewLink?.isNotEmpty == true ? 'online' : 'in_person');
     _location.text = app.interviewLocation ?? '';
     _link.text = app.interviewLink ?? '';
-    _useEnactMeet = app.interviewMeetingId != null || (app.interviewLink ?? '').isEmpty;
+    _useEnactMeet =
+        app.interviewMeetingId != null || (app.interviewLink ?? '').isEmpty;
     _note.text = app.interviewNote ?? '';
     _selected.addAll(
       app.interviewJurors
@@ -155,6 +235,14 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
       setState(() => _error = 'Choisis au moins un membre du jury.');
       return;
     }
+    if (!_hasDepartmentJuror) {
+      setState(
+        () => _error =
+            'Choisis au moins un juré du département du candidat : '
+            '${widget.application.department ?? "non renseigné"}.',
+      );
+      return;
+    }
     setState(() {
       _sending = true;
       _error = null;
@@ -173,7 +261,9 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
               ? null
               : _location.text.trim(),
           'use_enactmeet': _mode != 'in_person' && _useEnactMeet,
-          'interview_link': _mode == 'in_person' || _useEnactMeet ? null : _link.text.trim(),
+          'interview_link': _mode == 'in_person' || _useEnactMeet
+              ? null
+              : _link.text.trim(),
           'interview_note': _note.text.trim(),
           if (_teamId.isEmpty) 'jury_member_ids': _selected.toList(),
           if (_teamId.isNotEmpty) ...{
@@ -306,31 +396,71 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Utiliser EnactMeet'),
-                  subtitle: const Text('Une salle privée pour ce candidat et son jury. Le candidat la rejoint depuis son suivi, sans compte membre.'),
+                  subtitle: const Text(
+                    'Une salle privée pour ce candidat et son jury. Le candidat la rejoint depuis son suivi, sans compte membre.',
+                  ),
                   value: _useEnactMeet,
-                  onChanged: _sending ? null : (value) => setState(() => _useEnactMeet = value),
+                  onChanged: _sending
+                      ? null
+                      : (value) => setState(() => _useEnactMeet = value),
                 ),
                 if (!_useEnactMeet)
-                TextFormField(
-                  controller: _link,
-                  enabled: !_sending,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien de l’entretien *',
-                    hintText: 'https://…',
+                  TextFormField(
+                    controller: _link,
+                    enabled: !_sending,
+                    decoration: const InputDecoration(
+                      labelText: 'Lien de l’entretien *',
+                      hintText: 'https://…',
+                    ),
+                    validator: (value) {
+                      final uri = Uri.tryParse(value?.trim() ?? '');
+                      return uri?.scheme != 'https' || uri!.host.isEmpty
+                          ? 'Indique un lien HTTPS.'
+                          : null;
+                    },
                   ),
-                  validator: (value) {
-                    final uri = Uri.tryParse(value?.trim() ?? '');
-                    return uri?.scheme != 'https' || uri!.host.isEmpty
-                        ? 'Indique un lien HTTPS.'
-                        : null;
-                  },
-                ),
               ],
               const SizedBox(height: 16),
               Text(
                 'Membres du jury',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Département du candidat : '
+                '${widget.application.department ?? "non renseigné"}. '
+                'Chaque entretien doit comprendre au moins un membre '
+                'de ce département.',
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                key: const ValueKey('jury-proposal-size'),
+                initialValue: _proposalSize,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre de jurés proposé',
+                ),
+                items: const [
+                  DropdownMenuItem(value: 2, child: Text('2 jurés')),
+                  DropdownMenuItem(value: 3, child: Text('3 jurés')),
+                  DropdownMenuItem(value: 4, child: Text('4 jurés')),
+                  DropdownMenuItem(value: 5, child: Text('5 jurés')),
+                ],
+                onChanged: _sending || _loading
+                    ? null
+                    : (value) => setState(() => _proposalSize = value ?? 3),
+              ),
+              OutlinedButton.icon(
+                onPressed: _sending || _loading ? null : _proposeRandomJury,
+                icon: const Icon(Icons.shuffle_outlined),
+                label: const Text('Proposer une composition aléatoire'),
+              ),
+              if (_proposalFeedback != null)
+                Text(
+                  _proposalFeedback!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               if (_loading) const LinearProgressIndicator(),
               if (!_loading) ...[
                 const SizedBox(height: 10),
@@ -345,7 +475,7 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                   items: [
                     const DropdownMenuItem(
                       value: '',
-                      child: Text('Composition personnalisée'),
+                      child: Text('Choisir les jurés manuellement'),
                     ),
                     for (final team in _teams)
                       DropdownMenuItem(
@@ -388,7 +518,9 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                   value: _selected.contains(member['id']),
                   title: Text(member['name'].toString()),
                   subtitle: Text(
-                    member['status'] == 'alumni' ? 'Alumni' : 'Enacteur',
+                    '${member['department']?.toString() ?? "Département non renseigné"}'
+                    '${_matchesDepartment(member) ? " · Même département" : ""}'
+                    ' · ${member['status'] == 'alumni' ? 'Alumni' : 'Enacteur'}',
                   ),
                   onChanged: _sending || _teamId.isNotEmpty
                       ? null
@@ -398,6 +530,20 @@ class _InterviewPlanningDialogState extends State<InterviewPlanningDialog> {
                               ? _selected.add(member['id'].toString())
                               : _selected.remove(member['id'].toString());
                         }),
+                ),
+              if (!_loading && _selected.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    _hasDepartmentJuror
+                        ? 'Un membre du département du candidat est présent.'
+                        : 'Ajoute un membre du département du candidat.',
+                    style: TextStyle(
+                      color: _hasDepartmentJuror
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
               TextFormField(
                 controller: _note,

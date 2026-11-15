@@ -1367,6 +1367,28 @@ def get_application(
     return application_payload(db, current_user, application, anonymized=anonymized, include_history=include_history)
 
 
+@router.get("/applications/{application_id}/interview/jury-proposal")
+def interview_jury_proposal(
+    application_id: str,
+    interview_at: datetime,
+    interview_end_at: datetime,
+    size: int = Query(default=3, ge=1, le=8),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_recruitment_access),
+):
+    require_staff(db, current_user)
+    application = get_application_or_404(db, application_id)
+    campaign = get_campaign_or_404(db, str(application.campaign_id))
+    if application.screening_decision != "shortlisted" or not campaign.screening_published_at:
+        raise HTTPException(409, "Publie la présélection avant de préparer le jury d'entretien.")
+    from app.services.recruitment_interviews import propose_interview_jury
+    from app.services.operational_integrity import to_naive_utc
+    start, end = to_naive_utc(interview_at), to_naive_utc(interview_end_at)
+    if not start < end or not 5 <= (end - start).total_seconds() / 60 <= 180:
+        raise HTTPException(422, "Choisis une durée comprise entre 5 et 180 minutes.")
+    return propose_interview_jury(db, application, start=start, end=end, size=size)
+
+
 @router.post("/applications/{application_id}/interview", response_model=ApplicationRead)
 def schedule_application_interview(
     application_id: str,

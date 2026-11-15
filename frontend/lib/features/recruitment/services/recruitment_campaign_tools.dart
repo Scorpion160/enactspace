@@ -29,6 +29,12 @@ abstract interface class RecruitmentCampaignTools {
   });
   Future<Map<String, dynamic>> loadPersonality(String applicationId);
   Future<void> invitePersonality(String applicationId, DateTime? dueAt);
+  Future<Map<String, dynamic>> proposeJury(
+    String applicationId,
+    DateTime start,
+    DateTime end, {
+    int size = 3,
+  });
   Future<ApplicationModel> scheduleWithJury(
     String applicationId,
     Map<String, dynamic> appointment,
@@ -169,6 +175,20 @@ class ApiRecruitmentCampaignTools implements RecruitmentCampaignTools {
       data: {'due_at': dueAt?.toUtc().toIso8601String()},
     );
   }
+
+  @override
+  Future<Map<String, dynamic>> proposeJury(
+    String applicationId,
+    DateTime start,
+    DateTime end, {
+    int size = 3,
+  }) async => Map<String, dynamic>.from(
+    await _api.get(
+          '/recruitment/applications/$applicationId/interview/jury-proposal?interview_at=${Uri.encodeQueryComponent(start.toUtc().toIso8601String())}&interview_end_at=${Uri.encodeQueryComponent(end.toUtc().toIso8601String())}&size=$size',
+          token: await _token(),
+        )
+        as Map,
+  );
 
   @override
   Future<ApplicationModel> scheduleWithJury(

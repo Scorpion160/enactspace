@@ -21,6 +21,7 @@ const candidate = ApplicationModel(
   firstName: 'Awa',
   lastName: 'Test',
   email: 'fixture@example.org',
+  department: 'Génie Civil',
   status: 'under_review',
   isAnonymized: false,
   canConvert: false,
@@ -28,8 +29,18 @@ const candidate = ApplicationModel(
 
 class _TeamTools implements RecruitmentCampaignTools {
   final members = <Map<String, dynamic>>[
-    {'id': 'm1', 'name': 'Enacteur Test', 'active': true},
-    {'id': 'm2', 'name': 'Alumni Test', 'active': true},
+    {
+      'id': 'm1',
+      'name': 'Enacteur Test',
+      'department': 'Génie Civil',
+      'active': true,
+    },
+    {
+      'id': 'm2',
+      'name': 'Alumni Test',
+      'department': 'Gestion',
+      'active': true,
+    },
   ];
   final teams = <Map<String, dynamic>>[];
   Map<String, dynamic>? saved;
