@@ -99,6 +99,7 @@ class _Tools implements RecruitmentCampaignTools {
         'user_id': 'alumni-1',
         'name': 'Alumni Test',
         'status': 'alumni',
+        'department': 'Génie Civil',
         'appointed': appointed,
         'active': appointed,
       },
@@ -152,6 +153,18 @@ class _Tools implements RecruitmentCampaignTools {
   @override
   Future<void> invitePersonality(String applicationId, DateTime? dueAt) async {}
   @override
+  Future<Map<String, dynamic>> proposeJury(
+    String applicationId,
+    DateTime start,
+    DateTime end, {
+    int size = 3,
+  }) async => {
+    'member_ids': ['member-1'],
+    'count': 1,
+    'confirmed': false,
+  };
+
+  @override
   Future<ApplicationModel> scheduleWithJury(
     String applicationId,
     Map<String, dynamic> appointment,
@@ -167,6 +180,7 @@ const _application = ApplicationModel(
   firstName: 'Awa',
   lastName: 'Test',
   email: 'fixture@example.org',
+  department: 'Génie Civil',
   status: 'under_review',
   isAnonymized: false,
   canConvert: false,
@@ -428,7 +442,10 @@ void main() {
         find.widgetWithText(DropdownButtonFormField<String>, 'Format'),
       );
       await _tap(tester, find.text('En ligne').last);
-      expect(find.widgetWithText(TextFormField, 'Lien de l’entretien *'), findsNothing);
+      expect(
+        find.widgetWithText(TextFormField, 'Lien de l’entretien *'),
+        findsNothing,
+      );
       await _tap(tester, find.text('Alumni Test'));
       await _tap(tester, find.text('Confirmer l’entretien'));
       expect(tools.saved?['interview_at'], '2026-11-16T19:00:00.000Z');

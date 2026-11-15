@@ -206,7 +206,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
               const RecruitmentPageHeading(
                 title: 'Le jury de la campagne',
                 subtitle:
-                    'Chaque juré peut évaluer tous les dossiers (minimum 3 avis par candidat). EnacChef suit les candidatures. Les accès temporaires sont gérés séparément.',
+                    'Une liste commune de jurés pour la campagne. Les équipes d’entretien seront constituées selon les disponibilités ; chaque candidat aura au moins un juré de son département.',
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
@@ -287,7 +287,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                                 ),
                                 title: Text(member['name'].toString()),
                                 subtitle: Text(
-                                  '${member['status'] == 'alumni' ? 'Alumni' : 'Enacteur'} · ${member['active'] == true
+                                  '${member['department']?.toString() ?? "Département non renseigné"} · ${member['status'] == 'alumni' ? 'Alumni' : 'Enacteur'} · ${member['active'] == true
                                       ? 'Sélectionné'
                                       : member['appointed'] == true
                                       ? 'Compte indisponible'

@@ -1,5 +1,8 @@
 """Dakar appointments, flexible formats and conflict checks across campaigns."""
 from datetime import timedelta
+import secrets
+import unicodedata
+import re
 from fastapi import HTTPException
 from sqlalchemy import or_
 
@@ -34,6 +37,83 @@ def interview_roster(db, application):
              "active": member.is_active and eligible_juror(user)} for member, user in rows]
 
 
+def department_key(value):
+    """Normalize ESP department names; Civil and GCBA remain distinct."""
+    text = unicodedata.normalize("NFKD", (value or "").casefold())
+    normalized = re.sub(r"[^a-z0-9]+", "", "".join(
+        character for character in text if not unicodedata.combining(character)
+    ))
+    aliases = {
+        "ge": "genieelectrique", "gi": "genieinformatique",
+        "gm": "geniemecanique", "gc": "geniecivil",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def department_represented(application, jury_users):
+    target = department_key(application.department)
+    return bool(target and any(department_key(user.department) == target for user in jury_users))
+
+
+def propose_interview_jury(db, application, *, start, end, size=3):
+    """Read-only, load-aware random proposal with departmental coverage."""
+    from sqlalchemy import func
+    members = db.query(RecruitmentJuryMember, User).join(
+        User, User.id == RecruitmentJuryMember.user_id
+    ).filter(
+        RecruitmentJuryMember.campaign_id == application.campaign_id,
+        RecruitmentJuryMember.is_active.is_(True),
+        User.is_active.is_(True),
+        User.email_verified.is_(True),
+        User.status.in_({"active", "alumni"}),
+    ).all()
+    eligible = [(member, user) for member, user in members
+                if user.email.casefold() != application.email.casefold()]
+    target = department_key(application.department)
+    if not target or not any(department_key(user.department) == target for _, user in eligible):
+        raise HTTPException(409, "Aucun juré du département du candidat n’est disponible dans la campagne.")
+    # Existing appointments across campaigns count towards each juror's workload.
+    loads = dict(db.query(RecruitmentJuryMember.user_id, func.count(ApplicationInterviewJuror.application_id))
+        .join(ApplicationInterviewJuror,
+              ApplicationInterviewJuror.jury_member_id == RecruitmentJuryMember.id)
+        .group_by(RecruitmentJuryMember.user_id).all())
+    concurrent = db.query(RecruitmentJuryMember.user_id, Application.interview_at,
+                          Application.interview_end_at).join(
+        ApplicationInterviewJuror,
+        ApplicationInterviewJuror.jury_member_id == RecruitmentJuryMember.id
+    ).join(Application, Application.id == ApplicationInterviewJuror.application_id).filter(
+        Application.id != application.id,
+        Application.status.in_({"interview_scheduled", "interview"}),
+        Application.interview_at < end,
+        RecruitmentJuryMember.user_id.in_([user.id for _, user in eligible]),
+    ).all()
+    occupied = {user_id for user_id, other_start, other_end in concurrent
+                if effective_interview_end(other_start, other_end) > start}
+    available = [(member, user) for member, user in eligible if user.id not in occupied]
+    same = [(member, user) for member, user in available if department_key(user.department) == target]
+    if len(available) < size:
+        raise HTTPException(409, "Pas assez de jurés disponibles sur ce créneau. Réduis la taille du jury ou change d'horaire.")
+    if not same:
+        raise HTTPException(409, "Aucun membre du département n'est libre sur ce créneau.")
+    rng = secrets.SystemRandom()
+    def pick(pool):
+        lightest = min(loads.get(user.id, 0) for _, user in pool)
+        return rng.choice([pair for pair in pool if loads.get(pair[1].id, 0) == lightest])
+    chosen = [pick(same)]
+    remaining = [pair for pair in available if pair[0].id != chosen[0][0].id]
+    while remaining and len(chosen) < size:
+        pair = pick(remaining)
+        chosen.append(pair)
+        remaining = [row for row in remaining if row[0].id != pair[0].id]
+    return {
+        "candidate_department": application.department,
+        "member_ids": [str(member.id) for member, _ in chosen],
+        "department_juror_id": str(chosen[0][0].id),
+        "count": len(chosen),
+        "confirmed": False,
+    }
+
+
 def assign_interview(db, application, payload):
     # Caller owns the campaign lock. All appointment and membership mutations
     # take that lock first; shared juror User locks serialize across campaigns.
@@ -61,6 +141,8 @@ def assign_interview(db, application, payload):
         raise HTTPException(409, "Le jury a changé. Choisis des membres disponibles dans cette campagne.")
     if any(user.email.casefold() == application.email.casefold() for _, user in rows):
         raise HTTPException(409, "Un membre du jury ne peut pas participer à son propre entretien de recrutement.")
+    if not department_represented(application, [user for _, user in rows]):
+        raise HTTPException(409, "Choisis au moins un juré du département du candidat pour cet entretien.")
     user_ids = [user.id for _, user in rows]
     if user_ids:
         db.query(User).filter(User.id.in_(user_ids)).order_by(User.id).populate_existing().with_for_update().all()

@@ -82,6 +82,7 @@ def team_payload(db, team, user):
             "available": bool(team.is_active and rows and all(
                 member.is_active and eligible_juror(user) for member, user in rows)),
             "members": [{"id": str(member.id), "name": f"{user.first_name} {user.last_name}".strip(),
+                         "department": user.department,
                          "active": member.is_active and eligible_juror(user)} for member, user in rows],
             "interviews": [{"application_id": str(app.id),
                             "name": interview_candidate_label(app, anonymized=anonymized),

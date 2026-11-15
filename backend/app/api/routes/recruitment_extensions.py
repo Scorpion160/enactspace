@@ -59,6 +59,7 @@ def jury_manager(db, user, campaign_id):
 def member_payload(member, user):
     return {"id": str(member.id), "user_id": str(user.id), "campaign_id": str(member.campaign_id),
             "name": f"{user.first_name} {user.last_name}".strip(), "status": user.status,
+            "department": user.department,
             "active": member.is_active and eligible_juror(user), "appointed": member.is_active,
             "updated_at": member.updated_at, "revoked_at": member.revoked_at}
 
