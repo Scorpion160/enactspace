@@ -12,6 +12,7 @@ import '../../widgets/internal/recruitment_viewers_section.dart';
 class RecruitmentJuryScreen extends StatefulWidget {
   final ValueChanged<RecruitmentSection>? onSectionSelected;
   final bool canManageCampaigns;
+  final bool enableInterviewPreparation;
   final RecruitmentCampaignTools tools;
   final List<RecruitmentCampaignModel> campaigns;
   final String? initialCampaignId;
@@ -24,6 +25,7 @@ class RecruitmentJuryScreen extends StatefulWidget {
     this.onOpenApplication,
     this.onSectionSelected,
     this.canManageCampaigns = true,
+    this.enableInterviewPreparation = true,
   });
   @override
   State<RecruitmentJuryScreen> createState() => _RecruitmentJuryScreenState();
@@ -442,7 +444,9 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                   );
                 },
               ),
-              if (_campaign != null && _roster != null) ...[
+              if (widget.enableInterviewPreparation &&
+                  _campaign != null &&
+                  _roster != null) ...[
                 const SizedBox(height: 20),
                 RecruitmentInterviewPreparation(
                   key: ValueKey('interview-drafts-$_campaign'),
