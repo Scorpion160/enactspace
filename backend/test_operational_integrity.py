@@ -283,6 +283,7 @@ class OperationalIntegrityTests(unittest.TestCase):
         manager = self._user()
         self._role(manager, "administrateur")
         juror = self._user()
+        juror.department = "Génie Civil"
         now = datetime.now(timezone.utc)
         campaign = RecruitmentCampaign(
             title="Campagne fictive", selection_policy_version=POLICY_VERSION,
@@ -293,7 +294,7 @@ class OperationalIntegrityTests(unittest.TestCase):
         appointment = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id)
         application = Application(
             campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
-            email="emilie@example.com", status="under_review", screening_decision="shortlisted",
+            email="emilie@example.com", department="Génie Civil", status="under_review", screening_decision="shortlisted",
         )
         self.db.add_all([appointment, application])
         self.db.commit()
@@ -448,6 +449,8 @@ class OperationalIntegrityTests(unittest.TestCase):
     def test_interview_end_controls_the_calendar_and_final_publication(self):
         manager = self._user()
         self._role(manager, "administrateur")
+        juror = self._user()
+        juror.department = "Génie Civil"
         campaign = RecruitmentCampaign(
             title="Campagne fictive", selection_policy_version=POLICY_VERSION,
             selection_schedule=NOVEMBER_2026_SCHEDULE, is_active=False,
@@ -455,9 +458,13 @@ class OperationalIntegrityTests(unittest.TestCase):
         )
         self.db.add(campaign)
         self.db.flush()
+        member = RecruitmentJuryMember(campaign_id=campaign.id, user_id=juror.id)
+        self.db.add(member)
+        self.db.flush()
         application = Application(
             campaign_id=campaign.id, first_name="Émilie", last_name="Exemple",
-            email="emilie@example.com", status="under_review", screening_decision="shortlisted",
+            email="emilie@example.com", department="Génie Civil",
+            status="under_review", screening_decision="shortlisted",
         )
         self.db.add(application)
         self.db.commit()
@@ -472,7 +479,9 @@ class OperationalIntegrityTests(unittest.TestCase):
         self.assertEqual(too_late.exception.status_code, 422)
         self.db.rollback()
         recruitment.schedule_application_interview(
-            str(application.id), ApplicationInterviewSchedule(interview_at=start), _request(), self.db, manager,
+            str(application.id), ApplicationInterviewSchedule(
+                interview_at=start, jury_member_ids=[member.id]
+            ), _request(), self.db, manager,
         )
         self.assertEqual(application.interview_end_at, end)
 
