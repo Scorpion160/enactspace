@@ -28,6 +28,7 @@ from app.services.recruitment_access import (
     active_jury_member, can_manage_jury, eligible_juror, require_campaign_access,
 )
 from app.services.recruitment_interviews import department_key, effective_interview_end
+from app.services.recruitment_interview_policy import fetch_policy, within_windows
 
 
 class DraftAppointment(BaseModel):
@@ -36,6 +37,8 @@ class DraftAppointment(BaseModel):
     starts_at: datetime
     ends_at: datetime
     jury_member_ids: list[UUID] = Field(min_length=3, max_length=3)
+    mode: str = Field(default="in_person", pattern="^(in_person|online|hybrid)$")
+    location: str | None = Field(default=None,max_length=180)
 
     @model_validator(mode="after")
     def unique_members(self):
@@ -97,6 +100,9 @@ def validate_drafts(db, campaign, inputs):
             User, User.id == RecruitmentJuryMember.user_id
         ).filter(RecruitmentJuryMember.campaign_id == campaign.id)
     }
+    policy=fetch_policy(db,campaign.id)
+    if policy["respect_candidate_availability"]:
+        raise HTTPException(409,"La validation automatique des souhaits libres des candidats n'est pas disponible.")
     starts_by_member = {}
     conflicts = []
     for row in inputs:
@@ -105,8 +111,8 @@ def validate_drafts(db, campaign, inputs):
             raise HTTPException(409, "Un dossier est déjà dans une étape incompatible avec le brouillon.")
         start = to_naive_utc(row.starts_at)
         end = to_naive_utc(row.ends_at)
-        if not _slot_ok(start, end):
-            raise HTTPException(422, "Les entretiens durent 20 minutes, entre 12 h 30–14 h ou 19 h–21 h.")
+        if not within_windows(policy,start,end):
+            raise HTTPException(422,"Ce créneau ne respecte pas la durée ou les plages horaires de la campagne.")
         selected = [members.get(member_id) for member_id in row.jury_member_ids]
         if any(pair is None or not pair[0].is_active or not eligible_juror(pair[1]) for pair in selected):
             raise HTTPException(409, "Un juré proposé n'est pas habilité ou n'appartient pas à la campagne.")
@@ -193,6 +199,8 @@ def _readable_rows(db, campaign, actor):
                 "declined" if test.declined_at else "in_progress"
             ),
             "revision": row.revision,
+            "mode": row.mode or "in_person",
+            "location": row.location,
             "draft_only": True,
         })
     return result
@@ -230,6 +238,8 @@ def register_interview_drafts(router):
             old.starts_at = to_naive_utc(item.starts_at)
             old.ends_at = to_naive_utc(item.ends_at)
             old.jury_member_ids = [str(i) for i in item.jury_member_ids]
+            old.mode = item.mode
+            old.location = item.location
             old.updated_by = actor.id
             old.updated_at = utc_now()
             old.revision = (old.revision or 0) + 1

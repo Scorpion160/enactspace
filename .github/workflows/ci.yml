@@ -22,6 +22,7 @@ on:
       - feature/recruitment-shortlist-20261115
       - feature/interview-jury-departments-20261115
       - feature/recruitment-interview-drafts-20261115
+      - feature/recruitment-filters-jury-workspace-20261115
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -134,7 +135,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261115_0039 (head)"
+          test "$output" = "20261115_0040 (head)"
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
@@ -270,8 +271,8 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          assert str(checks['web_version']['public_fields']['build_number']) == '45'
-          assert checks['web_main']['sha256'] == '53a2ad71a06dfaa2c25c4f36fbbb29a614d501c644d2602da3b0c00246f224ac'
+          assert str(checks['web_version']['public_fields']['build_number']) == '46'
+          assert checks['web_main']['sha256'] == 'f25f475544ef811aa754b6eabaa212e06e7212bca9f8db3a8a144f396121770f'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -283,14 +284,14 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 53a2ad71a06dfaa2c25c4f36fbbb29a614d501c644d2602da3b0c00246f224ac
+          --live-main-sha256 f25f475544ef811aa754b6eabaa212e06e7212bca9f8db3a8a144f396121770f
           --live-version 1.0.30
-          --live-build 45
+          --live-build 46
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build46-PREFLIGHT-ONLY-${{ github.run_id }}
+          name: enactspace-web-1.0.30-build47-PREFLIGHT-ONLY-${{ github.run_id }}
           path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7

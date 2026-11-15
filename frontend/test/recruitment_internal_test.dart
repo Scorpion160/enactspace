@@ -25,6 +25,10 @@ const _campaign = RecruitmentCampaignModel(
 ApplicationModel _application({
   int index = 1,
   String status = 'under_review',
+  String? screeningDecision,
+  String department = 'Génie informatique',
+  String studyLevel = 'DIC 2',
+  String gender = 'female',
   DateTime? interviewAt,
   String? interviewLocation,
   double? finalScore = 15,
@@ -35,11 +39,11 @@ ApplicationModel _application({
   campaignId: _campaign.id,
   firstName: 'Awa',
   lastName: 'Candidate $index',
-  gender: 'female',
+  gender: gender,
   email: 'awa$index@example.com',
   phone: '+22177000000$index',
-  department: 'Génie informatique',
-  studyLevel: 'DIC 2',
+  department: department,
+  studyLevel: studyLevel,
   className: 'Classe $index',
   motivation: 'Je souhaite contribuer durablement aux projets Enactus.',
   knownEnactusFrom: 'Forum associatif',
@@ -61,6 +65,7 @@ ApplicationModel _application({
   motivationLetterUrl: '/uploads/letter.pdf',
   attachmentUrl: '/uploads/attachment.png',
   status: status,
+  screeningDecision: screeningDecision,
   trackingCode: 'AUDIT-REC-${index.toString().padLeft(3, '0')}',
   finalScore: finalScore,
   createdAt: '2026-08-01T10:00:00',
@@ -466,26 +471,107 @@ void main() {
     expect(find.text('Réinitialiser les filtres'), findsOneWidget);
   });
 
-  testWidgets('filtre statut puis réinitialisation', (tester) async {
-    await _pump(tester, _FakeGateway());
-    final expand = find.byTooltip('Afficher les filtres');
-    if (expand.evaluate().isNotEmpty) {
-      await tester.tap(expand);
+  testWidgets(
+    'les décisions de présélection sont filtrées sans dépendre du statut technique',
+    (tester) async {
+      final items = [
+        _application(
+          index: 1,
+          status: 'under_review',
+          screeningDecision: 'shortlisted',
+        ),
+        _application(
+          index: 2,
+          status: 'under_review',
+          screeningDecision: 'not_shortlisted',
+        ),
+        _application(index: 3, status: 'submitted'),
+      ];
+      await _pump(tester, _FakeGateway(applications: () async => items));
+      expect(find.textContaining('3 dossier(s) affiché(s)'), findsOneWidget);
+      final dropdown = find.byKey(const Key('internal-status-all'));
+      await tester.tap(dropdown);
       await tester.pumpAndSettle();
-    }
-    await tester.tap(find.byKey(const Key('internal-status-filter')));
+      await tester.tap(find.text('Retenus pour entretien').last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1 dossier(s) affiché(s)'), findsOneWidget);
+      expect(find.textContaining('Candidate 1'), findsWidgets);
+      expect(find.textContaining('Candidate 2'), findsNothing);
+
+      // A restored selected value must agree with the new list after reset.
+      final expand = find.byTooltip('Afficher les filtres');
+      if (expand.evaluate().isNotEmpty) {
+        await tester.tap(expand);
+        await tester.pumpAndSettle();
+      }
+      final reset = find.byKey(const Key('internal-reset-filters'));
+      await tester.ensureVisible(reset);
+      await tester.pumpAndSettle();
+      await tester.tap(reset);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('3 dossier(s) affiché(s)'), findsOneWidget);
+      expect(find.byKey(const Key('internal-status-all')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un statut technique conserve sa signification après la présélection',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeGateway(
+          applications: () async => [
+            _application(
+              index: 1,
+              status: 'under_review',
+              screeningDecision: 'shortlisted',
+            ),
+            _application(index: 2, status: 'submitted'),
+          ],
+        ),
+      );
+      await tester.tap(find.byKey(const Key('internal-status-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dossier déposé').last);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1 dossier(s) affiché(s)'), findsOneWidget);
+      expect(find.textContaining('Candidate 2'), findsWidgets);
+    },
+  );
+
+  testWidgets('campagne, département, niveau et recherche se combinent', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeGateway(
+        applications: () async => [
+          _application(index: 1, department: 'GCBA', studyLevel: 'DIC 1'),
+          _application(
+            index: 2,
+            department: 'Génie informatique',
+            studyLevel: 'DIC 2',
+          ),
+        ],
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const Key('internal-search')),
+      'AUDIT-REC-002',
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Candidature retenue').last);
+    expect(find.textContaining('1 dossier(s) affiché(s)'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('internal-search')), '');
     await tester.pumpAndSettle();
-    expect(find.text('Aucun résultat'), findsOneWidget);
-    // The advanced filters add height to the page. Simulate scrolling to the
-    // reset control instead of tapping an off-screen widget.
-    final reset = find.text('Réinitialiser les filtres');
-    await tester.ensureVisible(reset);
+    await tester.tap(find.byTooltip('Afficher les filtres'));
     await tester.pumpAndSettle();
-    await tester.tap(reset);
+    final department = find.byKey(const Key('internal-department-all'));
+    await tester.ensureVisible(department);
+    await tester.tap(department);
     await tester.pumpAndSettle();
-    expect(find.text('Ouvrir le dossier'), findsOneWidget);
+    await tester.tap(find.text('GCBA').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 dossier(s) affiché(s)'), findsOneWidget);
   });
 
   testWidgets('pagination client par quinze dossiers', (tester) async {

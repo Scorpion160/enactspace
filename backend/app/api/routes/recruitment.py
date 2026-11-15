@@ -2090,3 +2090,6 @@ register_recruitment_extensions(router)
 
 from app.services.recruitment_interview_drafts import register_interview_drafts
 register_interview_drafts(router)
+
+from app.services.recruitment_interview_policy import register_interview_policy
+register_interview_policy(router)

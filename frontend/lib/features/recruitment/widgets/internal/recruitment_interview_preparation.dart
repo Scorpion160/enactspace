@@ -27,6 +27,7 @@ class _RecruitmentInterviewPreparationState
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
   bool _canManage = false;
+  int _page = 0;
   String? _error;
   int _generation = 0;
 
@@ -78,6 +79,7 @@ class _RecruitmentInterviewPreparationState
             .map((row) => Map<String, dynamic>.from(row))
             .toList();
         _canManage = payload['can_manage'] == true;
+        _page = 0;
       });
     } catch (_) {
       if (mounted && current == _generation) {
@@ -172,6 +174,10 @@ class _RecruitmentInterviewPreparationState
               ].join(' ').toLowerCase().contains(search),
         )
         .toList();
+    const perPage = 10;
+    final pageCount = (visible.length / perPage).ceil();
+    final currentPage = pageCount == 0 ? 0 : _page.clamp(0, pageCount - 1);
+    final shown = visible.skip(currentPage * perPage).take(perPage).toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -230,11 +236,11 @@ class _RecruitmentInterviewPreparationState
                   labelText: 'Rechercher un candidat',
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) => setState(() => _page = 0),
               ),
               const SizedBox(height: 8),
               Text('${visible.length} candidat(s)'),
-              for (final row in visible)
+              for (final row in shown)
                 Card(
                   margin: const EdgeInsets.only(top: 7),
                   child: Padding(
@@ -248,9 +254,11 @@ class _RecruitmentInterviewPreparationState
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${row['candidate_department'] ?? ''} · '
-                          '${(row['starts_at'] ?? '').toString().replaceAll('T', ' ').replaceAll('Z', '')}'
-                          ' · 20 min',
+                          '${row['candidate_department'] ?? ''} · ${(row['starts_at'] ?? '').toString().replaceAll('T', ' ').replaceAll('Z', '')} · ${row['mode'] == 'online'
+                              ? 'En ligne'
+                              : row['mode'] == 'hybrid'
+                              ? 'Mixte'
+                              : 'Présentiel'}',
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -287,6 +295,30 @@ class _RecruitmentInterviewPreparationState
                         ),
                       ],
                     ),
+                  ),
+                ),
+              if (pageCount > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        tooltip: 'Page précédente',
+                        onPressed: currentPage == 0
+                            ? null
+                            : () => setState(() => _page = currentPage - 1),
+                        icon: const Icon(Icons.chevron_left),
+                      ),
+                      Text('Page ${currentPage + 1} / $pageCount'),
+                      IconButton(
+                        tooltip: 'Page suivante',
+                        onPressed: currentPage + 1 >= pageCount
+                            ? null
+                            : () => setState(() => _page = currentPage + 1),
+                        icon: const Icon(Icons.chevron_right),
+                      ),
+                    ],
                   ),
                 ),
             ],
