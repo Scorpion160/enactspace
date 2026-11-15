@@ -6,7 +6,7 @@ import '../../../../core/auth/auth_service.dart';
 /// One editable availability window. Different days may have different hours.
 class _AvailabilityEntry {
   _AvailabilityEntry({
-    this.day = 'weekday:0',
+    this.day = '',
     String start = '19:00',
     String end = '21:00',
     String date = '',
@@ -348,7 +348,7 @@ class _RecruitmentJuryPolicyPanelState
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
                                     key: ValueKey(entry),
-                                    initialValue: entry.day,
+                                    initialValue: entry.day.isEmpty ? null : entry.day,
                                     isExpanded: true,
                                     decoration: const InputDecoration(
                                       labelText: 'Jour',
