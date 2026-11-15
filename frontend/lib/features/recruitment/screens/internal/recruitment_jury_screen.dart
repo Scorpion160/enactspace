@@ -6,11 +6,13 @@ import '../../models/recruitment_campaign_model.dart';
 import '../../services/recruitment_campaign_tools.dart';
 import '../../services/recruitment_message.dart';
 import '../../widgets/internal/jury_teams_section.dart';
+import '../../widgets/internal/recruitment_interview_preparation.dart';
 import '../../widgets/internal/recruitment_viewers_section.dart';
 
 class RecruitmentJuryScreen extends StatefulWidget {
   final ValueChanged<RecruitmentSection>? onSectionSelected;
   final bool canManageCampaigns;
+  final bool enableInterviewPreparation;
   final RecruitmentCampaignTools tools;
   final List<RecruitmentCampaignModel> campaigns;
   final String? initialCampaignId;
@@ -23,6 +25,7 @@ class RecruitmentJuryScreen extends StatefulWidget {
     this.onOpenApplication,
     this.onSectionSelected,
     this.canManageCampaigns = true,
+    this.enableInterviewPreparation = true,
   });
   @override
   State<RecruitmentJuryScreen> createState() => _RecruitmentJuryScreenState();
@@ -441,6 +444,16 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                   );
                 },
               ),
+              if (widget.enableInterviewPreparation &&
+                  _campaign != null &&
+                  _roster != null) ...[
+                const SizedBox(height: 20),
+                RecruitmentInterviewPreparation(
+                  key: ValueKey('interview-drafts-$_campaign'),
+                  campaignId: _campaign!,
+                  onOpenApplication: widget.onOpenApplication,
+                ),
+              ],
               if (canManage && _campaign != null) ...[
                 const SizedBox(height: 20),
                 RecruitmentViewersSection(

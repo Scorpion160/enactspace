@@ -375,6 +375,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: RecruitmentJuryScreen(
+            enableInterviewPreparation: false,
             tools: tools,
             campaigns: const [
               RecruitmentCampaignModel(

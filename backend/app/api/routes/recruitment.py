@@ -2087,3 +2087,6 @@ def convert_application_to_user(
 # Register on this same router so embedded test/demo apps receive the same routes.
 from app.api.routes.recruitment_extensions import register_recruitment_extensions
 register_recruitment_extensions(router)
+
+from app.services.recruitment_interview_drafts import register_interview_drafts
+register_interview_drafts(router)
