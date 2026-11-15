@@ -134,7 +134,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261107_0038 (head)"
+          test "$output" = "20261115_0039 (head)"
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
