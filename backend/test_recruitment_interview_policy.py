@@ -1,9 +1,17 @@
 """Campaign-specific interview rules and availability, no notification operations."""
 import unittest
 from datetime import datetime,timedelta
+from uuid import uuid4
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+from fastapi import HTTPException
+from app.models.recruitment import RecruitmentJuryMember
+from app.models.recruitment_interview_drafts import RecruitmentInterviewDraft
+from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
+from app.models.user import User
 from pydantic import ValidationError
 from app.services.recruitment_interview_policy import (
-    PolicySave, AvailabilitySave, fetch_policy, within_windows, juror_available, DEFAULT_WINDOWS,
+    PolicySave, AvailabilitySave, fetch_policy, within_windows, juror_available, register_interview_policy, DEFAULT_WINDOWS,
 )
 
 class RecruitmentInterviewPolicyTests(unittest.TestCase):
@@ -58,6 +66,48 @@ class RecruitmentInterviewPolicyTests(unittest.TestCase):
         self.assertTrue(juror_available(windows,midday,midday+timedelta(minutes=20)))
         next_tuesday=start+timedelta(days=7)
         self.assertTrue(juror_available(windows,next_tuesday,next_tuesday+timedelta(minutes=20)))
+
+    def test_updating_availability_cannot_break_saved_interview_draft(self):
+        routes = {}
+        class Router:
+            def get(self, path):
+                return lambda fn: fn
+            def put(self, path):
+                def decorator(fn):
+                    routes[path] = fn
+                    return fn
+                return decorator
+        register_interview_policy(Router())
+        cid, uid, mid = uuid4(), uuid4(), uuid4()
+        db = MagicMock()
+        user = SimpleNamespace(is_active=True, status="active")
+        db.get.side_effect = lambda model, key: (
+            user if model is User else None
+        )
+        qmember, qdraft = MagicMock(), MagicMock()
+        db.query.side_effect = [qmember, qdraft]
+        qmember.filter.return_value.first.return_value = SimpleNamespace(id=mid)
+        start = datetime(2026, 11, 17, 19, 0)
+        qdraft.filter.return_value.all.return_value = [
+            SimpleNamespace(
+                jury_member_ids=[str(mid)],
+                starts_at=start,
+                ends_at=start + timedelta(minutes=20),
+            )
+        ]
+        payload = AvailabilitySave.model_validate({
+            "windows": [{"weekday":0, "start":"19:00", "end":"21:00"}]
+        })
+        with patch("app.services.recruitment_interview_policy.can_manage"), patch(
+            "app.services.recruitment_interview_policy.lock_row"
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                routes["/campaigns/{campaign_id}/jury/availability/{user_id}"](
+                    cid, uid, payload, db=db, actor=SimpleNamespace(id=uuid4())
+                )
+        self.assertEqual(caught.exception.status_code, 409)
+        db.add.assert_not_called()
+        db.commit.assert_not_called()
 
     def test_weekday_availability_without_campaign_specific_dates(self):
         saved=AvailabilitySave.model_validate({
