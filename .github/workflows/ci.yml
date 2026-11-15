@@ -19,6 +19,7 @@ on:
       - fix/chat-scroll-and-payment-hardening-20261111
       - integration/consolidated-20261113
       - feature/safe-maintenance-20261114
+      - feature/recruitment-shortlist-20261115
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
