@@ -356,7 +356,7 @@ class _RecruitmentJuryPolicyPanelState
                                     items: [
                                       for (var i = 0; i < names.length; i++)
                                         DropdownMenuItem(
-                                          value: 'weekday:${i}',
+                                          value: 'weekday:$i',
                                           child: Text(names[i]),
                                         ),
                                       const DropdownMenuItem(
