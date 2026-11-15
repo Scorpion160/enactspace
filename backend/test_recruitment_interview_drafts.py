@@ -41,11 +41,13 @@ class DraftInterviewTests(unittest.TestCase):
     def _db(self):
         db=MagicMock()
         db.get.return_value = None  # No campaign policy row in this fixture.
-        q1,q2,q3=MagicMock(),MagicMock(),MagicMock()
-        db.query.side_effect=[q1,q2,q3]
+        q1,q2,q3,q4=MagicMock(),MagicMock(),MagicMock(),MagicMock()
+        db.query.side_effect=[q1,q2,q3,q4]
         q1.filter.return_value=[self.app]
         q2.join.return_value.filter.return_value=self.jurors
-        q3.join.return_value.join.return_value.filter.return_value.all.return_value=[]
+        db.availability_query=q3
+        q3.filter.return_value.all.return_value=[]
+        q4.join.return_value.join.return_value.filter.return_value.all.return_value=[]
         return db
 
     def test_windows_are_exactly_twenty_minutes(self):
@@ -61,6 +63,37 @@ class DraftInterviewTests(unittest.TestCase):
         self.assertEqual(result,{"valid":True,"count":1,"notifications_to_candidates":0})
         db.add.assert_not_called()
         db.commit.assert_not_called()
+
+    def test_declared_juror_availability_blocks_wrong_weekday(self):
+        db=self._db()
+        db.availability_query.filter.return_value.all.return_value=[
+            SimpleNamespace(
+                user_id=self.jurors[0][1].id,
+                windows=[{"weekday":0,"start":"19:00","end":"21:00"}],
+            )
+        ]
+        with self.assertRaises(HTTPException) as caught:
+            validate_drafts(db,self.campaign,[self.payload])
+        self.assertEqual(caught.exception.status_code,409)
+        db.commit.assert_not_called()
+
+    def test_declared_juror_availability_accepts_matching_slot(self):
+        db=self._db()
+        db.availability_query.filter.return_value.all.return_value=[
+            SimpleNamespace(
+                user_id=self.jurors[0][1].id,
+                windows=[{"weekday":1,"start":"18:00","end":"21:00"}],
+            )
+        ]
+        self.assertTrue(validate_drafts(db,self.campaign,[self.payload])["valid"])
+
+    def test_explicit_empty_availability_rejects_assignment(self):
+        db=self._db()
+        db.availability_query.filter.return_value.all.return_value=[
+            SimpleNamespace(user_id=self.jurors[0][1].id,windows=[])
+        ]
+        with self.assertRaises(HTTPException):
+            validate_drafts(db,self.campaign,[self.payload])
 
     def test_three_distinct_departments_required(self):
         db=self._db()
