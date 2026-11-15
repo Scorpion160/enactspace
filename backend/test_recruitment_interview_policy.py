@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime,timedelta
 from pydantic import ValidationError
 from app.services.recruitment_interview_policy import (
-    PolicySave, AvailabilitySave, fetch_policy, within_windows, DEFAULT_WINDOWS,
+    PolicySave, AvailabilitySave, fetch_policy, within_windows, juror_available, DEFAULT_WINDOWS,
 )
 
 class RecruitmentInterviewPolicyTests(unittest.TestCase):
@@ -36,6 +36,28 @@ class RecruitmentInterviewPolicyTests(unittest.TestCase):
                                  {"start":"13:30","end":"15:00"}],
                 "default_mode":"in_person",
             })
+
+    def test_availability_on_recurring_weekday(self):
+        start=datetime(2026,11,17,19,0)  # Tuesday, Dakar local
+        end=start+timedelta(minutes=20)
+        windows=[{"weekday":1,"start":"18:00","end":"21:00"}]
+        self.assertTrue(juror_available(windows,start,end))
+        self.assertFalse(juror_available(windows,start-timedelta(days=1),end-timedelta(days=1)))
+        self.assertFalse(juror_available(windows,start+timedelta(hours=2),end+timedelta(hours=2)))
+        self.assertFalse(juror_available([],start,end))
+
+    def test_specific_date_replaces_recurring_weekday(self):
+        start=datetime(2026,11,17,19,0)
+        end=start+timedelta(minutes=20)
+        windows=[
+            {"weekday":1,"start":"19:00","end":"21:00"},
+            {"date":"2026-11-17","start":"12:30","end":"13:30"},
+        ]
+        self.assertFalse(juror_available(windows,start,end))
+        midday=datetime(2026,11,17,12,30)
+        self.assertTrue(juror_available(windows,midday,midday+timedelta(minutes=20)))
+        next_tuesday=start+timedelta(days=7)
+        self.assertTrue(juror_available(windows,next_tuesday,next_tuesday+timedelta(minutes=20)))
 
     def test_weekday_availability_without_campaign_specific_dates(self):
         saved=AvailabilitySave.model_validate({
