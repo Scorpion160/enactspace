@@ -4,6 +4,7 @@ import '../../models/application_model.dart';
 import '../../services/recruitment_message.dart';
 import '../../services/recruitment_selection_api.dart';
 import 'recruitment_comparison_panel.dart';
+import 'recruitment_shortlist_panel.dart';
 import '../../models/recruitment_schedule_model.dart';
 import '../recruitment_schedule.dart';
 
@@ -173,14 +174,22 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
   Future<void> _publish() async {
     final report = _report;
     if (report == null) return;
-    final count = (report['rows'] as List? ?? const []).length;
+    final rows = (report['rows'] as List? ?? const [])
+        .whereType<Map>()
+        .toList();
+    final count = rows.length;
+    final isScreening = report['stage'] == 'screening';
+    final shortlisted = rows
+        .where((row) => row['decision'] == 'shortlisted')
+        .length;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Publier les résultats de ce lot ?'),
+        title: const Text('Publier et communiquer les résultats ?'),
         content: Text(
-          '$count candidat(s) pourront consulter leur résultat dès cette publication. '
-          'Leurs mails seront préparés ensemble. Relis les décisions avant de confirmer.',
+          '$count candidats pourront consulter leur résultat dès la publication. $count e-mails de résultat seront mis en file d’envoi immédiatement. ${isScreening ? 'Les $shortlisted candidats présélectionnés recevront aussi '
+                    'une invitation au questionnaire obligatoire, sauf si elle '
+                    'a déjà été créée. ' : ''}Cette opération ne programme aucun entretien. Vérifie les décisions et les adresses avant de confirmer.',
         ),
         actions: [
           TextButton(
@@ -352,6 +361,13 @@ class _RecruitmentSelectionPanelState extends State<RecruitmentSelectionPanel> {
               ),
             ),
             const SizedBox(height: 18),
+            RecruitmentShortlistPanel(
+              campaignId: widget.campaignId,
+              refreshToken: widget.refreshToken,
+              onOpen: widget.onOpenApplication,
+              api: widget.api,
+            ),
+            const SizedBox(height: 12),
             RecruitmentComparisonPanel(
               key: ValueKey('comparison-${widget.campaignId}'),
               rows: rows,
