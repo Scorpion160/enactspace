@@ -30,7 +30,7 @@ class RecruitmentInterviewBoard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const RecruitmentNotice(
-          'Les horaires sont affichés à Dakar. Ouvre un dossier pour planifier ou modifier le créneau, l’équipe et le format, selon tes droits.',
+          'Les horaires confirmés sont affichés à l’heure de Dakar. Les entretiens en préparation restent internes jusqu’à leur validation.',
         ),
         if (pending.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -56,7 +56,7 @@ class RecruitmentInterviewBoard extends StatelessWidget {
         ],
         const SizedBox(height: 20),
         Text(
-          'Planning des entretiens',
+          'Entretiens officiellement programmés',
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -67,7 +67,7 @@ class RecruitmentInterviewBoard extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.all(24),
               child: Text(
-                'Aucun entretien daté pour les filtres sélectionnés. Les dossiers restent accessibles depuis Candidatures.',
+                'Aucun entretien encore confirmé pour les filtres sélectionnés.',
               ),
             ),
           ),
