@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.services.recruitment_interview_drafts import (
     DraftAppointment, _slot_ok, validate_drafts,
-    register_interview_drafts,
+    juror_availability_readiness, register_interview_drafts,
 )
 
 
@@ -94,6 +94,71 @@ class DraftInterviewTests(unittest.TestCase):
         ]
         with self.assertRaises(HTTPException):
             validate_drafts(db,self.campaign,[self.payload])
+
+    def _readiness_db(self, availability):
+        db = MagicMock()
+        qs = [MagicMock(), MagicMock(), MagicMock()]
+        db.query.side_effect = qs
+        qs[0].filter.return_value.all.return_value = [
+            SimpleNamespace(
+                jury_member_ids=[str(m.id) for m, _ in self.jurors],
+                starts_at=self.start,
+                ends_at=self.end,
+            )
+        ]
+        qs[1].join.return_value.filter.return_value.all.return_value = self.jurors
+        qs[2].filter.return_value.all.return_value = availability
+        return db
+
+    def test_readiness_flags_unrecorded_juror_availability(self):
+        db = self._readiness_db([])
+        result = juror_availability_readiness(db, self.cid)
+        self.assertEqual(result, {
+            "assigned": 3, "confirmed": 0,
+            "to_confirm": 3, "ready": False,
+        })
+        db.commit.assert_not_called()
+
+    def test_readiness_checks_all_slots_for_recorded_jurors(self):
+        available = [
+            SimpleNamespace(
+                user_id=user.id,
+                windows=[{"weekday": 1, "start": "18:00", "end": "21:00"}],
+            )
+            for _, user in self.jurors[:2]
+        ]
+        self.assertEqual(
+            juror_availability_readiness(
+                self._readiness_db(available), self.cid
+            )["to_confirm"], 1,
+        )
+        _, last_user = self.jurors[2]
+        available.append(SimpleNamespace(
+            user_id=last_user.id,
+            windows=[{"weekday": 1, "start": "19:00", "end": "21:00"}],
+        ))
+        result = juror_availability_readiness(
+            self._readiness_db(available), self.cid
+        )
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["confirmed"], 3)
+
+    def test_readiness_rejects_inactive_juror_account(self):
+        for _, user in self.jurors:
+            user.email_verified = True
+        self.jurors[0][1].is_active = False
+        available = [
+            SimpleNamespace(
+                user_id=user.id,
+                windows=[{"weekday": 1, "start": "18:00", "end": "21:00"}],
+            )
+            for _, user in self.jurors
+        ]
+        result = juror_availability_readiness(
+            self._readiness_db(available), self.cid
+        )
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["to_confirm"], 1)
 
     def test_three_distinct_departments_required(self):
         db=self._db()
