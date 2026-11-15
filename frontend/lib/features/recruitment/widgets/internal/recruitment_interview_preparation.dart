@@ -194,7 +194,9 @@ class _RecruitmentInterviewPreparationState
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Mes entretiens à préparer',
+                    _canManage
+                        ? 'Entretiens en préparation'
+                        : 'Mes entretiens à préparer',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -304,7 +306,7 @@ class _RecruitmentInterviewPreparationState
                                   row['application_id'].toString(),
                                 ),
                                 icon: const Icon(Icons.folder_open_outlined),
-                                label: const Text('Consulter le dossier'),
+                                label: const Text('Dossier et réponses'),
                               ),
                             if ((row['jury'] as List? ?? const [])
                                 .whereType<Map>()
