@@ -1,5 +1,5 @@
 """Campaign-scoped reusable recruitment scheduling rules. Nothing is mailed."""
-from datetime import datetime, date, time
+from datetime import datetime, date as CalendarDate, time
 from uuid import UUID
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -41,7 +41,7 @@ class PolicySave(BaseModel):
 
 class AvailabilityWindow(DailyWindow):
     weekday: int | None = Field(default=None,ge=0,le=6)
-    date: date | None = None
+    date: CalendarDate | None = None
     @model_validator(mode="after")
     def require_day(self):
         if (self.weekday is None)==(self.date is None):
