@@ -442,7 +442,7 @@ class _RecruitmentJuryPolicyPanelState
                 child: const Text('Annuler'),
               ),
               FilledButton(
-                onPressed: saving
+                onPressed: saving || (previous == null && entries.isEmpty)
                     ? null
                     : () async {
                         update(() {
