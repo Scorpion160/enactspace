@@ -46,6 +46,7 @@ from app.models.chat import (
     ChatPollOption,
     ChatPollVote,
 )
+from app.models.recruitment_interview_drafts import (RecruitmentInterviewDraft, RecruitmentInterviewPrepNote)
 from app.models.recruitment import (
     RecruitmentCampaign,
     Application,

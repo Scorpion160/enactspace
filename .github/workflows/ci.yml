@@ -21,6 +21,7 @@ on:
       - feature/safe-maintenance-20261114
       - feature/recruitment-shortlist-20261115
       - feature/interview-jury-departments-20261115
+      - feature/recruitment-interview-drafts-20261115
       - feat/product-readiness-v1
       - feat/institutional-documents-v1
       - feat/institutional-pdf-generation-v1
@@ -269,8 +270,8 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          assert str(checks['web_version']['public_fields']['build_number']) == '44'
-          assert checks['web_main']['sha256'] == 'e54c4afab4a16558151000015905d1761ea97dfa7b4de66473d6cf547c26f28a'
+          assert str(checks['web_version']['public_fields']['build_number']) == '45'
+          assert checks['web_main']['sha256'] == '53a2ad71a06dfaa2c25c4f36fbbb29a614d501c644d2602da3b0c00246f224ac'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -282,14 +283,14 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 e54c4afab4a16558151000015905d1761ea97dfa7b4de66473d6cf547c26f28a
+          --live-main-sha256 53a2ad71a06dfaa2c25c4f36fbbb29a614d501c644d2602da3b0c00246f224ac
           --live-version 1.0.30
-          --live-build 44
+          --live-build 45
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: enactspace-web-1.0.30-build45-PREFLIGHT-ONLY-${{ github.run_id }}
+          name: enactspace-web-1.0.30-build46-PREFLIGHT-ONLY-${{ github.run_id }}
           path: frontend/build/release-candidate/*
           if-no-files-found: error
           retention-days: 7
