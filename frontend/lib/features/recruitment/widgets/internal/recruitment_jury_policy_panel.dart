@@ -3,6 +3,38 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
 
 /// Settings belong to the selected campaign. Editing never contacts candidates.
+/// One editable availability window. Different days may have different hours.
+class _AvailabilityEntry {
+  _AvailabilityEntry({
+    this.day = 'weekday:0',
+    String start = '19:00',
+    String end = '21:00',
+    String date = '',
+  }) : start = TextEditingController(text: start),
+       end = TextEditingController(text: end),
+       date = TextEditingController(text: date);
+
+  String day;
+  final TextEditingController start;
+  final TextEditingController end;
+  final TextEditingController date;
+
+  Map<String, dynamic> toJson() => {
+    if (day == 'date')
+      'date': date.text.trim()
+    else
+      'weekday': int.parse(day.substring('weekday:'.length)),
+    'start': start.text.trim(),
+    'end': end.text.trim(),
+  };
+
+  void dispose() {
+    start.dispose();
+    end.dispose();
+    date.dispose();
+  }
+}
+
 class RecruitmentJuryPolicyPanel extends StatefulWidget {
   const RecruitmentJuryPolicyPanel({
     super.key,
@@ -237,7 +269,7 @@ class _RecruitmentJuryPolicyPanelState
                               'default_location': venue.text.trim().isEmpty
                                   ? null
                                   : venue.text.trim(),
-                              'respect_candidate_availability': false,
+                              'respect_candidate_availability': policy['respect_candidate_availability'] == true,
                             },
                           );
                           if (dialog.mounted) Navigator.pop(dialog);
@@ -266,20 +298,32 @@ class _RecruitmentJuryPolicyPanelState
     final previous = _availability
         .where((a) => a['user_id'].toString() == person['user_id'].toString())
         .firstOrNull;
-    final days = <int>{};
     final rows = (previous?['windows'] as List? ?? const [])
         .whereType<Map>()
         .toList();
-    for (final row in rows) {
-      if (row['weekday'] is int) days.add(row['weekday'] as int);
-    }
-    final start = TextEditingController(
-      text: rows.isEmpty ? '19:00' : rows.first['start'].toString(),
-    );
-    final end = TextEditingController(
-      text: rows.isEmpty ? '21:00' : rows.first['end'].toString(),
-    );
-    const labels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    final entries = <_AvailabilityEntry>[
+      for (final row in rows)
+        _AvailabilityEntry(
+          day: row['weekday'] is int
+              ? 'weekday:${row['weekday']}'
+              : 'date',
+          start: row['start']?.toString() ?? '19:00',
+          end: row['end']?.toString() ?? '21:00',
+          date: row['date']?.toString() ?? '',
+        ),
+    ];
+    final retired = <_AvailabilityEntry>[];
+    const names = [
+      'Lundi',
+      'Mardi',
+      'Mercredi',
+      'Jeudi',
+      'Vendredi',
+      'Samedi',
+      'Dimanche',
+    ];
+    var saving = false;
+    String? error;
     try {
       await showDialog<void>(
         context: context,
@@ -288,80 +332,142 @@ class _RecruitmentJuryPolicyPanelState
             title: Text('Disponibilités · ${person['name']}'),
             content: SizedBox(
               width: 460,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      for (var i = 0; i < 7; i++)
-                        FilterChip(
-                          label: Text(labels[i]),
-                          selected: days.contains(i),
-                          onSelected: (yes) =>
-                              update(() => yes ? days.add(i) : days.remove(i)),
-                        ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: start,
-                          decoration: const InputDecoration(
-                            labelText: 'Début (HH:MM)',
-                          ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final entry in entries)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    key: ValueKey(entry),
+                                    initialValue: entry.day,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Jour',
+                                    ),
+                                    items: [
+                                      for (var i = 0; i < names.length; i++)
+                                        DropdownMenuItem(
+                                          value: 'weekday:${i}',
+                                          child: Text(names[i]),
+                                        ),
+                                      const DropdownMenuItem(
+                                        value: 'date',
+                                        child: Text('Date précise'),
+                                      ),
+                                    ],
+                                    onChanged: saving
+                                        ? null
+                                        : (value) => update(
+                                            () => entry.day = value ?? entry.day,
+                                          ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: saving
+                                      ? null
+                                      : () => update(() {
+                                          entries.remove(entry);
+                                          retired.add(entry);
+                                        }),
+                                  tooltip: 'Supprimer cette plage',
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                ),
+                              ],
+                            ),
+                            if (entry.day == 'date')
+                              TextField(
+                                controller: entry.date,
+                                decoration: const InputDecoration(
+                                  labelText: 'Date (AAAA-MM-JJ)',
+                                ),
+                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: entry.start,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Début (HH:MM)',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: entry.end,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Fin (HH:MM)',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: end,
-                          decoration: const InputDecoration(
-                            labelText: 'Fin (HH:MM)',
-                          ),
+                    TextButton.icon(
+                      onPressed: saving || entries.length >= 30
+                          ? null
+                          : () => update(
+                              () => entries.add(_AvailabilityEntry()),
+                            ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Ajouter une plage'),
+                    ),
+                    if (entries.isEmpty)
+                      const Text('Aucune disponibilité enregistrée.'),
+                    if (error != null)
+                      Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialog),
+                onPressed: saving ? null : () => Navigator.pop(dialog),
                 child: const Text('Annuler'),
               ),
               FilledButton(
-                onPressed: () async {
-                  try {
-                    await _api.putJson(
-                      '$_base/jury/availability/${person['user_id']}',
-                      token: await _token(),
-                      data: {
-                        'windows': [
-                          for (final day in days.toList()..sort())
-                            {
-                              'weekday': day,
-                              'start': start.text.trim(),
-                              'end': end.text.trim(),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        update(() {
+                          saving = true;
+                          error = null;
+                        });
+                        try {
+                          await _api.putJson(
+                            '$_base/jury/availability/${person['user_id']}',
+                            token: await _token(),
+                            data: {
+                              'windows': [for (final entry in entries) entry.toJson()],
                             },
-                        ],
+                          );
+                          if (dialog.mounted) Navigator.pop(dialog);
+                          await _load();
+                        } catch (_) {
+                          if (dialog.mounted) {
+                            update(() {
+                              saving = false;
+                              error = 'Vérifie les jours, dates et horaires.';
+                            });
+                          }
+                        }
                       },
-                    );
-                    if (dialog.mounted) Navigator.pop(dialog);
-                    await _load();
-                  } catch (_) {
-                    if (dialog.mounted) {
-                      ScaffoldMessenger.of(dialog).showSnackBar(
-                        const SnackBar(
-                          content: Text('Vérifie les disponibilités.'),
-                        ),
-                      );
-                    }
-                  }
-                },
                 child: const Text('Enregistrer'),
               ),
             ],
@@ -369,8 +475,9 @@ class _RecruitmentJuryPolicyPanelState
         ),
       );
     } finally {
-      start.dispose();
-      end.dispose();
+      for (final entry in [...entries, ...retired]) {
+        entry.dispose();
+      }
     }
   }
 
