@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - integration/consolidated-20261113
       - feature/interface-coherence-20261107
       - feature/recruitment-decision-workspace-20261110
       - integration/recruitment-production-parity-20261110
@@ -17,6 +18,7 @@ on:
       - feature/recruitment-decision-workspace-20261110
       - integration/recruitment-production-parity-20261110
       - fix/chat-scroll-and-payment-hardening-20261111
+      - fix/release-ci-live-baseline-20261115
       - integration/consolidated-20261113
       - feature/safe-maintenance-20261114
       - feature/recruitment-shortlist-20261115
@@ -271,8 +273,10 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          assert str(checks['web_version']['public_fields']['build_number']) == '46'
-          assert checks['web_main']['sha256'] == 'f25f475544ef811aa754b6eabaa212e06e7212bca9f8db3a8a144f396121770f'
+          # Verified public release 1.0.30+47 (15 November 2026).
+          # Refresh this baseline only after checking the actual deployed assets.
+          assert str(checks['web_version']['public_fields']['build_number']) == '47'
+          assert checks['web_main']['sha256'] == '971b79ddf0d26accc404863338417df1c9610c36e8d545a4795a8fae80762b5c'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -284,9 +288,9 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 f25f475544ef811aa754b6eabaa212e06e7212bca9f8db3a8a144f396121770f
+          --live-main-sha256 971b79ddf0d26accc404863338417df1c9610c36e8d545a4795a8fae80762b5c
           --live-version 1.0.30
-          --live-build 46
+          --live-build 47
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
