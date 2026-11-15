@@ -45,6 +45,7 @@ class DraftInterviewTests(unittest.TestCase):
         db.query.side_effect=[q1,q2,q3,q4]
         q1.filter.return_value=[self.app]
         q2.join.return_value.filter.return_value=self.jurors
+        db.availability_query=q3
         q3.filter.return_value.all.return_value=[]
         q4.join.return_value.join.return_value.filter.return_value.all.return_value=[]
         return db
@@ -65,7 +66,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def test_declared_juror_availability_blocks_wrong_weekday(self):
         db=self._db()
-        db.query.side_effect[2].filter.return_value.all.return_value=[
+        db.availability_query.filter.return_value.all.return_value=[
             SimpleNamespace(
                 user_id=self.jurors[0][1].id,
                 windows=[{"weekday":0,"start":"19:00","end":"21:00"}],
@@ -78,7 +79,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def test_declared_juror_availability_accepts_matching_slot(self):
         db=self._db()
-        db.query.side_effect[2].filter.return_value.all.return_value=[
+        db.availability_query.filter.return_value.all.return_value=[
             SimpleNamespace(
                 user_id=self.jurors[0][1].id,
                 windows=[{"weekday":1,"start":"18:00","end":"21:00"}],
@@ -88,7 +89,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def test_explicit_empty_availability_rejects_assignment(self):
         db=self._db()
-        db.query.side_effect[2].filter.return_value.all.return_value=[
+        db.availability_query.filter.return_value.all.return_value=[
             SimpleNamespace(user_id=self.jurors[0][1].id,windows=[])
         ]
         with self.assertRaises(HTTPException):
