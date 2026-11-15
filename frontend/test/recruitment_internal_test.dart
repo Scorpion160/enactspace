@@ -515,6 +515,33 @@ void main() {
   );
 
   testWidgets(
+    'le filtre des retenus ne duplique pas un statut technique homonyme',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeGateway(
+          applications: () async => [
+            _application(
+              index: 1,
+              status: 'shortlisted',
+              screeningDecision: 'shortlisted',
+            ),
+            _application(index: 2, status: 'submitted'),
+          ],
+        ),
+      );
+      await tester.tap(find.byKey(const Key('internal-status-all')));
+      await tester.pumpAndSettle();
+      expect(find.text('Retenus pour entretien'), findsOneWidget);
+      await tester.tap(find.text('Retenus pour entretien'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1 dossier(s) affiché(s)'), findsOneWidget);
+      expect(find.textContaining('Candidate 1'), findsWidgets);
+      expect(find.textContaining('Candidate 2'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'un statut technique conserve sa signification après la présélection',
     (tester) async {
       await _pump(
