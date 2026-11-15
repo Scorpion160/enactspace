@@ -12,6 +12,7 @@ from app.models.recruitment import RecruitmentCampaign, RecruitmentJuryMember
 from app.models.recruitment_interview_policy import RecruitmentInterviewPolicy, RecruitmentJuryAvailability
 from app.services.recruitment_access import can_manage_jury, require_campaign_access
 from app.services.audit_service import create_audit_log
+from app.services.operational_integrity import lock_row
 
 DEFAULT_WINDOWS = [{"start":"12:30","end":"14:00"},{"start":"19:00","end":"21:00"}]
 
@@ -115,6 +116,7 @@ def register_interview_policy(router):
     def save_policy(campaign_id:UUID,payload:PolicySave,db:Session=Depends(get_db),
                     actor:User=Depends(require_recruitment_access)):
         can_manage(db,campaign_id,actor)
+        lock_row(db,RecruitmentCampaign,campaign_id)
         row=db.get(RecruitmentInterviewPolicy,campaign_id)
         if row is None:
             row=RecruitmentInterviewPolicy(campaign_id=campaign_id)
@@ -156,6 +158,7 @@ def register_interview_policy(router):
     def save_availability(campaign_id:UUID,user_id:UUID,payload:AvailabilitySave,
                           db:Session=Depends(get_db),actor:User=Depends(require_recruitment_access)):
         can_manage(db,campaign_id,actor)
+        lock_row(db,RecruitmentCampaign,campaign_id)
         user=db.get(User,user_id)
         if not user or not user.is_active or user.status not in {"active","alumni"}:
             raise HTTPException(409,"Ce compte n'est pas actif.")
