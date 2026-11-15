@@ -239,12 +239,13 @@ def juror_availability_readiness(db, campaign_id):
     if not total:
         return {"assigned": 0, "confirmed": 0, "to_confirm": 0, "ready": False}
     members = {
-        str(row.id): row for row in db.query(RecruitmentJuryMember).filter(
-            RecruitmentJuryMember.campaign_id == campaign_id,
-        ).all()
+        str(member.id): (member, user)
+        for member, user in db.query(RecruitmentJuryMember, User).join(
+            User, User.id == RecruitmentJuryMember.user_id
+        ).filter(RecruitmentJuryMember.campaign_id == campaign_id).all()
     }
     user_ids = {
-        members[mid].user_id for mid in slots if mid in members
+        members[mid][0].user_id for mid in slots if mid in members
     }
     availabilities = {
         row.user_id: row.windows for row in db.query(
@@ -257,10 +258,11 @@ def juror_availability_readiness(db, campaign_id):
     confirmed = sum(
         1 for member_id, appointments in slots.items()
         if member_id in members
-        and members[member_id].is_active
-        and members[member_id].user_id in availabilities
+        and members[member_id][0].is_active
+        and eligible_juror(members[member_id][1])
+        and members[member_id][0].user_id in availabilities
         and all(juror_available(
-            availabilities[members[member_id].user_id], start, end
+            availabilities[members[member_id][0].user_id], start, end
         ) for start, end in appointments)
     )
     return {
