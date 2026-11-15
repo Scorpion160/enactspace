@@ -106,9 +106,7 @@ class DraftInterviewTests(unittest.TestCase):
                 ends_at=self.end,
             )
         ]
-        qs[1].filter.return_value.all.return_value = [
-            m for m, _ in self.jurors
-        ]
+        qs[1].join.return_value.filter.return_value.all.return_value = self.jurors
         qs[2].filter.return_value.all.return_value = availability
         return db
 
@@ -144,6 +142,23 @@ class DraftInterviewTests(unittest.TestCase):
         )
         self.assertTrue(result["ready"])
         self.assertEqual(result["confirmed"], 3)
+
+    def test_readiness_rejects_inactive_juror_account(self):
+        for _, user in self.jurors:
+            user.email_verified = True
+        self.jurors[0][1].is_active = False
+        available = [
+            SimpleNamespace(
+                user_id=user.id,
+                windows=[{"weekday": 1, "start": "18:00", "end": "21:00"}],
+            )
+            for _, user in self.jurors
+        ]
+        result = juror_availability_readiness(
+            self._readiness_db(available), self.cid
+        )
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["to_confirm"], 1)
 
     def test_three_distinct_departments_required(self):
         db=self._db()
