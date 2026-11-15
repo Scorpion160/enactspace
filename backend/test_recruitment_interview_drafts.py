@@ -40,6 +40,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def _db(self):
         db=MagicMock()
+        db.get.return_value = None  # No campaign policy row in this fixture.
         q1,q2,q3=MagicMock(),MagicMock(),MagicMock()
         db.query.side_effect=[q1,q2,q3]
         q1.filter.return_value=[self.app]
