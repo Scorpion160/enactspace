@@ -68,7 +68,7 @@ from app.services.recruitment_selection import (
     require_application_access, require_review_assignment,
     redact_candidate_text, public_selection_state, reviewed_summary,
     distribute_assignments, can_review_application, valid_reviews_query,
-    required_reviews,
+    required_reviews, collective_decisions, is_collectively_resolved,
 )
 from app.services.recruitment_eligibility import eligibility_error
 
@@ -112,7 +112,7 @@ def recruitment_statistics(
                 for row in rows
             ) if overview['stage'] == 'screening' else 0,
             'decisions_prepared': sum(row['decision'] is not None for row in rows),
-            'additional_reviews': sum(max(0, row['required_reviews'] - row['review_count']) for row in rows),
+            'additional_reviews': sum(max(0, row['required_reviews'] - row['review_count']) for row in rows if not row['ready']),
             'minimum_reviews': overview['minimum_reviews'],
             'disagreement_threshold': overview['disagreement_threshold'],
             'screening_published': overview['screening_published_at'] is not None,
@@ -1032,7 +1032,11 @@ def application_payload(
                 # Campaign-specific thresholds, not hard-coded frontend rules.
                 needed = required_reviews(campaign, summary)
                 data["selection_required_reviews"] = needed
-                data["selection_ready"] = summary["screening_review_count"] >= needed
+                done = summary["screening_review_count"] >= needed
+                if not done and current_user is not None and can_manage_jury(db, current_user):
+                    recorded = collective_decisions(db, campaign.id, [application.id]).get(str(application.id), {})
+                    done = is_collectively_resolved(campaign, application, stage_reviews, summary, needed, recorded)
+                data["selection_ready"] = done
             data["final_score"] = _review_score(stage_reviews, summary)
         data["screening_rubric"] = rubric_payload(version)
         own_review = next((review for review in stage_reviews if review.reviewer_id == current_user.id), None)
