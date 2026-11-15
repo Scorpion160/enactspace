@@ -489,6 +489,74 @@ def selection_overview(db, campaign):
     }
 
 
+def screening_shortlist_rows(applications, reviews, campaign):
+    """All shortlisted candidates ordered by actual jury mean on /20.
+
+    The ranking is a read-only snapshot of screening scores, including after
+    the application moves to the interview stage. Identity remains blind until
+    formal publication *and* the separate identity-reveal step.
+    """
+    grouped = {}
+    for review in reviews:
+        if review.stage == "screening":
+            grouped.setdefault(review.application_id, []).append(review)
+    show_names = bool(campaign.screening_published_at and campaign.identities_revealed_at)
+    rows = []
+    for application in applications:
+        if application.screening_decision != "shortlisted" or application.status == "cancelled":
+            continue
+        assessments = grouped.get(application.id, [])
+        summary = reviewed_summary(assessments, campaign, "screening")
+        notes = [float(review.score) for review in assessments if review.score is not None]
+        rubric = summary["screening_score"]
+        average = (
+            round(sum(notes) / len(notes), 4) if notes else
+            round(float(rubric) / 5, 4) if rubric is not None else None
+        )
+        rows.append({
+            "application_id": str(application.id),
+            "anonymous_code": anonymous_code(application),
+            "candidate_name": (
+                f"{application.first_name} {application.last_name}".strip()
+                if show_names else None
+            ),
+            "department": application.department,
+            "study_level": application.study_level,
+            "jury_average_20": average,
+            "review_count": summary["screening_review_count"],
+            "jury_score_source": "jury_notes" if notes else ("rubric" if rubric is not None else None),
+            "interview_scheduled": application.status == "interview_scheduled",
+        })
+    rows.sort(key=lambda row: (
+        row["jury_average_20"] is None,
+        -(row["jury_average_20"] or 0),
+        row["anonymous_code"],
+    ))
+    for index, row in enumerate(rows, 1):
+        row["rank"] = index
+    return rows
+
+
+def selection_shortlist(db, campaign):
+    applications = db.query(Application).filter(
+        Application.campaign_id == campaign.id,
+        Application.screening_decision == "shortlisted",
+        Application.status != "cancelled",
+    ).all()
+    reviews = valid_reviews_query(db).join(
+        Application, Application.id == ApplicationReview.application_id
+    ).filter(
+        Application.campaign_id == campaign.id,
+        ApplicationReview.stage == "screening",
+    ).all()
+    return {
+        "campaign_id": str(campaign.id),
+        "screening_published": campaign.screening_published_at is not None,
+        "identities_revealed": bool(campaign.screening_published_at and campaign.identities_revealed_at),
+        "rows": screening_shortlist_rows(applications, reviews, campaign),
+    }
+
+
 def _enqueue_result(db, application, campaign, stage, published_at):
     from app.api.routes.recruitment import ensure_tracking_code
     from app.services.email_delivery_service import enqueue_email_delivery
@@ -528,6 +596,12 @@ def register_recruitment_selection(router):
     def overview(campaign_id: UUID, db=Depends(get_db), user=Depends(require_recruitment_access)):
         campaign = _manager_campaign(db, user, campaign_id)
         return selection_overview(db, campaign)
+
+    @router.get("/campaigns/{campaign_id}/selection/shortlist")
+    def shortlisted_candidates(campaign_id: UUID, db=Depends(get_db),
+                               user=Depends(require_recruitment_access)):
+        campaign = _manager_campaign(db, user, campaign_id)
+        return selection_shortlist(db, campaign)
 
     @router.post("/campaigns/{campaign_id}/selection/assign")
     def assign(campaign_id: UUID, payload: AssignmentSettings, db=Depends(get_db), user=Depends(require_recruitment_access)):

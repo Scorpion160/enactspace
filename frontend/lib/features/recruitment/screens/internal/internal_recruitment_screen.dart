@@ -150,7 +150,8 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
         : '${row.lastName} ${row.firstName}'.toLowerCase();
     final evaluator = _access['can_review_any'] == true;
     final sortMode = _access['can_manage_jury'] == true
-        ? _sortMode : 'reviews_needed';
+        ? _sortMode
+        : 'reviews_needed';
     result.sort((a, b) {
       if (sortMode == 'score_desc' || sortMode == 'score_asc') {
         // Complete assessments must lead the ranking. The backend computes
@@ -418,18 +419,26 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final selectedCampaign = _campaignId == 'all'
         ? 'Toutes les campagnes'
         : _campaignTitle(_campaignId);
-    final selectionCampaign = _campaigns.where((campaign) => campaign.id == _campaignId).firstOrNull;
+    final selectionCampaign = _campaigns
+        .where((campaign) => campaign.id == _campaignId)
+        .firstOrNull;
     final inCampaign = _applications.where(
       (item) => _campaignId == 'all' || item.campaignId == _campaignId,
     );
-    final departmentOptions = inCampaign
-        .map((item) => item.department?.trim() ?? '')
-        .where((value) => value.isNotEmpty)
-        .toSet().toList()..sort();
-    final studyLevelOptions = inCampaign
-        .map((item) => item.studyLevel?.trim() ?? '')
-        .where((value) => value.isNotEmpty)
-        .toSet().toList()..sort();
+    final departmentOptions =
+        inCampaign
+            .map((item) => item.department?.trim() ?? '')
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final studyLevelOptions =
+        inCampaign
+            .map((item) => item.studyLevel?.trim() ?? '')
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     final padding = MediaQuery.sizeOf(context).width < 560 ? 14.0 : 24.0;
     return RefreshIndicator(
       onRefresh: () => _load(initial: false),
@@ -462,8 +471,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               onToggleFilters: () =>
                   setState(() => _filtersExpanded = !_filtersExpanded),
               onManageCampaigns: _openCampaignManagement,
-              onOpenGuide: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => const RecruitmentTeamGuideScreen())),
+              onOpenGuide: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RecruitmentTeamGuideScreen(),
+                ),
+              ),
               canManageCampaigns: _access['can_manage_campaigns'] != false,
             ),
           if (_section == RecruitmentSection.interviews)
@@ -471,9 +483,17 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               title: 'Les entretiens',
               subtitle:
                   'Les créneaux confirmés et les dossiers à replanifier, par campagne.',
-              actions: [IconButton(tooltip: 'Guide équipe', icon: const Icon(Icons.menu_book_outlined),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => const RecruitmentTeamGuideScreen())))],
+              actions: [
+                IconButton(
+                  tooltip: 'Guide équipe',
+                  icon: const Icon(Icons.menu_book_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const RecruitmentTeamGuideScreen(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           const SizedBox(height: 18),
           if (!_loading && _error == null)
@@ -490,19 +510,26 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                   icon: Icons.inbox_outlined,
                 ),
                 (
-                  label: 'À examiner',
+                  label: _access['can_manage_jury'] == true
+                      ? 'Retenus pour entretien'
+                      : 'En cours de sélection',
                   count: _applications
                       .where(
                         (a) =>
                             (_campaignId == 'all' ||
                                 a.campaignId == _campaignId) &&
-                            ['submitted', 'under_review'].contains(a.status),
+                            (_access['can_manage_jury'] == true
+                                ? a.screeningDecision == 'shortlisted'
+                                : [
+                                    'submitted',
+                                    'under_review',
+                                  ].contains(a.status)),
                       )
                       .length,
                   icon: Icons.rate_review_outlined,
                 ),
                 (
-                  label: 'Entretiens prévus',
+                  label: 'Entretiens programmés',
                   count: _applications
                       .where(
                         (a) =>
@@ -514,7 +541,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                   icon: Icons.event_available_outlined,
                 ),
                 (
-                  label: 'Candidatures retenues',
+                  label: 'Admissions définitives',
                   count: _applications
                       .where(
                         (a) =>
@@ -537,14 +564,19 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               onChanged: () => _load(initial: false),
               onOpenApplication: (id) {
                 final candidate = _applications
-                    .where((item) => item.id == id).firstOrNull;
+                    .where((item) => item.id == id)
+                    .firstOrNull;
                 if (candidate != null) _openApplication(candidate);
               },
             ),
-          if (_section == RecruitmentSection.applications && _campaignId == 'all' && _access['can_manage_jury'] == true)
+          if (_section == RecruitmentSection.applications &&
+              _campaignId == 'all' &&
+              _access['can_manage_jury'] == true)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Sélectionne une campagne dans les filtres pour répartir les évaluations et publier les résultats.'),
+              child: Text(
+                'Sélectionne une campagne dans les filtres pour répartir les évaluations et publier les résultats.',
+              ),
             ),
           SizedBox(height: 14),
           InternalFilterBar(
@@ -563,7 +595,8 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onDepartmentChanged: (value) => setState(() {
               _departmentChoice = value ?? 'all';
               _department.text = _departmentChoice == 'all'
-                  ? '' : _departmentChoice;
+                  ? ''
+                  : _departmentChoice;
               _page = 0;
             }),
             onStudyLevelChanged: (value) => setState(() {

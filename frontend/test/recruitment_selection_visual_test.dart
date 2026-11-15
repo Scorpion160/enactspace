@@ -23,6 +23,9 @@ class _SyntheticSelectionApi extends RecruitmentSelectionApi {
     if (body != null) {
       throw StateError('The visual fixture must never write or publish data');
     }
+    if (path.endsWith('/selection/shortlist')) {
+      return {'rows': <Map<String, dynamic>>[], 'identities_revealed': false};
+    }
     if (!path.endsWith('/selection')) {
       throw StateError('Unexpected synthetic request $path');
     }
