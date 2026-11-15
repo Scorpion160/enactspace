@@ -8,7 +8,7 @@ from app.api.deps import require_recruitment_access
 from app.db.database import get_db
 from app.core.time import utc_now
 from app.models.user import User
-from app.models.recruitment import RecruitmentCampaign
+from app.models.recruitment import RecruitmentCampaign, RecruitmentJuryMember
 from app.models.recruitment_interview_policy import RecruitmentInterviewPolicy, RecruitmentJuryAvailability
 from app.services.recruitment_access import can_manage_jury, require_campaign_access
 from app.services.audit_service import create_audit_log
@@ -79,6 +79,24 @@ def within_windows(policy,start,end):
     left,right=start.strftime("%H:%M"),end.strftime("%H:%M")
     return any(w["start"]<=left and right<=w["end"] for w in policy["daily_windows"])
 
+def juror_available(windows, start, end):
+    """Honor a juror's recorded Dakar-local availability, without candidate contact.
+
+    A date-specific availability replaces the recurring weekday windows on that
+    date. An empty list means that the juror declared no available slot.
+    A missing availability record is different: the scheduler does not assume
+    availability and delegates confirmation to the jury manager.
+    """
+    if start.date() != end.date():
+        return False
+    date_rows = [w for w in windows if w.get("date") == start.date().isoformat()]
+    eligible = date_rows if date_rows else [
+        w for w in windows if w.get("weekday") == start.weekday()
+    ]
+    begin, finish = start.strftime("%H:%M"), end.strftime("%H:%M")
+    return any(w["start"] <= begin and finish <= w["end"] for w in eligible)
+
+
 def can_manage(db,campaign_id,actor):
     campaign=db.get(RecruitmentCampaign,campaign_id)
     if not campaign:raise HTTPException(404,"Campagne introuvable.")
@@ -141,11 +159,30 @@ def register_interview_policy(router):
         user=db.get(User,user_id)
         if not user or not user.is_active or user.status not in {"active","alumni"}:
             raise HTTPException(409,"Ce compte n'est pas actif.")
+        from app.models.recruitment_interview_drafts import RecruitmentInterviewDraft
+        normalized = [w.model_dump(mode="json", exclude_none=True) for w in payload.windows]
+        member = db.query(RecruitmentJuryMember).filter(
+            RecruitmentJuryMember.campaign_id == campaign_id,
+            RecruitmentJuryMember.user_id == user_id,
+        ).first()
+        if member is not None:
+            drafts = db.query(RecruitmentInterviewDraft).filter(
+                RecruitmentInterviewDraft.campaign_id == campaign_id
+            ).all()
+            for draft in drafts:
+                if str(member.id) in draft.jury_member_ids and not juror_available(
+                    normalized, draft.starts_at, draft.ends_at
+                ):
+                    raise HTTPException(
+                        409,
+                        "Ces disponibilités ne couvrent pas un entretien déjà préparé. "
+                        "Modifie d'abord l'affectation concernée.",
+                    )
         row=db.get(RecruitmentJuryAvailability,(campaign_id,user_id))
         if row is None:
             row=RecruitmentJuryAvailability(campaign_id=campaign_id,user_id=user_id)
             db.add(row)
-        row.windows=[w.model_dump(mode="json",exclude_none=True) for w in payload.windows]
+        row.windows=normalized
         row.updated_at=utc_now()
         create_audit_log(db,"disponibilites_membre_jury",actor.id,"recruitment_campaign",campaign_id,
                          new_value={"user_id":str(user_id),"windows":row.windows})
