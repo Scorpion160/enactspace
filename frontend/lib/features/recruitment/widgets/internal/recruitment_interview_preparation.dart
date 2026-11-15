@@ -51,8 +51,9 @@ class _RecruitmentInterviewPreparationState
 
   Future<String> _token() async {
     final token = await _auth.getToken();
-    if (token == null)
+    if (token == null) {
       throw StateError('Connecte-toi pour consulter les entretiens.');
+    }
     return token;
   }
 
