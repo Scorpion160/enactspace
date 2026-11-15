@@ -224,14 +224,67 @@ def _readable_rows(db, campaign, actor):
     return result
 
 
+def juror_availability_readiness(db, campaign_id):
+    """Read-only readiness summary for jury managers (never a convocation)."""
+    drafts = db.query(RecruitmentInterviewDraft).filter(
+        RecruitmentInterviewDraft.campaign_id == campaign_id
+    ).all()
+    slots = {}
+    for draft in drafts:
+        for member_id in draft.jury_member_ids:
+            slots.setdefault(str(member_id), []).append(
+                (draft.starts_at, draft.ends_at)
+            )
+    total = len(slots)
+    if not total:
+        return {"assigned": 0, "confirmed": 0, "to_confirm": 0, "ready": False}
+    members = {
+        str(row.id): row for row in db.query(RecruitmentJuryMember).filter(
+            RecruitmentJuryMember.campaign_id == campaign_id,
+        ).all()
+    }
+    user_ids = {
+        members[mid].user_id for mid in slots if mid in members
+    }
+    availabilities = {
+        row.user_id: row.windows for row in db.query(
+            RecruitmentJuryAvailability
+        ).filter(
+            RecruitmentJuryAvailability.campaign_id == campaign_id,
+            RecruitmentJuryAvailability.user_id.in_(user_ids),
+        ).all()
+    }
+    confirmed = sum(
+        1 for member_id, appointments in slots.items()
+        if member_id in members
+        and members[member_id].is_active
+        and members[member_id].user_id in availabilities
+        and all(juror_available(
+            availabilities[members[member_id].user_id], start, end
+        ) for start, end in appointments)
+    )
+    return {
+        "assigned": total,
+        "confirmed": confirmed,
+        "to_confirm": total - confirmed,
+        "ready": confirmed == total,
+    }
+
+
 def register_interview_drafts(router):
     @router.get("/campaigns/{campaign_id}/interviews/drafts")
     def list_drafts(campaign_id: UUID, db: Session = Depends(get_db),
                     actor: User = Depends(require_recruitment_access)):
         campaign = private_campaign(db, campaign_id, actor)
         result = _readable_rows(db, campaign, actor)
-        return {"rows": result, "draft_only": True, "candidate_notifications": 0,
-                "can_manage": can_manage_jury(db, actor)}
+        can_manage = can_manage_jury(db, actor)
+        response = {"rows": result, "draft_only": True, "candidate_notifications": 0,
+                    "can_manage": can_manage}
+        if can_manage:
+            response["juror_availability_readiness"] = juror_availability_readiness(
+                db, campaign.id
+            )
+        return response
 
     @router.post("/campaigns/{campaign_id}/interviews/drafts")
     def replace_drafts(campaign_id: UUID, payload: DraftBatch,
