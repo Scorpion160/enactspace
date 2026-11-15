@@ -27,6 +27,7 @@ class _RecruitmentInterviewPreparationState
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
   bool _canManage = false;
+  Map<String, dynamic>? _availabilityReadiness;
   int _page = 0;
   String? _error;
   int _generation = 0;
@@ -79,6 +80,9 @@ class _RecruitmentInterviewPreparationState
             .map((row) => Map<String, dynamic>.from(row))
             .toList();
         _canManage = payload['can_manage'] == true;
+        _availabilityReadiness = payload['juror_availability_readiness'] is Map
+            ? Map<String, dynamic>.from(payload['juror_availability_readiness'] as Map)
+            : null;
         _page = 0;
       });
     } catch (_) {
@@ -211,6 +215,25 @@ class _RecruitmentInterviewPreparationState
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
                   'Vue responsable : ensemble des affectations en préparation.',
+                ),
+              ),
+            if (_canManage &&
+                _availabilityReadiness != null &&
+                (_availabilityReadiness!['to_confirm'] as num? ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_busy_outlined, size: 19),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_availabilityReadiness!['to_confirm']} juré(s) '
+                        'sur ${_availabilityReadiness!['assigned']} '
+                        'ont des disponibilités à confirmer.',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             if (_loading)
