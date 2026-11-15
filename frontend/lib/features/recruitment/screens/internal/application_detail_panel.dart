@@ -365,6 +365,7 @@ class _DetailBodyState extends State<_DetailBody> {
   late final Map<String, GlobalKey> _anchors = {
     for (final label in [
       'Réponses',
+      'Questionnaire',
       'Évaluation',
       'Entretien',
       'Décision',
@@ -390,8 +391,11 @@ class _DetailBodyState extends State<_DetailBody> {
           children: [
             for (final entry in _anchors.entries.where(
               (e) =>
-                  e.key != 'Décision' ||
-                  widget.application.permissions['can_decide'] != false,
+                  (e.key != 'Décision' ||
+                      widget.application.permissions['can_decide'] != false) &&
+                  (e.key != 'Questionnaire' ||
+                      (!widget.anonymized &&
+                          widget.gateway is CampaignToolsProvider)),
             ))
               Padding(
                 padding: const EdgeInsets.only(right: 6),
@@ -420,7 +424,6 @@ class _DetailBodyState extends State<_DetailBody> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _Section(
-                key: _anchors['Réponses'],
                 title: 'Résumé',
                 icon: Icons.badge_outlined,
                 children: [
@@ -497,6 +500,7 @@ class _DetailBodyState extends State<_DetailBody> {
                 ],
               ),
               _Section(
+                key: _anchors['Réponses'],
                 title: 'Réponses',
                 icon: Icons.forum_outlined,
                 children: [
@@ -693,10 +697,13 @@ class _DetailBodyState extends State<_DetailBody> {
                   ],
                 ),
               if (!widget.anonymized && widget.gateway is CampaignToolsProvider)
-                PersonalityReviewCard(
-                  application: widget.application,
-                  tools:
-                      (widget.gateway as CampaignToolsProvider).campaignTools,
+                KeyedSubtree(
+                  key: _anchors['Questionnaire'],
+                  child: PersonalityReviewCard(
+                    application: widget.application,
+                    tools: (widget.gateway as CampaignToolsProvider)
+                        .campaignTools,
+                  ),
                 ),
               if (widget.application.interviewNeedsReassignment)
                 const Card(
