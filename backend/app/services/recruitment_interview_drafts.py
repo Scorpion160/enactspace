@@ -28,7 +28,8 @@ from app.services.recruitment_access import (
     active_jury_member, can_manage_jury, eligible_juror, require_campaign_access,
 )
 from app.services.recruitment_interviews import department_key, effective_interview_end
-from app.services.recruitment_interview_policy import fetch_policy, within_windows
+from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
+from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
 
 
 class DraftAppointment(BaseModel):
@@ -100,6 +101,15 @@ def validate_drafts(db, campaign, inputs):
             User, User.id == RecruitmentJuryMember.user_id
         ).filter(RecruitmentJuryMember.campaign_id == campaign.id)
     }
+    available_by_user = {
+        row.user_id: row.windows
+        for row in db.query(RecruitmentJuryAvailability).filter(
+            RecruitmentJuryAvailability.campaign_id == campaign.id,
+            RecruitmentJuryAvailability.user_id.in_(
+                [member.user_id for member, _ in members.values()]
+            ),
+        ).all()
+    }
     policy=fetch_policy(db,campaign.id)
     if policy["respect_candidate_availability"]:
         raise HTTPException(409,"La validation automatique des souhaits libres des candidats n'est pas disponible.")
@@ -117,6 +127,14 @@ def validate_drafts(db, campaign, inputs):
         if any(pair is None or not pair[0].is_active or not eligible_juror(pair[1]) for pair in selected):
             raise HTTPException(409, "Un juré proposé n'est pas habilité ou n'appartient pas à la campagne.")
         users = [pair[1] for pair in selected]
+        for user in users:
+            if user.id in available_by_user and not juror_available(
+                available_by_user[user.id], start, end
+            ):
+                raise HTTPException(
+                    409,
+                    "Un juré n'est pas disponible sur le créneau proposé.",
+                )
         depts = [department_key(user.department) for user in users]
         if not all(depts) or len(set(depts)) != 3:
             raise HTTPException(409, "Chaque jury doit représenter trois départements différents.")
