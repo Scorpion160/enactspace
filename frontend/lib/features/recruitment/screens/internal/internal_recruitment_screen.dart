@@ -36,7 +36,6 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   final _search = TextEditingController();
   final _pole = TextEditingController();
   final _project = TextEditingController();
-  final _department = TextEditingController();
   final _className = TextEditingController();
   List<RecruitmentCampaignModel> _campaigns = const [];
   List<ApplicationModel> _applications = const [];
@@ -70,13 +69,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   @override
   void dispose() {
     _generation++;
-    for (final controller in [
-      _search,
-      _pole,
-      _project,
-      _department,
-      _className,
-    ]) {
+    for (final controller in [_search, _pole, _project, _className]) {
       controller.dispose();
     }
     super.dispose();
@@ -131,7 +124,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
         item.trackingCode,
       ].whereType<String>().join(' ').toLowerCase();
       return (_campaignId == 'all' || item.campaignId == _campaignId) &&
-          (_status == 'all' || item.status == _status) &&
+          _matchesStatus(item, _status) &&
           (_gender == 'all' || _normalizedGender(item.gender) == _gender) &&
           (query.isEmpty || searchable.contains(query)) &&
           _matches(item.preferredPole, _pole.text) &&
@@ -191,6 +184,14 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     return result;
   }
 
+  static bool _matchesStatus(ApplicationModel row, String status) =>
+      switch (status) {
+        'all' => true,
+        'shortlisted' => row.screeningDecision == 'shortlisted',
+        'not_shortlisted' => row.screeningDecision == 'not_shortlisted',
+        _ => row.status == status,
+      };
+
   static String _normalizedGender(String? raw) => switch (raw?.toLowerCase()) {
     'femme' || 'female' => 'female',
     'homme' || 'male' => 'male',
@@ -222,11 +223,9 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     _departmentChoice != 'all',
     _studyLevelChoice != 'all',
     _academicHorizon != 'all',
-    _access['can_manage_jury'] == true && _sortMode != 'reviews_needed',
     _pole.text.trim().isNotEmpty,
     _project.text.trim().isNotEmpty,
     _className.text.trim().isNotEmpty,
-    _anonymized,
     _submittedFrom != null,
     _submittedTo != null,
   ].where((active) => active).length;
@@ -239,13 +238,7 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
   }
 
   void _resetFilters() => setState(() {
-    for (final controller in [
-      _search,
-      _pole,
-      _project,
-      _department,
-      _className,
-    ]) {
+    for (final controller in [_search, _pole, _project, _className]) {
       controller.clear();
     }
     _campaignId = 'all';
@@ -425,6 +418,25 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final inCampaign = _applications.where(
       (item) => _campaignId == 'all' || item.campaignId == _campaignId,
     );
+    final statusValues = inCampaign.map((item) => item.status).toSet();
+    final decisionValues = inCampaign
+        .map((item) => item.screeningDecision)
+        .toSet();
+    final statusOptions = [
+      if (decisionValues.contains('shortlisted')) 'shortlisted',
+      if (decisionValues.contains('not_shortlisted')) 'not_shortlisted',
+      for (final status in internalApplicationStatuses)
+        if (statusValues.contains(status)) status,
+    ];
+    final showPoleFilter = inCampaign.any(
+      (item) => (item.preferredPole ?? '').trim().isNotEmpty,
+    );
+    final showProjectFilter = inCampaign.any(
+      (item) => (item.projectInterest ?? '').trim().isNotEmpty,
+    );
+    final showClassFilter = inCampaign.any(
+      (item) => (item.className ?? '').trim().isNotEmpty,
+    );
     final departmentOptions =
         inCampaign
             .map((item) => item.department?.trim() ?? '')
@@ -569,21 +581,11 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
                 if (candidate != null) _openApplication(candidate);
               },
             ),
-          if (_section == RecruitmentSection.applications &&
-              _campaignId == 'all' &&
-              _access['can_manage_jury'] == true)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Sélectionne une campagne dans les filtres pour répartir les évaluations et publier les résultats.',
-              ),
-            ),
           SizedBox(height: 14),
           InternalFilterBar(
             searchController: _search,
             poleController: _pole,
             projectController: _project,
-            departmentController: _department,
             classController: _className,
             departmentOptions: departmentOptions,
             studyLevelOptions: studyLevelOptions,
@@ -594,9 +596,6 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             canManageJury: _access['can_manage_jury'] == true,
             onDepartmentChanged: (value) => setState(() {
               _departmentChoice = value ?? 'all';
-              _department.text = _departmentChoice == 'all'
-                  ? ''
-                  : _departmentChoice;
               _page = 0;
             }),
             onStudyLevelChanged: (value) => setState(() {
@@ -614,6 +613,10 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             campaigns: _campaigns,
             campaignId: _campaignId,
             status: _status,
+            statusOptions: statusOptions,
+            showPoleFilter: showPoleFilter,
+            showProjectFilter: showProjectFilter,
+            showClassFilter: showClassFilter,
             gender: _gender,
             anonymized: _anonymized,
             expanded: _filtersExpanded,
@@ -624,8 +627,15 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             onSearchChanged: (_) => setState(() => _page = 0),
             onCampaignChanged: (value) => setState(() {
               _campaignId = value ?? 'all';
+              _status = 'all';
+              _gender = 'all';
+              _search.clear();
+              _pole.clear();
+              _project.clear();
+              _className.clear();
+              _submittedFrom = null;
+              _submittedTo = null;
               _departmentChoice = 'all';
-              _department.clear();
               _studyLevelChoice = 'all';
               _academicHorizon = 'all';
               _sortMode = 'reviews_needed';
@@ -645,12 +655,6 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
             }),
             onPickSubmittedFrom: () => _pickSubmittedDate(from: true),
             onPickSubmittedTo: () => _pickSubmittedDate(from: false),
-            onApply: () => setState(() {
-              _page = 0;
-              if (MediaQuery.sizeOf(context).width < 1100) {
-                _filtersExpanded = false;
-              }
-            }),
             onReset: _resetFilters,
           ),
           SizedBox(height: 14),

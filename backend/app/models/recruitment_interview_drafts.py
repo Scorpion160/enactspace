@@ -19,6 +19,8 @@ class RecruitmentInterviewDraft(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     jury_member_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False, default="in_person")
+    location: Mapped[str | None] = mapped_column(String(180), nullable=True)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)

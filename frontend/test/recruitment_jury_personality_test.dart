@@ -396,6 +396,7 @@ void main() {
         find.textContaining('1 entretien(s) à réattribuer'),
         findsOneWidget,
       );
+      await _tap(tester, find.text('Ajouter un membre'));
       await _tap(tester, find.byTooltip('Ajouter au jury'));
       expect(tools.appointed, isTrue);
     },

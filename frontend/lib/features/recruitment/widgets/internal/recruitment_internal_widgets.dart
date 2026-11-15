@@ -14,6 +14,8 @@ const internalApplicationStatuses = <String>[
   'rejected',
   'waiting_list',
   'cancelled',
+  'shortlisted',
+  'not_shortlisted',
 ];
 
 class InternalRecruitmentHeader extends StatelessWidget {
@@ -47,8 +49,12 @@ class InternalRecruitmentHeader extends StatelessWidget {
         '$campaignLabel · $visibleCount dossier(s) affiché(s) sur $totalCount',
     actions: [
       if (onOpenGuide != null)
-        IconButton(key: const Key('recruitment-team-guide'), onPressed: onOpenGuide,
-          tooltip: 'Guide équipe', icon: const Icon(Icons.menu_book_outlined)),
+        IconButton(
+          key: const Key('recruitment-team-guide'),
+          onPressed: onOpenGuide,
+          tooltip: 'Guide équipe',
+          icon: const Icon(Icons.menu_book_outlined),
+        ),
       IconButton(
         onPressed: onRefresh,
         tooltip: 'Actualiser la liste',
@@ -69,7 +75,6 @@ class InternalFilterBar extends StatelessWidget {
   final TextEditingController searchController;
   final TextEditingController poleController;
   final TextEditingController projectController;
-  final TextEditingController departmentController;
   final TextEditingController classController;
   final List<String> departmentOptions;
   final List<String> studyLevelOptions;
@@ -85,6 +90,10 @@ class InternalFilterBar extends StatelessWidget {
   final List<RecruitmentCampaignModel> campaigns;
   final String campaignId;
   final String status;
+  final List<String> statusOptions;
+  final bool showPoleFilter;
+  final bool showProjectFilter;
+  final bool showClassFilter;
   final String gender;
   final bool anonymized;
   final bool expanded;
@@ -98,7 +107,6 @@ class InternalFilterBar extends StatelessWidget {
   final ValueChanged<bool> onAnonymizedChanged;
   final VoidCallback onPickSubmittedFrom;
   final VoidCallback onPickSubmittedTo;
-  final VoidCallback onApply;
   final VoidCallback onReset;
 
   const InternalFilterBar({
@@ -106,7 +114,6 @@ class InternalFilterBar extends StatelessWidget {
     required this.searchController,
     required this.poleController,
     required this.projectController,
-    required this.departmentController,
     required this.classController,
     this.departmentOptions = const [],
     this.studyLevelOptions = const [],
@@ -122,6 +129,10 @@ class InternalFilterBar extends StatelessWidget {
     required this.campaigns,
     required this.campaignId,
     required this.status,
+    this.statusOptions = internalApplicationStatuses,
+    this.showPoleFilter = false,
+    this.showProjectFilter = false,
+    this.showClassFilter = true,
     required this.gender,
     required this.anonymized,
     required this.expanded,
@@ -135,7 +146,6 @@ class InternalFilterBar extends StatelessWidget {
     required this.onAnonymizedChanged,
     required this.onPickSubmittedFrom,
     required this.onPickSubmittedTo,
-    required this.onApply,
     required this.onReset,
   });
 
@@ -155,7 +165,7 @@ class InternalFilterBar extends StatelessWidget {
         ),
       ),
       DropdownButtonFormField<String>(
-        key: const Key('internal-campaign-filter'),
+        key: ValueKey('internal-campaign-$campaignId'),
         isExpanded: true,
         initialValue: campaignId,
         itemHeight: null,
@@ -169,18 +179,22 @@ class InternalFilterBar extends StatelessWidget {
         onChanged: onCampaignChanged,
       ),
       DropdownButtonFormField<String>(
-        key: const Key('internal-status-filter'),
+        key: ValueKey('internal-status-$status'),
         isExpanded: true,
         initialValue: status,
-        decoration: const InputDecoration(labelText: 'Statut'),
+        decoration: const InputDecoration(labelText: 'Étape du dossier'),
         items: [
           const DropdownMenuItem(value: 'all', child: Text('Tous')),
-          ...internalApplicationStatuses.map(
+          ...statusOptions.map(
             (value) => DropdownMenuItem(
               value: value,
-              child: Text(
-                ApplicationStatusPresentation.fromStatus(value).title,
-              ),
+              child: Text(switch (value) {
+                'shortlisted' => 'Retenus pour entretien',
+                'not_shortlisted' => 'Non retenus',
+                'submitted' => 'Dossier déposé',
+                'under_review' => 'En cours d’examen',
+                _ => ApplicationStatusPresentation.fromStatus(value).title,
+              }),
             ),
           ),
         ],
@@ -206,9 +220,14 @@ class InternalFilterBar extends StatelessWidget {
         ),
       ],
       activeFilterCount:
-          [campaignId, status, gender, departmentChoice, studyLevelChoice,
-           academicHorizon].where((v) => v != 'all').length +
-          (canManageJury && sortMode != 'reviews_needed' ? 1 : 0) +
+          [
+            campaignId,
+            status,
+            gender,
+            departmentChoice,
+            studyLevelChoice,
+            academicHorizon,
+          ].where((v) => v != 'all').length +
           [
             poleController,
             projectController,
@@ -224,23 +243,38 @@ class InternalFilterBar extends StatelessWidget {
           children: [
             AppFilterToolbar(
               filters: [
-                _TextFilter(controller: poleController, label: 'Pôle'),
-                _TextFilter(controller: projectController, label: 'Projet'),
+                if (showPoleFilter)
+                  _TextFilter(
+                    controller: poleController,
+                    label: 'Pôle',
+                    onChanged: onSearchChanged,
+                  ),
+                if (showProjectFilter)
+                  _TextFilter(
+                    controller: projectController,
+                    label: 'Projet',
+                    onChanged: onSearchChanged,
+                  ),
                 DropdownButtonFormField<String>(
                   key: ValueKey('internal-department-$departmentChoice'),
                   isExpanded: true,
                   initialValue: departmentOptions.contains(departmentChoice)
-                      ? departmentChoice : 'all',
+                      ? departmentChoice
+                      : 'all',
                   decoration: const InputDecoration(
                     labelText: 'Département',
                     prefixIcon: Icon(Icons.school_outlined),
                   ),
                   items: [
                     const DropdownMenuItem(
-                      value: 'all', child: Text('Tous les départements')),
+                      value: 'all',
+                      child: Text('Tous les départements'),
+                    ),
                     for (final value in departmentOptions)
-                      DropdownMenuItem(value: value,
-                        child: Text(value, overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(
+                        value: value,
+                        child: Text(value, overflow: TextOverflow.ellipsis),
+                      ),
                   ],
                   onChanged: onDepartmentChanged,
                 ),
@@ -248,14 +282,17 @@ class InternalFilterBar extends StatelessWidget {
                   key: ValueKey('internal-study-level-$studyLevelChoice'),
                   isExpanded: true,
                   initialValue: studyLevelOptions.contains(studyLevelChoice)
-                      ? studyLevelChoice : 'all',
+                      ? studyLevelChoice
+                      : 'all',
                   decoration: const InputDecoration(
                     labelText: 'Niveau d’études',
                     prefixIcon: Icon(Icons.auto_stories_outlined),
                   ),
                   items: [
                     const DropdownMenuItem(
-                      value: 'all', child: Text('Tous les niveaux')),
+                      value: 'all',
+                      child: Text('Tous les niveaux'),
+                    ),
                     for (final value in studyLevelOptions)
                       DropdownMenuItem(value: value, child: Text(value)),
                   ],
@@ -270,13 +307,22 @@ class InternalFilterBar extends StatelessWidget {
                     prefixIcon: Icon(Icons.timelapse_outlined),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Sans préférence')),
-                    DropdownMenuItem(value: 'two_plus',
-                      child: Text('Au moins deux années estimées')),
-                    DropdownMenuItem(value: 'last_year',
-                      child: Text('Dernière année du cycle')),
-                    DropdownMenuItem(value: 'unknown',
-                      child: Text('Parcours non classé')),
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Sans préférence'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'two_plus',
+                      child: Text('Au moins deux années estimées'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'last_year',
+                      child: Text('Dernière année du cycle'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'unknown',
+                      child: Text('Parcours non classé'),
+                    ),
                   ],
                   onChanged: onAcademicHorizonChanged,
                 ),
@@ -290,20 +336,35 @@ class InternalFilterBar extends StatelessWidget {
                       prefixIcon: Icon(Icons.sort_outlined),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'reviews_needed',
-                        child: Text('Avis manquants en premier')),
-                      DropdownMenuItem(value: 'score_desc',
-                        child: Text('Notes décroissantes (indicatif)')),
-                      DropdownMenuItem(value: 'score_asc',
-                        child: Text('Notes croissantes (indicatif)')),
-                      DropdownMenuItem(value: 'name',
-                        child: Text('Nom ou référence')),
-                      DropdownMenuItem(value: 'newest',
-                        child: Text('Dépôts les plus récents')),
+                      DropdownMenuItem(
+                        value: 'reviews_needed',
+                        child: Text('Avis manquants en premier'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'score_desc',
+                        child: Text('Notes décroissantes (indicatif)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'score_asc',
+                        child: Text('Notes croissantes (indicatif)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'name',
+                        child: Text('Nom ou référence'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'newest',
+                        child: Text('Dépôts les plus récents'),
+                      ),
                     ],
                     onChanged: onSortModeChanged,
                   ),
-                _TextFilter(controller: classController, label: 'Promotion'),
+                if (showClassFilter)
+                  _TextFilter(
+                    controller: classController,
+                    label: 'Promotion',
+                    onChanged: onSearchChanged,
+                  ),
                 _DateFilter(
                   label: 'Soumise à partir du',
                   value: submittedFrom,
@@ -316,6 +377,7 @@ class InternalFilterBar extends StatelessWidget {
                 ),
                 DropdownButtonFormField<String>(
                   isExpanded: true,
+                  key: ValueKey('internal-gender-$gender'),
                   initialValue: gender,
                   decoration: const InputDecoration(labelText: 'Genre'),
                   items: const [
@@ -344,11 +406,6 @@ class InternalFilterBar extends StatelessWidget {
                   onPressed: onReset,
                   child: const Text('Réinitialiser'),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: onApply,
-                  child: const Text('Appliquer'),
-                ),
               ],
             ),
           ],
@@ -361,8 +418,13 @@ class InternalFilterBar extends StatelessWidget {
 class _TextFilter extends StatelessWidget {
   final TextEditingController controller;
   final String label;
+  final ValueChanged<String> onChanged;
 
-  const _TextFilter({required this.controller, required this.label});
+  const _TextFilter({
+    required this.controller,
+    required this.label,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -370,6 +432,7 @@ class _TextFilter extends StatelessWidget {
     child: TextField(
       controller: controller,
       decoration: InputDecoration(labelText: label),
+      onChanged: onChanged,
     ),
   );
 }
