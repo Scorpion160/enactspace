@@ -1,6 +1,7 @@
 import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import '../../widgets/internal/recruitment_interview_board.dart';
+import '../../widgets/internal/recruitment_interview_preparation.dart';
 import '../../widgets/internal/recruitment_selection_panel.dart';
 import '../../services/recruitment_advisory_filters.dart';
 import '../../services/recruitment_campaign_tools.dart';
@@ -404,6 +405,13 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
 
   Widget _buildPage(BuildContext context) {
     final filtered = _filtered;
+    final preparationCampaignIds = _campaignId == 'all'
+        ? _applications
+            .where((application) => application.screeningDecision == 'shortlisted')
+            .map((application) => application.campaignId)
+            .toSet()
+            .toList()
+        : <String>[_campaignId];
     final pageCount = math.max(1, (filtered.length / _pageSize).ceil());
     final safePage = math.min(_page, pageCount - 1);
     final start = safePage * _pageSize;
@@ -706,10 +714,38 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
               onAction: _resetFilters,
             )
           else if (_section == RecruitmentSection.interviews)
-            RecruitmentInterviewBoard(
-              applications: filtered,
-              anonymized: _anonymized,
-              onOpen: _openApplication,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_access['can_manage_jury'] == true && !_anonymized) ...[
+                  if (preparationCampaignIds.length == 1)
+                    RecruitmentInterviewPreparation(
+                      key: ValueKey(
+                        'internal-interview-preparation-${preparationCampaignIds.single}',
+                      ),
+                      campaignId: preparationCampaignIds.single,
+                      onOpenApplication: (id) async {
+                        final match = _applications
+                            .where((candidate) => candidate.id == id)
+                            .firstOrNull;
+                        if (match != null) await _openApplication(match);
+                      },
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'Choisissez une campagne pour consulter les entretiens en préparation.',
+                      ),
+                    ),
+                  const SizedBox(height: 18),
+                ],
+                RecruitmentInterviewBoard(
+                  applications: filtered,
+                  anonymized: _anonymized,
+                  onOpen: _openApplication,
+                ),
+              ],
             )
           else
             ApplicationWorkbench(
