@@ -425,8 +425,13 @@ class _InternalRecruitmentScreenState extends State<InternalRecruitmentScreen> {
     final statusOptions = [
       if (decisionValues.contains('shortlisted')) 'shortlisted',
       if (decisionValues.contains('not_shortlisted')) 'not_shortlisted',
+      // Decision filters are sourced only from recorded screening decisions.
+      // Never also insert them as technical statuses (duplicate dropdown values).
       for (final status in internalApplicationStatuses)
-        if (statusValues.contains(status)) status,
+        if (status != 'shortlisted' &&
+            status != 'not_shortlisted' &&
+            statusValues.contains(status))
+          status,
     ];
     final showPoleFilter = inCampaign.any(
       (item) => (item.preferredPole ?? '').trim().isNotEmpty,
