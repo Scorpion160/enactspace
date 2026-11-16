@@ -193,7 +193,9 @@ def register_collective_interview(router):
             "recommendation": review.recommendation if review else None,
             "actual_jury_member_ids": [str(value) for value in member_ids],
             "entered_by": str(review.reviewer_id) if review else None,
+            "last_edited_by": details.get("last_edited_by"),
             "can_manage_jury": manager,
+            "can_edit": bool(manager or review is None or review.reviewer_id == actor.id),
             "candidate_notifications": 0,
         }
 
@@ -233,6 +235,10 @@ def register_collective_interview(router):
                 },
             )
         existing = _review(db, app.id)
+        if existing is not None and existing.reviewer_id != actor.id and not manager:
+            raise HTTPException(403, "La note du jury a déjà un saisisseur désigné. Contacter les responsables.")
+        previous_assessment = dict(existing.criteria_assessment or {}) if existing else None
+        previous_score = float(existing.score) if existing and existing.score is not None else None
         if existing is None:
             existing = ApplicationReview(
                 application_id=app.id, reviewer_id=actor.id, stage="interview",
@@ -260,8 +266,14 @@ def register_collective_interview(router):
         create_audit_log(
             db, "notation_collective_entretien", actor.id,
             "application", app.id,
-            new_value={"score": general, "english_score": sum(payload.english.values()) if payload.english else None,
-                       "rubric_version": RUBRIC_VERSION, "notification_candidates": 0},
+            old_value={"score": previous_score, "assessment": previous_assessment},
+            new_value={
+                "score": general,
+                "assessment": dict(existing.criteria_assessment),
+                "english_score": sum(payload.english.values()) if payload.english is not None else None,
+                "rubric_version": RUBRIC_VERSION,
+                "notification_candidates": 0,
+            },
         )
         db.commit()
         return {"saved": True, "collective": True, "general_score": general,
@@ -332,7 +344,15 @@ def register_collective_interview(router):
             ApplicationReview.stage == "interview",
             ApplicationReview.score.is_not(None),
         ).all()
-        ordered = sorted(reviews, key=lambda row: (-float(row[0].score), row[1].last_name.casefold(), row[1].first_name.casefold()))
+        collective = [
+            (review, app) for review, app in reviews
+            if (review.criteria_assessment or {}).get("rubric_version") == RUBRIC_VERSION
+        ]
+        if len({app.id for _, app in collective}) != len(collective):
+            raise HTTPException(409, "Des notes collectives en double nécessitent une revue.")
+        ordered = sorted(collective, key=lambda row: (
+            -float(row[0].score), row[1].last_name.casefold(), row[1].first_name.casefold()
+        ))
         return {
             "evaluated": len(ordered),
             "ranking": [{
