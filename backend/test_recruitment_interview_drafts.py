@@ -6,6 +6,7 @@ from uuid import uuid4
 from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
+from app.services.recruitment_jury_constraints import constraints_from_events
 from app.services.recruitment_interview_drafts import (
     DraftAppointment, _slot_ok, validate_drafts,
     juror_availability_readiness, register_interview_drafts,
@@ -41,13 +42,14 @@ class DraftInterviewTests(unittest.TestCase):
     def _db(self):
         db=MagicMock()
         db.get.return_value = None  # No campaign policy row in this fixture.
-        q1,q2,q3,q4=MagicMock(),MagicMock(),MagicMock(),MagicMock()
-        db.query.side_effect=[q1,q2,q3,q4]
+        q1,q2,q3,q4,q5=[MagicMock() for _ in range(5)]
+        db.query.side_effect=[q1,q2,q3,q4,q5]
         q1.filter.return_value=[self.app]
         q2.join.return_value.filter.return_value=self.jurors
         db.availability_query=q3
         q3.filter.return_value.all.return_value=[]
-        q4.join.return_value.join.return_value.filter.return_value.all.return_value=[]
+        q4.filter.return_value.order_by.return_value.all.return_value=[]
+        q5.join.return_value.join.return_value.filter.return_value.all.return_value=[]
         return db
 
     def test_windows_are_exactly_twenty_minutes(self):
@@ -97,7 +99,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def _readiness_db(self, availability):
         db = MagicMock()
-        qs = [MagicMock(), MagicMock(), MagicMock()]
+        qs = [MagicMock(), MagicMock(), MagicMock(), MagicMock()]
         db.query.side_effect = qs
         qs[0].filter.return_value.all.return_value = [
             SimpleNamespace(
@@ -108,6 +110,7 @@ class DraftInterviewTests(unittest.TestCase):
         ]
         qs[1].join.return_value.filter.return_value.all.return_value = self.jurors
         qs[2].filter.return_value.all.return_value = availability
+        qs[3].filter.return_value.order_by.return_value.all.return_value = []
         return db
 
     def test_readiness_flags_unrecorded_juror_availability(self):
@@ -159,6 +162,61 @@ class DraftInterviewTests(unittest.TestCase):
         )
         self.assertFalse(result["ready"])
         self.assertEqual(result["to_confirm"], 1)
+
+    def test_audited_blackout_blocks_new_jury_assignment(self):
+        from app.services.recruitment_jury_constraints import constraints_from_events
+        db = self._db()
+        user = self.jurors[0][1]
+        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value = [
+            SimpleNamespace(
+                action="indisponibilite_jure_exceptionnelle_20261117",
+                new_value={"user_id": str(user.id), "date": "2026-11-17", "available": False},
+            )
+        ]
+        with self.assertRaises(HTTPException) as error:
+            validate_drafts(db, self.campaign, [self.payload])
+        self.assertEqual(error.exception.status_code, 409)
+        db.commit.assert_not_called()
+
+    def test_remote_only_juror_requires_hybrid_or_online_mode(self):
+        db = self._db()
+        uid = self.jurors[0][1].id
+        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value = [
+            SimpleNamespace(
+                action="restriction_jure_distanciel",
+                new_value={"jury_user_id": str(uid), "allowed_participation": "online_only"},
+            )
+        ]
+        with self.assertRaises(HTTPException):
+            validate_drafts(db, self.campaign, [self.payload])
+        hybrid = self.payload.model_copy(update={"mode": "hybrid"})
+        self.assertTrue(validate_drafts(self._db_with_remote_restriction(uid),self.campaign,[hybrid])["valid"])
+
+    def _db_with_remote_restriction(self, uid):
+        db=self._db()
+        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value=[
+            SimpleNamespace(
+                action="restriction_jure_distanciel",
+                new_value={"jury_user_id": str(uid), "allowed_participation": "online_only"},
+            )
+        ]
+        return db
+
+    def test_readiness_fails_when_a_current_juror_is_unavailable(self):
+        db=self._readiness_db([
+            SimpleNamespace(user_id=user.id,windows=[{"weekday":1,"start":"18:00","end":"21:00"}])
+            for _,user in self.jurors
+        ])
+        target=self.jurors[0][1]
+        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value=[
+            SimpleNamespace(
+                action="indisponibilite_jure_exceptionnelle_20261117",
+                new_value={"user_id":str(target.id),"date":"2026-11-17","available":False},
+            )
+        ]
+        result=juror_availability_readiness(db,self.cid)
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["to_confirm"],1)
 
     def test_three_distinct_departments_required(self):
         db=self._db()
