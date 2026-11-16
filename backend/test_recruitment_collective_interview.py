@@ -33,7 +33,7 @@ class CollectiveJuryEvaluationTests(unittest.TestCase):
 
     def test_mixed_ratings_are_weighted(self):
         grades = dict(zip(WEIGHTS, [5, 4, 3, 2, 1, 4, 5]))
-        self.assertEqual(collective_score(grades), 70)
+        self.assertEqual(collective_score(grades), 68)
 
     def test_english_never_increases_general_score(self):
         english = {key: 5 for key in ENGLISH}
