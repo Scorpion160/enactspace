@@ -273,10 +273,10 @@ jobs:
           checks = report['results']
           assert report['all_public_checks_ok']
           assert checks['web_version']['public_fields']['version'] == '1.0.30'
-          # Verified public release 1.0.30+49 (16 November 2026).
+          # Verified public release 1.0.30+50 (16 November 2026).
           # Refresh this baseline only after checking the actual deployed assets.
-          assert str(checks['web_version']['public_fields']['build_number']) == '49'
-          assert checks['web_main']['sha256'] == '87437cefd0783efd585e46385c0a418bef2f468e4ddee4f465ef952a3244b03e'
+          assert str(checks['web_version']['public_fields']['build_number']) == '50'
+          assert checks['web_main']['sha256'] == '358a947bf2a386b0e4af26e5a2861f9cdda024974626c2611a22910ebfa16e90'
           assert checks['web_firebase_worker']['sha256'] == '5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3'
           assert checks['api_health']['public_fields']['ok'] is True
           print('LIVE_RELEASE_FINGERPRINTS_PINNED')
@@ -288,9 +288,9 @@ jobs:
         run: >-
           python3 tools/assemble_web_release.py
           --worker-sha256 5560e639af87e9c35428ac7ef0f6dccf0c1b8299ff359af82302ba491a50b2c3
-          --live-main-sha256 87437cefd0783efd585e46385c0a418bef2f468e4ddee4f465ef952a3244b03e
+          --live-main-sha256 358a947bf2a386b0e4af26e5a2861f9cdda024974626c2611a22910ebfa16e90
           --live-version 1.0.30
-          --live-build 49
+          --live-build 50
 
       - name: Archive preflight-validated Web candidate (not deployed)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
