@@ -48,6 +48,7 @@ class DraftInterviewTests(unittest.TestCase):
         q2.join.return_value.filter.return_value=self.jurors
         db.availability_query=q3
         q3.filter.return_value.all.return_value=[]
+        db.constraint_query=q4
         q4.filter.return_value.order_by.return_value.all.return_value=[]
         q5.join.return_value.join.return_value.filter.return_value.all.return_value=[]
         return db
@@ -106,10 +107,12 @@ class DraftInterviewTests(unittest.TestCase):
                 jury_member_ids=[str(m.id) for m, _ in self.jurors],
                 starts_at=self.start,
                 ends_at=self.end,
+                mode="in_person",
             )
         ]
         qs[1].join.return_value.filter.return_value.all.return_value = self.jurors
         qs[2].filter.return_value.all.return_value = availability
+        db.constraint_query=qs[3]
         qs[3].filter.return_value.order_by.return_value.all.return_value = []
         return db
 
@@ -167,7 +170,7 @@ class DraftInterviewTests(unittest.TestCase):
         from app.services.recruitment_jury_constraints import constraints_from_events
         db = self._db()
         user = self.jurors[0][1]
-        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value = [
+        db.constraint_query.filter.return_value.order_by.return_value.all.return_value = [
             SimpleNamespace(
                 action="indisponibilite_jure_exceptionnelle_20261117",
                 new_value={"user_id": str(user.id), "date": "2026-11-17", "available": False},
@@ -181,7 +184,7 @@ class DraftInterviewTests(unittest.TestCase):
     def test_remote_only_juror_requires_hybrid_or_online_mode(self):
         db = self._db()
         uid = self.jurors[0][1].id
-        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value = [
+        db.constraint_query.filter.return_value.order_by.return_value.all.return_value = [
             SimpleNamespace(
                 action="restriction_jure_distanciel",
                 new_value={"jury_user_id": str(uid), "allowed_participation": "online_only"},
@@ -194,7 +197,7 @@ class DraftInterviewTests(unittest.TestCase):
 
     def _db_with_remote_restriction(self, uid):
         db=self._db()
-        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value=[
+        db.constraint_query.filter.return_value.order_by.return_value.all.return_value=[
             SimpleNamespace(
                 action="restriction_jure_distanciel",
                 new_value={"jury_user_id": str(uid), "allowed_participation": "online_only"},
@@ -208,7 +211,7 @@ class DraftInterviewTests(unittest.TestCase):
             for _,user in self.jurors
         ])
         target=self.jurors[0][1]
-        db.query.side_effect[3].filter.return_value.order_by.return_value.all.return_value=[
+        db.constraint_query.filter.return_value.order_by.return_value.all.return_value=[
             SimpleNamespace(
                 action="indisponibilite_jure_exceptionnelle_20261117",
                 new_value={"user_id":str(target.id),"date":"2026-11-17","available":False},
