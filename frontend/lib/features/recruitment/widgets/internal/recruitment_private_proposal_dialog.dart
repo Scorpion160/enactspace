@@ -85,8 +85,8 @@ Future<bool> showPrivateInterviewProposalDialog(
                                     final value = await showDatePicker(
                                       context: context,
                                       initialDate: chosenDate,
-                                      firstDate: DateTime(2026, 1, 1),
-                                      lastDate: DateTime(2035, 12, 31),
+                                      firstDate: DateTime(chosenDate.year - 2, 1, 1),
+                                      lastDate: DateTime(chosenDate.year + 10, 12, 31),
                                     );
                                     if (value != null && context.mounted) {
                                       update(() => chosenDate = value);
