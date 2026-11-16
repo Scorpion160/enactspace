@@ -84,8 +84,9 @@ Future<bool> showCollectiveEvaluationDialog(
   final justification = TextEditingController(
     text: existing['justification']?.toString() ?? '',
   );
-  var recommendation = existing['recommendation']?.toString();
+  var recommendation = existing['recommendation']?.toString() ?? 'reserve';
   const recommendations = <String, String>{
+    'reserve': 'En attente de délibération',
     'tres_favorable': 'Très favorable',
     'favorable': 'Favorable',
     'a_discuter': 'À discuter',
@@ -135,7 +136,7 @@ Future<bool> showCollectiveEvaluationDialog(
                         for (final entry in _criteria.entries)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: DropdownButtonFormField<int>(
+                            child: DropdownButtonFormField<int?>(
                               key: ValueKey('collective-${entry.key}'),
                               isExpanded: true,
                               initialValue: ratings[entry.key],
@@ -144,6 +145,7 @@ Future<bool> showCollectiveEvaluationDialog(
                                 border: const OutlineInputBorder(),
                               ),
                               items: [
+                                const DropdownMenuItem<int?>(value: null, child: Text('Non évalué')),
                                 for (var i = 1; i <= 5; i++)
                                   DropdownMenuItem(
                                     value: i,
@@ -158,7 +160,7 @@ Future<bool> showCollectiveEvaluationDialog(
                           ),
                         Text(
                           score == null
-                              ? 'Score général : à compléter'
+                              ? 'Score général non calculé — critères à compléter'
                               : 'Score général : ${score.toStringAsFixed(0)} / 100',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
@@ -178,7 +180,7 @@ Future<bool> showCollectiveEvaluationDialog(
                           for (final entry in _english.entries)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: DropdownButtonFormField<int>(
+                              child: DropdownButtonFormField<int?>(
                                 key: ValueKey('english-${entry.key}'),
                                 initialValue: english[entry.key],
                                 decoration: InputDecoration(
@@ -186,6 +188,7 @@ Future<bool> showCollectiveEvaluationDialog(
                                   border: const OutlineInputBorder(),
                                 ),
                                 items: [
+                                  const DropdownMenuItem<int?>(value: null, child: Text('Non évalué')),
                                   for (var i = 1; i <= 5; i++)
                                     DropdownMenuItem(
                                       value: i,
@@ -201,7 +204,7 @@ Future<bool> showCollectiveEvaluationDialog(
                             ),
                         if (useEnglish)
                           Text(englishScore == null
-                              ? 'Anglais : à compléter'
+                              ? 'Anglais : évaluation partielle'
                               : 'Anglais : $englishScore / 25'),
                         const SizedBox(height: 8),
                         for (final data in [
@@ -265,8 +268,7 @@ Future<bool> showCollectiveEvaluationDialog(
                     child: const Text('Annuler'),
                   ),
                   FilledButton(
-                    onPressed: saving || !canEdit || !complete || !englishComplete ||
-                            recommendation == null
+                    onPressed: saving || !canEdit
                         ? null
                         : () async {
                             update(() {
@@ -280,12 +282,12 @@ Future<bool> showCollectiveEvaluationDialog(
                                 data: {
                                   'ratings': {
                                     for (final entry in ratings.entries)
-                                      entry.key: entry.value!,
+                                      entry.key: entry.value,
                                   },
                                   'english': useEnglish
                                       ? {
                                           for (final entry in english.entries)
-                                            entry.key: entry.value!,
+                                            entry.key: entry.value,
                                         }
                                       : null,
                                   'strengths': strengths.text.trim(),
