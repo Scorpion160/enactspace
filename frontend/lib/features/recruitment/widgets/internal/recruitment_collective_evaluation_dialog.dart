@@ -244,7 +244,7 @@ Future<bool> showCollectiveEvaluationDialog(
                           onChanged: saving || !canEdit
                               ? null
                               : (value) =>
-                                    update(() => recommendation = value),
+                                    update(() => recommendation = value ?? recommendation),
                         ),
                         if (error != null)
                           Padding(
