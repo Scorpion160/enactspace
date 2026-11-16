@@ -344,6 +344,20 @@ class _RecruitmentInterviewPreparationState
                         ),
                         const SizedBox(height: 3),
                         Text(
+                          switch (row['operational_status']) {
+                            'completed' => 'Entretien réalisé · note à renseigner',
+                            'postponed' => 'Report en préparation',
+                            'no_show' => 'Absence signalée',
+                            _ => 'Entretien à réaliser',
+                          },
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        if (row['awaiting_candidate_notification'] == true)
+                          const Text(
+                            'Nouvel horaire interne · convocation non envoyée',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        Text(
                           '${row['candidate_department'] ?? ''} · ${(row['starts_at'] ?? '').toString().replaceAll('T', ' ').replaceAll('Z', '')} · ${row['mode'] == 'online'
                               ? 'En ligne'
                               : row['mode'] == 'hybrid'
@@ -352,8 +366,12 @@ class _RecruitmentInterviewPreparationState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Avec : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
+                          'Jury prévu : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
                         ),
+                        if ((row['actual_jury'] as List? ?? const []).isNotEmpty)
+                          Text(
+                            'Jury réellement présent : ${(row['actual_jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
+                          ),
                         Text(
                           'Questionnaire : ${switch (row['personality_status']) {
                             'submitted' => 'Terminé',
