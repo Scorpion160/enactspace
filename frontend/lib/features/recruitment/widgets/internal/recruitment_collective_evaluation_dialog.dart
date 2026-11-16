@@ -54,6 +54,7 @@ Future<bool> showCollectiveEvaluationDialog(
     }
     return false;
   }
+  final canEdit = existing['can_edit'] == true;
   final previous = existing['ratings'] is Map
       ? Map<String, dynamic>.from(existing['ratings'] as Map)
       : <String, dynamic>{};
@@ -125,6 +126,11 @@ Future<bool> showCollectiveEvaluationDialog(
                           'Elle peut être saisie par un juré désigné. '
                           'La décision finale reste distincte du score.',
                         ),
+                        if (!canEdit)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Cette note collective a déjà un saisisseur désigné. Adressez-vous aux responsables pour toute correction.'),
+                          ),
                         const SizedBox(height: 12),
                         for (final entry in _criteria.entries)
                           Padding(
@@ -144,7 +150,7 @@ Future<bool> showCollectiveEvaluationDialog(
                                     child: Text('$i / 5'),
                                   ),
                               ],
-                              onChanged: saving
+                              onChanged: saving || !canEdit
                                   ? null
                                   : (value) =>
                                         update(() => ratings[entry.key] = value),
@@ -164,7 +170,7 @@ Future<bool> showCollectiveEvaluationDialog(
                           subtitle: const Text(
                             'Score distinct sur 25, sans incidence automatique sur le classement.',
                           ),
-                          onChanged: saving
+                          onChanged: saving || !canEdit
                               ? null
                               : (value) => update(() => useEnglish = value),
                         ),
@@ -186,7 +192,7 @@ Future<bool> showCollectiveEvaluationDialog(
                                       child: Text('$i / 5'),
                                     ),
                                 ],
-                                onChanged: saving
+                                onChanged: saving || !canEdit
                                     ? null
                                     : (value) => update(
                                         () => english[entry.key] = value,
@@ -232,7 +238,7 @@ Future<bool> showCollectiveEvaluationDialog(
                                 child: Text(choice.value),
                               ),
                           ],
-                          onChanged: saving
+                          onChanged: saving || !canEdit
                               ? null
                               : (value) =>
                                     update(() => recommendation = value),
@@ -259,7 +265,7 @@ Future<bool> showCollectiveEvaluationDialog(
                     child: const Text('Annuler'),
                   ),
                   FilledButton(
-                    onPressed: saving || !complete || !englishComplete ||
+                    onPressed: saving || !canEdit || !complete || !englishComplete ||
                             recommendation == null
                         ? null
                         : () async {
