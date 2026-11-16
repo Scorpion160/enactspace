@@ -31,6 +31,7 @@ from app.services.recruitment_access import (
 from app.services.recruitment_interviews import department_key, effective_interview_end
 from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
 from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
+from app.services.recruitment_jury_constraints import jury_constraints, juror_respects_constraints
 
 
 class DraftAppointment(BaseModel):
@@ -112,6 +113,7 @@ def validate_drafts(db, campaign, inputs):
         ).all()
     }
     policy=fetch_policy(db,campaign.id)
+    blackouts, remote_only = jury_constraints(db, campaign.id)
     if policy["respect_candidate_availability"]:
         raise HTTPException(409,"La validation automatique des souhaits libres des candidats n'est pas disponible.")
     starts_by_member = {}
@@ -129,6 +131,13 @@ def validate_drafts(db, campaign, inputs):
             raise HTTPException(409, "Un juré proposé n'est pas habilité ou n'appartient pas à la campagne.")
         users = [pair[1] for pair in selected]
         for user in users:
+            if not juror_respects_constraints(
+                user.id, start, row.mode, blackouts, remote_only
+            ):
+                raise HTTPException(
+                    409,
+                    "Un juré est indisponible ce jour ou participe uniquement à distance.",
+                )
             if user.id in available_by_user and not juror_available(
                 available_by_user[user.id], start, end
             ):
@@ -317,15 +326,28 @@ def juror_availability_readiness(db, campaign_id):
             RecruitmentJuryAvailability.user_id.in_(user_ids),
         ).all()
     }
+    blackouts, remote_only = jury_constraints(db, campaign_id)
+    draft_modes = {
+        str(member_id): [
+            (draft.starts_at, draft.ends_at, draft.mode)
+            for draft in drafts if str(member_id) in draft.jury_member_ids
+        ] for member_id in slots
+    }
     confirmed = sum(
         1 for member_id, appointments in slots.items()
         if member_id in members
         and members[member_id][0].is_active
         and eligible_juror(members[member_id][1])
         and members[member_id][0].user_id in availabilities
-        and all(juror_available(
-            availabilities[members[member_id][0].user_id], start, end
-        ) for start, end in appointments)
+        and all(
+            juror_available(
+                availabilities[members[member_id][0].user_id], start, end
+            ) and juror_respects_constraints(
+                members[member_id][0].user_id, start, mode,
+                blackouts, remote_only,
+            )
+            for start, end, mode in draft_modes[member_id]
+        )
     )
     return {
         "assigned": total,
