@@ -22,6 +22,7 @@ from app.models.recruitment_interview_drafts import (
     RecruitmentInterviewDraft, RecruitmentInterviewPrepNote,
 )
 from app.models.user import User
+from app.models.audit import AuditLog
 from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row, to_naive_utc
 from app.services.recruitment_access import (
@@ -198,10 +199,40 @@ def _readable_rows(db, campaign, actor):
             ApplicationPersonality.application_id.in_([row.application_id for row in visible])
         ).all()
     }
+    # Read private status changes in one query to avoid N+1 requests.
+    events = db.query(AuditLog).filter(
+        AuditLog.entity_type == "application",
+        AuditLog.entity_id.in_([row.application_id for row in visible]),
+        AuditLog.action.in_([
+            "entretien_reel_confirme_par_organisateur",
+            "entretien_presence_enregistree",
+            "entretien_report_replanifie_interne",
+            "entretien_presence_jury_modifiee",
+        ]),
+    ).order_by(AuditLog.created_at, AuditLog.id).all()
+    event_by_application = {}
+    completed_by_application = {}
+    for event in events:
+        event_by_application[event.entity_id] = event
+        if (event.new_value or {}).get("status") in ("completed", "completed_pending_score"):
+            completed_by_application[event.entity_id] = event
     result = []
     for row in visible:
         app = apps[row.application_id]
         test = personality.get(row.application_id)
+        last_event = event_by_application.get(row.application_id)
+        latest = (last_event.new_value or {}) if last_event else {}
+        realized_event = completed_by_application.get(row.application_id)
+        realized = (realized_event.new_value or {}) if realized_event else {}
+        status = "completed" if realized_event else latest.get("status", "scheduled")
+        if last_event and last_event.action == "entretien_report_replanifie_interne":
+            status = "postponed"
+        published = app.interview_at.isoformat() + "Z" if app.interview_at else None
+        communicated = bool(
+            app.interview_at is not None and
+            app.interview_at == row.starts_at and
+            (app.interview_mode or "in_person") == (row.mode or "in_person")
+        )
         result.append({
             "application_id": str(row.application_id),
             "candidate_name": f"{app.first_name} {app.last_name}".strip(),
@@ -219,7 +250,16 @@ def _readable_rows(db, campaign, actor):
             "revision": row.revision,
             "mode": row.mode or "in_person",
             "location": row.location,
-            "draft_only": True,
+            "draft_only": not communicated,
+            "operational_status": status,
+            "official_starts_at": published,
+            "awaiting_candidate_notification": not communicated and status == "postponed",
+            "actual_jury": [
+                dict(by_id.get(mid, {"name": "Juré non trouvé", "department": None}))
+                for mid in realized.get("actual_jury_member_ids", [])
+            ],
+            "internal_changes_only": True,
+            "candidate_notifications": 0,
         })
     return result
 
