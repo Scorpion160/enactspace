@@ -37,19 +37,19 @@ ENGLISH = (
     "grammaire", "prononciation",
 )
 RUBRIC_VERSION = "jury-collectif-v1"
-RECOMMENDATIONS = {"tres_favorable", "favorable", "a_discuter", "defavorable"}
+RECOMMENDATIONS = {"reserve", "tres_favorable", "favorable", "a_discuter", "defavorable"}
 
 
 class CollectiveEvaluationSave(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    ratings: dict[str, StrictInt]
-    english: dict[str, StrictInt] | None = None
+    ratings: dict[str, StrictInt | None]
+    english: dict[str, StrictInt | None] | None = None
     strengths: str = Field(default="", max_length=3000)
     vigilance: str = Field(default="", max_length=3000)
     potential: str = Field(default="", max_length=3000)
     recommended_pole: str = Field(default="", max_length=150)
     justification: str = Field(default="", max_length=3000)
-    recommendation: str
+    recommendation: str = "reserve"
     actual_jury_member_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=6)
     exception_reason: str | None = Field(default=None, max_length=600)
 
@@ -57,11 +57,11 @@ class CollectiveEvaluationSave(BaseModel):
     def valid(self):
         if set(self.ratings) != set(WEIGHTS):
             raise ValueError("Les sept critères du jury sont obligatoires.")
-        if any(type(v) is not int or v < 1 or v > 5 for v in self.ratings.values()):
+        if any(v is not None and (type(v) is not int or v < 1 or v > 5) for v in self.ratings.values()):
             raise ValueError("Chaque critère doit être noté de 1 à 5.")
         if self.english is not None:
             if set(self.english) != set(ENGLISH) or any(
-                type(v) is not int or v < 1 or v > 5 for v in self.english.values()
+                v is not None and (type(v) is not int or v < 1 or v > 5) for v in self.english.values()
             ):
                 raise ValueError("Les cinq indicateurs d'anglais doivent être notés de 1 à 5.")
         if self.recommendation not in RECOMMENDATIONS:
@@ -72,6 +72,8 @@ class CollectiveEvaluationSave(BaseModel):
 
 
 def collective_score(ratings):
+    if set(ratings) != set(WEIGHTS) or any(value is None for value in ratings.values()):
+        return None
     return sum(value * WEIGHTS[key] / 5 for key, value in ratings.items())
 
 
@@ -245,6 +247,11 @@ def register_collective_interview(router):
             )
             db.add(existing)
         general = collective_score(payload.ratings)
+        english_total = (
+            sum(payload.english.values())
+            if payload.english is not None and all(v is not None for v in payload.english.values())
+            else None
+        )
         existing.score = general
         existing.recommendation = payload.recommendation
         existing.comment = payload.justification
@@ -253,7 +260,7 @@ def register_collective_interview(router):
             "ratings": payload.ratings,
             "weights": WEIGHTS,
             "english": payload.english,
-            "english_score": sum(payload.english.values()) if payload.english is not None else None,
+            "english_score": english_total,
             "strengths": payload.strengths,
             "vigilance": payload.vigilance,
             "potential": payload.potential,
@@ -270,14 +277,15 @@ def register_collective_interview(router):
             new_value={
                 "score": general,
                 "assessment": dict(existing.criteria_assessment),
-                "english_score": sum(payload.english.values()) if payload.english is not None else None,
+                "english_score": english_total,
                 "rubric_version": RUBRIC_VERSION,
                 "notification_candidates": 0,
             },
         )
         db.commit()
         return {"saved": True, "collective": True, "general_score": general,
-                "english_score": sum(payload.english.values()) if payload.english else None,
+                "complete": general is not None,
+                "english_score": english_total,
                 "candidate_notifications": 0}
 
     @router.put("/applications/{application_id}/interview/attendance")
