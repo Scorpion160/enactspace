@@ -191,8 +191,16 @@ def register_recruitment_extensions(router):
         jury_manager(db, user, campaign_id)
         query = db.query(User).filter(User.is_active.is_(True), User.email_verified.is_(True), User.status.in_({"active", "alumni"}))
         if search.strip():
-            pattern = "%" + search.strip() + "%"
-            query = query.filter(or_(User.first_name.ilike(pattern), User.last_name.ilike(pattern)))
+            # The first 100 accounts are only a preview. Searching must work
+            # across the complete name, e.g. "Ndeye Awa Seye" even when the
+            # account stores "Ndeye Awa" as first_name and "SEYE" as last_name.
+            pattern = "%" + " ".join(search.split()) + "%"
+            full_name = User.first_name + " " + User.last_name
+            query = query.filter(or_(
+                User.first_name.ilike(pattern),
+                User.last_name.ilike(pattern),
+                full_name.ilike(pattern),
+            ))
         return [{"id": str(row.id), "name": f"{row.first_name} {row.last_name}".strip(), "status": row.status}
                 for row in query.order_by(User.last_name, User.first_name, User.id).limit(100)]
 

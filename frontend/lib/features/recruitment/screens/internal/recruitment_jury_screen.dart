@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../widgets/recruitment_style.dart';
 import '../../widgets/recruitment_workspace.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +36,7 @@ class RecruitmentJuryScreen extends StatefulWidget {
 
 class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
   final _search = TextEditingController();
+  Timer? _searchDebounce;
   String? _campaign;
   Map<String, dynamic>? _roster;
   List<Map<String, dynamic>> _eligible = [];
@@ -53,6 +56,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -473,11 +477,22 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                         children: [
                           TextField(
                             controller: _search,
-                            enabled: !_busy,
-                            onSubmitted: (_) => _load(),
+                            onChanged: (_) {
+                              _searchDebounce?.cancel();
+                              _searchDebounce = Timer(
+                                const Duration(milliseconds: 350),
+                                () {
+                                  if (mounted) _load();
+                                },
+                              );
+                            },
+                            onSubmitted: (_) {
+                              _searchDebounce?.cancel();
+                              _load();
+                            },
                             decoration: InputDecoration(
                               labelText: 'Rechercher un membre',
-                              hintText: 'Nom ou prénom',
+                              hintText: 'Prénom, nom ou nom complet',
                               prefixIcon: const Icon(Icons.search),
                               suffixIcon: IconButton(
                                 tooltip: 'Chercher',
