@@ -38,6 +38,24 @@ class CollectiveJuryEvaluationTests(unittest.TestCase):
         grades = dict(zip(WEIGHTS, [5, 4, 3, 2, 1, 4, 5]))
         self.assertEqual(collective_score(grades), 68)
 
+    def test_unassessed_criterion_is_saved_without_fake_score(self):
+        partial={key:3 for key in WEIGHTS}
+        partial["communication"]=None
+        valid=CollectiveEvaluationSave.model_validate(
+            payload(ratings=partial,recommendation="reserve")
+        )
+        self.assertIsNone(collective_score(valid.ratings))
+        self.assertIsNone(valid.ratings["communication"])
+
+    def test_partial_english_has_no_fictitious_total(self):
+        english={key:3 for key in ENGLISH}
+        english["grammaire"]=None
+        valid=CollectiveEvaluationSave.model_validate(
+            payload(english=english)
+        )
+        self.assertIsNone(valid.english["grammaire"])
+        self.assertNotIn(None, [valid.ratings[key] for key in WEIGHTS])
+
     def test_english_never_increases_general_score(self):
         english = {key: 5 for key in ENGLISH}
         validated = CollectiveEvaluationSave.model_validate(payload(english=english))
