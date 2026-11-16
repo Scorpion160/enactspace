@@ -273,6 +273,9 @@ def _readable_rows(db, campaign, actor):
             ),
             "revision": row.revision,
             "mode": row.mode or "in_person",
+            "candidate_presence": candidate_presence_from_mode(row.mode),
+            "remote_juror_enabled": row.mode == "hybrid",
+            "video_link_to_verify": remote_link_to_verify(row.mode, row.location),
             "location": row.location,
             "draft_only": not communicated,
             "operational_status": status,
@@ -293,6 +296,23 @@ def _readable_rows(db, campaign, actor):
             "candidate_notifications": 0,
         })
     return result
+
+
+def candidate_presence_from_mode(mode):
+    """The candidate remains on site when only the jury joins remotely.
+
+    Keep this separate from juror participation so mixed interviews never
+    accidentally become remote invitations for the candidate.
+    """
+    return "remote_exception" if mode == "online" else "on_site"
+
+
+def remote_link_to_verify(mode, location):
+    """Advisory indicator only; no participant is notified from this check."""
+    import re
+    if mode not in ("hybrid", "online"):
+        return False
+    return re.search(r"https?://[^\s,;]+", location or "") is None
 
 
 def juror_availability_readiness(db, campaign_id):
