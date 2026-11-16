@@ -97,9 +97,9 @@ class RecruitmentInterviewBoard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         Text(switch (a.interviewMode) {
-                          'online' => 'En ligne',
-                          'hybrid' => 'Mixte',
-                          'in_person' => 'Présentiel',
+                          'online' => 'Candidat à distance (exception)',
+                          'hybrid' => 'Candidat à l’ESP · juré en ligne',
+                          'in_person' => 'Présentiel à l’ESP',
                           _ => 'Format à confirmer',
                         }),
                         if (a.interviewLocation?.isNotEmpty == true)
