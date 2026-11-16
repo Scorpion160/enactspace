@@ -22,6 +22,7 @@ from app.models.recruitment_interview_drafts import (
     RecruitmentInterviewDraft, RecruitmentInterviewPrepNote,
 )
 from app.models.user import User
+from app.models.audit import AuditLog
 from app.services.audit_service import create_audit_log
 from app.services.operational_integrity import lock_row, to_naive_utc
 from app.services.recruitment_access import (
@@ -30,6 +31,7 @@ from app.services.recruitment_access import (
 from app.services.recruitment_interviews import department_key, effective_interview_end
 from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
 from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
+from app.services.recruitment_jury_constraints import jury_constraints, juror_respects_constraints
 
 
 class DraftAppointment(BaseModel):
@@ -111,6 +113,7 @@ def validate_drafts(db, campaign, inputs):
         ).all()
     }
     policy=fetch_policy(db,campaign.id)
+    blackouts, remote_only = jury_constraints(db, campaign.id)
     if policy["respect_candidate_availability"]:
         raise HTTPException(409,"La validation automatique des souhaits libres des candidats n'est pas disponible.")
     starts_by_member = {}
@@ -128,6 +131,13 @@ def validate_drafts(db, campaign, inputs):
             raise HTTPException(409, "Un juré proposé n'est pas habilité ou n'appartient pas à la campagne.")
         users = [pair[1] for pair in selected]
         for user in users:
+            if not juror_respects_constraints(
+                user.id, start, row.mode, blackouts, remote_only
+            ):
+                raise HTTPException(
+                    409,
+                    "Un juré est indisponible ce jour ou participe uniquement à distance.",
+                )
             if user.id in available_by_user and not juror_available(
                 available_by_user[user.id], start, end
             ):
@@ -181,7 +191,7 @@ def _readable_rows(db, campaign, actor):
         User, RecruitmentJuryMember.user_id == User.id
     ).filter(RecruitmentJuryMember.campaign_id == campaign.id).all()
     by_id = {
-        str(m.id): {"name": f"{u.first_name} {u.last_name}".strip(),
+        str(m.id): {"id": str(m.id), "name": f"{u.first_name} {u.last_name}".strip(),
                     "department": u.department, "user_id": str(u.id)}
         for m, u in roster
     }
@@ -189,7 +199,39 @@ def _readable_rows(db, campaign, actor):
     drafts = db.query(RecruitmentInterviewDraft).filter(
         RecruitmentInterviewDraft.campaign_id == campaign.id
     ).order_by(RecruitmentInterviewDraft.starts_at, RecruitmentInterviewDraft.application_id).all()
-    visible = [row for row in drafts if manager or bool(current.intersection(row.jury_member_ids))]
+    # Determine the effective jury from real attendance when known. Replacement
+    # jurors gain access to the dossier; absent jurors lose access. A postponed
+    # interview instead uses the revised private draft, not the former roster.
+    events = db.query(AuditLog).filter(
+        AuditLog.entity_type == "application",
+        AuditLog.entity_id.in_([row.application_id for row in drafts]),
+        AuditLog.action.in_([
+            "entretien_reel_confirme_par_organisateur",
+            "entretien_presence_enregistree",
+            "entretien_report_replanifie_interne",
+            "entretien_presence_jury_modifiee",
+            "reorganisation_jury_indisponibilite_17nov",
+        ]),
+    ).order_by(AuditLog.created_at, AuditLog.id).all()
+    event_by_application = {}
+    completed_by_application = {}
+    for event in events:
+        event_by_application[event.entity_id] = event
+        if (event.new_value or {}).get("status") in ("completed", "completed_pending_score"):
+            completed_by_application[event.entity_id] = event
+
+    def effective_ids(row):
+        completed = completed_by_application.get(row.application_id)
+        if completed:
+            return (completed.new_value or {}).get("actual_jury_member_ids", row.jury_member_ids)
+        latest = event_by_application.get(row.application_id)
+        if latest and latest.action in ("entretien_presence_enregistree", "entretien_presence_jury_modifiee"):
+            data = latest.new_value or {}
+            if data.get("status") != "postponed":
+                return data.get("actual_jury_member_ids") or row.jury_member_ids
+        return row.jury_member_ids
+
+    visible = [row for row in drafts if manager or bool(current.intersection(effective_ids(row)))]
     apps = {app.id:app for app in db.query(Application).filter(
         Application.id.in_([row.application_id for row in visible])
     ).all()}
@@ -202,6 +244,19 @@ def _readable_rows(db, campaign, actor):
     for row in visible:
         app = apps[row.application_id]
         test = personality.get(row.application_id)
+        last_event = event_by_application.get(row.application_id)
+        latest = (last_event.new_value or {}) if last_event else {}
+        realized_event = completed_by_application.get(row.application_id)
+        realized = (realized_event.new_value or {}) if realized_event else {}
+        status = "completed" if realized_event else latest.get("status", "scheduled")
+        if last_event and last_event.action == "entretien_report_replanifie_interne":
+            status = "postponed"
+        published = app.interview_at.isoformat() + "Z" if app.interview_at else None
+        communicated = bool(
+            app.interview_at is not None and
+            app.interview_at == row.starts_at and
+            (app.interview_mode or "in_person") == (row.mode or "in_person")
+        )
         result.append({
             "application_id": str(row.application_id),
             "candidate_name": f"{app.first_name} {app.last_name}".strip(),
@@ -219,7 +274,23 @@ def _readable_rows(db, campaign, actor):
             "revision": row.revision,
             "mode": row.mode or "in_person",
             "location": row.location,
-            "draft_only": True,
+            "draft_only": not communicated,
+            "operational_status": status,
+            "official_starts_at": published,
+            "awaiting_candidate_notification": not communicated and status == "postponed",
+            "actual_jury": [
+                dict(by_id.get(mid, {"name": "Juré non trouvé", "department": None}))
+                for mid in realized.get("actual_jury_member_ids", [])
+            ],
+            "actual_day": realized.get("actual_date") or realized.get("actual_day"),
+            "actual_session": realized.get("session"),
+            "effective_jury": [
+                dict(by_id.get(mid, {"name": "Juré non trouvé", "department": None}),
+                     is_me=by_id.get(mid, {}).get("user_id") == str(actor.id))
+                for mid in effective_ids(row)
+            ],
+            "internal_changes_only": True,
+            "candidate_notifications": 0,
         })
     return result
 
@@ -255,15 +326,28 @@ def juror_availability_readiness(db, campaign_id):
             RecruitmentJuryAvailability.user_id.in_(user_ids),
         ).all()
     }
+    blackouts, remote_only = jury_constraints(db, campaign_id)
+    draft_modes = {
+        str(member_id): [
+            (draft.starts_at, draft.ends_at, draft.mode)
+            for draft in drafts if str(member_id) in draft.jury_member_ids
+        ] for member_id in slots
+    }
     confirmed = sum(
         1 for member_id, appointments in slots.items()
         if member_id in members
         and members[member_id][0].is_active
         and eligible_juror(members[member_id][1])
         and members[member_id][0].user_id in availabilities
-        and all(juror_available(
-            availabilities[members[member_id][0].user_id], start, end
-        ) for start, end in appointments)
+        and all(
+            juror_available(
+                availabilities[members[member_id][0].user_id], start, end
+            ) and juror_respects_constraints(
+                members[member_id][0].user_id, start, mode,
+                blackouts, remote_only,
+            )
+            for start, end, mode in draft_modes[member_id]
+        )
     )
     return {
         "assigned": total,

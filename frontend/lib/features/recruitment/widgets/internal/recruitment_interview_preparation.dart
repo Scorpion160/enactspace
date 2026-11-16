@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
+import 'recruitment_collective_evaluation_dialog.dart';
+import 'recruitment_interview_attendance_dialog.dart';
+import 'recruitment_private_proposal_dialog.dart';
+import 'recruitment_jury_kit_dialog.dart';
 
 /// Staff and assigned jurors' private interview workspace. No candidate mail
 /// or public interview state is changed by its read/note actions.
@@ -165,6 +169,57 @@ class _RecruitmentInterviewPreparationState
     }
   }
 
+  Future<void> _showRanking() async {
+    try {
+      final data = Map<String, dynamic>.from(
+        await _api.get(
+          '/recruitment/campaigns/${widget.campaignId}/interviews/collective/ranking',
+          token: await _token(),
+        ) as Map,
+      );
+      if (!mounted) return;
+      final rows = (data['ranking'] as List? ?? const []).whereType<Map>().toList();
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const Text('Classement des entretiens'),
+          content: SizedBox(
+            width: 680,
+            height: 460,
+            child: rows.isEmpty
+                ? const Center(
+                    child: Text('Aucune note collective enregistrée.'),
+                  )
+                : ListView.builder(
+                    itemCount: rows.length,
+                    itemBuilder: (context, index) {
+                      final row = rows[index];
+                      return ListTile(
+                        leading: Text('${row['rank']}.'),
+                        title: Text(row['candidate_name']?.toString() ?? ''),
+                        subtitle: Text(row['department']?.toString() ?? ''),
+                        trailing: Text('${row['score']} / 100'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible de charger le classement.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final search = _search.text.trim().toLowerCase();
@@ -200,6 +255,17 @@ class _RecruitmentInterviewPreparationState
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
+                TextButton.icon(
+                  onPressed: () => showRecruitmentJuryKit(context),
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('Kit du jury'),
+                ),
+                if (_canManage)
+                  TextButton.icon(
+                    onPressed: _showRanking,
+                    icon: const Icon(Icons.leaderboard_outlined),
+                    label: const Text('Classement'),
+                  ),
                 IconButton(
                   tooltip: 'Actualiser les affectations',
                   onPressed: _loading ? null : _load,
@@ -209,8 +275,8 @@ class _RecruitmentInterviewPreparationState
             ),
             const SizedBox(height: 6),
             const Text(
-              'Répartition interne. Les horaires ne sont pas encore '
-              'communiqués aux candidats.',
+              'Entretiens à préparer ou à évaluer. Les rendez-vous confirmés '
+              'et les affectations internes sont distingués dans le dossier.',
             ),
             if (_canManage)
               const Padding(
@@ -279,6 +345,20 @@ class _RecruitmentInterviewPreparationState
                         ),
                         const SizedBox(height: 3),
                         Text(
+                          switch (row['operational_status']) {
+                            'completed' => 'Entretien réalisé · note à renseigner',
+                            'postponed' => 'Report en préparation',
+                            'no_show' => 'Absence signalée',
+                            _ => 'Entretien à réaliser',
+                          },
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        if (row['awaiting_candidate_notification'] == true)
+                          const Text(
+                            'Nouvel horaire interne · convocation non envoyée',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        Text(
                           '${row['candidate_department'] ?? ''} · ${(row['starts_at'] ?? '').toString().replaceAll('T', ' ').replaceAll('Z', '')} · ${row['mode'] == 'online'
                               ? 'En ligne'
                               : row['mode'] == 'hybrid'
@@ -287,8 +367,17 @@ class _RecruitmentInterviewPreparationState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Avec : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
+                          'Jury prévu : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
                         ),
+                        if (row['operational_status'] == 'completed')
+                          Text(
+                            'Séance réellement effectuée : ${row['actual_day'] ?? 'date à confirmer'}'
+                            '${row['actual_session'] == 'pause_de_midi' ? ' · pause de midi' : ''}',
+                          ),
+                        if ((row['actual_jury'] as List? ?? const []).isNotEmpty)
+                          Text(
+                            'Jury réellement présent : ${(row['actual_jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
+                          ),
                         Text(
                           'Questionnaire : ${switch (row['personality_status']) {
                             'submitted' => 'Terminé',
@@ -308,7 +397,74 @@ class _RecruitmentInterviewPreparationState
                                 icon: const Icon(Icons.folder_open_outlined),
                                 label: const Text('Dossier et réponses'),
                               ),
-                            if ((row['jury'] as List? ?? const [])
+                            if (_canManage &&
+                                row['operational_status'] != 'completed')
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final saved = await showPrivateInterviewProposalDialog(
+                                    context,
+                                    campaignId: widget.campaignId,
+                                    applicationId: row['application_id'].toString(),
+                                    candidateName: row['candidate_name']?.toString() ?? 'Candidat',
+                                    currentStart: row['starts_at']?.toString() ?? '',
+                                    currentMode: row['mode']?.toString() ?? 'in_person',
+                                    currentLocation: row['location']?.toString() ?? '',
+                                    currentJury: (row['jury'] as List? ?? const [])
+                                        .whereType<Map>()
+                                        .map((m) => m['id']?.toString() ?? '')
+                                        .where((id) => id.isNotEmpty)
+                                        .toList(),
+                                  );
+                                  if (saved && context.mounted) {
+                                    await _load();
+                                  }
+                                },
+                                icon: const Icon(Icons.edit_calendar_outlined),
+                                label: const Text('Modifier le créneau'),
+                              ),
+                            if (_canManage ||
+                                (row['effective_jury'] as List? ?? const [])
+                                    .whereType<Map>()
+                                    .any((member) => member['is_me'] == true))
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final saved = await showInterviewAttendanceDialog(
+                                    context,
+                                    campaignId: widget.campaignId,
+                                    applicationId: row['application_id'].toString(),
+                                    candidateName: row['candidate_name']?.toString() ?? 'Candidat',
+                                  );
+                                  if (saved && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Suivi de l’entretien enregistré.')),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.fact_check_outlined),
+                                label: const Text('Présence / report'),
+                              ),
+                            if (_canManage ||
+                                (row['effective_jury'] as List? ?? const [])
+                                    .whereType<Map>()
+                                    .any((member) => member['is_me'] == true))
+                              TextButton.icon(
+                                key: Key('collective-review-${row['application_id']}'),
+                                onPressed: () async {
+                                  final saved = await showCollectiveEvaluationDialog(
+                                    context,
+                                    applicationId: row['application_id'].toString(),
+                                    candidateName: row['candidate_name']?.toString() ?? 'Candidat',
+                                  );
+                                  if (saved && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Note collective du jury enregistrée.')),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.rate_review_outlined),
+                                label: const Text('Noter ensemble'),
+                              ),
+                            if ((row['effective_jury'] as List? ?? const [])
                                 .whereType<Map>()
                                 .any((member) => member['is_me'] == true))
                               TextButton.icon(
