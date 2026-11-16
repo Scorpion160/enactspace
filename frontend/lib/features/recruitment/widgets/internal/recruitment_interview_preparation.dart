@@ -385,7 +385,7 @@ class _RecruitmentInterviewPreparationState
                                     applicationId: row['application_id'].toString(),
                                     candidateName: row['candidate_name']?.toString() ?? 'Candidat',
                                   );
-                                  if (saved && mounted) {
+                                  if (saved && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Suivi de l’entretien enregistré.')),
                                     );
@@ -406,7 +406,7 @@ class _RecruitmentInterviewPreparationState
                                     applicationId: row['application_id'].toString(),
                                     candidateName: row['candidate_name']?.toString() ?? 'Candidat',
                                   );
-                                  if (saved && mounted) {
+                                  if (saved && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Note collective du jury enregistrée.')),
                                     );
