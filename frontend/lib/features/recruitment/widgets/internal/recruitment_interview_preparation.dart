@@ -360,10 +360,10 @@ class _RecruitmentInterviewPreparationState
                           ),
                         Text(
                           '${row['candidate_department'] ?? ''} · ${(row['starts_at'] ?? '').toString().replaceAll('T', ' ').replaceAll('Z', '')} · ${row['mode'] == 'online'
-                              ? 'En ligne'
+                              ? 'Candidat à distance (exception)'
                               : row['mode'] == 'hybrid'
-                              ? 'Mixte'
-                              : 'Présentiel'}',
+                              ? 'Candidat sur place · juré en ligne'
+                              : 'Candidat et jury sur place'}',
                         ),
                         const SizedBox(height: 4),
                         Text(
