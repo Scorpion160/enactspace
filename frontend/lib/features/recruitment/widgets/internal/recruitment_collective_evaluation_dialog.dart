@@ -93,6 +93,7 @@ Future<bool> showCollectiveEvaluationDialog(
   var saving = false;
   String? error;
   try {
+    if (!context.mounted) return false;
     return await showDialog<bool>(
           context: context,
           builder: (dialogContext) => StatefulBuilder(
