@@ -6,7 +6,7 @@ English is a separate training indicator, never added to the general ranking.
 from uuid import UUID
 from datetime import date as CalendarDate
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, StrictInt, model_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_recruitment_access
@@ -42,8 +42,8 @@ RECOMMENDATIONS = {"tres_favorable", "favorable", "a_discuter", "defavorable"}
 
 class CollectiveEvaluationSave(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    ratings: dict[str, int]
-    english: dict[str, int] | None = None
+    ratings: dict[str, StrictInt]
+    english: dict[str, StrictInt] | None = None
     strengths: str = Field(default="", max_length=3000)
     vigilance: str = Field(default="", max_length=3000)
     potential: str = Field(default="", max_length=3000)
