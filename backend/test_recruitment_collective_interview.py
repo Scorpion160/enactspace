@@ -2,8 +2,11 @@
 import unittest
 from pydantic import ValidationError
 from app.services.recruitment_collective_interview import (
-    CollectiveEvaluationSave, collective_score, WEIGHTS, ENGLISH,
+    CollectiveEvaluationSave, collective_score, WEIGHTS, ENGLISH, _current_jury,
 )
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 
 def payload(**overrides):
@@ -65,6 +68,51 @@ class CollectiveJuryEvaluationTests(unittest.TestCase):
         grades["unknown"] = 5
         with self.assertRaises(ValidationError):
             CollectiveEvaluationSave.model_validate(payload(ratings=grades))
+
+    def test_completed_jury_uses_actual_replacements(self):
+        old, present = uuid4(), uuid4()
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(jury_member_ids=[str(old)])
+        event = SimpleNamespace(
+            action="entretien_reel_confirme_par_organisateur",
+            new_value={"status": "completed_pending_score",
+                       "actual_jury_member_ids": [str(present)]},
+        )
+        self.assertEqual(
+            _current_jury(db, SimpleNamespace(id=uuid4()), event),
+            [present],
+        )
+
+    def test_postponed_jury_uses_latest_private_draft(self):
+        old, replacement = uuid4(), uuid4()
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(
+            jury_member_ids=[str(replacement)]
+        )
+        event = SimpleNamespace(
+            action="entretien_report_replanifie_interne",
+            new_value={"status": "postponed",
+                       "actual_jury_member_ids": [str(old)]},
+        )
+        self.assertEqual(
+            _current_jury(db, SimpleNamespace(id=uuid4()), event),
+            [replacement],
+        )
+
+    def test_new_uncommunicated_jury_uses_updated_draft(self):
+        changed = uuid4()
+        db = MagicMock()
+        db.get.return_value = SimpleNamespace(
+            jury_member_ids=[str(changed)]
+        )
+        event = SimpleNamespace(
+            action="reorganisation_jury_indisponibilite_17nov",
+            new_value={"jury_member_ids": [str(changed)]},
+        )
+        self.assertEqual(
+            _current_jury(db, SimpleNamespace(id=uuid4()), event),
+            [changed],
+        )
 
     def test_duplicate_real_jurors_is_invalid(self):
         from uuid import uuid4
