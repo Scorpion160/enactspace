@@ -312,7 +312,7 @@ def remote_link_to_verify(mode, location):
     import re
     if mode not in ("hybrid", "online"):
         return False
-    return re.search(r"https?://[^\\s,;]+", location or "") is None
+    return re.search(r"https?://[^\s,;]+", location or "") is None
 
 
 def juror_availability_readiness(db, campaign_id):
