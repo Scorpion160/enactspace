@@ -119,18 +119,32 @@ Future<bool> showPrivateInterviewProposalDialog(
                         ),
                         items: const [
                           DropdownMenuItem(
-                            value: 'in_person', child: Text('Présentiel'),
+                            value: 'in_person',
+                            child: Text('Candidat et jury sur place'),
                           ),
                           DropdownMenuItem(
-                            value: 'hybrid', child: Text('Mixte'),
+                            value: 'hybrid',
+                            child: Text('Candidat sur place, juré à distance'),
                           ),
                           DropdownMenuItem(
-                            value: 'online', child: Text('En ligne'),
+                            value: 'online',
+                            child: Text('Candidat à distance (exception)'),
                           ),
                         ],
                         onChanged: saving
                             ? null
                             : (v) => update(() => mode = v ?? mode),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        mode == 'online'
+                            ? 'Exception : le candidat ne peut pas se déplacer. '
+                                'Précisez la contrainte dans le motif et confirmez '
+                                'le lien avant tout envoi.'
+                            : mode == 'hybrid'
+                                ? 'Le candidat se présente à l’ESP ; seul un ou '
+                                    'plusieurs jurés participent à distance.'
+                                : 'Le candidat et les jurés sont présents à l’ESP.',
                       ),
                       const SizedBox(height: 8),
                       TextField(
