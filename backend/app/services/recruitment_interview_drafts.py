@@ -190,24 +190,18 @@ def _readable_rows(db, campaign, actor):
     drafts = db.query(RecruitmentInterviewDraft).filter(
         RecruitmentInterviewDraft.campaign_id == campaign.id
     ).order_by(RecruitmentInterviewDraft.starts_at, RecruitmentInterviewDraft.application_id).all()
-    visible = [row for row in drafts if manager or bool(current.intersection(row.jury_member_ids))]
-    apps = {app.id:app for app in db.query(Application).filter(
-        Application.id.in_([row.application_id for row in visible])
-    ).all()}
-    personality = {
-        row.application_id:row for row in db.query(ApplicationPersonality).filter(
-            ApplicationPersonality.application_id.in_([row.application_id for row in visible])
-        ).all()
-    }
-    # Read private status changes in one query to avoid N+1 requests.
+    # Determine the effective jury from real attendance when known. Replacement
+    # jurors gain access to the dossier; absent jurors lose access. A postponed
+    # interview instead uses the revised private draft, not the former roster.
     events = db.query(AuditLog).filter(
         AuditLog.entity_type == "application",
-        AuditLog.entity_id.in_([row.application_id for row in visible]),
+        AuditLog.entity_id.in_([row.application_id for row in drafts]),
         AuditLog.action.in_([
             "entretien_reel_confirme_par_organisateur",
             "entretien_presence_enregistree",
             "entretien_report_replanifie_interne",
             "entretien_presence_jury_modifiee",
+            "reorganisation_jury_indisponibilite_17nov",
         ]),
     ).order_by(AuditLog.created_at, AuditLog.id).all()
     event_by_application = {}
@@ -216,6 +210,27 @@ def _readable_rows(db, campaign, actor):
         event_by_application[event.entity_id] = event
         if (event.new_value or {}).get("status") in ("completed", "completed_pending_score"):
             completed_by_application[event.entity_id] = event
+
+    def effective_ids(row):
+        completed = completed_by_application.get(row.application_id)
+        if completed:
+            return (completed.new_value or {}).get("actual_jury_member_ids", row.jury_member_ids)
+        latest = event_by_application.get(row.application_id)
+        if latest and latest.action in ("entretien_presence_enregistree", "entretien_presence_jury_modifiee"):
+            data = latest.new_value or {}
+            if data.get("status") != "postponed":
+                return data.get("actual_jury_member_ids") or row.jury_member_ids
+        return row.jury_member_ids
+
+    visible = [row for row in drafts if manager or bool(current.intersection(effective_ids(row)))]
+    apps = {app.id:app for app in db.query(Application).filter(
+        Application.id.in_([row.application_id for row in visible])
+    ).all()}
+    personality = {
+        row.application_id:row for row in db.query(ApplicationPersonality).filter(
+            ApplicationPersonality.application_id.in_([row.application_id for row in visible])
+        ).all()
+    }
     result = []
     for row in visible:
         app = apps[row.application_id]
@@ -257,6 +272,13 @@ def _readable_rows(db, campaign, actor):
             "actual_jury": [
                 dict(by_id.get(mid, {"name": "Juré non trouvé", "department": None}))
                 for mid in realized.get("actual_jury_member_ids", [])
+            ],
+            "actual_day": realized.get("actual_date") or realized.get("actual_day"),
+            "actual_session": realized.get("session"),
+            "effective_jury": [
+                dict(by_id.get(mid, {"name": "Juré non trouvé", "department": None}),
+                     is_me=by_id.get(mid, {}).get("user_id") == str(actor.id))
+                for mid in effective_ids(row)
             ],
             "internal_changes_only": True,
             "candidate_notifications": 0,
