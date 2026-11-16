@@ -83,12 +83,19 @@ def _latest_attendance(db, application_id):
             "entretien_reel_confirme_par_organisateur",
             "entretien_presence_jury_modifiee",
             "entretien_presence_enregistree",
+            "entretien_report_replanifie_interne",
+            "reorganisation_jury_indisponibilite_17nov",
         }),
     ).order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).first()
 
 
 def _current_jury(db, app, attendance):
-    if attendance and (attendance.new_value or {}).get("actual_jury_member_ids"):
+    if attendance and attendance.action not in (
+        "entretien_report_replanifie_interne",
+        "reorganisation_jury_indisponibilite_17nov",
+    ) and (attendance.new_value or {}).get("status") != "postponed" and (
+        attendance.new_value or {}
+    ).get("actual_jury_member_ids"):
         return [UUID(x) for x in attendance.new_value["actual_jury_member_ids"]]
     draft = db.get(RecruitmentInterviewDraft, app.id)
     if draft:
@@ -167,7 +174,12 @@ def register_collective_interview(router):
         details = (review.criteria_assessment or {}) if review else {}
         return {
             "application_id": str(app.id),
-            "status": (attendance.new_value or {}).get("status", "scheduled") if attendance else "scheduled",
+            "status": (
+                "postponed"
+                if attendance and attendance.action == "entretien_report_replanifie_interne"
+                else (attendance.new_value or {}).get("status", "scheduled")
+                if attendance else "scheduled"
+            ),
             "score": float(review.score) if review and review.score is not None else None,
             "rating_version": details.get("rubric_version"),
             "ratings": details.get("ratings", {}),
@@ -211,7 +223,12 @@ def register_collective_interview(router):
                 old_value={"actual_jury_member_ids": [str(x) for x in member_ids]},
                 new_value={
                     "actual_jury_member_ids": [str(x) for x in new_jury],
-                    "status": (attendance.new_value or {}).get("status", "scheduled") if attendance else "scheduled",
+                    "status": (
+                "postponed"
+                if attendance and attendance.action == "entretien_report_replanifie_interne"
+                else (attendance.new_value or {}).get("status", "scheduled")
+                if attendance else "scheduled"
+            ),
                     "reason": payload.exception_reason.strip(),
                 },
             )
