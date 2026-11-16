@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
 import 'recruitment_collective_evaluation_dialog.dart';
+import 'recruitment_interview_attendance_dialog.dart';
+import 'recruitment_jury_kit_dialog.dart';
 
 /// Staff and assigned jurors' private interview workspace. No candidate mail
 /// or public interview state is changed by its read/note actions.
@@ -252,6 +254,11 @@ class _RecruitmentInterviewPreparationState
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
+                TextButton.icon(
+                  onPressed: () => showRecruitmentJuryKit(context),
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('Kit du jury'),
+                ),
                 if (_canManage)
                   TextButton.icon(
                     onPressed: _showRanking,
@@ -365,6 +372,27 @@ class _RecruitmentInterviewPreparationState
                                 ),
                                 icon: const Icon(Icons.folder_open_outlined),
                                 label: const Text('Dossier et réponses'),
+                              ),
+                            if (_canManage ||
+                                (row['jury'] as List? ?? const [])
+                                    .whereType<Map>()
+                                    .any((member) => member['is_me'] == true))
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final saved = await showInterviewAttendanceDialog(
+                                    context,
+                                    campaignId: widget.campaignId,
+                                    applicationId: row['application_id'].toString(),
+                                    candidateName: row['candidate_name']?.toString() ?? 'Candidat',
+                                  );
+                                  if (saved && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Suivi de l’entretien enregistré.')),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.fact_check_outlined),
+                                label: const Text('Présence / report'),
                               ),
                             if (_canManage ||
                                 (row['jury'] as List? ?? const [])
