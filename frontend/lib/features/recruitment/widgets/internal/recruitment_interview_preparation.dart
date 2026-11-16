@@ -365,6 +365,13 @@ class _RecruitmentInterviewPreparationState
                               ? 'Candidat sur place · juré en ligne'
                               : 'Candidat et jury sur place'}',
                         ),
+                        if (row['video_link_to_verify'] == true)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Lien de réunion à confirmer pour le(s) participant(s) en ligne.',
+                            ),
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           'Jury prévu : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
