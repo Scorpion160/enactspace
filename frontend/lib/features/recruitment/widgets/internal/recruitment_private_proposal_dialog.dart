@@ -13,6 +13,7 @@ Future<bool> showPrivateInterviewProposalDialog(
   required String currentMode,
   required String currentLocation,
   required List<String> currentJury,
+  String? officialStart,
 }) async {
   final api = ApiClient();
   final token = await AuthService().getToken();
@@ -46,6 +47,17 @@ Future<bool> showPrivateInterviewProposalDialog(
       ? currentMode
       : 'in_person';
   final selected = Set<String>.from(currentJury);
+  // Existing assignments must be visible first, even in a long jury roster.
+  members.sort((left, right) {
+    final a = selected.contains(left['id']?.toString());
+    final b = selected.contains(right['id']?.toString());
+    if (a != b) return a ? -1 : 1;
+    return (left['name']?.toString() ?? '').toLowerCase().compareTo(
+      (right['name']?.toString() ?? '').toLowerCase(),
+    );
+  });
+  final juryScroll = ScrollController();
+  var juryFilter = '';
   final reason = TextEditingController();
   final location = TextEditingController(text: currentLocation);
   var saving = false;
@@ -59,7 +71,7 @@ Future<bool> showPrivateInterviewProposalDialog(
           context: context,
           builder: (dialog) => StatefulBuilder(
             builder: (context, update) => AlertDialog(
-              title: Text('Réorganiser · $candidateName'),
+              title: Text('Modifier le créneau · $candidateName'),
               content: SizedBox(
                 width: 650,
                 child: SingleChildScrollView(
@@ -67,9 +79,14 @@ Future<bool> showPrivateInterviewProposalDialog(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Préparation interne uniquement. Une nouvelle convocation '
-                        'ne sera ni publiée ni envoyée aux candidats ou aux jurés.',
+                      Text(
+                        officialStart == null
+                            ? 'Cette modification reste interne. Aucun message '
+                                'ne sera envoyé aux candidats ni aux jurés.'
+                            : 'Une convocation a déjà été publiée pour cet '
+                                'entretien. Les changements saisis ici restent '
+                                'internes tant qu’une nouvelle convocation '
+                                'n’est pas validée.',
                       ),
                       const SizedBox(height: 12),
                       Wrap(
@@ -95,7 +112,10 @@ Future<bool> showPrivateInterviewProposalDialog(
                           ),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.schedule),
-                            label: Text(chosenTime.format(context)),
+                            label: Text(
+                              '${chosenTime.hour.toString().padLeft(2, '0')} h '
+                              '${chosenTime.minute.toString().padLeft(2, '0')}',
+                            ),
                             onPressed: saving
                                 ? null
                                 : () async {
@@ -155,38 +175,106 @@ Future<bool> showPrivateInterviewProposalDialog(
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Membres du jury',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Membres du jury',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Text('${selected.length} sélectionné(s)'),
+                        ],
                       ),
-                      const Text(
-                        'Les exceptions de composition sont permises avec '
-                        'justification, sans déroger aux disponibilités et '
-                        'aux règles d’accès.',
-                      ),
-                      for (final member in members)
-                        CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(member['name']?.toString() ?? ''),
-                          subtitle: Text(member['department']?.toString() ?? ''),
-                          value: selected.contains(member['id']?.toString()),
-                          onChanged: saving
-                              ? null
-                              : (checked) => update(() {
-                                    final id = member['id'].toString();
-                                    if (checked == true) {
-                                      selected.add(id);
-                                    } else {
-                                      selected.remove(id);
-                                    }
-                                  }),
+                      const SizedBox(height: 6),
+                      if (selected.isNotEmpty)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            for (final member in members.where(
+                              (m) => selected.contains(m['id']?.toString()),
+                            ))
+                              InputChip(
+                                label: Text(member['name']?.toString() ?? ''),
+                                onDeleted: saving
+                                    ? null
+                                    : () => update(
+                                        () => selected.remove(member['id'].toString()),
+                                      ),
+                              ),
+                          ],
                         ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Rechercher un juré ou un département',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) => update(() => juryFilter = value),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 210,
+                        child: Scrollbar(
+                          controller: juryScroll,
+                          thumbVisibility: true,
+                          child: ListView(
+                            controller: juryScroll,
+                            children: [
+                              for (final member in members.where((m) {
+                                final query = juryFilter.trim().toLowerCase();
+                                final label =
+                                    '${m['name'] ?? ''} ${m['department'] ?? ''}'
+                                        .toLowerCase();
+                                return query.isEmpty || label.contains(query);
+                              }))
+                                CheckboxListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  title: Text(member['name']?.toString() ?? ''),
+                                  subtitle: Text(
+                                    member['department']?.toString() ?? '',
+                                  ),
+                                  value: selected.contains(
+                                    member['id']?.toString(),
+                                  ),
+                                  onChanged: saving
+                                      ? null
+                                      : (checked) => update(() {
+                                          final id = member['id'].toString();
+                                          if (checked == true) {
+                                            selected.add(id);
+                                          } else {
+                                            selected.remove(id);
+                                          }
+                                        }),
+                                ),
+                              if (!members.any((m) {
+                                final query = juryFilter.trim().toLowerCase();
+                                return ('${m['name'] ?? ''} ${m['department'] ?? ''}')
+                                    .toLowerCase()
+                                    .contains(query);
+                              }))
+                                const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Text('Aucun juré ne correspond à la recherche.'),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: reason,
                         maxLines: 2,
                         decoration: const InputDecoration(
-                          labelText: 'Motif du changement (obligatoire)',
+                          labelText: 'Motif de la modification',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -242,12 +330,19 @@ Future<bool> showPrivateInterviewProposalDialog(
                               },
                             );
                             if (dialog.mounted) Navigator.pop(dialog, true);
+                          } on ApiException catch (failure) {
+                            if (dialog.mounted) {
+                              update(() {
+                                saving = false;
+                                error = failure.message;
+                              });
+                            }
                           } catch (_) {
                             if (dialog.mounted) {
                               update(() {
                                 saving = false;
-                                error = 'Vérifiez les horaires, les disponibilités '
-                                    'et les éventuels conflits de jury.';
+                                error = 'Enregistrement impossible. Vérifiez '
+                                    'votre connexion et réessayez.';
                               });
                             }
                           }
@@ -262,5 +357,6 @@ Future<bool> showPrivateInterviewProposalDialog(
   } finally {
     reason.dispose();
     location.dispose();
+    juryScroll.dispose();
   }
 }

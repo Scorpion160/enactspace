@@ -416,6 +416,7 @@ class _RecruitmentInterviewPreparationState
                                     currentStart: row['starts_at']?.toString() ?? '',
                                     currentMode: row['mode']?.toString() ?? 'in_person',
                                     currentLocation: row['location']?.toString() ?? '',
+                                    officialStart: row['official_starts_at']?.toString(),
                                     currentJury: (row['jury'] as List? ?? const [])
                                         .whereType<Map>()
                                         .map((m) => m['id']?.toString() ?? '')
