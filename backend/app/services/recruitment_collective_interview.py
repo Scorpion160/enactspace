@@ -1,0 +1,259 @@
+"""One collective jury evaluation per candidate. No candidate notifications.
+
+The source of truth for each score is the seven-criterion interview workbook.
+English is a separate training indicator, never added to the general ranking.
+"""
+from uuid import UUID
+from datetime import date
+from fastapi import Depends, HTTPException
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+from sqlalchemy.orm import Session
+
+from app.api.deps import require_recruitment_access
+from app.db.database import get_db
+from app.core.time import utc_now
+from app.models.audit import AuditLog
+from app.models.user import User
+from app.models.recruitment import (
+    Application, ApplicationReview, RecruitmentCampaign,
+    RecruitmentJuryMember, ApplicationInterviewJuror,
+)
+from app.models.recruitment_interview_drafts import RecruitmentInterviewDraft
+from app.services.recruitment_access import can_manage_jury, eligible_juror
+from app.services.operational_integrity import lock_row
+from app.services.audit_service import create_audit_log
+
+WEIGHTS = {
+    "motivation": 20,
+    "mission_enactus": 15,
+    "initiative_leadership": 15,
+    "travail_equipe": 15,
+    "esprit_entrepreneurial": 15,
+    "communication": 10,
+    "disponibilite": 10,
+}
+ENGLISH = (
+    "comprehension_orale", "fluidite", "vocabulaire",
+    "grammaire", "prononciation",
+)
+RUBRIC_VERSION = "jury-collectif-v1"
+RECOMMENDATIONS = {"tres_favorable", "favorable", "a_discuter", "defavorable"}
+
+
+class CollectiveEvaluationSave(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ratings: dict[str, int]
+    english: dict[str, int] | None = None
+    strengths: str = Field(default="", max_length=3000)
+    vigilance: str = Field(default="", max_length=3000)
+    potential: str = Field(default="", max_length=3000)
+    recommended_pole: str = Field(default="", max_length=150)
+    justification: str = Field(default="", max_length=3000)
+    recommendation: str
+    actual_jury_member_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=6)
+    exception_reason: str | None = Field(default=None, max_length=600)
+
+    @model_validator(mode="after")
+    def valid(self):
+        if set(self.ratings) != set(WEIGHTS):
+            raise ValueError("Les sept critères du jury sont obligatoires.")
+        if any(type(v) is not int or v < 1 or v > 5 for v in self.ratings.values()):
+            raise ValueError("Chaque critère doit être noté de 1 à 5.")
+        if self.english is not None:
+            if set(self.english) != set(ENGLISH) or any(
+                type(v) is not int or v < 1 or v > 5 for v in self.english.values()
+            ):
+                raise ValueError("Les cinq indicateurs d'anglais doivent être notés de 1 à 5.")
+        if self.recommendation not in RECOMMENDATIONS:
+            raise ValueError("Appréciation du jury inconnue.")
+        if self.actual_jury_member_ids is not None and len(set(self.actual_jury_member_ids)) != len(self.actual_jury_member_ids):
+            raise ValueError("Un juré ne peut être compté deux fois.")
+        return self
+
+
+def collective_score(ratings):
+    return sum(value * WEIGHTS[key] / 5 for key, value in ratings.items())
+
+
+def _latest_attendance(db, application_id):
+    return db.query(AuditLog).filter(
+        AuditLog.entity_type == "application",
+        AuditLog.entity_id == application_id,
+        AuditLog.action.in_({
+            "entretien_reel_confirme_par_organisateur",
+            "entretien_presence_jury_modifiee",
+        }),
+    ).order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).first()
+
+
+def _current_jury(db, app, attendance):
+    if attendance and (attendance.new_value or {}).get("actual_jury_member_ids"):
+        return [UUID(x) for x in attendance.new_value["actual_jury_member_ids"]]
+    draft = db.get(RecruitmentInterviewDraft, app.id)
+    if draft:
+        return [UUID(x) for x in draft.jury_member_ids]
+    return [
+        row.jury_member_id for row in db.query(ApplicationInterviewJuror).filter(
+            ApplicationInterviewJuror.application_id == app.id
+        ).all()
+    ]
+
+
+def _private_access(db, application_id, actor, *, management=False):
+    app = db.get(Application, application_id)
+    if app is None:
+        raise HTTPException(404, "Candidature introuvable.")
+    campaign = db.get(RecruitmentCampaign, app.campaign_id)
+    if campaign is None or not campaign.screening_published_at or not campaign.identities_revealed_at:
+        raise HTTPException(403, "Les entretiens de cette campagne ne sont pas accessibles.")
+    manager = can_manage_jury(db, actor)
+    if management and not manager:
+        raise HTTPException(403, "Action réservée aux responsables du recrutement.")
+    attendance = _latest_attendance(db, app.id)
+    current = _current_jury(db, app, attendance)
+    juror = db.query(RecruitmentJuryMember).filter(
+        RecruitmentJuryMember.campaign_id == app.campaign_id,
+        RecruitmentJuryMember.user_id == actor.id,
+        RecruitmentJuryMember.id.in_(current),
+        RecruitmentJuryMember.is_active.is_(True),
+    ).first()
+    if not manager and not (juror and eligible_juror(actor)):
+        raise HTTPException(403, "Accès réservé au jury affecté et aux responsables.")
+    return app, attendance, current, manager
+
+
+def _review(db, application_id):
+    rows = db.query(ApplicationReview).filter(
+        ApplicationReview.application_id == application_id,
+        ApplicationReview.stage == "interview",
+    ).with_for_update().all()
+    if len(rows) > 1:
+        raise HTTPException(409, "Plusieurs évaluations collectives existent ; une revue est nécessaire.")
+    return rows[0] if rows else None
+
+
+def register_collective_interview(router):
+    @router.get("/applications/{application_id}/interview/collective")
+    def read_collective(application_id: UUID, db: Session = Depends(get_db),
+                        actor: User = Depends(require_recruitment_access)):
+        app, attendance, member_ids, manager = _private_access(db, application_id, actor)
+        rows = db.query(ApplicationReview).filter(
+            ApplicationReview.application_id == app.id,
+            ApplicationReview.stage == "interview",
+        ).all()
+        if len(rows) > 1:
+            raise HTTPException(409, "Évaluations en conflit ; contacter l'organisation.")
+        review = rows[0] if rows else None
+        details = (review.criteria_assessment or {}) if review else {}
+        return {
+            "application_id": str(app.id),
+            "status": (attendance.new_value or {}).get("status", "scheduled") if attendance else "scheduled",
+            "score": float(review.score) if review and review.score is not None else None,
+            "rating_version": details.get("rubric_version"),
+            "ratings": details.get("ratings", {}),
+            "english": details.get("english"),
+            "english_score": details.get("english_score"),
+            "strengths": details.get("strengths", ""),
+            "vigilance": details.get("vigilance", ""),
+            "potential": details.get("potential", ""),
+            "recommended_pole": details.get("recommended_pole", ""),
+            "justification": details.get("justification", ""),
+            "recommendation": review.recommendation if review else None,
+            "actual_jury_member_ids": [str(value) for value in member_ids],
+            "entered_by": str(review.reviewer_id) if review else None,
+            "can_manage_jury": manager,
+            "candidate_notifications": 0,
+        }
+
+    @router.put("/applications/{application_id}/interview/collective")
+    def save_collective(application_id: UUID, payload: CollectiveEvaluationSave,
+                        db: Session = Depends(get_db),
+                        actor: User = Depends(require_recruitment_access)):
+        app, attendance, member_ids, manager = _private_access(db, application_id, actor)
+        lock_row(db, RecruitmentCampaign, app.campaign_id)
+        new_jury = payload.actual_jury_member_ids or member_ids
+        if new_jury != member_ids:
+            if not manager or not (payload.exception_reason or "").strip():
+                raise HTTPException(409, "Un remplacement de juré exige une justification et un responsable.")
+            allowed = {
+                m.id: u for m, u in db.query(RecruitmentJuryMember, User).join(
+                    User, User.id == RecruitmentJuryMember.user_id
+                ).filter(RecruitmentJuryMember.campaign_id == app.campaign_id).all()
+                if m.is_active and eligible_juror(u)
+            }
+            if any(member_id not in allowed for member_id in new_jury):
+                raise HTTPException(409, "Un membre du jury remplacé n'est pas habilité.")
+            # A real-world emergency may legitimately break the department-coverage
+            # rule, but only the authorized manager can record that exception.
+            create_audit_log(
+                db, "entretien_presence_jury_modifiee", actor.id,
+                "application", app.id,
+                old_value={"actual_jury_member_ids": [str(x) for x in member_ids]},
+                new_value={
+                    "actual_jury_member_ids": [str(x) for x in new_jury],
+                    "status": (attendance.new_value or {}).get("status", "scheduled") if attendance else "scheduled",
+                    "reason": payload.exception_reason.strip(),
+                },
+            )
+        existing = _review(db, app.id)
+        if existing is None:
+            existing = ApplicationReview(
+                application_id=app.id, reviewer_id=actor.id, stage="interview",
+            )
+            db.add(existing)
+        general = collective_score(payload.ratings)
+        existing.score = general
+        existing.recommendation = payload.recommendation
+        existing.comment = payload.justification
+        existing.criteria_assessment = {
+            "rubric_version": RUBRIC_VERSION,
+            "ratings": payload.ratings,
+            "weights": WEIGHTS,
+            "english": payload.english,
+            "english_score": sum(payload.english.values()) if payload.english is not None else None,
+            "strengths": payload.strengths,
+            "vigilance": payload.vigilance,
+            "potential": payload.potential,
+            "recommended_pole": payload.recommended_pole,
+            "justification": payload.justification,
+            "actual_jury_member_ids": [str(x) for x in new_jury],
+            "last_edited_by": str(actor.id),
+        }
+        existing.updated_at = utc_now()
+        create_audit_log(
+            db, "notation_collective_entretien", actor.id,
+            "application", app.id,
+            new_value={"score": general, "english_score": sum(payload.english.values()) if payload.english else None,
+                       "rubric_version": RUBRIC_VERSION, "notification_candidates": 0},
+        )
+        db.commit()
+        return {"saved": True, "collective": True, "general_score": general,
+                "english_score": sum(payload.english.values()) if payload.english else None,
+                "candidate_notifications": 0}
+
+    @router.get("/campaigns/{campaign_id}/interviews/collective/ranking")
+    def collective_ranking(campaign_id: UUID, db: Session = Depends(get_db),
+                           actor: User = Depends(require_recruitment_access)):
+        if not can_manage_jury(db, actor):
+            raise HTTPException(403, "Classement réservé aux responsables.")
+        reviews = db.query(ApplicationReview, Application).join(
+            Application, Application.id == ApplicationReview.application_id
+        ).filter(
+            Application.campaign_id == campaign_id,
+            ApplicationReview.stage == "interview",
+            ApplicationReview.score.is_not(None),
+        ).all()
+        ordered = sorted(reviews, key=lambda row: (-float(row[0].score), row[1].last_name.casefold(), row[1].first_name.casefold()))
+        return {
+            "evaluated": len(ordered),
+            "ranking": [{
+                "rank": index + 1,
+                "application_id": str(app.id),
+                "candidate_name": f"{app.first_name} {app.last_name}".strip(),
+                "department": app.department,
+                "score": float(review.score),
+                "english_score": (review.criteria_assessment or {}).get("english_score"),
+                "recommendation": review.recommendation,
+            } for index, (review, app) in enumerate(ordered)],
+            "published_to_candidates": False,
+        }
