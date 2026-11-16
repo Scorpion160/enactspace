@@ -368,6 +368,11 @@ class _RecruitmentInterviewPreparationState
                         Text(
                           'Jury prévu : ${(row['jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
                         ),
+                        if (row['operational_status'] == 'completed')
+                          Text(
+                            'Séance réellement effectuée : ${row['actual_day'] ?? 'date à confirmer'}'
+                            '${row['actual_session'] == 'pause_de_midi' ? ' · pause de midi' : ''}',
+                          ),
                         if ((row['actual_jury'] as List? ?? const []).isNotEmpty)
                           Text(
                             'Jury réellement présent : ${(row['actual_jury'] as List? ?? const []).whereType<Map>().map((person) => person['name']?.toString() ?? '').join(', ')}',
@@ -392,7 +397,7 @@ class _RecruitmentInterviewPreparationState
                                 label: const Text('Dossier et réponses'),
                               ),
                             if (_canManage ||
-                                (row['jury'] as List? ?? const [])
+                                (row['effective_jury'] as List? ?? const [])
                                     .whereType<Map>()
                                     .any((member) => member['is_me'] == true))
                               TextButton.icon(
@@ -413,7 +418,7 @@ class _RecruitmentInterviewPreparationState
                                 label: const Text('Présence / report'),
                               ),
                             if (_canManage ||
-                                (row['jury'] as List? ?? const [])
+                                (row['effective_jury'] as List? ?? const [])
                                     .whereType<Map>()
                                     .any((member) => member['is_me'] == true))
                               TextButton.icon(
@@ -433,7 +438,7 @@ class _RecruitmentInterviewPreparationState
                                 icon: const Icon(Icons.rate_review_outlined),
                                 label: const Text('Noter ensemble'),
                               ),
-                            if ((row['jury'] as List? ?? const [])
+                            if ((row['effective_jury'] as List? ?? const [])
                                 .whereType<Map>()
                                 .any((member) => member['is_me'] == true))
                               TextButton.icon(
