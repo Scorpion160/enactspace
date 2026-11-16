@@ -2096,3 +2096,6 @@ register_interview_policy(router)
 
 from app.services.recruitment_collective_interview import register_collective_interview
 register_collective_interview(router)
+
+from app.services.recruitment_interview_proposals import register_private_interview_proposals
+register_private_interview_proposals(router)
