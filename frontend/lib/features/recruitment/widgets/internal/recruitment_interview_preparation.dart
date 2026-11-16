@@ -4,6 +4,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
 import 'recruitment_collective_evaluation_dialog.dart';
 import 'recruitment_interview_attendance_dialog.dart';
+import 'recruitment_private_proposal_dialog.dart';
 import 'recruitment_jury_kit_dialog.dart';
 
 /// Staff and assigned jurors' private interview workspace. No candidate mail
@@ -395,6 +396,31 @@ class _RecruitmentInterviewPreparationState
                                 ),
                                 icon: const Icon(Icons.folder_open_outlined),
                                 label: const Text('Dossier et réponses'),
+                              ),
+                            if (_canManage &&
+                                row['operational_status'] != 'completed')
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final saved = await showPrivateInterviewProposalDialog(
+                                    context,
+                                    campaignId: widget.campaignId,
+                                    applicationId: row['application_id'].toString(),
+                                    candidateName: row['candidate_name']?.toString() ?? 'Candidat',
+                                    currentStart: row['starts_at']?.toString() ?? '',
+                                    currentMode: row['mode']?.toString() ?? 'in_person',
+                                    currentLocation: row['location']?.toString() ?? '',
+                                    currentJury: (row['jury'] as List? ?? const [])
+                                        .whereType<Map>()
+                                        .map((m) => m['id']?.toString() ?? '')
+                                        .where((id) => id.isNotEmpty)
+                                        .toList(),
+                                  );
+                                  if (saved && context.mounted) {
+                                    await _load();
+                                  }
+                                },
+                                icon: const Icon(Icons.edit_calendar_outlined),
+                                label: const Text('Modifier le créneau'),
                               ),
                             if (_canManage ||
                                 (row['effective_jury'] as List? ?? const [])
