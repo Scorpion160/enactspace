@@ -191,7 +191,7 @@ def _readable_rows(db, campaign, actor):
         User, RecruitmentJuryMember.user_id == User.id
     ).filter(RecruitmentJuryMember.campaign_id == campaign.id).all()
     by_id = {
-        str(m.id): {"name": f"{u.first_name} {u.last_name}".strip(),
+        str(m.id): {"id": str(m.id), "name": f"{u.first_name} {u.last_name}".strip(),
                     "department": u.department, "user_id": str(u.id)}
         for m, u in roster
     }
