@@ -57,6 +57,7 @@ Future<bool> showInterviewAttendanceDialog(
     'no_show': 'Candidat absent',
   };
   try {
+    if (!context.mounted) return false;
     return await showDialog<bool>(
           context: context,
           builder: (dialog) => StatefulBuilder(
