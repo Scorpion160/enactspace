@@ -346,7 +346,9 @@ class _RecruitmentInterviewPreparationState
                         const SizedBox(height: 3),
                         Text(
                           switch (row['operational_status']) {
-                            'completed' => 'Entretien réalisé · note à renseigner',
+                            'completed' => row['score_recorded'] == true
+                                ? 'Entretien réalisé · noté'
+                                : 'Entretien réalisé · note à renseigner',
                             'postponed' => 'Report en préparation',
                             'no_show' => 'Absence signalée',
                             _ => 'Entretien à réaliser',

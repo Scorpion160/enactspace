@@ -22,6 +22,7 @@ from app.models.recruitment_interview_drafts import RecruitmentInterviewDraft
 from app.services.recruitment_access import can_manage_jury, eligible_juror, active_jury_member
 from app.services.operational_integrity import lock_row
 from app.services.audit_service import create_audit_log
+from app.services.recruitment_interview_status import operational_status_from_score
 
 WEIGHTS = {
     "motivation": 20,
@@ -174,14 +175,19 @@ def register_collective_interview(router):
             raise HTTPException(409, "Évaluations en conflit ; contacter l'organisation.")
         review = rows[0] if rows else None
         details = (review.criteria_assessment or {}) if review else {}
+        operational_status = (
+            "postponed" if attendance and attendance.action == "entretien_report_replanifie_interne"
+            else (attendance.new_value or {}).get("status", "scheduled")
+            if attendance else "scheduled"
+        )
+        operational_status = operational_status_from_score(
+            operational_status,
+            score=float(review.score) if review and review.score is not None else None,
+            scheduled_at=app.interview_at, now=utc_now(),
+        )
         return {
             "application_id": str(app.id),
-            "status": (
-                "postponed"
-                if attendance and attendance.action == "entretien_report_replanifie_interne"
-                else (attendance.new_value or {}).get("status", "scheduled")
-                if attendance else "scheduled"
-            ),
+            "status": operational_status,
             "score": float(review.score) if review and review.score is not None else None,
             "rating_version": details.get("rubric_version"),
             "ratings": details.get("ratings", {}),
@@ -282,6 +288,31 @@ def register_collective_interview(router):
                 "notification_candidates": 0,
             },
         )
+        # Recording a complete interview score is evidence that the session
+        # took place. Keep that operational state separate from the public
+        # application status and never send notifications here.
+        previous_status = (attendance.new_value or {}).get("status") if attendance else None
+        if general is not None and app.interview_at and app.interview_at <= utc_now():
+            if previous_status == "no_show":
+                raise HTTPException(409, "Corrige d'abord l'absence signalee avant de noter cet entretien.")
+            if previous_status != "completed":
+                prior = attendance.new_value or {} if attendance else {}
+                create_audit_log(
+                    db, "entretien_presence_enregistree", actor.id,
+                    "application", app.id,
+                    old_value=prior or None,
+                    new_value={
+                        "status": "completed",
+                        "actual_day": prior.get("actual_day") or prior.get("actual_date")
+                        or app.interview_at.date().isoformat(),
+                        "actual_jury_member_ids": prior.get("actual_jury_member_ids")
+                        or [str(member_id) for member_id in new_jury],
+                        "source": "notation_collective_complete",
+                        "score_recorded": True,
+                        "public_schedule_changed": False,
+                        "candidate_notifications": 0,
+                    },
+                )
         db.commit()
         return {"saved": True, "collective": True, "general_score": general,
                 "complete": general is not None,
