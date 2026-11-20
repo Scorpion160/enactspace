@@ -15,8 +15,8 @@ from app.api.deps import require_recruitment_access
 from app.core.time import utc_now
 from app.db.database import get_db
 from app.models.recruitment import (
-    Application, ApplicationPersonality, RecruitmentCampaign, RecruitmentJuryMember,
-    ApplicationInterviewJuror,
+    Application, ApplicationPersonality, ApplicationReview, RecruitmentCampaign,
+    RecruitmentJuryMember, ApplicationInterviewJuror,
 )
 from app.models.recruitment_interview_drafts import (
     RecruitmentInterviewDraft, RecruitmentInterviewPrepNote,
@@ -29,6 +29,7 @@ from app.services.recruitment_access import (
     active_jury_member, can_manage_jury, eligible_juror, require_campaign_access,
 )
 from app.services.recruitment_interviews import department_key, effective_interview_end
+from app.services.recruitment_interview_status import operational_status_from_score
 from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
 from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
 from app.services.recruitment_jury_constraints import jury_constraints, juror_respects_constraints
@@ -240,6 +241,14 @@ def _readable_rows(db, campaign, actor):
             ApplicationPersonality.application_id.in_([row.application_id for row in visible])
         ).all()
     }
+    scored = {
+        review.application_id: float(review.score)
+        for review in db.query(ApplicationReview).filter(
+            ApplicationReview.application_id.in_([row.application_id for row in visible]),
+            ApplicationReview.stage == "interview",
+            ApplicationReview.score.is_not(None),
+        ).all()
+    }
     result = []
     for row in visible:
         app = apps[row.application_id]
@@ -251,6 +260,10 @@ def _readable_rows(db, campaign, actor):
         status = "completed" if realized_event else latest.get("status", "scheduled")
         if last_event and last_event.action == "entretien_report_replanifie_interne":
             status = "postponed"
+        status = operational_status_from_score(
+            status, score=scored.get(row.application_id),
+            scheduled_at=app.interview_at, now=utc_now(),
+        )
         published = app.interview_at.isoformat() + "Z" if app.interview_at else None
         communicated = bool(
             app.interview_at is not None and
@@ -279,6 +292,9 @@ def _readable_rows(db, campaign, actor):
             "location": row.location,
             "draft_only": not communicated,
             "operational_status": status,
+            "score_recorded": row.application_id in scored,
+            "interview_score": scored.get(row.application_id),
+            "awaiting_score": status == "completed" and row.application_id not in scored,
             "official_starts_at": published,
             "awaiting_candidate_notification": not communicated and status == "postponed",
             "actual_jury": [
