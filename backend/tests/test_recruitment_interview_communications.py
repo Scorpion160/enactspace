@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from app.services.recruitment_interview_communications import (
     InterviewCommunicationRequest, _email_ok, _validate_mail,
-    _when, register_interview_communications,
+    _when, _allowed_status, register_interview_communications,
 )
 
 
@@ -43,6 +43,13 @@ class InterviewCommunicationTests(unittest.TestCase):
                 action="venue", application_ids=[candidate],
                 location="Salle CRENT", send_candidates=False, send_jurors=True,
             )
+
+    def test_first_publication_allows_shortlisted_unpublished_dossier(self):
+        self.assertTrue(_allowed_status("under_review", "publish"))
+        self.assertFalse(_allowed_status("under_review", "reminder"))
+        self.assertFalse(_allowed_status("under_review", "venue"))
+        self.assertFalse(_allowed_status("rejected", "publish"))
+        self.assertTrue(_allowed_status("interview_scheduled", "publish"))
 
     def test_next_campaign_is_dynamic(self):
         request = InterviewCommunicationRequest(

@@ -82,6 +82,12 @@ class InterviewCommunicationRequest(BaseModel):
         return self
 
 
+def _allowed_status(status, action):
+    if action == "publish":
+        return status in {"under_review", "interview", "interview_scheduled"}
+    return status in {"interview", "interview_scheduled"}
+
+
 def _name(value):
     return f"{value.first_name} {value.last_name}".strip()
 
@@ -181,7 +187,7 @@ def _build(db, campaign, actor, payload):
     jury_lines = defaultdict(list)
     changes = []
     for app, draft in rows:
-        if app.status not in ("interview", "interview_scheduled") or app.screening_decision != "shortlisted":
+        if not _allowed_status(app.status, payload.action) or app.screening_decision != "shortlisted":
             raise HTTPException(409, f"{_name(app)} : candidature non autorisée pour une convocation.")
         if not _email_ok(app.email):
             raise HTTPException(409, f"{_name(app)} : adresse e-mail manquante ou invalide.")
@@ -406,6 +412,7 @@ def register_interview_communications(router):
                 app.interview_at = datetime.fromisoformat(change["new"])
                 app.interview_end_at = datetime.fromisoformat(change["end"])
                 app.interview_mode = change["mode"]
+                app.status = "interview_scheduled"
                 app.interview_jury = ", ".join(
                     _name(db.get(User, db.get(RecruitmentJuryMember, UUID(mid)).user_id))
                     for mid in change["new_jury"])
