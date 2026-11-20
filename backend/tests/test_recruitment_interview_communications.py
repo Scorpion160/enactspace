@@ -86,3 +86,12 @@ def test_manager_routes_are_registered_on_campaign():
     assert "POST" in paths[base + "preview"]
     assert "POST" in paths[base + "send"]
     assert "GET" in paths[base + "history"]
+
+
+def test_scheduling_appointment_does_not_silently_send_email():
+    """Publication of emails is exclusively controlled by the preview/send flow."""
+    import inspect
+    from app.api.routes.recruitment import schedule_application_interview
+
+    code = inspect.getsource(schedule_application_interview)
+    assert "notify_application_status(" not in code

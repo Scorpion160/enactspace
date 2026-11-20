@@ -1431,7 +1431,8 @@ def schedule_application_interview(
     application.interview_note = payload.interview_note
     application.updated_at = utc_now()
     if changed:
-        notify_application_status(db, application)
+        # All interview communication now requires explicit review and approval.
+        # A scheduling save alone must not email any recipient.
         create_audit_log(
             db=db,
             action="changement_statut_candidature",
@@ -1447,13 +1448,8 @@ def schedule_application_interview(
         name: getattr(application, name).isoformat() if isinstance(getattr(application, name), datetime) else getattr(application, name)
         for name in old_interview
     }:
-        public_interview_changed = any(
-            old_interview[name] != (getattr(application, name).isoformat()
-                if isinstance(getattr(application, name), datetime) else getattr(application, name))
-            for name in ("interview_at", "interview_end_at", "interview_mode", "interview_location", "interview_link")
-        )
-        if public_interview_changed:
-            notify_application_status(db, application, interview_updated=True)
+        # The communication hub owns all interview update emails.
+        # Preserve the audit event without an automatic notification.
         create_audit_log(
             db=db, action="programmation_entretien_candidature", user_id=current_user.id,
             entity_type="application", entity_id=application.id,
