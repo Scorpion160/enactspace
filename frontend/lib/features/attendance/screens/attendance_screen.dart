@@ -1,9 +1,16 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
+
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_form_dialog.dart';
 import '../../../shared/ui/app_components.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../models/attendance_record_model.dart';
 import '../models/attendance_session_model.dart';
 import '../services/attendance_service.dart';
@@ -16,11 +23,15 @@ import 'attendance_session_detail_screen.dart';
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({
     super.key,
+    this.authService,
+    this.attendanceService,
     @visibleForTesting this.testUser,
     @visibleForTesting this.testSessions,
     @visibleForTesting this.testRecords,
   });
 
+  final AuthService? authService;
+  final AttendanceService? attendanceService;
   final UserExperience? testUser;
   final List<AttendanceSessionModel>? testSessions;
   final List<AttendanceRecordModel>? testRecords;
@@ -30,8 +41,9 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  final AuthService _authService = AuthService();
-  final AttendanceService _attendanceService = AttendanceService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final AttendanceService _attendanceService =
+      widget.attendanceService ?? AttendanceService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
@@ -145,35 +157,51 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _submitJustification(AttendanceRecordModel record) async {
+    SelectedAttachment? attachment;
     final controller = TextEditingController(
       text: record.justificationReason ?? record.justification ?? '',
     );
     final reason = await showDialog<String?>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Justifier l\'absence'),
-          content: TextField(
-            controller: controller,
-            minLines: 3,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Motif',
-              prefixIcon: Icon(Icons.edit_note_rounded),
+      builder: (context) => StatefulBuilder(
+        builder: (context, dialogSetState) {
+          return AlertDialog(
+            title: Text('Justifier l\'absence'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    minLines: 3,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                      labelText: 'Motif',
+                      prefixIcon: Icon(Icons.edit_note_rounded),
+                    ),
+                  ),
+                  AttachmentPickerField(
+                    label: 'Justificatif facultatif',
+                    value: attachment,
+                    onChanged: (file) =>
+                        dialogSetState(() => attachment = file),
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('Envoyer'),
-            ),
-          ],
-        );
-      },
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(controller.text),
+                child: Text('Envoyer'),
+              ),
+            ],
+          );
+        },
+      ),
     );
     controller.dispose();
 
@@ -183,6 +211,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       await _attendanceService.submitJustification(
         recordId: record.id,
         reason: reason,
+        file: attachment,
       );
       await _loadSessions();
       if (!mounted) return;
@@ -254,10 +283,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               value: _view,
               onChanged: (value) => setState(() => _view = value),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
           ],
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(),
@@ -292,10 +321,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         onScanQr: () => context.push('/attendance/scan'),
         onManageNfc: () => context.push('/attendance/nfc'),
       ),
-      const SizedBox(height: 22),
+      SizedBox(height: 22),
       if (_stats != null) ...[
         _AttendanceStatsOverview(stats: _stats!),
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
       ],
       _AttendanceFiltersCard(
         controller: _searchController,
@@ -305,7 +334,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         onStatusChanged: (value) => setState(() => _statusFilter = value),
         onTypeChanged: (value) => setState(() => _typeFilter = value),
       ),
-      const SizedBox(height: 18),
+      SizedBox(height: 18),
       if (_sessions.isEmpty)
         const _EmptySessionsCard()
       else if (_filteredSessions.isEmpty)
@@ -327,6 +356,8 @@ class _AttendanceViewSwitch extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: SegmentedButton<String>(
+        expandedInsets: EdgeInsets.zero,
+        showSelectedIcon: false,
         segments: const [
           ButtonSegment(
             value: 'management',
@@ -406,7 +437,7 @@ class _AttendanceStatsOverview extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = constraints.maxWidth;
@@ -439,7 +470,7 @@ class _AttendanceStatsOverview extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(item.icon),
-                          const SizedBox(width: 10),
+                          SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -449,15 +480,17 @@ class _AttendanceStatsOverview extends StatelessWidget {
                                   item.value,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.w900),
                                 ),
                                 Text(
                                   item.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.black54),
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ],
                             ),
@@ -470,11 +503,22 @@ class _AttendanceStatsOverview extends StatelessWidget {
               },
             ),
             if (watchCount > 0) ...[
-              const SizedBox(height: 12),
-              Chip(
-                avatar: const Icon(Icons.visibility_rounded, size: 16),
-                label: Text('$watchCount membre(s) a surveiller'),
-                backgroundColor: Colors.orange.shade50,
+              SizedBox(height: 12),
+              Builder(
+                builder: (context) {
+                  final colors = Theme.of(context).colorScheme;
+                  return Chip(
+                    avatar: Icon(
+                      Icons.visibility_rounded,
+                      size: 16,
+                      color: colors.onSecondaryContainer,
+                    ),
+                    label: Text('$watchCount membre(s) à surveiller'),
+                    backgroundColor: colors.secondaryContainer,
+                    labelStyle: TextStyle(color: colors.onSecondaryContainer),
+                    side: BorderSide(color: colors.outlineVariant),
+                  );
+                },
               ),
             ],
           ],
@@ -548,21 +592,21 @@ class _PersonalAttendanceView extends StatelessWidget {
                       color: AppTheme.enactusYellow,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.fact_check_rounded,
                       color: AppTheme.softBlack,
                       size: 30,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  const Expanded(
+                  SizedBox(width: 16),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Mon suivi de présence',
                           style: TextStyle(
-                            color: AppTheme.darkText,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                           ),
@@ -570,7 +614,11 @@ class _PersonalAttendanceView extends StatelessWidget {
                         SizedBox(height: 4),
                         Text(
                           'Mes présences, retards et absences uniquement.',
-                          style: TextStyle(color: AppTheme.secondaryText),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -579,19 +627,19 @@ class _PersonalAttendanceView extends StatelessWidget {
                     onPressed: onRefresh,
                     tooltip: 'Actualiser',
                     color: AppTheme.softBlack,
-                    icon: const Icon(Icons.refresh_rounded),
+                    icon: Icon(Icons.refresh_rounded),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: 22),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: [
                   ElevatedButton.icon(
                     onPressed: onScanQr,
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                    label: const Text('Scanner QR'),
+                    icon: Icon(Icons.qr_code_scanner_rounded),
+                    label: Text('Scanner QR'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.enactusYellow,
                       foregroundColor: AppTheme.softBlack,
@@ -607,12 +655,12 @@ class _PersonalAttendanceView extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 22),
-        const Text(
+        SizedBox(height: 22),
+        Text(
           'Mon historique',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         if (records.isEmpty)
           const _EmptyPersonalAttendance()
         else
@@ -650,13 +698,18 @@ class _PersonalMetric extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppTheme.softBlack,
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
-          Text(label, style: const TextStyle(color: AppTheme.secondaryText)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -682,15 +735,17 @@ class _PersonalAttendanceTile extends StatelessWidget {
       children: [
         Text(
           session?.title ?? 'Session de présence',
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
         ),
-        const SizedBox(height: 5),
+        SizedBox(height: 5),
         Text(
           session?.dateLabel ?? _recordDateLabel(record),
-          style: const TextStyle(color: Colors.black54),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         if (record.justification?.trim().isNotEmpty == true) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             record.justification!,
             maxLines: 2,
@@ -721,8 +776,8 @@ class _PersonalAttendanceTile extends StatelessWidget {
         if (canJustify)
           OutlinedButton.icon(
             onPressed: () => onSubmitJustification(record),
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('Justifier'),
+            icon: Icon(Icons.edit_note_rounded),
+            label: Text('Justifier'),
           ),
       ],
     );
@@ -744,9 +799,9 @@ class _PersonalAttendanceTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   avatar,
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14),
                   Expanded(child: details),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Flexible(child: actions),
                 ],
               );
@@ -759,11 +814,11 @@ class _PersonalAttendanceTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     avatar,
-                    const SizedBox(width: 14),
+                    SizedBox(width: 14),
                     Expanded(child: details),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Align(alignment: Alignment.centerLeft, child: actions),
               ],
             );
@@ -779,7 +834,7 @@ class _EmptyPersonalAttendance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(28),
         child: Center(
@@ -870,23 +925,23 @@ class _AttendanceHeader extends StatelessWidget {
       children: [
         OutlinedButton.icon(
           onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          icon: Icon(Icons.refresh_rounded),
+          label: Text('Actualiser'),
         ),
         OutlinedButton.icon(
           onPressed: onScanQr,
-          icon: const Icon(Icons.qr_code_scanner_rounded),
-          label: const Text('Scanner QR'),
+          icon: Icon(Icons.qr_code_scanner_rounded),
+          label: Text('Scanner QR'),
         ),
         OutlinedButton.icon(
           onPressed: onManageNfc,
-          icon: const Icon(Icons.nfc_rounded),
-          label: const Text('Badges NFC'),
+          icon: Icon(Icons.nfc_rounded),
+          label: Text('Badges NFC'),
         ),
         ElevatedButton.icon(
           onPressed: onCreate,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Créer session'),
+          icon: Icon(Icons.add_rounded),
+          label: Text('Créer session'),
         ),
       ],
     );
@@ -897,7 +952,7 @@ class _AttendanceHeader extends StatelessWidget {
           ? Row(
               children: [
                 const _HeaderIcon(),
-                const SizedBox(width: 18),
+                SizedBox(width: 18),
                 Expanded(
                   child: _HeaderText(
                     total: total,
@@ -915,7 +970,7 @@ class _AttendanceHeader extends StatelessWidget {
                 Row(
                   children: [
                     const _HeaderIcon(),
-                    const SizedBox(width: 18),
+                    SizedBox(width: 18),
                     Expanded(
                       child: _HeaderText(
                         total: total,
@@ -926,7 +981,7 @@ class _AttendanceHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 actions,
               ],
             ),
@@ -946,7 +1001,7 @@ class _HeaderIcon extends StatelessWidget {
         color: AppTheme.enactusYellow,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.fact_check_rounded,
         color: AppTheme.softBlack,
         size: 34,
@@ -973,18 +1028,21 @@ class _HeaderText extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Présences',
           style: TextStyle(
-            color: AppTheme.darkText,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 28,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
           '$total session(s) • $open ouverte(s) • $closed clôturée(s) • $scheduledSoon à venir',
-          style: const TextStyle(color: AppTheme.secondaryText, height: 1.4),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
         ),
       ],
     );
@@ -1010,102 +1068,63 @@ class _AttendanceFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppFilterBar(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 760;
-          final search = TextField(
-            controller: controller,
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(
-              labelText: 'Rechercher une session',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-          );
-          final filters = Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _FilterChoice(
-                label: 'Toutes',
-                selected: statusFilter == 'all',
-                onSelected: () => onStatusChanged('all'),
-              ),
-              _FilterChoice(
-                label: 'Ouvertes',
-                selected: statusFilter == 'open',
-                onSelected: () => onStatusChanged('open'),
-              ),
-              _FilterChoice(
-                label: 'Clôturées',
-                selected: statusFilter == 'closed',
-                onSelected: () => onStatusChanged('closed'),
-              ),
-              _FilterChoice(
-                label: 'Planifiées',
-                selected: statusFilter == 'scheduled',
-                onSelected: () => onStatusChanged('scheduled'),
-              ),
-              PopupMenuButton<String>(
-                tooltip: 'Filtrer par type',
-                onSelected: onTypeChanged,
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'all', child: Text('Tous les types')),
-                  PopupMenuItem(
-                    value: 'general_meeting',
-                    child: Text('Réunions générales'),
-                  ),
-                  PopupMenuItem(
-                    value: 'pole_meeting',
-                    child: Text('Réunions pôle'),
-                  ),
-                  PopupMenuItem(
-                    value: 'project_meeting',
-                    child: Text('Réunions projet'),
-                  ),
-                  PopupMenuItem(value: 'training', child: Text('Formations')),
-                  PopupMenuItem(value: 'activity', child: Text('Activités')),
-                ],
-                child: Chip(
-                  avatar: const Icon(Icons.tune_rounded, size: 16),
-                  label: Text(_typeFilterLabel(typeFilter)),
-                ),
-              ),
-            ],
-          );
-
-          if (isWide) {
-            return Row(
-              children: [
-                Expanded(child: search),
-                const SizedBox(width: 14),
-                Flexible(child: filters),
-              ],
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              search,
-              const SizedBox(height: 10),
-              AppDataCard(
-                padding: EdgeInsets.zero,
-                child: ExpansionTile(
-                  title: const Text('Filtres de session'),
-                  subtitle: Text(
-                    '$statusFilter • ${_typeFilterLabel(typeFilter)}',
-                  ),
-                  childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
-                  children: [
-                    Align(alignment: Alignment.centerLeft, child: filters),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher une session',
+          prefixIcon: Icon(Icons.search_rounded),
+        ),
       ),
+      quickFilters: [
+        _FilterChoice(
+          label: 'Toutes',
+          selected: statusFilter == 'all',
+          onSelected: () => onStatusChanged('all'),
+        ),
+        _FilterChoice(
+          label: 'Ouvertes',
+          selected: statusFilter == 'open',
+          onSelected: () => onStatusChanged('open'),
+        ),
+        _FilterChoice(
+          label: 'Clôturées',
+          selected: statusFilter == 'closed',
+          onSelected: () => onStatusChanged('closed'),
+        ),
+        _FilterChoice(
+          label: 'Planifiées',
+          selected: statusFilter == 'scheduled',
+          onSelected: () => onStatusChanged('scheduled'),
+        ),
+      ],
+      filters: [
+        PopupMenuButton<String>(
+          tooltip: 'Filtrer par type',
+          onSelected: onTypeChanged,
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 'all', child: Text('Tous les types')),
+            PopupMenuItem(
+              value: 'general_meeting',
+              child: Text('Réunions générales'),
+            ),
+            PopupMenuItem(value: 'pole_meeting', child: Text('Réunions pôle')),
+            PopupMenuItem(
+              value: 'project_meeting',
+              child: Text('Réunions projet'),
+            ),
+            PopupMenuItem(value: 'training', child: Text('Formations')),
+            PopupMenuItem(value: 'activity', child: Text('Activités')),
+          ],
+          child: Chip(
+            avatar: Icon(Icons.tune_rounded, size: 16),
+            label: Text(_typeFilterLabel(typeFilter)),
+          ),
+        ),
+      ],
+      actions: const [],
+      activeFilterCount: typeFilter == 'all' ? 0 : 1,
     );
   }
 }
@@ -1127,7 +1146,7 @@ class _FilterChoice extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
     );
   }
 }
@@ -1159,7 +1178,10 @@ class _SessionsList extends StatelessWidget {
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 720;
                   final leading = CircleAvatar(
-                    backgroundColor: _sessionStatusColor(session).withAlpha(35),
+                    backgroundColor: _sessionStatusColor(
+                      context,
+                      session,
+                    ).withAlpha(35),
                     foregroundColor: AppTheme.softBlack,
                     child: Icon(_sessionTypeIcon(session.sessionType)),
                   );
@@ -1168,19 +1190,21 @@ class _SessionsList extends StatelessWidget {
                     children: [
                       Text(
                         session.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 17,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      SizedBox(height: 5),
                       Text(
                         session.description ?? 'Aucune description',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1192,7 +1216,7 @@ class _SessionsList extends StatelessWidget {
                           _InfoChip(
                             label: session.statusLabel,
                             icon: Icons.circle_rounded,
-                            color: _sessionStatusColor(session),
+                            color: _sessionStatusColor(context, session),
                           ),
                           _InfoChip(
                             label: session.dateLabel,
@@ -1211,9 +1235,9 @@ class _SessionsList extends StatelessWidget {
                     return Row(
                       children: [
                         leading,
-                        const SizedBox(width: 14),
+                        SizedBox(width: 14),
                         Expanded(child: content),
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         AppSecondaryButton(
                           label: 'Ouvrir le détail',
                           icon: Icons.arrow_forward_rounded,
@@ -1237,22 +1261,22 @@ class _SessionsList extends StatelessWidget {
                       Row(
                         children: [
                           leading,
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               session.title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 17,
                               ),
                             ),
                           ),
-                          const Icon(Icons.arrow_forward_rounded),
+                          Icon(Icons.arrow_forward_rounded),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       content,
                     ],
                   );
@@ -1308,8 +1332,10 @@ class CreateAttendanceSessionDialog extends StatefulWidget {
 class _CreateAttendanceSessionDialogState
     extends State<CreateAttendanceSessionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final PolesService _polesService = PolesService();
-  final ProjectsService _projectsService = ProjectsService();
+  late final PolesService _polesService =
+      (PreviewModeScope.service<PolesService>(context) ?? PolesService());
+  late final ProjectsService _projectsService =
+      (PreviewModeScope.service<ProjectsService>(context) ?? ProjectsService());
 
   final _titleController = TextEditingController(text: 'Réunion générale');
   final _descriptionController = TextEditingController(
@@ -1460,9 +1486,11 @@ class _CreateAttendanceSessionDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AppFormDialog(
+      icon: Icons.event_available_rounded,
+      description: 'Planifiez une rencontre et définissez son périmètre.',
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Créer une session'),
+      title: Text('Créer une session'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: Form(
@@ -1477,13 +1505,17 @@ class _CreateAttendanceSessionDialogState
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                     child: Text(
                       _error!,
-                      style: TextStyle(color: Colors.red.shade700),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
                   ),
                 TextFormField(
@@ -1499,7 +1531,7 @@ class _CreateAttendanceSessionDialogState
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _descriptionController,
                   minLines: 2,
@@ -1509,7 +1541,7 @@ class _CreateAttendanceSessionDialogState
                     prefixIcon: Icon(Icons.description_outlined),
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: _sessionType,
                   decoration: const InputDecoration(
@@ -1547,7 +1579,7 @@ class _CreateAttendanceSessionDialogState
                           });
                         },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: _scopeType,
                   decoration: const InputDecoration(
@@ -1583,14 +1615,14 @@ class _CreateAttendanceSessionDialogState
                         },
                 ),
                 if (_scopeType == 'pole') ...[
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     initialValue: _selectedPoleId,
                     decoration: InputDecoration(
                       labelText: _loadingScopes
                           ? 'Chargement des poles...'
                           : 'Pôle concerné',
-                      prefixIcon: const Icon(Icons.hub_rounded),
+                      prefixIcon: Icon(Icons.hub_rounded),
                     ),
                     items: _poles
                         .map(
@@ -1609,14 +1641,14 @@ class _CreateAttendanceSessionDialogState
                   ),
                 ],
                 if (_scopeType == 'project') ...[
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     initialValue: _selectedProjectId,
                     decoration: InputDecoration(
                       labelText: _loadingScopes
                           ? 'Chargement des projets...'
                           : 'Projet concerne',
-                      prefixIcon: const Icon(Icons.rocket_launch_rounded),
+                      prefixIcon: Icon(Icons.rocket_launch_rounded),
                     ),
                     items: _projects
                         .map(
@@ -1634,7 +1666,7 @@ class _CreateAttendanceSessionDialogState
                         : (value) => setState(() => _selectedProjectId = value),
                   ),
                 ],
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
@@ -1643,18 +1675,18 @@ class _CreateAttendanceSessionDialogState
                       runSpacing: 10,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(Icons.schedule_rounded),
+                        Icon(Icons.schedule_rounded),
                         Text(
                           _datePreview,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         TextButton(
                           onPressed: _loading ? null : _pickDate,
-                          child: const Text('Date'),
+                          child: Text('Date'),
                         ),
                         TextButton(
                           onPressed: _loading ? null : _pickTime,
-                          child: const Text('Heure'),
+                          child: Text('Heure'),
                         ),
                       ],
                     ),
@@ -1668,12 +1700,12 @@ class _CreateAttendanceSessionDialogState
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -1681,7 +1713,7 @@ class _CreateAttendanceSessionDialogState
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.add_rounded),
+              : Icon(Icons.add_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -1707,18 +1739,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1736,14 +1768,14 @@ class _EmptySessionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune session de présence trouvée.',
             style: TextStyle(
-              color: Colors.black54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1758,14 +1790,14 @@ class _NoSessionMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune session ne correspond aux filtres.',
             style: TextStyle(
-              color: Colors.black54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1807,7 +1839,10 @@ IconData _sessionTypeIcon(String? type) {
   }
 }
 
-Color _sessionStatusColor(AttendanceSessionModel session) {
+Color _sessionStatusColor(
+  BuildContext context,
+  AttendanceSessionModel session,
+) {
   switch (session.status) {
     case 'open':
       return Colors.green.shade700;
@@ -1816,7 +1851,7 @@ Color _sessionStatusColor(AttendanceSessionModel session) {
     case 'scheduled':
       return Colors.orange.shade700;
     default:
-      return Colors.black45;
+      return Theme.of(context).colorScheme.onSurfaceVariant;
   }
 }
 

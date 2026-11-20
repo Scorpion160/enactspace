@@ -4,23 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_service.dart';
-import '../../../core/brand/brand_assets.dart';
+import '../../../core/auth/biometric_authenticator.dart';
+import '../../../core/brand/enact_brand_lockup.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final AuthService? authService;
+  final BiometricAuthenticator? biometrics;
+  const SplashScreen({super.key, this.authService, this.biometrics});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final AuthService _authService = AuthService();
+  late final AuthService _authService;
+  late final BiometricAuthenticator _biometrics;
   bool _retry = false;
 
   @override
   void initState() {
     super.initState();
+    _authService = widget.authService ?? AuthService();
+    _biometrics = widget.biometrics ?? BiometricAuthenticator();
     unawaited(_continue());
   }
 
@@ -30,9 +36,20 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 850));
     if (!mounted) return;
     try {
-      final loggedIn = await _authService.restoreSession();
+      final hasSession = await _authService.isLoggedIn();
+      final biometricAvailable = hasSession && await _biometrics.isAvailable();
       if (!mounted) return;
-      context.go(loggedIn ? '/dashboard' : '/login');
+      if (biometricAvailable) {
+        context.go('/login?unlock=1');
+        return;
+      }
+      if (!hasSession) {
+        context.go('/login');
+        return;
+      }
+      final restored = await _authService.restoreSession();
+      if (!mounted) return;
+      context.go(restored ? '/dashboard' : '/login');
     } catch (_) {
       if (mounted) setState(() => _retry = true);
     }
@@ -42,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isCompact = size.width < 520 || size.height < 680;
-    final logoWidth = (size.width * 0.64).clamp(220.0, 420.0);
+    final logoWidth = (size.width * 0.64).clamp(260.0, 480.0);
 
     return Scaffold(
       body: Container(
@@ -56,11 +73,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    BrandAssets.logoFull,
-                    width: logoWidth,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(width: logoWidth, child: const EnactBrandLockup()),
                   SizedBox(height: isCompact ? 18 : 28),
                   const Text(
                     'Gestion interne Enactus ESP',

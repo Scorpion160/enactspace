@@ -1,5 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
+import 'package:flutter/services.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../../core/api/api_client.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/user_experience.dart';
@@ -7,27 +13,41 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
 import '../../members/models/member_model.dart';
 import '../../members/services/members_service.dart';
+import '../../members/widgets/searchable_member_picker.dart';
 import '../models/fee_model.dart';
 import '../models/financial_account_model.dart';
 import '../models/mobile_money_admin_summary_model.dart';
 import '../models/payment_model.dart';
 import '../services/finance_service.dart';
 import '../widgets/mobile_money_payment_sheet.dart';
+import '../widgets/mobile_money_readiness_card.dart';
 
 class FinanceScreen extends StatefulWidget {
-  const FinanceScreen({super.key});
+  static final ValueNotifier<int> incomingReceipts = ValueNotifier(0);
+  final FinanceService? financeService;
+  final AuthService? authService;
+  final MembersService? membersService;
+  const FinanceScreen({
+    super.key,
+    this.financeService,
+    this.authService,
+    this.membersService,
+  });
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
-  final FinanceService _financeService = FinanceService();
-  final AuthService _authService = AuthService();
-  final MembersService _membersService = MembersService();
+  late final FinanceService _financeService =
+      widget.financeService ?? FinanceService();
+  late final AuthService _authService = widget.authService ?? AuthService();
+  late final MembersService _membersService =
+      widget.membersService ?? MembersService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
+  bool _openingSharedReceipt = false;
   String? _error;
   String _paymentFilter = 'all';
   String _accountFilter = 'all';
@@ -45,11 +65,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
   @override
   void initState() {
     super.initState();
+    FinanceScreen.incomingReceipts.addListener(_onReceiptShared);
     _loadFinance();
   }
 
   @override
   void dispose() {
+    FinanceScreen.incomingReceipts.removeListener(_onReceiptShared);
     _searchController.dispose();
     super.dispose();
   }
@@ -104,6 +126,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       if (user.canManageFinance) {
         _loadMobileMoneySummary();
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openSharedReceipt());
     } catch (e) {
       if (!mounted) return;
 
@@ -148,12 +171,22 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return _memberById(userId)?.displayName ?? 'Membre inconnu';
   }
 
+  Iterable<FeeModel> get _activeFees =>
+      _fees.where((fee) => fee.status != 'cancelled');
+
   double get _totalDue {
-    return _accounts.fold(0, (sum, account) => sum + account.balanceDue);
+    return _activeFees.fold(0, (sum, fee) => sum + fee.remainingAmount);
   }
 
   double get _totalPaid {
     return _accounts.fold(0, (sum, account) => sum + account.totalPaid);
+  }
+
+  double get _allocatedPaid {
+    return _activeFees.fold(
+      0,
+      (sum, fee) => sum + fee.amountPaid.clamp(0.0, fee.amount).toDouble(),
+    );
   }
 
   double get _pendingPayments {
@@ -162,7 +195,15 @@ class _FinanceScreenState extends State<FinanceScreen> {
         .fold(0, (sum, payment) => sum + payment.amount);
   }
 
-  double get _totalExpected => _totalPaid + _totalDue;
+  double get _totalExpected {
+    return _activeFees.fold(0, (sum, fee) => sum + fee.amount);
+  }
+
+  double get _validatedUnallocated {
+    return _payments
+        .where((payment) => payment.status == 'validated')
+        .fold(0, (sum, payment) => sum + payment.unallocatedAmount);
+  }
 
   List<FinancialAccountModel> get _filteredAccounts {
     final query = _searchController.text.trim().toLowerCase();
@@ -224,12 +265,52 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   double get _collectionRate {
-    final total = _totalPaid + _totalDue;
-    if (total <= 0) return 0;
-    return (_totalPaid / total).clamp(0.0, 1.0);
+    if (_totalExpected <= 0) return 0;
+    return (_allocatedPaid / _totalExpected).clamp(0.0, 1.0);
   }
 
-  Future<void> _openCreatePaymentDialog() async {
+  void _onReceiptShared() {
+    if (!_loading && mounted) _openSharedReceipt();
+  }
+
+  Future<void> _openSharedReceipt() async {
+    if (!mounted || _loading || _openingSharedReceipt) return;
+    _openingSharedReceipt = true;
+    const channel = MethodChannel('sn.enactusesp.enactspace/receipt_share');
+    try {
+      final receipt = await channel.invokeMapMethod<String, dynamic>(
+        'getPendingReceipt',
+      );
+      if (receipt != null && mounted) {
+        await _openCreatePaymentDialog(receipt: receipt);
+      }
+    } on MissingPluginException {
+      // Web and desktop use the file picker in the payment form.
+    } finally {
+      _openingSharedReceipt = false;
+      if (mounted) {
+        try {
+          final hasAnother =
+              await channel.invokeMethod<bool>('hasPendingReceipt') ?? false;
+          if (hasAnother && mounted) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _openSharedReceipt(),
+            );
+          }
+        } on MissingPluginException {
+          // No Android bridge on web/desktop.
+        }
+      }
+    }
+  }
+
+  Future<void> _openCreatePaymentDialog({
+    Map<String, dynamic>? receipt,
+    String? initialMethod,
+    String? initialUserId,
+    List<String> initialFeeIds = const [],
+    double? initialAmount,
+  }) async {
     final created = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -237,6 +318,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
           financeService: _financeService,
           members: _members,
           canManage: _canManageFinance,
+          fees: _fees,
+          sharedReceipt: receipt,
+          initialMethod: initialMethod,
+          initialUserId: initialUserId,
+          initialFeeIds: initialFeeIds,
+          initialAmount: initialAmount,
         );
       },
     );
@@ -249,6 +336,72 @@ class _FinanceScreenState extends State<FinanceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Paiement enregistré avec succès.')),
       );
+    }
+  }
+
+  Future<void> _openPaymentActions() async {
+    if (_canManageFinance) {
+      await _openCreatePaymentDialog();
+      return;
+    }
+
+    final payableFees = _fees
+        .where(
+          (fee) =>
+              fee.remainingAmount > 0 &&
+              fee.status != 'paid' &&
+              fee.status != 'cancelled',
+        )
+        .toList();
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.phone_android_rounded),
+              title: Text('Payer par Wave ou Orange Money'),
+              subtitle: Text(
+                payableFees.isEmpty
+                    ? 'Aucune dette n’est actuellement payable en ligne.'
+                    : 'Choisir les frais et le montant avant le checkout.',
+              ),
+              enabled: payableFees.isNotEmpty,
+              onTap: payableFees.isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop('online'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(Icons.receipt_long_rounded),
+              title: Text('Déclarer un paiement déjà effectué'),
+              subtitle: Text(
+                'Wave, Orange Money ou autre paiement avec référence/reçu.',
+              ),
+              onTap: () => Navigator.of(context).pop('declare'),
+            ),
+            ListTile(
+              leading: Icon(Icons.payments_rounded),
+              title: Text('Déclarer un paiement en espèces'),
+              subtitle: Text('Le financier devra confirmer l’encaissement.'),
+              onTap: () => Navigator.of(context).pop('cash'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'online') {
+      await _openMobileMoneySheet(payableFees.first);
+    } else if (action == 'cash') {
+      await _openCreatePaymentDialog(initialMethod: 'especes');
+    } else if (action == 'declare') {
+      await _openCreatePaymentDialog();
     }
   }
 
@@ -297,6 +450,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
           onChanged: () {
             _loadFinance();
           },
+          onDeclareManually: (method, feeIds, amount) async {
+            Navigator.of(context).pop();
+            if (!mounted) return;
+            await _openCreatePaymentDialog(
+              initialMethod: method,
+              initialUserId: fee.userId,
+              initialFeeIds: feeIds,
+              initialAmount: amount.toDouble(),
+            );
+          },
         );
       },
     );
@@ -308,6 +471,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       builder: (context) => PaymentDecisionDialog(
         payment: payment,
         memberName: _memberName(payment.userId),
+        fees: _fees.where((fee) => fee.userId == payment.userId).toList(),
         approve: true,
       ),
     );
@@ -340,6 +504,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
       builder: (context) => PaymentDecisionDialog(
         payment: payment,
         memberName: _memberName(payment.userId),
+        fees: _fees.where((fee) => fee.userId == payment.userId).toList(),
         approve: false,
       ),
     );
@@ -377,7 +542,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Annuler ce paiement ?'),
+        title: Text('Annuler ce paiement ?'),
         content: Text(
           'La déclaration de ${_money(payment.amount)} sera annulée. '
           'Un paiement validé ne peut pas être annulé ici.',
@@ -385,12 +550,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Retour'),
+            child: Text('Retour'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.cancel_rounded),
-            label: const Text('Annuler le paiement'),
+            icon: Icon(Icons.cancel_rounded),
+            label: Text('Annuler le paiement'),
           ),
         ],
       ),
@@ -423,24 +588,24 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return RefreshIndicator(
       onRefresh: _loadFinance,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(
           MediaQuery.sizeOf(context).width < 560 ? 14 : 24,
         ),
         children: [
           _FinanceHeader(
-            totalExpected: _totalExpected,
-            totalDue: _totalDue,
-            totalPaid: _totalPaid,
-            pendingPayments: _pendingPayments,
-            onRefresh: _loadFinance,
-            onCreatePayment: _openCreatePaymentDialog,
-            onCreateFee: _openCreateFeeDialog,
-            canCreateFee: _canManageFinance,
+            onRefresh: _loading ? null : _loadFinance,
+            onCreatePayment: _loading || _error != null
+                ? null
+                : _openPaymentActions,
+            onCreateFee: !_loading && _error == null && _canManageFinance
+                ? _openCreateFeeDialog
+                : null,
             personalView: !_canManageFinance,
           ),
-          const SizedBox(height: 22),
+          SizedBox(height: 22),
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(),
@@ -449,26 +614,36 @@ class _FinanceScreenState extends State<FinanceScreen> {
           else if (_error != null)
             _ErrorCard(message: _error!, onRetry: _loadFinance)
           else ...[
+            _FinanceStatsGrid(
+              totalExpected: _totalExpected,
+              totalDue: _totalDue,
+              totalPaid: _totalPaid,
+              pendingPayments: _pendingPayments,
+            ),
+            const SizedBox(height: 18),
             if (_canManageFinance) ...[
               _FinanceRiskPanel(
                 debtorsCount: _debtorsCount,
                 pendingPaymentCount: _pendingPaymentCount,
                 collectionRate: _collectionRate,
                 totalDue: _totalDue,
+                unallocatedAmount: _validatedUnallocated,
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
+              MobileMoneyReadinessCard(financeService: _financeService),
+              SizedBox(height: 18),
               if (_mobileMoneySummary != null) ...[
                 _MobileMoneyAdminCard(
                   summary: _mobileMoneySummary!,
                   memberName: _memberName,
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
               ] else if (_mobileMoneyError != null) ...[
                 _MobileMoneyErrorCard(
                   message: _mobileMoneyError!,
                   onRetry: _loadMobileMoneySummary,
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
               ],
               _FinanceFiltersCard(
                 controller: _searchController,
@@ -486,16 +661,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   });
                 },
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
             _AccountsCard(accounts: _filteredAccounts, memberName: _memberName),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             _FeesCard(
               fees: _filteredFees,
               memberName: _memberName,
               onPayMobileMoney: _openMobileMoneySheet,
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             _PaymentsCard(
               payments: _filteredPayments,
               memberName: _memberName,
@@ -512,96 +687,45 @@ class _FinanceScreenState extends State<FinanceScreen> {
 }
 
 class _FinanceHeader extends StatelessWidget {
-  final double totalExpected;
-  final double totalDue;
-  final double totalPaid;
-  final double pendingPayments;
-  final VoidCallback onRefresh;
-  final VoidCallback onCreatePayment;
-  final VoidCallback onCreateFee;
-  final bool canCreateFee;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onCreatePayment;
+  final VoidCallback? onCreateFee;
   final bool personalView;
+
   const _FinanceHeader({
-    required this.totalExpected,
-    required this.totalDue,
-    required this.totalPaid,
-    required this.pendingPayments,
     required this.onRefresh,
     required this.onCreatePayment,
     required this.onCreateFee,
-    required this.canCreateFee,
     required this.personalView,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final actions = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: personalView ? 'Mes finances' : 'Finance',
+    subtitle: personalView
+        ? 'Consultez vos cotisations, vos paiements et vos échéances.'
+        : 'Suivez les encaissements, les échéances et les paiements à vérifier.',
+    icon: Icons.account_balance_wallet_outlined,
+    eyebrow: personalView ? 'Situation personnelle' : 'Suivi financier',
+    actions: [
+      OutlinedButton.icon(
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Actualiser'),
+      ),
+      if (onCreateFee != null)
         OutlinedButton.icon(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+          onPressed: onCreateFee,
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text('Ajouter des frais'),
         ),
-        if (canCreateFee)
-          ElevatedButton.icon(
-            onPressed: onCreateFee,
-            icon: const Icon(Icons.receipt_long_rounded),
-            label: const Text('Ajouter des frais'),
-          ),
-        ElevatedButton.icon(
-          onPressed: onCreatePayment,
-          icon: const Icon(Icons.add_card_rounded),
-          label: const Text('Déclarer un paiement'),
-        ),
-      ],
-    );
-
-    return AppDataCard(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppPageHeader(
-            title: personalView ? 'Mes finances' : 'Finance',
-            eyebrow: personalView ? 'Situation personnelle' : 'Suivi financier',
-            subtitle: personalView
-                ? 'Cotisations, déclarations et échéances de votre compte.'
-                : 'Encaissements, paiements à vérifier et échéances du moment.',
-            leading: _HeaderIcon(),
-            actions: [actions],
-          ),
-          const SizedBox(height: 18),
-          _FinanceStatsGrid(
-            totalExpected: totalExpected,
-            totalDue: totalDue,
-            totalPaid: totalPaid,
-            pendingPayments: pendingPayments,
-          ),
-        ],
+      FilledButton.icon(
+        onPressed: onCreatePayment,
+        icon: const Icon(Icons.add_card_rounded),
+        label: Text(personalView ? 'Payer / déclarer' : 'Enregistrer un paiement'),
       ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 58,
-      decoration: BoxDecoration(
-        color: AppTheme.enactusYellow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Icon(
-        Icons.account_balance_wallet_rounded,
-        color: AppTheme.softBlack,
-        size: 34,
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _FinanceStatsGrid extends StatelessWidget {
@@ -656,7 +780,9 @@ class _FinanceStatsGrid extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.035),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.black12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: Row(
                 children: [
@@ -665,7 +791,7 @@ class _FinanceStatsGrid extends StatelessWidget {
                     foregroundColor: AppTheme.softBlack,
                     child: Icon(stat.icon),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -674,8 +800,8 @@ class _FinanceStatsGrid extends StatelessWidget {
                         Text(
                           _money(stat.amount),
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppTheme.darkText,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 19,
                             fontWeight: FontWeight.w900,
                           ),
@@ -683,7 +809,11 @@ class _FinanceStatsGrid extends StatelessWidget {
                         Text(
                           stat.label,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppTheme.secondaryText),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -711,12 +841,14 @@ class _FinanceRiskPanel extends StatelessWidget {
   final int pendingPaymentCount;
   final double collectionRate;
   final double totalDue;
+  final double unallocatedAmount;
 
   const _FinanceRiskPanel({
     required this.debtorsCount,
     required this.pendingPaymentCount,
     required this.collectionRate,
     required this.totalDue,
+    required this.unallocatedAmount,
   });
 
   @override
@@ -730,25 +862,27 @@ class _FinanceRiskPanel extends StatelessWidget {
             final summary = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Pilotage financier',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: collectionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Colors.black12,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant,
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Text(
                   'Taux d’encaissement ${(collectionRate * 100).round()}% • dette ${_money(totalDue)}',
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -772,6 +906,12 @@ class _FinanceRiskPanel extends StatelessWidget {
                       ? Colors.orange.shade800
                       : Colors.green.shade700,
                 ),
+                if (unallocatedAmount > 0)
+                  _FinanceAlertChip(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: '${_money(unallocatedAmount)} non affectés',
+                    color: Colors.deepOrange.shade700,
+                  ),
                 const _FinanceAlertChip(
                   icon: Icons.verified_user_rounded,
                   label: 'Validation financier',
@@ -790,7 +930,7 @@ class _FinanceRiskPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: summary),
-                  const SizedBox(width: 18),
+                  SizedBox(width: 18),
                   Flexible(child: alerts),
                 ],
               );
@@ -798,7 +938,7 @@ class _FinanceRiskPanel extends StatelessWidget {
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [summary, const SizedBox(height: 16), alerts],
+              children: [summary, SizedBox(height: 16), alerts],
             );
           },
         ),
@@ -890,7 +1030,7 @@ class _MobileMoneyAdminCard extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -911,7 +1051,7 @@ class _MobileMoneyAdminCard extends StatelessWidget {
             ],
           ),
           if (summary.recentTransactions.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             ...summary.recentTransactions.take(4).map((transaction) {
               return ListTile(
                 dense: true,
@@ -921,7 +1061,7 @@ class _MobileMoneyAdminCard extends StatelessWidget {
                     alpha: 0.2,
                   ),
                   foregroundColor: AppTheme.softBlack,
-                  child: const Icon(Icons.payments_rounded),
+                  child: Icon(Icons.payments_rounded),
                 ),
                 title: Text(
                   memberName(transaction.memberId),
@@ -939,11 +1079,13 @@ class _MobileMoneyAdminCard extends StatelessWidget {
                   children: [
                     Text(
                       _money(transaction.amount.toDouble()),
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                     Text(
                       transaction.status,
-                      style: const TextStyle(color: Colors.black54),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -971,22 +1113,27 @@ class _MobileMoneyErrorCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.error_outline_rounded, color: Colors.red.shade700),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Le résumé Mobile Money est indisponible.',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 4),
-                Text(message, style: const TextStyle(color: Colors.black54)),
-                const SizedBox(height: 8),
+                SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Réessayer'),
+                  icon: Icon(Icons.refresh_rounded),
+                  label: Text('Réessayer'),
                 ),
               ],
             ),
@@ -1022,7 +1169,7 @@ class _MobileMoneyStatTile extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: color),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1032,13 +1179,15 @@ class _MobileMoneyStatTile extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.black54),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1057,16 +1206,18 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final effectiveColor = dark ? Color.lerp(color, Colors.white, 0.4)! : color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
+        color: effectiveColor.withValues(alpha: dark ? 0.18 : 0.09),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.24)),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w800),
+        style: TextStyle(color: effectiveColor, fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -1091,105 +1242,55 @@ class _FinanceFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 820;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Rechercher membre, frais, référence',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _FinanceChoiceChip(
-                  label: 'Tous paiements',
-                  selected: paymentFilter == 'all',
-                  onSelected: () => onPaymentFilterChanged('all'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'À valider',
-                  selected: paymentFilter == 'pending',
-                  onSelected: () => onPaymentFilterChanged('pending'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Validés',
-                  selected: paymentFilter == 'validated',
-                  onSelected: () => onPaymentFilterChanged('validated'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Annulés',
-                  selected: paymentFilter == 'cancelled',
-                  onSelected: () => onPaymentFilterChanged('cancelled'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Tous comptes',
-                  selected: accountFilter == 'all',
-                  onSelected: () => onAccountFilterChanged('all'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Débiteurs',
-                  selected: accountFilter == 'debt',
-                  onSelected: () => onAccountFilterChanged('debt'),
-                ),
-                _FinanceChoiceChip(
-                  label: 'Soldés',
-                  selected: accountFilter == 'clear',
-                  onSelected: () => onAccountFilterChanged('clear'),
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Semantics(
-              button: true,
-              label: 'Filtres et recherche',
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                minTileHeight: 44,
-                leading: const Icon(Icons.filter_list_rounded),
-                title: const Text('Filtres et recherche'),
-                childrenPadding: const EdgeInsets.only(bottom: 4),
-                children: [
-                  search,
-                  const SizedBox(height: 12),
-                  filters,
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        controller.clear();
-                        onPaymentFilterChanged('all');
-                        onAccountFilterChanged('all');
-                        onChanged();
-                      },
-                      icon: const Icon(Icons.restart_alt_rounded),
-                      label: const Text('Réinitialiser'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher membre, frais, référence',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      quickFilters: [
+        _FinanceChoiceChip(
+          label: 'Tous paiements',
+          selected: paymentFilter == 'all',
+          onSelected: () => onPaymentFilterChanged('all'),
+        ),
+        _FinanceChoiceChip(
+          label: 'À valider',
+          selected: paymentFilter == 'pending',
+          onSelected: () => onPaymentFilterChanged('pending'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Validés',
+          selected: paymentFilter == 'validated',
+          onSelected: () => onPaymentFilterChanged('validated'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Annulés',
+          selected: paymentFilter == 'cancelled',
+          onSelected: () => onPaymentFilterChanged('cancelled'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Tous comptes',
+          selected: accountFilter == 'all',
+          onSelected: () => onAccountFilterChanged('all'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Débiteurs',
+          selected: accountFilter == 'debt',
+          onSelected: () => onAccountFilterChanged('debt'),
+        ),
+        _FinanceChoiceChip(
+          label: 'Soldés',
+          selected: accountFilter == 'clear',
+          onSelected: () => onAccountFilterChanged('clear'),
+        ),
+      ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }
@@ -1210,7 +1311,7 @@ class _FinanceChoiceChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
       onSelected: (_) => onSelected(),
     );
   }
@@ -1232,9 +1333,7 @@ class _AccountsCard extends StatelessWidget {
           : Column(
               children: accounts.map((account) {
                 return ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.person_rounded),
-                  ),
+                  leading: CircleAvatar(child: Icon(Icons.person_rounded)),
                   title: Text(
                     memberName(account.userId),
                     maxLines: 1,
@@ -1282,9 +1381,7 @@ class _FeesCard extends StatelessWidget {
                     fee.status != 'paid' &&
                     fee.status != 'cancelled';
                 return ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.receipt_rounded),
-                  ),
+                  leading: CircleAvatar(child: Icon(Icons.receipt_rounded)),
                   title: Text(
                     '${fee.typeLabel} — ${memberName(fee.userId)}',
                     maxLines: 1,
@@ -1310,26 +1407,28 @@ class _FeesCard extends StatelessWidget {
                                 _money(fee.amount),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                               Text(
                                 'reste ${_money(fee.remainingAmount)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.black54),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         if (canPay) ...[
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           Tooltip(
                             message: 'Payer par Mobile Money',
                             child: IconButton.filledTonal(
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.phone_android_rounded),
+                              icon: Icon(Icons.phone_android_rounded),
                               onPressed: () => onPayMobileMoney(fee),
                             ),
                           ),
@@ -1410,6 +1509,8 @@ class _PaymentListItem extends StatelessWidget {
     final detailParts = [
       payment.methodLabel,
       if (payment.reference != null) payment.reference!,
+      if (payment.unallocatedAmount > 0)
+        'Non affecté : ${_money(payment.unallocatedAmount)}',
       if (payment.rejectionReason != null) 'Motif : ${payment.rejectionReason}',
     ];
     final Widget? actionMenu =
@@ -1429,8 +1530,8 @@ class _PaymentListItem extends StatelessWidget {
         if (payment.hasProof)
           TextButton.icon(
             onPressed: onOpenProof,
-            icon: const Icon(Icons.description_outlined),
-            label: const Text('Preuve'),
+            icon: Icon(Icons.description_outlined),
+            label: Text('Preuve'),
           ),
         if (actionMenu case final Widget menu) menu,
       ],
@@ -1445,14 +1546,16 @@ class _PaymentListItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(memberName, maxLines: 1, overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 3),
+        SizedBox(height: 3),
         Text(
           detailParts.join(' - '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.black54),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
-        const SizedBox(height: 5),
+        SizedBox(height: 5),
         Wrap(
           spacing: 6,
           runSpacing: 4,
@@ -1461,7 +1564,7 @@ class _PaymentListItem extends StatelessWidget {
             _PaymentStatusBadge(payment: payment),
             Text(
               payment.proofLabel,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -1480,9 +1583,9 @@ class _PaymentListItem extends StatelessWidget {
             children: [
               Text(
                 _money(payment.amount),
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(fontWeight: FontWeight.w900),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Flexible(child: actions),
             ],
           ),
@@ -1498,12 +1601,12 @@ class _PaymentListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               leading,
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(child: details),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 _money(payment.amount),
-                style: const TextStyle(fontWeight: FontWeight.w900),
+                style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ],
           ),
@@ -1665,11 +1768,23 @@ class _PaymentProofDialogState extends State<PaymentProofDialog> {
   @override
   Widget build(BuildContext context) {
     final payment = widget.payment;
-    final filename = _proofUri?.pathSegments.last;
-    final isPdf = filename?.toLowerCase().endsWith('.pdf') ?? false;
-    final isImage = PaymentProofUriResolver.isImageUri(_proofUri);
+    final filename =
+        payment.proofFileName ??
+        (_proofUri?.pathSegments.isNotEmpty == true
+            ? _proofUri!.pathSegments.last
+            : null);
+    final mimeType = payment.proofMimeType?.toLowerCase();
+    final isPdf =
+        mimeType == 'application/pdf' ||
+        (filename?.toLowerCase().endsWith('.pdf') ?? false);
+    final isImage =
+        (mimeType?.startsWith('image/') ?? false) ||
+        PaymentProofUriResolver.isImageUri(_proofUri) ||
+        const ['.jpg', '.jpeg', '.png', '.webp'].any(
+          (extension) => filename?.toLowerCase().endsWith(extension) ?? false,
+        );
     return AlertDialog(
-      title: const Text('Preuve de paiement'),
+      title: Text('Preuve de paiement'),
       content: SizedBox(
         width: 520,
         child: payment.hasProof
@@ -1700,12 +1815,18 @@ class _PaymentProofDialogState extends State<PaymentProofDialog> {
                           : 'Document de preuve',
                     ),
                   ),
-                  if (isImage && _proofUri != null) ...[
-                    const SizedBox(height: 12),
-                    _ProofImagePreview(uri: _proofUri!, token: _token),
+                  if ((isImage || isPdf) && _proofUri != null) ...[
+                    SizedBox(height: 12),
+                    _ProofPreview(
+                      uri: _proofUri!,
+                      token: _token,
+                      requiresAuth: payment.proofFileId != null,
+                      isPdf: isPdf,
+                      sourceName: filename ?? 'justificatif',
+                    ),
                   ],
                   if (_proofUri == null) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Text(
                       'Seules les adresses http et https sont acceptées.',
                       style: TextStyle(color: Colors.red.shade700),
@@ -1713,31 +1834,33 @@ class _PaymentProofDialogState extends State<PaymentProofDialog> {
                   ],
                   Text(
                     '${_money(payment.amount)} • ${payment.reference ?? 'Sans référence'}',
-                    style: const TextStyle(color: AppTheme.secondaryText),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 14),
+                    SizedBox(height: 14),
                     Text(_error!, style: TextStyle(color: Colors.red.shade700)),
                   ],
                 ],
               )
-            : const Text('Aucune preuve fournie pour ce paiement.'),
+            : Text('Aucune preuve fournie pour ce paiement.'),
       ),
       actions: [
         TextButton(
           onPressed: _opening ? null : () => Navigator.of(context).pop(),
-          child: const Text('Fermer'),
+          child: Text('Fermer'),
         ),
-        if (payment.hasProof)
+        if (payment.hasProof && payment.proofFileId == null)
           FilledButton.icon(
             onPressed: _opening || _proofUri == null ? null : _openProof,
             icon: _opening
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.open_in_new_rounded),
+                : Icon(Icons.open_in_new_rounded),
             label: Text(_error == null ? 'Ouvrir la preuve' : 'Réessayer'),
           ),
       ],
@@ -1762,40 +1885,77 @@ class PaymentProofUriResolver {
   }
 }
 
-class _ProofImagePreview extends StatelessWidget {
+class _ProofPreview extends StatelessWidget {
   final Uri uri;
   final String? token;
+  final bool requiresAuth;
+  final bool isPdf;
+  final String sourceName;
 
-  const _ProofImagePreview({required this.uri, required this.token});
+  const _ProofPreview({
+    required this.uri,
+    required this.token,
+    required this.requiresAuth,
+    required this.isPdf,
+    required this.sourceName,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 260),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black12),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.network(
-        uri.toString(),
-        headers: token == null ? null : {'Authorization': 'Bearer $token'},
-        fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const SizedBox(
-            height: 180,
+    if (requiresAuth && (token == null || token!.isEmpty)) {
+      return SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return FutureBuilder<List<int>>(
+      future: ApiClient().getBytes(uri.toString(), token: token ?? ''),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return SizedBox(
+            height: 220,
             child: Center(child: CircularProgressIndicator()),
           );
-        },
-        errorBuilder: (context, error, stackTrace) => const SizedBox(
-          height: 180,
-          child: Center(
-            child: Text('Aperçu indisponible. Ouvrez la preuve complète.'),
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return SizedBox(
+            height: 180,
+            child: Center(
+              child: Text(
+                'L’aperçu du justificatif est indisponible.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+        final bytes = Uint8List.fromList(snapshot.data!);
+        if (isPdf) {
+          return SizedBox(
+            height: 440,
+            child: PdfViewer.data(bytes, sourceName: sourceName),
+          );
+        }
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 360),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
-        ),
-      ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => SizedBox(
+              height: 180,
+              child: Center(child: Text('Image de preuve illisible.')),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1803,12 +1963,14 @@ class _ProofImagePreview extends StatelessWidget {
 class PaymentDecisionDialog extends StatefulWidget {
   final PaymentModel payment;
   final String memberName;
+  final List<FeeModel> fees;
   final bool approve;
 
   const PaymentDecisionDialog({
     super.key,
     required this.payment,
     required this.memberName,
+    required this.fees,
     required this.approve,
   });
 
@@ -1843,7 +2005,7 @@ class _PaymentDecisionDialogState extends State<PaymentDecisionDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _PaymentStatusBadge(payment: payment),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               _PaymentContextLine(label: 'Membre', value: widget.memberName),
               _PaymentContextLine(
                 label: 'Montant',
@@ -1855,8 +2017,31 @@ class _PaymentDecisionDialogState extends State<PaymentDecisionDialog> {
               ),
               _PaymentContextLine(label: 'Méthode', value: payment.methodLabel),
               _PaymentContextLine(label: 'Preuve', value: payment.proofLabel),
+              if (payment.hasProof)
+                TextButton.icon(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => PaymentProofDialog(payment: payment),
+                  ),
+                  icon: Icon(Icons.receipt_long_rounded),
+                  label: Text('Examiner le justificatif'),
+                ),
+              if (payment.receiptDetails != null) ...[
+                SizedBox(height: 10),
+                _ReceiptDetailsCard(details: payment.receiptDetails!),
+              ],
+              if (payment.allocationPlan != null ||
+                  payment.unallocatedAmount > 0) ...[
+                SizedBox(height: 10),
+                _AllocationPlanCard(
+                  plan: payment.allocationPlan ?? const [],
+                  fees: widget.fees,
+                  unallocatedAmount: payment.unallocatedAmount,
+                  isFinal: payment.status == 'validated',
+                ),
+              ],
               if (requiresReason) ...[
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 TextField(
                   controller: _reasonController,
                   autofocus: true,
@@ -1877,7 +2062,7 @@ class _PaymentDecisionDialogState extends State<PaymentDecisionDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Retour'),
+          child: Text('Retour'),
         ),
         FilledButton.icon(
           style: widget.approve
@@ -1919,15 +2104,203 @@ class _PaymentContextLine extends StatelessWidget {
             width: 126,
             child: Text(
               label,
-              style: const TextStyle(color: AppTheme.secondaryText),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptDetailsCard extends StatelessWidget {
+  final Map<String, dynamic> details;
+
+  const _ReceiptDetailsCard({required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <(String, String)>[];
+    void add(String label, dynamic value) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && text != 'null') rows.add((label, text));
+    }
+
+    String moneyValue(dynamic value) {
+      final amount = double.tryParse(value?.toString() ?? '');
+      return amount == null ? value?.toString() ?? '' : _money(amount);
+    }
+
+    String phoneValue(dynamic value) {
+      final digits = (value?.toString() ?? '').replaceAll(RegExp(r'\D'), '');
+      if (digits.length != 9) return value?.toString() ?? '';
+      return '${digits.substring(0, 2)} ${digits.substring(2, 5)} '
+          '${digits.substring(5, 7)} ${digits.substring(7)}';
+    }
+
+    final provider = details['provider_candidate']?.toString();
+    if (provider == 'wave') {
+      add('Service détecté', 'Wave');
+    }
+    if (provider == 'orange_money') {
+      add('Service détecté', 'Orange Money / Max it');
+    }
+    add('Statut lu', details['status_text']);
+    add('Montant du paiement', moneyValue(details['amount']));
+    if (details['sent_amount'] != null) {
+      add('Montant débité', moneyValue(details['sent_amount']));
+    }
+    if (details['fee_amount'] != null) {
+      add('Frais opérateur', moneyValue(details['fee_amount']));
+    }
+    add('Date / heure', details['date_text']);
+    if (details['sender_phone'] != null) {
+      add('Expéditeur', phoneValue(details['sender_phone']));
+    }
+    if (details['recipient_phone'] != null) {
+      add('Destinataire', phoneValue(details['recipient_phone']));
+    }
+    add('Référence sur le reçu', details['reference']);
+
+    final amountMatch = details['amount_matches_declaration'];
+    final referenceMatch = details['reference_matches_declaration'];
+    final providerMatch = details['provider_matches_declaration'];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Lecture automatique du reçu — à vérifier',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          SizedBox(height: 8),
+          ...rows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('${row.$1} : ${row.$2}'),
             ),
           ),
+          if (amountMatch is bool)
+            Text(
+              amountMatch
+                  ? 'Le montant correspond à la déclaration.'
+                  : 'Le montant lu sur le reçu diffère de la déclaration.',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: amountMatch
+                    ? Colors.green.shade700
+                    : Colors.red.shade700,
+              ),
+            ),
+          if (referenceMatch is bool && details['reference'] != null)
+            Text(
+              referenceMatch
+                  ? 'La référence correspond à la déclaration.'
+                  : 'Vérifiez la référence sur le reçu.',
+            ),
+          if (providerMatch is bool && providerMatch == false)
+            Text(
+              'Attention : le service détecté sur le reçu ne correspond pas '
+              'au moyen de paiement déclaré.',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          SizedBox(height: 4),
+          Text(
+            'Le justificatif reste à vérifier avant de confirmer le paiement.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllocationPlanCard extends StatelessWidget {
+  final List<dynamic> plan;
+  final List<FeeModel> fees;
+  final double unallocatedAmount;
+  final bool isFinal;
+
+  const _AllocationPlanCard({
+    required this.plan,
+    required this.fees,
+    required this.unallocatedAmount,
+    required this.isFinal,
+  });
+
+  String _feeLabel(String id) {
+    for (final fee in fees) {
+      if (fee.id == id) return fee.label;
+    }
+    return 'Frais $id';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = plan.whereType<Map>().map((item) {
+      final id = item['fee_id']?.toString() ?? '';
+      final amount = double.tryParse(item['amount']?.toString() ?? '0') ?? 0;
+      return (_feeLabel(id), amount);
+    }).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.enactusYellow.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppTheme.enactusYellow.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isFinal ? 'Répartition comptabilisée' : 'Répartition proposée',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          SizedBox(height: 8),
+          if (rows.isEmpty) Text('Aucun frais affecté.'),
+          ...rows.map((row) => Text('${row.$1} : ${_money(row.$2)}')),
+          if (unallocatedAmount > 0) ...[
+            SizedBox(height: 6),
+            Text(
+              'Solde non affecté : ${_money(unallocatedAmount)}',
+              style: TextStyle(
+                color: Colors.deepOrange.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (!isFinal)
+            Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'La validation recalcule ces montants sur les soldes encore dus.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -2033,7 +2406,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Nouveau frais'),
+      title: Text('Nouveau frais'),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: Form(
@@ -2047,42 +2420,32 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.35),
+                      ),
                     ),
                     child: Text(
                       _error!,
-                      style: TextStyle(color: Colors.red.shade700),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
                   ),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedUserId,
-                  decoration: const InputDecoration(
-                    labelText: 'Membre',
-                    prefixIcon: Icon(Icons.person_rounded),
-                  ),
-                  items: widget.members.map((member) {
-                    return DropdownMenuItem(
-                      value: member.id,
-                      child: Text(member.displayName),
-                    );
-                  }).toList(),
-                  onChanged: _loading
-                      ? null
-                      : (value) {
-                          setState(() {
-                            _selectedUserId = value;
-                          });
-                        },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Sélectionnez un membre.';
-                    }
-                    return null;
-                  },
+                SearchableMemberPickerField(
+                  members: widget.members,
+                  value: _selectedUserId,
+                  label: 'Membre',
+                  enabled: !_loading,
+                  onChanged: (value) => setState(() => _selectedUserId = value),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Sélectionnez un membre.'
+                      : null,
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: _type,
                   decoration: const InputDecoration(
@@ -2110,7 +2473,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                           });
                         },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _labelController,
                   decoration: const InputDecoration(
@@ -2124,7 +2487,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
@@ -2141,18 +2504,18 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.event_rounded),
-                    title: const Text('Date limite'),
+                    leading: Icon(Icons.event_rounded),
+                    title: Text('Date limite'),
                     subtitle: Text(_dueDateLabel),
                     trailing: Wrap(
                       spacing: 8,
                       children: [
                         TextButton(
                           onPressed: _loading ? null : _pickDueDate,
-                          child: const Text('Choisir'),
+                          child: Text('Choisir'),
                         ),
                         TextButton(
                           onPressed: _loading
@@ -2162,7 +2525,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                                     _dueDate = null;
                                   });
                                 },
-                          child: const Text('Aucune'),
+                          child: Text('Aucune'),
                         ),
                       ],
                     ),
@@ -2176,12 +2539,12 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -2189,7 +2552,7 @@ class _CreateFeeDialogState extends State<CreateFeeDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Création...' : 'Créer'),
         ),
       ],
@@ -2201,12 +2564,24 @@ class CreatePaymentDialog extends StatefulWidget {
   final FinanceService financeService;
   final List<MemberModel> members;
   final bool canManage;
+  final List<FeeModel> fees;
+  final Map<String, dynamic>? sharedReceipt;
+  final String? initialMethod;
+  final String? initialUserId;
+  final List<String> initialFeeIds;
+  final double? initialAmount;
 
   const CreatePaymentDialog({
     super.key,
     required this.financeService,
     required this.members,
     required this.canManage,
+    required this.fees,
+    this.sharedReceipt,
+    this.initialMethod,
+    this.initialUserId,
+    this.initialFeeIds = const [],
+    this.initialAmount,
   });
 
   @override
@@ -2218,7 +2593,10 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
 
   final _amountController = TextEditingController();
   final _referenceController = TextEditingController();
-  final _proofUrlController = TextEditingController();
+  Uint8List? _receiptBytes;
+  String? _receiptName;
+  String? _receiptText;
+  final Set<String> _selectedFeeIds = {};
 
   String? _selectedUserId;
   String _method = 'wave';
@@ -2229,11 +2607,90 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
   @override
   void initState() {
     super.initState();
-    if (!widget.canManage && widget.members.length == 1) {
+    _selectedUserId = widget.initialUserId;
+    if (_selectedUserId == null &&
+        !widget.canManage &&
+        widget.members.length == 1) {
       _selectedUserId = widget.members.first.id;
     }
-    if (widget.canManage) {
-      _method = 'especes';
+    _method = widget.initialMethod ?? (widget.canManage ? 'especes' : 'wave');
+    final initialAmount = widget.initialAmount;
+    if (initialAmount != null && initialAmount > 0) {
+      _amountController.text = initialAmount == initialAmount.roundToDouble()
+          ? initialAmount.toInt().toString()
+          : initialAmount.toString();
+    }
+
+    if (widget.initialFeeIds.isNotEmpty) {
+      _selectedFeeIds.addAll(widget.initialFeeIds);
+    } else if (_selectedUserId != null) {
+      _selectedFeeIds.addAll(
+        widget.fees
+            .where(
+              (fee) =>
+                  fee.userId == _selectedUserId &&
+                  fee.remainingAmount > 0 &&
+                  fee.status != 'cancelled',
+            )
+            .map((fee) => fee.id),
+      );
+    }
+
+    final receipt = widget.sharedReceipt;
+    if (receipt != null) {
+      final rawBytes = receipt['bytes'];
+      if (rawBytes is Uint8List) {
+        _receiptBytes = rawBytes;
+      } else if (rawBytes is List<int>) {
+        _receiptBytes = Uint8List.fromList(rawBytes);
+      }
+      _receiptName = receipt['name']?.toString();
+      _receiptText = receipt['text']?.toString();
+      _applyReceiptText(_receiptText ?? '');
+    }
+  }
+
+  void _applyReceiptText(String text) {
+    if (text.trim().isEmpty) return;
+    final lower = text.toLowerCase();
+    if (widget.initialMethod == null) {
+      if (lower.contains('orange money') ||
+          lower.contains('max it') ||
+          lower.contains('#ofms')) {
+        _method = 'orange_money';
+      } else if (lower.contains('wave')) {
+        _method = 'wave';
+      }
+    }
+
+    String? readAmount(RegExp pattern) =>
+        pattern.firstMatch(text)?.group(1)?.replaceAll(RegExp(r'\D'), '');
+
+    final receivedAmount = readAmount(
+      RegExp(
+        r'montant\s+re[cç]u[\s\S]{0,40}?([\d .]+)\s*(?:FCFA|F CFA|XOF|F\b)',
+        caseSensitive: false,
+      ),
+    );
+    final genericAmount = readAmount(
+      RegExp(
+        r'montant(?!\s+(?:re[cç]u|envoy[eé]))[\s\S]{0,40}?([\d .]+)\s*(?:FCFA|F CFA|XOF|F\b)',
+        caseSensitive: false,
+      ),
+    );
+    final amount = receivedAmount ?? genericAmount;
+    if (amount != null &&
+        amount.isNotEmpty &&
+        _amountController.text.trim().isEmpty) {
+      _amountController.text = amount;
+    }
+
+    final reference = RegExp(
+      r'(?:référence|id\s+de\s+transaction|transaction(?:\s+id|\s+n[o°])?)\s*[:#-]?\s*([A-Z0-9._-]{5,64})',
+      caseSensitive: false,
+    ).firstMatch(text)?.group(1);
+    if (reference != null && _referenceController.text.trim().isEmpty) {
+      _referenceController.text = reference;
     }
   }
 
@@ -2241,8 +2698,107 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
   void dispose() {
     _amountController.dispose();
     _referenceController.dispose();
-    _proofUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickReceipt() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+      withData: true,
+    );
+    if (result == null || result.files.single.bytes == null) return;
+
+    final file = result.files.single;
+    final bytes = file.bytes!;
+    if (bytes.length > 12 * 1024 * 1024) {
+      setState(() => _error = 'Le justificatif dépasse la limite de 12 Mo.');
+      return;
+    }
+
+    setState(() {
+      _receiptBytes = bytes;
+      _receiptName = file.name;
+      _receiptText = null;
+      _error = null;
+    });
+
+    if (file.extension?.toLowerCase() == 'pdf') return;
+    try {
+      const channel = MethodChannel('sn.enactusesp.enactspace/receipt_share');
+      final text = await channel.invokeMethod<String>('recognizeReceipt', {
+        'bytes': bytes,
+        'name': file.name,
+      });
+      if (!mounted || text == null || text.trim().isEmpty) return;
+      setState(() {
+        _receiptText = text;
+        _applyReceiptText(text);
+      });
+    } on MissingPluginException {
+      // OCR local disponible uniquement via l'intégration Android.
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message ?? 'Lecture du reçu impossible.');
+    }
+  }
+
+  List<Widget> _feeChoices() {
+    final fees = widget.fees
+        .where(
+          (fee) =>
+              fee.userId == _selectedUserId &&
+              fee.remainingAmount > 0 &&
+              fee.status != 'cancelled',
+        )
+        .toList();
+    if (fees.isEmpty) {
+      return [
+        Text('Aucun frais en attente ; le financier contrôlera le paiement.'),
+      ];
+    }
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    var available = amount;
+    return [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Affectation du paiement',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+      ...fees.map((fee) {
+        final selected = _selectedFeeIds.contains(fee.id);
+        final applied = selected
+            ? available.clamp(0.0, fee.remainingAmount).toDouble()
+            : 0.0;
+        if (selected) available -= applied;
+        return CheckboxListTile(
+          dense: true,
+          value: selected,
+          title: Text(fee.label),
+          subtitle: Text(
+            'Reste dû : ${_money(fee.remainingAmount)} • prévu : ${_money(applied)}',
+          ),
+          onChanged: _loading
+              ? null
+              : (value) => setState(() {
+                  if (value == true) {
+                    _selectedFeeIds.add(fee.id);
+                  } else {
+                    _selectedFeeIds.remove(fee.id);
+                  }
+                }),
+        );
+      }),
+      if (available > 0)
+        Text(
+          'Solde non affecté : ${_money(available)} ; à examiner par le financier.',
+        ),
+      Text(
+        'Cette proposition est recalculée lors de la validation. Les frais non couverts restent dus.',
+      ),
+    ];
   }
 
   Future<void> _submit() async {
@@ -2255,8 +2811,9 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
       return;
     }
     if (!widget.canManage &&
+        _method != 'especes' &&
         _referenceController.text.trim().isEmpty &&
-        _proofUrlController.text.trim().isEmpty) {
+        _receiptBytes == null) {
       setState(() {
         _error = 'Ajoutez une référence ou une preuve de paiement.';
       });
@@ -2269,6 +2826,12 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
     });
 
     try {
+      final proofId = _receiptBytes == null
+          ? null
+          : await widget.financeService.uploadPaymentReceipt(
+              _receiptName ?? 'recu.jpg',
+              _receiptBytes!,
+            );
       await widget.financeService.createPayment(
         userId: _selectedUserId!,
         amount: double.parse(_amountController.text.trim()),
@@ -2276,9 +2839,9 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
         reference: _referenceController.text.trim().isEmpty
             ? null
             : _referenceController.text.trim(),
-        proofUrl: _proofUrlController.text.trim().isEmpty
-            ? null
-            : _proofUrlController.text.trim(),
+        proofFileId: proofId,
+        feeIds: _selectedFeeIds.toList(),
+        receiptText: _receiptText,
       );
 
       if (!mounted) return;
@@ -2298,9 +2861,17 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedReceiptText = (_receiptText ?? '').replaceAll('\n', ' ');
+    final receiptPreview = normalizedReceiptText.length > 240
+        ? normalizedReceiptText.substring(0, 240)
+        : normalizedReceiptText;
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Nouveau paiement'),
+      title: Text(
+        widget.sharedReceipt == null
+            ? 'Déclarer un paiement'
+            : 'Déclarer le reçu partagé',
+      ),
       content: SizedBox(
         width: _dialogWidth(context, 520),
         child: Form(
@@ -2314,47 +2885,55 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Theme.of(context).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.35),
+                      ),
                     ),
                     child: Text(
                       _error!,
-                      style: TextStyle(color: Colors.red.shade700),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
                     ),
                   ),
                 if (widget.canManage)
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedUserId,
-                    decoration: const InputDecoration(
-                      labelText: 'Membre',
-                      prefixIcon: Icon(Icons.person_rounded),
-                    ),
-                    items: widget.members.map((member) {
-                      return DropdownMenuItem(
-                        value: member.id,
-                        child: Text(member.displayName),
+                  SearchableMemberPickerField(
+                    members: widget.members,
+                    value: _selectedUserId,
+                    label: 'Membre',
+                    enabled: !_loading,
+                    onChanged: (value) => setState(() {
+                      _selectedUserId = value;
+                      _selectedFeeIds.clear();
+                      _selectedFeeIds.addAll(
+                        widget.fees
+                            .where(
+                              (fee) =>
+                                  fee.userId == value &&
+                                  fee.remainingAmount > 0,
+                            )
+                            .map((fee) => fee.id),
                       );
-                    }).toList(),
-                    onChanged: _loading
-                        ? null
-                        : (value) => setState(() => _selectedUserId = value),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Sélectionnez un membre.';
-                      }
-                      return null;
-                    },
+                    }),
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Sélectionnez un membre.'
+                        : null,
                   )
                 else
-                  const Align(
+                  Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Ce paiement sera déclaré pour votre compte.',
-                      style: TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
@@ -2363,6 +2942,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     suffixText: 'FCFA',
                     prefixIcon: Icon(Icons.payments_rounded),
                   ),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     final amount = double.tryParse(value ?? '');
                     if (amount == null || amount <= 0) {
@@ -2371,7 +2951,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   initialValue: _method,
                   decoration: const InputDecoration(
@@ -2379,11 +2959,10 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     prefixIcon: Icon(Icons.account_balance_wallet_rounded),
                   ),
                   items: [
-                    if (widget.canManage)
-                      const DropdownMenuItem(
-                        value: 'especes',
-                        child: Text('Espèces'),
-                      ),
+                    const DropdownMenuItem(
+                      value: 'especes',
+                      child: Text('Espèces'),
+                    ),
                     if (widget.canManage)
                       const DropdownMenuItem(
                         value: 'manuel',
@@ -2410,7 +2989,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                           setState(() => _method = value);
                         },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _referenceController,
                   decoration: const InputDecoration(
@@ -2419,15 +2998,33 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     prefixIcon: Icon(Icons.tag_rounded),
                   ),
                 ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _proofUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lien de preuve',
-                    hintText: 'Capture ou reçu de paiement',
-                    prefixIcon: Icon(Icons.link_rounded),
+                SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _pickReceipt,
+                  icon: Icon(Icons.upload_file_rounded),
+                  label: Text(
+                    _receiptName == null
+                        ? 'Joindre un reçu ou une capture'
+                        : _receiptName!,
                   ),
                 ),
+                if (receiptPreview.isNotEmpty) ...[
+                  SizedBox(height: 8),
+                  Text(
+                    'Lecture locale du reçu : $receiptPreview',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Vérifiez le montant, la référence, la date et les numéros avant de déclarer. '
+                    'Cette lecture ne valide jamais le paiement.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                SizedBox(height: 14),
+                ..._feeChoices(),
               ],
             ),
           ),
@@ -2436,12 +3033,12 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
         ElevatedButton.icon(
           onPressed: _loading ? null : _submit,
           icon: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -2449,7 +3046,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.save_rounded),
+              : Icon(Icons.save_rounded),
           label: Text(_loading ? 'Enregistrement...' : 'Enregistrer'),
         ),
       ],
@@ -2482,14 +3079,11 @@ class _SectionCard extends StatelessWidget {
             Row(
               children: [
                 Icon(icon),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
@@ -2512,7 +3106,10 @@ class _EmptyText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(18),
-      child: Text(text, style: const TextStyle(color: Colors.black54)),
+      child: Text(
+        text,
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
     );
   }
 }
@@ -2535,18 +3132,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

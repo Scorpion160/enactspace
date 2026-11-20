@@ -32,12 +32,14 @@ def _accessible_request(
     db: Session,
     current_user: User,
     request_id: UUID,
+    *, lock: bool = False,
 ) -> InstitutionalDocumentRequest:
-    item = (
-        db.query(InstitutionalDocumentRequest)
-        .filter(InstitutionalDocumentRequest.id == request_id)
-        .first()
+    query = db.query(InstitutionalDocumentRequest).filter(
+        InstitutionalDocumentRequest.id == request_id
     )
+    if lock:
+        query = query.populate_existing().with_for_update()
+    item = query.first()
     if item is None or not can_access_request(db, current_user, item):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -100,7 +102,7 @@ def generate_institutional_document(
             detail="Génération réservée au SG, au Team Leader ou à l'administration.",
         )
 
-    item = _accessible_request(db, current_user, request_id)
+    item = _accessible_request(db, current_user, request_id, lock=True)
 
     if item.generated_document_id is not None:
         return {

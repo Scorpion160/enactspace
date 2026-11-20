@@ -324,6 +324,25 @@ class InstitutionalPdfGenerationTests(unittest.TestCase):
                 self.assertNotIn("[{'", data_tex)
                 self.assertNotIn("'}]", data_tex)
 
+    def test_auto_resolved_pv_signatories_use_names_not_orm_repr(self):
+        # The form can omit the explicit user IDs. In that case the role
+        # lookup returns User objects (not UUID strings).
+        for template_code in ("pv_enacchef", "pv_reunion_generale"):
+            with self.subTest(template=template_code):
+                payload = dict(self._payloads()[template_code])
+                payload.pop("chairperson_id")
+                payload.pop("secretary_id")
+                request = self._request(template_code, payload)
+                tex = build_data_tex(self.db, request)
+                self.assertIn(
+                    r"\newcommand{\MeetingChair}{Cheikh Sarr}", tex
+                )
+                self.assertIn(
+                    r"\newcommand{\MeetingSecretary}{Fatou Fall}", tex
+                )
+                self.assertNotIn("app.models.user.User object", tex)
+                self.assertNotIn("object at 0x", tex)
+
     @unittest.skipUnless(shutil.which("pdflatex"), "pdflatex not installed")
     def test_all_eight_templates_compile_to_pdf(self):
         for code, payload in self._payloads().items():

@@ -1,0 +1,35 @@
+name: Public EnactSpace fingerprint (read-only)
+
+on:
+  push:
+    branches:
+      - integration/recruitment-production-parity-20261110
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-fingerprint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public_fingerprint:
+    name: Public Web / worker / API read-only fingerprint
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out candidate sources
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Probe public production endpoints without credentials
+        run: python3 tools/fingerprint_public_production.py production-fingerprint
+
+      - name: Archive public fingerprint and verified Firebase worker
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-public-fingerprint-${{ github.run_id }}
+          path: production-fingerprint/
+          if-no-files-found: warn
+          retention-days: 7

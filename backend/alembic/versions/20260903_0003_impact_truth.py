@@ -6,6 +6,7 @@ Create Date: 2026-09-03
 """
 
 from __future__ import annotations
+from app.core.time import utc_now
 
 import uuid
 from datetime import datetime
@@ -216,7 +217,7 @@ def _migrate_values() -> None:
             + " FROM impact_projects"
         )
     ).mappings()
-    now = datetime.utcnow()
+    now = utc_now()
     for row in legacy_rows:
         for column, (semantic_key, title, unit) in LEGACY_CLAIMS.items():
             value = row[column]

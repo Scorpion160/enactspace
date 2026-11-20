@@ -83,6 +83,11 @@ VALID_NOTIFICATION_TYPES = {
     "chat_thread_created",
     "chat_participant_added",
     "chat_reaction",
+    "meeting_invitation",
+    "meeting_started",
+    "meeting_updated",
+    "meeting_cancelled",
+    "meeting_ended",
     "general",
 }
 

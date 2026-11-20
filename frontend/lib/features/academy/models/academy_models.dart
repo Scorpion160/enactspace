@@ -20,6 +20,19 @@ String academyRoleLabel(String value) => switch (value.toLowerCase()) {
   _ => value.replaceAll('_', ' '),
 };
 
+class AcademyPrerequisiteModel {
+  final String id;
+  final String title;
+  final bool completed;
+  final bool available;
+  const AcademyPrerequisiteModel({
+    required this.id,
+    required this.title,
+    this.completed = false,
+    this.available = true,
+  });
+}
+
 class AcademyCourseModel {
   final String id;
   final String title;
@@ -35,6 +48,12 @@ class AcademyCourseModel {
   final String? projectId;
   final List<AcademyLessonModel> lessons;
   final AcademyQuizModel quiz;
+  final bool quizPassed;
+  final bool isLocked;
+  final String lockReason;
+  final List<String> prerequisiteCourseIds;
+  final List<AcademyPrerequisiteModel> prerequisites;
+  final bool? serverMastered;
 
   const AcademyCourseModel({
     required this.id,
@@ -51,6 +70,12 @@ class AcademyCourseModel {
     this.projectId,
     required this.lessons,
     required this.quiz,
+    this.quizPassed = false,
+    this.isLocked = false,
+    this.lockReason = '',
+    this.prerequisiteCourseIds = const [],
+    this.prerequisites = const [],
+    this.serverMastered,
   });
 
   int get lessonCount => lessons.length;
@@ -58,6 +83,9 @@ class AcademyCourseModel {
       lessons.where((lesson) => lesson.completed).length;
   bool get isCompleted =>
       lessonCount > 0 && completedLessonCount == lessonCount;
+  bool get isMastered =>
+      serverMastered ?? (isCompleted && (quiz.id.isEmpty || quizPassed));
+  bool get canTakeQuiz => !isLocked && isCompleted && quiz.id.isNotEmpty;
   bool get isInProgress => completedLessonCount > 0 && !isCompleted;
   double get progress {
     if (lessonCount == 0) return 0;
@@ -106,6 +134,13 @@ class AcademyLessonModel {
     this.orderIndex = 0,
     this.isPublished = true,
   });
+
+  int get readingMinutes =>
+      ((content ?? summary).split(RegExp(r'\s+')).length / 180).ceil().clamp(
+        1,
+        999,
+      );
+  int get practiceMinutes => (durationMinutes - readingMinutes).clamp(0, 999);
 
   String get typeLabel => switch (lessonType) {
     'video' => 'Vidéo',
@@ -250,6 +285,8 @@ class AcademyHomeData {
   final List<AcademyBadgeModel> badges;
   final List<AcademyCaseStudyModel> caseStudies;
   final AcademyProgressModel progress;
+  final bool offline;
+  final int pendingActions;
 
   const AcademyHomeData({
     required this.courses,
@@ -257,6 +294,8 @@ class AcademyHomeData {
     required this.badges,
     required this.caseStudies,
     required this.progress,
+    this.offline = false,
+    this.pendingActions = 0,
   });
 }
 
@@ -279,12 +318,14 @@ class AcademyQuizResult {
   final int total;
   final int points;
   final int? attemptNumber;
+  final List<Map<String, dynamic>> feedback;
 
   const AcademyQuizResult({
     required this.score,
     required this.passed,
     required this.correctAnswers,
     required this.total,
+    this.feedback = const [],
     required this.points,
     required this.attemptNumber,
   });

@@ -1,4 +1,9 @@
+import 'recruitment_question_model.dart';
+import 'recruitment_schedule_model.dart';
+
 class RecruitmentCampaignModel {
+  final List<RecruitmentApplicationQuestion> applicationQuestions;
+  final String? questionnaireVersion;
   final String id;
   final String? seasonId;
   final String title;
@@ -6,11 +11,19 @@ class RecruitmentCampaignModel {
   final String? startDate;
   final String? endDate;
   final bool isActive;
+  final bool eligibilityRequired;
+  final RecruitmentScheduleModel? selectionSchedule;
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
+  final DateTime? serverTime;
+  final DateTime? receivedAt;
+  final DateTime? opensAt;
+  final DateTime? closesAt;
 
   const RecruitmentCampaignModel({
+    this.applicationQuestions = defaultRecruitmentQuestions,
+    this.questionnaireVersion,
     required this.id,
     this.seasonId,
     required this.title,
@@ -18,13 +31,30 @@ class RecruitmentCampaignModel {
     this.startDate,
     this.endDate,
     required this.isActive,
+    this.eligibilityRequired = false,
+    this.selectionSchedule,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.serverTime,
+    this.receivedAt,
+    this.opensAt,
+    this.closesAt,
   });
 
   factory RecruitmentCampaignModel.fromJson(Map<String, dynamic> json) {
     return RecruitmentCampaignModel(
+      applicationQuestions: json['application_questions'] is List
+          ? (json['application_questions'] as List)
+                .whereType<Map>()
+                .map(
+                  (q) => RecruitmentApplicationQuestion.fromJson(
+                    Map<String, dynamic>.from(q),
+                  ),
+                )
+                .toList()
+          : defaultRecruitmentQuestions,
+      questionnaireVersion: json['questionnaire_version']?.toString(),
       id: json['id']?.toString() ?? '',
       seasonId: json['season_id']?.toString(),
       title: json['title']?.toString() ?? 'Campagne sans titre',
@@ -32,9 +62,17 @@ class RecruitmentCampaignModel {
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       isActive: json['is_active'] == true,
+      eligibilityRequired: json['eligibility_required'] == true,
+      selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
       createdBy: json['created_by']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      serverTime: DateTime.tryParse(
+        json['server_time']?.toString() ?? '',
+      )?.toUtc(),
+      receivedAt: DateTime.now().toUtc(),
+      opensAt: DateTime.tryParse(json['opens_at']?.toString() ?? '')?.toUtc(),
+      closesAt: DateTime.tryParse(json['closes_at']?.toString() ?? '')?.toUtc(),
     );
   }
 
@@ -42,13 +80,39 @@ class RecruitmentCampaignModel {
 
   DateTime? get endDateValue => DateTime.tryParse(endDate ?? '');
 
+  DateTime get currentTime => serverTime != null && receivedAt != null
+      ? serverTime!.add(DateTime.now().toUtc().difference(receivedAt!))
+      : DateTime.now().toUtc();
+
+  DateTime? get openingInstant {
+    final date = startDateValue;
+    return opensAt ??
+        (date == null ? null : DateTime.utc(date.year, date.month, date.day));
+  }
+
+  DateTime? get closingInstant {
+    final date = endDateValue;
+    return closesAt ??
+        (date == null
+            ? null
+            : DateTime.utc(date.year, date.month, date.day + 1));
+  }
+
+  bool isOpenAt(DateTime now) =>
+      isActive &&
+      (openingInstant == null || !now.isBefore(openingInstant!)) &&
+      (closingInstant == null || now.isBefore(closingInstant!));
+
   RecruitmentCampaignModel copyWith({
     String? title,
     String? description,
     String? startDate,
     String? endDate,
     bool? isActive,
+    List<RecruitmentApplicationQuestion>? applicationQuestions,
   }) => RecruitmentCampaignModel(
+    applicationQuestions: applicationQuestions ?? this.applicationQuestions,
+    questionnaireVersion: questionnaireVersion,
     id: id,
     seasonId: seasonId,
     title: title ?? this.title,
@@ -56,9 +120,15 @@ class RecruitmentCampaignModel {
     startDate: startDate ?? this.startDate,
     endDate: endDate ?? this.endDate,
     isActive: isActive ?? this.isActive,
+    eligibilityRequired: eligibilityRequired,
+    selectionSchedule: selectionSchedule,
     createdBy: createdBy,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    serverTime: serverTime,
+    receivedAt: receivedAt,
+    opensAt: startDate == null ? opensAt : null,
+    closesAt: endDate == null ? closesAt : null,
   );
 
   String get periodLabel {

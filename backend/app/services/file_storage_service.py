@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import base64
 import binascii
 import hashlib
@@ -8,9 +9,11 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.finance import Payment
 from app.models.document import Document
 from app.models.post import Post
 from app.models.stored_file import StoredFile
@@ -29,6 +32,7 @@ ALLOWED_STORAGE_SCOPES = {
     "chat",
     "document",
     "post",
+    "profile",
     "project",
     "pole",
     "impact",
@@ -36,6 +40,7 @@ ALLOWED_STORAGE_SCOPES = {
     "academy",
     "archive",
     "official",
+    "finance",
     "temporary",
 }
 ALLOWED_VISIBILITIES = {
@@ -85,8 +90,9 @@ def normalize_base64(data: str) -> str:
 
 
 def infer_mime_type(file_name: str, provided_mime_type: str | None = None) -> str:
-    if provided_mime_type and "/" in provided_mime_type:
-        return provided_mime_type[:160]
+    normalized = (provided_mime_type or "").strip().lower()
+    if normalized and normalized != "application/octet-stream" and "/" in normalized:
+        return normalized[:160]
     guessed, _ = mimetypes.guess_type(file_name)
     return guessed or "application/octet-stream"
 
@@ -130,7 +136,7 @@ def build_expiration(
     is_ephemeral: bool,
     ephemeral_duration: str | None,
 ) -> datetime | None:
-    now = datetime.utcnow()
+    now = utc_now()
     if is_ephemeral:
         duration = ALLOWED_EPHEMERAL_DURATIONS.get(ephemeral_duration or "")
         if duration is None:
@@ -149,7 +155,7 @@ def store_bytes(
     *,
     data: bytes,
     original_filename: str,
-    uploaded_by: User,
+    uploaded_by: User | None,
     mime_type: str | None = None,
     storage_scope: str = "temporary",
     visibility: str = "private",
@@ -194,7 +200,7 @@ def store_bytes(
         extension=extension,
         storage_path=str(file_path.relative_to(UPLOAD_ROOT)),
         storage_scope=storage_scope,
-        uploaded_by_id=uploaded_by.id,
+        uploaded_by_id=uploaded_by.id if uploaded_by else None,
         is_temporary=is_temporary,
         is_ephemeral=is_ephemeral,
         ephemeral_duration=ephemeral_duration if is_ephemeral else None,
@@ -209,7 +215,11 @@ def store_bytes(
         ),
     )
     db.add(stored_file)
-    db.flush()
+    try:
+        db.flush()
+    except Exception:
+        file_path.unlink(missing_ok=True)
+        raise
     return stored_file
 
 
@@ -225,7 +235,11 @@ def store_base64(db: Session, *, data_base64: str, **kwargs) -> StoredFile:
 
 
 def file_path(stored_file: StoredFile) -> Path:
-    return (UPLOAD_ROOT / stored_file.storage_path).resolve()
+    root = UPLOAD_ROOT.resolve()
+    path = (root / stored_file.storage_path).resolve()
+    if path == root or root not in path.parents:
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    return path
 
 
 def delete_physical_file(stored_file: StoredFile) -> None:
@@ -242,7 +256,7 @@ def is_storage_path_safe(stored_file: StoredFile) -> bool:
         path = file_path(stored_file)
         root = UPLOAD_ROOT.resolve()
         return path != root and root in path.parents
-    except OSError:
+    except (OSError, HTTPException):
         return False
 
 
@@ -254,6 +268,12 @@ def cleanup_skip_reason(
 ) -> str | None:
     if not is_storage_path_safe(stored_file):
         return "unsafe_path"
+
+    if db.query(Payment.id).filter(or_(
+        Payment.proof_file_id == stored_file.id,
+        Payment.receipt_file_id == stored_file.id,
+    )).first():
+        return "linked_payment"
 
     if stored_file.storage_scope in PROTECTED_STORAGE_SCOPES:
         return "protected_scope"
@@ -298,7 +318,7 @@ def cleanup_expired_files(
     limit: int = 500,
     dry_run: bool = True,
 ) -> dict:
-    cleanup_time = now or datetime.utcnow()
+    cleanup_time = now or utc_now()
     temporary_cutoff = cleanup_time - timedelta(days=TEMPORARY_RETENTION_DAYS)
     candidates = (
         db.query(StoredFile)

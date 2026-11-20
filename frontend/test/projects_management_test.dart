@@ -85,7 +85,7 @@ void main() {
         'Objectifs',
         'Impact attendu',
         'Budget estimé',
-        'Saison',
+        'Année',
         'Statut initial',
       ]) {
         if (find.text(label).evaluate().isEmpty) {

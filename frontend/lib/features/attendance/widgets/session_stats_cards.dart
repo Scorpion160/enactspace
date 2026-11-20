@@ -96,7 +96,7 @@ class SessionStatsCards extends StatelessWidget {
                       foregroundColor: AppTheme.softBlack,
                       child: Icon(stat.icon),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -106,7 +106,7 @@ class SessionStatsCards extends StatelessWidget {
                             stat.value,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
                             ),
@@ -115,8 +115,10 @@ class SessionStatsCards extends StatelessWidget {
                             stat.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.black54,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

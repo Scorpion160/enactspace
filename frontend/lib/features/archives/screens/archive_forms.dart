@@ -105,7 +105,7 @@ class _ArchiveItemFormDialogState extends State<ArchiveItemFormDialog> {
                     .toList(),
                 onChanged: (value) => setState(() => _visibility = value!),
               ),
-              _field('season_id', 'Saison (identifiant fiable)'),
+              _field('season_id', 'Année (identifiant fiable)'),
               _field('pole_id', 'Pôle'),
               _field('project_id', 'Projet'),
               _field('document_id', 'Document'),
@@ -301,7 +301,7 @@ Future<bool> showHistoricalProjectDialog(
   fields: const {
     'name': 'Nom',
     'year': 'Année',
-    'season_label': 'Saison / période',
+    'season_label': 'Année / période',
     'description': 'Description',
     'problem': 'Problème',
     'solution': 'Solution',
@@ -487,11 +487,11 @@ Future<bool> showHistoricalStatisticDialog(
     'source_label': item.sourceLabel,
     'status': item.status,
   },
-  fields: const {
+  fields: {
     'label': 'Libellé',
-    'value': 'Valeur',
+    'value': item.isMinimum ? 'Valeur minimale (plus de)' : 'Valeur',
     'unit': 'Unité',
-    'description': 'Description',
+    'description': 'Note ou période',
     'source_label': 'Source',
     'status': 'Statut',
   },
@@ -608,11 +608,22 @@ class _ContractFormDialogState extends State<_ContractFormDialog> {
                     keyboardType: widget.numericFields.contains(entry.key)
                         ? TextInputType.number
                         : null,
-                    validator: widget.requiredFields.contains(entry.key)
-                        ? (value) => value == null || value.trim().isEmpty
-                              ? 'Champ requis'
-                              : null
-                        : null,
+                    validator: (value) {
+                      final input = (value ?? '').trim();
+                      if (input.isEmpty) {
+                        return widget.requiredFields.contains(entry.key)
+                            ? 'Champ requis'
+                            : null;
+                      }
+                      if (entry.key == 'year' && int.tryParse(input) == null) {
+                        return 'Saisis une année entière.';
+                      }
+                      if (widget.numericFields.contains(entry.key) &&
+                          _archiveFormNumber(input)?.isFinite != true) {
+                        return 'Saisis un nombre valide.';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               for (final entry in widget.boolFields.entries)
@@ -661,7 +672,7 @@ class _ContractFormDialogState extends State<_ContractFormDialog> {
       final value = entry.value.text.trim();
       if (value.isEmpty) continue;
       if (widget.numericFields.contains(entry.key)) {
-        payload[entry.key] = num.tryParse(value);
+        payload[entry.key] = _archiveFormNumber(value);
       } else if (widget.listFields.contains(entry.key)) {
         payload[entry.key] = value
             .split(',')
@@ -686,3 +697,7 @@ class _ContractFormDialogState extends State<_ContractFormDialog> {
     }
   }
 }
+
+num? _archiveFormNumber(String value) => num.tryParse(
+  value.replaceAll(RegExp(r'[\s\u00a0\u202f]'), '').replaceAll(',', '.'),
+);

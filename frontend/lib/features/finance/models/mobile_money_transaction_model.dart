@@ -2,6 +2,7 @@ class MobileMoneyTransactionModel {
   final String transactionId;
   final int amount;
   final String currency;
+  final String? channel;
   final String status;
   final String? checkoutUrl;
   final DateTime? expiresAt;
@@ -11,6 +12,7 @@ class MobileMoneyTransactionModel {
     required this.transactionId,
     required this.amount,
     required this.currency,
+    this.channel,
     required this.status,
     this.checkoutUrl,
     this.expiresAt,
@@ -22,11 +24,23 @@ class MobileMoneyTransactionModel {
       transactionId: json['transaction_id']?.toString() ?? '',
       amount: int.tryParse(json['amount']?.toString() ?? '0') ?? 0,
       currency: json['currency']?.toString() ?? 'XOF',
+      channel: json['channel']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       checkoutUrl: json['checkout_url']?.toString(),
       expiresAt: DateTime.tryParse(json['expires_at']?.toString() ?? ''),
       message: json['message']?.toString() ?? 'Paiement en cours.',
     );
+  }
+
+  String get channelLabel {
+    switch (channel) {
+      case 'wave-senegal':
+        return 'Wave';
+      case 'orange-money-senegal':
+        return 'Orange Money';
+      default:
+        return 'Mobile Money';
+    }
   }
 
   bool get isFinal {

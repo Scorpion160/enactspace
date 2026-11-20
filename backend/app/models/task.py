@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -40,6 +41,8 @@ class Task(Base):
         ForeignKey("users.id"),
         nullable=True,
     )
+    veille_plan_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    veille_season_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
 
     pole_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -72,8 +75,8 @@ class Task(Base):
 
     is_late_alert_sent: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     @validates("status")
     def normalize_status(self, _key, value):
@@ -108,7 +111,7 @@ class TaskAssignee(Base):
         nullable=False,
     )
 
-    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("task_id", "user_id", name="uq_task_user"),
@@ -133,8 +136,8 @@ class TaskChecklistItem(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     is_done: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class TaskComment(Base):
@@ -160,4 +163,4 @@ class TaskComment(Base):
 
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

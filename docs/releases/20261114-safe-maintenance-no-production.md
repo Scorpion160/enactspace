@@ -1,0 +1,75 @@
+# EnactSpace — préparation de maintenance sans interruption de production
+
+**Préparation initiale :** branche `feature/safe-maintenance-20261114`. **Mise en service ultérieure :** Web `1.0.30+42`, le 14 novembre 2026, après sauvegardes et validation CI complète. Ce lot n'a modifié ni l'API, ni les travailleurs, ni les candidatures.
+
+La production est utilisée par les membres. **Interdictions pour ce lot de préparation :** pas de `docker compose up`, `down`, `restart`, `build` sur le VPS ; pas de mise à jour de `/opt/enactspace/web`, pas de migration, écriture SQL, fusion de comptes, envoi de courriels ou activation de paiement.
+
+## 1. Risque de confusion des images Docker
+
+L'application utilise des images distinctes du fichier Compose de base. Celui-ci contient un `build:` pour l'API et ne définit pas directement les trois workers. La configuration opérationnelle assemble plusieurs fichiers d'override. Un futur `docker compose up` mal ciblé pourrait redémarrer la mauvaise version.
+
+**Correctif préparé :** `tools/verify_vps_compose_alignment.py` est un garde-fou en lecture seule, **sans import Docker ni action réseau**, qui compare deux inventaires JSON préparés à l'avance.
+
+Pour une maintenance future, sur un poste autorisé, collecter les informations **en lecture seule** :
+
+```bash
+docker compose -p enactspace \
+  -f /opt/enactspace/app/deploy/docker-compose.vps.yml \
+  -f /opt/enactspace/staging/chat-mail-hotfix-20261111-46668d1f/hotfix.override.yml \
+  -f /opt/enactspace/staging/chat-search-20261114/release.override.yml \
+  config --format json > effective-compose.json
+
+docker inspect enactspace_backend enactspace_email_worker \
+  enactspace_push_worker enactspace_veille_worker > current-containers.json
+
+python3 tools/verify_vps_compose_alignment.py \
+  --compose-json effective-compose.json \
+  --containers-json current-containers.json
+```
+
+La vérification refuse les images différentes, services absents ou arrêtés, les reconstructions implicites et les identifiants d'images divergents. Elle ne répare ni ne redémarre rien : l'alignement réel doit être établi **avant** tout futur déploiement. Le contrôle porte sur la configuration actuelle, pas sur la validité d'une candidate de version future.
+
+## 2. Cache du Chat
+
+Les synchronisations Chat interrogent périodiquement les discussions et messages. Auparavant, chaque résultat provoquait une écriture du cache chiffré même si les données étaient strictement inchangées.
+
+Le service conserve à présent une représentation JSON comparable des discussions et messages. Il continue à actualiser le cache mémoire de session mais **n'écrit dans le stockage chiffré que si le contenu a changé**. Les modifications de contenu, les compteurs non lus, les réactions et les détails des discussions sont couverts par les données `toJson()` du modèle ; le format du cache chiffré demeure inchangé.
+
+La synchronisation réseau elle-même reste inchangée. Il ne faut pas considérer ce correctif comme la solution à toute latence sans recette instrumentée en navigateur authentifié. Il réduit les écritures inutiles dans le stockage local.
+
+## 3. Tests
+
+- 5 tests synthétiques du garde-fou Compose.
+- Tests Flutter de non-réécriture du cache sur données identiques, puis de réécriture en cas de modification.
+- Vérification de la restauration du contenu après redémarrage logique de ChatService et de l'isolement du cache entre comptes.
+- Tests de confidentialité et des commandes de groupe Chat existants.
+
+**Recommandation de livraison :** fusionner cette branche uniquement après validation de la CI et planifier une fenêtre d'intervention lorsque personne n'utilise la plateforme. Vérifier ensuite le nouveau commit sur un environnement de recette, puis préparer les sauvegardes et un plan de retour arrière indépendants de la production.
+
+## Livraison Web confirmée
+
+- La CI applicative `43652505175` et les contrôles de sécurité `43652505194` ont tous réussi pour le commit `69fe2b9`.
+- Archive Web officielle `1.0.30+42` : SHA du JavaScript `a01de565a9c2ffe950ff052c430859cf63ef5c0897a71d7f33b0b8a8a4c280cf`.
+- Publication `WEB_DEPLOYED_LOCAL_CHECKS_PASSED`, puis vérification HTTPS de `version.json`, `main.dart.js`, Material Icons et Cupertino Icons : OK.
+- Sauvegardes prépublication vérifiées : `/opt/enactspace/staging/web-cache42-20261114/backups/`. Retour arrière Web sous `/opt/enactspace/releases/web-previous-eb6b06ba14a34acdbd3a0098bcbe9b6c`.
+- Aucun nouveau conteneur backend, aucune migration SQL ni notification aux candidats pendant cette livraison.
+
+## État distinct du recrutement
+
+Au contrôle, **95 décisions préparées** : **64 shortlistées, 31 écartées** ; **301 notes**. Après la publication Web, le même total et les mêmes décisions sont restés enregistrés. **33 dossiers (20 shortlistés, 13 écartés) n'ont que 3 avis contre 4 exigés par la règle de désaccord** : la procédure de publication des résultats reste donc **non prête**. Ce contrôle ne doit pas être assimilé à une autorisation de notifier les candidats. Voir `docs/recruitment/audit-tri-20261114.md`.
+
+## Risque Docker restant
+
+Le contrôle en lecture seule `verify_vps_compose_alignment.py` a confirmé que les quatre images de service correspondent à la configuration effective, **mais que la section `backend` comporte encore une instruction `build:`**. Ne pas lancer une reconstruction ou un `docker compose up` générique lors des futures livraisons. Il reste à normaliser la configuration de déploiement backend dans un chantier distinct avant une nouvelle mise à jour serveur.
+
+## Correction ciblée de la configuration de production (sans redémarrage)
+
+La configuration Docker **réellement utilisée sur le VPS** (156 lignes) est plus riche que l'ancien modèle du dépôt (90 lignes) : plusieurs paramètres et services présents en production n'y figurent pas. Un remplacement complet par le fichier du dépôt aurait supprimé ces réglages ; il a été **refusé** par les contrôles.
+
+La configuration active a ensuite été modifiée **uniquement** pour :
+- épingler `enactspace-backend:chat41-949575e` sur les quatre services concernés, au lieu de tags historiques différents ;
+- retirer `build:` du service backend pour empêcher toute reconstruction implicite.
+
+Avant application, la comparaison de la configuration Compose effective a renvoyé `CANDIDATE_DIFF_PATHS []` après suppression virtuelle de ce seul champ `build`. Le remplacement du fichier a été atomique, **sans commande `up`, `restart`, `down` ni modification des conteneurs**. Le garde-fou `verify_vps_compose_alignment.py` a ensuite confirmé `CONFORME — quatre services alignés`.
+
+Ancienne configuration préservée sous `/opt/enactspace/staging/web-cache42-20261114/docker-compose-vps.before42.yml`. Le fichier candidat temporaire a été retiré après validation. **Reste à faire** : rapprocher explicitement le modèle Docker du dépôt du fichier de production après revue des différences, avant toute prochaine livraison backend ; ne pas recopier le modèle ancien par-dessus le fichier serveur.

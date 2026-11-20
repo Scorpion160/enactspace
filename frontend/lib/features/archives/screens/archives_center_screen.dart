@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../shared/attachments/attachment_picker.dart';
 import '../models/archive_contract_models.dart';
 import '../models/archive_models.dart';
 import '../models/memory_timeline_models.dart';
 import '../services/archives_gateway.dart';
+import 'archive_visuals.dart';
 import 'archives_center_sections.dart';
 
 class ArchivesScreen extends StatefulWidget {
   final ArchivesGateway? gateway;
   final MemoryTimelineFilters initialFilters;
+  final bool initialHistoricalView;
 
   const ArchivesScreen({
     super.key,
     this.gateway,
     this.initialFilters = const MemoryTimelineFilters(),
+    this.initialHistoricalView = false,
   });
 
   @override
@@ -34,8 +40,10 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
   Object? _moreError;
   bool _loading = true;
   bool _loadingMore = false;
+  int _timelineGeneration = 0;
   bool _legacyMode = false;
   Future<ArchivesHomeData>? _legacyHome;
+  ArchivesHomeData? _lastLegacyData;
 
   @override
   void initState() {
@@ -43,6 +51,10 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     _gateway = widget.gateway ?? ApiArchivesGateway();
     _filters = widget.initialFilters;
     _search = TextEditingController(text: _filters.search);
+    if (widget.initialHistoricalView) {
+      _legacyMode = true;
+      _legacyHome = _loadHistoricalHome();
+    }
     _loadInitial();
   }
 
@@ -53,34 +65,48 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
   }
 
   Future<void> _loadInitial() async {
+    final generation = ++_timelineGeneration;
+    final filters = _filters;
     setState(() {
       _loading = true;
+      _loadingMore = false;
       _initialError = null;
       _moreError = null;
     });
     try {
       final permissions = await _gateway.getPermissions();
+      if (!mounted || generation != _timelineGeneration) return;
       final effectiveFilters = permissions.canValidate
-          ? _filters
-          : _filters.copyWith(review: false);
+          ? filters
+          : filters.copyWith(review: false);
       final page = await _gateway.getTimeline(filters: effectiveFilters);
-      if (!mounted) return;
+      if (!mounted || generation != _timelineGeneration) return;
       setState(() {
         _permissions = permissions;
         _filters = effectiveFilters;
         _items = page.items;
         _nextCursor = page.nextCursor;
+        if (page.items.isEmpty &&
+            !effectiveFilters.isFiltered &&
+            !effectiveFilters.review) {
+          _legacyHome ??= _loadHistoricalHome();
+        }
       });
     } catch (error) {
-      if (mounted) setState(() => _initialError = error);
+      if (mounted && generation == _timelineGeneration) {
+        setState(() => _initialError = error);
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _timelineGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _loadMore() async {
     final cursor = _nextCursor;
-    if (_loadingMore || cursor == null || _legacyMode) return;
+    if (_loading || _loadingMore || cursor == null || _legacyMode) return;
+    final generation = _timelineGeneration;
     setState(() {
       _loadingMore = true;
       _moreError = null;
@@ -90,16 +116,20 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
         filters: _filters,
         cursor: cursor,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _timelineGeneration) return;
       setState(() {
         final known = _items.map((item) => item.id).toSet();
         _items = [..._items, ...page.items.where((item) => known.add(item.id))];
         _nextCursor = page.nextCursor;
       });
     } catch (error) {
-      if (mounted) setState(() => _moreError = error);
+      if (mounted && generation == _timelineGeneration) {
+        setState(() => _moreError = error);
+      }
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      if (mounted && generation == _timelineGeneration) {
+        setState(() => _loadingMore = false);
+      }
     }
   }
 
@@ -113,10 +143,17 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     _loadInitial();
   }
 
+  void _resetFilters() {
+    _search.clear();
+    _filters = MemoryTimelineFilters(review: _filters.review);
+    _loadInitial();
+  }
+
   Future<void> _showFilters() async {
     final start = TextEditingController(text: _filters.startYear?.toString());
     final end = TextEditingController(text: _filters.endYear?.toString());
     var selectedType = _filters.resourceType;
+    String? error;
     final result = await showDialog<MemoryTimelineFilters>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -184,6 +221,16 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
                   onChanged: (value) =>
                       setDialogState(() => selectedType = value),
                 ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -204,20 +251,38 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
             ),
             FilledButton(
               key: const Key('memory_apply_filters'),
-              onPressed: () => Navigator.pop(
-                context,
-                MemoryTimelineFilters(
-                  startYear: int.tryParse(start.text.trim()),
-                  endYear: int.tryParse(end.text.trim()),
-                  resourceType: selectedType,
-                  projectId: _filters.projectId,
-                  poleId: _filters.poleId,
-                  memberId: _filters.memberId,
-                  eventId: _filters.eventId,
-                  search: _filters.search,
-                  review: _filters.review,
-                ),
-              ),
+              onPressed: () {
+                final firstYear = int.tryParse(start.text.trim());
+                final lastYear = int.tryParse(end.text.trim());
+                if ((start.text.trim().isNotEmpty && firstYear == null) ||
+                    (end.text.trim().isNotEmpty && lastYear == null)) {
+                  setDialogState(() => error = 'Saisis une année entière.');
+                  return;
+                }
+                if (firstYear != null &&
+                    lastYear != null &&
+                    firstYear > lastYear) {
+                  setDialogState(
+                    () => error =
+                        'L’année de début doit précéder l’année de fin.',
+                  );
+                  return;
+                }
+                Navigator.pop(
+                  context,
+                  MemoryTimelineFilters(
+                    startYear: firstYear,
+                    endYear: lastYear,
+                    resourceType: selectedType,
+                    projectId: _filters.projectId,
+                    poleId: _filters.poleId,
+                    memberId: _filters.memberId,
+                    eventId: _filters.eventId,
+                    search: _filters.search,
+                    review: _filters.review,
+                  ),
+                );
+              },
               child: const Text('Appliquer'),
             ),
           ],
@@ -234,13 +299,15 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
   void _showLegacy() {
     setState(() {
       _legacyMode = true;
-      _legacyHome ??= _gateway.loadHome();
+      _legacyHome ??= _loadHistoricalHome();
     });
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: _legacyMode ? _buildLegacy() : _buildTimeline()),
+  Widget build(BuildContext context) => ArchiveTheme(
+    child: Scaffold(
+      body: SafeArea(child: _legacyMode ? _buildLegacy() : _buildTimeline()),
+    ),
   );
 
   Widget _buildTimeline() => RefreshIndicator(
@@ -251,6 +318,8 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
         return false;
       },
       child: CustomScrollView(
+        key: const PageStorageKey('archives_timeline'),
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
             padding: EdgeInsets.fromLTRB(
@@ -259,7 +328,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
               MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
               0,
             ),
-            sliver: SliverToBoxAdapter(child: _header()),
+            sliver: SliverToBoxAdapter(child: Builder(builder: _header)),
           ),
           if (_loading)
             const SliverFillRemaining(
@@ -271,10 +340,31 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
               hasScrollBody: false,
               child: _MemoryError(onRetry: _loadInitial),
             )
+          else if (_items.isEmpty && !_filters.isFiltered && !_filters.review)
+            SliverPadding(
+              padding: const EdgeInsets.all(20),
+              sliver: SliverToBoxAdapter(
+                child: FutureBuilder<ArchivesHomeData>(
+                  future: _legacyHome,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) return _MemoryError(onRetry: _refreshLegacy);
+                    final home = snapshot.data ?? _lastLegacyData;
+                    if (home == null) return const LinearProgressIndicator();
+                    return HistoricalMemoryContents(
+                      home: home, gateway: _gateway, onChanged: _refreshLegacy,
+                    );
+                  },
+                ),
+              ),
+            )
           else if (_items.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _MemoryEmpty(filtered: _filters.isFiltered),
+              child: _MemoryEmpty(
+                filtered: _filters.isFiltered,
+                onReset: _filters.isFiltered ? _resetFilters : null,
+                onOpenHistorical: !_filters.isFiltered ? _showLegacy : null,
+              ),
             )
           else
             SliverPadding(
@@ -292,6 +382,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _MemoryTimelineCard(
                         item: _items[index],
+                        review: _filters.review,
                         onOpen: () => _openDetail(_items[index]),
                         onOpenSource: _items[index].source?.capability == null
                             ? null
@@ -326,116 +417,159 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
     ),
   );
 
-  Widget _header() => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      borderRadius: BorderRadius.circular(28),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Mémoire Enactus ESP',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Une chronologie institutionnelle vérifiée, reliée à ses sources.',
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const Key('archives_search'),
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            onSubmitted: _applySearch,
-            decoration: InputDecoration(
-              hintText: 'Rechercher dans la mémoire',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                tooltip: 'Effacer la recherche',
-                onPressed: () {
-                  _search.clear();
-                  _applySearch('');
-                },
-                icon: const Icon(Icons.clear),
-              ),
-              filled: true,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (_filters.isFiltered)
-                const Chip(
-                  avatar: Icon(Icons.filter_alt_outlined, size: 18),
-                  label: Text('Vue filtrée'),
-                ),
-              if (_permissions.canValidate)
-                FilterChip(
-                  key: const Key('memory_review_mode'),
-                  selected: _filters.review,
-                  onSelected: _setReview,
-                  label: const Text('Mode révision'),
-                ),
-              OutlinedButton.icon(
-                key: const Key('memory_filters'),
-                onPressed: _showFilters,
-                icon: const Icon(Icons.tune),
-                label: const Text('Filtres'),
-              ),
-              if (_permissions.canValidate)
-                OutlinedButton.icon(
-                  key: const Key('memory_legacy_area'),
-                  onPressed: _showLegacy,
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('Archives héritées à vérifier'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _buildLegacy() => FutureBuilder<ArchivesHomeData>(
-    future: _legacyHome,
-    builder: (context, snapshot) => ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Row(
+  Widget _header(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ArchiveBanner(
+        eyebrow: 'ARCHIVES & MÉMOIRE COLLECTIVE',
+        title: 'Mémoire Enactus ESP',
+        description:
+            'Les projets, les rencontres et les moments qui racontent Enactus ESP.',
+        motif: ArchiveMotif.binder,
+        actions: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            IconButton(
-              onPressed: () => setState(() => _legacyMode = false),
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Retour à la mémoire vérifiée',
+            FilledButton.icon(
+              key: const Key('memory_legacy_area'),
+              onPressed: _showLegacy,
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('L’histoire du club'),
             ),
-            const Expanded(
-              child: Text(
-                'Archives héritées à vérifier',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
+            OutlinedButton.icon(
+              key: const Key('memory_minutes'),
+              onPressed: () =>
+                  context.push('/archives/minutes', extra: _gateway),
+              icon: const Icon(Icons.record_voice_over_outlined),
+              label: const Text('Minute de l’enacteur'),
+            ),
+            IconButton(
+              tooltip: 'Actualiser',
+              onPressed: _loading ? null : _loadInitial,
+              icon: const Icon(Icons.refresh),
             ),
           ],
         ),
-        const Text(
-          'Contenu de compatibilité distinct de la mémoire institutionnelle vérifiée.',
+      ),
+      const SizedBox(height: 12),
+      AppFilterToolbar(
+        quickFiltersWidth: _filters.isFiltered && _permissions.canValidate
+            ? 340
+            : null,
+        search: TextField(
+          key: const Key('archives_search'),
+          controller: _search,
+          textInputAction: TextInputAction.search,
+          onSubmitted: _applySearch,
+          decoration: InputDecoration(
+            hintText: 'Rechercher dans la mémoire',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(
+              tooltip: 'Effacer la recherche',
+              onPressed: () {
+                _search.clear();
+                _applySearch('');
+              },
+              icon: const Icon(Icons.clear),
+            ),
+            filled: true,
+            border: const OutlineInputBorder(),
+          ),
         ),
-        const SizedBox(height: 20),
-        if (snapshot.connectionState == ConnectionState.waiting)
-          const Center(child: CircularProgressIndicator())
-        else if (snapshot.hasError)
-          _MemoryError(
-            onRetry: () => setState(() => _legacyHome = _gateway.loadHome()),
-          )
-        else
-          ArchivesOverview(home: snapshot.requireData, gateway: _gateway),
-      ],
+        quickFilters: [
+          if (_filters.isFiltered)
+            const Chip(
+              avatar: Icon(Icons.filter_alt_outlined, size: 18),
+              label: Text('Vue filtrée'),
+            ),
+          if (_permissions.canValidate)
+            FilterChip(
+              key: const Key('memory_review_mode'),
+              selected: _filters.review,
+              selectedColor: Theme.of(context).colorScheme.primaryContainer,
+              showCheckmark: true,
+              onSelected: _setReview,
+              label: const Text('Mode révision'),
+            ),
+        ],
+        filters: const [],
+        actions: [
+          OutlinedButton.icon(
+            key: const Key('memory_filters'),
+            onPressed: _showFilters,
+            icon: const Icon(Icons.tune),
+            label: const Text('Filtres'),
+          ),
+        ],
+        activeFilterCount: _filters.isFiltered ? 1 : 0,
+        onReset: _resetFilters,
+      ),
+    ],
+  );
+
+  Future<ArchivesHomeData> _loadHistoricalHome() async {
+    final home = await _gateway.loadHome();
+    _lastLegacyData = home;
+    return home;
+  }
+
+  Future<void> _refreshLegacy() async {
+    if (!mounted) return;
+    final future = _loadHistoricalHome();
+    setState(() {
+      _legacyHome = future;
+    });
+    try {
+      await future;
+    } catch (_) {
+      // The historical view displays the error and keeps any available data.
+    }
+  }
+
+  Widget _buildLegacy() => RefreshIndicator(
+    onRefresh: _refreshLegacy,
+    child: FutureBuilder<ArchivesHomeData>(
+      future: _legacyHome,
+      builder: (context, snapshot) => ListView(
+        key: const PageStorageKey('archives_history'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() => _legacyMode = false),
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Retour aux Archives',
+              ),
+              const Expanded(
+                child: Text(
+                  'Mémoire historique Enactus ESP',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualiser la mémoire historique',
+                onPressed: snapshot.connectionState == ConnectionState.waiting
+                    ? null
+                    : _refreshLegacy,
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (snapshot.connectionState == ConnectionState.waiting)
+            const LinearProgressIndicator(),
+          if (snapshot.hasError) _MemoryError(onRetry: _refreshLegacy),
+          if (_lastLegacyData != null)
+            HistoricalMemoryContents(
+              home: _lastLegacyData!,
+              gateway: _gateway,
+              onChanged: _refreshLegacy,
+            ),
+        ],
+      ),
     ),
   );
 
@@ -463,14 +597,7 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
   Future<void> _openSource(MemorySourceCapability capability) async {
     if (capability.type == 'document') {
       final id = capability.url.split('/').last;
-      context.go('/documents/$id');
-      return;
-    }
-    if (capability.type == 'stored_file') {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Source non accessible')));
+      context.push('/documents/$id');
       return;
     }
     final raw = capability.url.startsWith('/')
@@ -489,11 +616,13 @@ class _ArchivesScreenState extends State<ArchivesScreen> {
 
 class _MemoryTimelineCard extends StatelessWidget {
   final MemoryTimelineItem item;
+  final bool review;
   final VoidCallback onOpen;
   final VoidCallback? onOpenSource;
 
   const _MemoryTimelineCard({
     required this.item,
+    required this.review,
     required this.onOpen,
     this.onOpenSource,
   });
@@ -524,11 +653,11 @@ class _MemoryTimelineCard extends StatelessWidget {
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            if (item.summary != null) ...[
+            if (!review && item.summary != null) ...[
               const SizedBox(height: 6),
               Text(item.summary!, maxLines: 3, overflow: TextOverflow.ellipsis),
             ],
-            if (item.relatedEntities.isNotEmpty) ...[
+            if (!review && item.relatedEntities.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(
                 item.relatedEntities.map((entity) => entity.label).join(' · '),
@@ -541,6 +670,11 @@ class _MemoryTimelineCard extends StatelessWidget {
               const Text('Source non accessible')
             else if (onOpenSource == null)
               Text('${item.source!.label} · Source non accessible')
+            else if (item.source!.capability!.type == 'stored_file')
+              StoredAttachmentButton(
+                url: item.source!.capability!.url,
+                label: 'Ouvrir la source · ${item.source!.label}',
+              )
             else
               TextButton.icon(
                 onPressed: onOpenSource,
@@ -549,6 +683,12 @@ class _MemoryTimelineCard extends StatelessWidget {
               ),
             if (item.hasUnavailableRelation)
               const Text('Élément source indisponible'),
+            if (review)
+              TextButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.visibility_outlined),
+                label: const Text('Dévoiler le repère'),
+              ),
           ],
         ),
       ),
@@ -606,17 +746,75 @@ class _MemoryDetail extends StatelessWidget {
 
 class _MemoryEmpty extends StatelessWidget {
   final bool filtered;
-  const _MemoryEmpty({required this.filtered});
+  final VoidCallback? onOpenHistorical;
+  final VoidCallback? onReset;
+
+  const _MemoryEmpty({
+    required this.filtered,
+    this.onOpenHistorical,
+    this.onReset,
+  });
 
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Text(
-        filtered
-            ? 'Aucun repère ne correspond à ces filtres.'
-            : 'Aucun repère institutionnel vérifié pour le moment.',
-        textAlign: TextAlign.center,
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  filtered
+                      ? Icons.search_off_rounded
+                      : Icons.history_edu_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  filtered
+                      ? 'Aucun repère ne correspond à ces filtres.'
+                      : 'Explore l’histoire du club à travers ses projets, ses rencontres et ses moments marquants.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (onReset != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: onReset,
+                    child: const Text('Réinitialiser les filtres'),
+                  ),
+                ],
+                if (!filtered) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Retrouve les projets, les compétitions, les distinctions et l’impact d’Enactus ESP dans l’histoire du club.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (onOpenHistorical != null) ...[
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: onOpenHistorical,
+                      icon: const Icon(Icons.inventory_2_outlined),
+                      label: const Text('Consulter la mémoire historique'),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     ),
   );

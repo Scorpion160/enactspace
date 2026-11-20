@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,6 +9,7 @@ from app.api.deps import (
     get_current_active_validated_user,
     oauth2_scheme,
     require_admin_or_team_leader,
+    require_sg_or_admin,
 )
 from app.core.security import decode_access_token_payload
 from app.db.database import get_db
@@ -21,6 +23,7 @@ from app.models.product_services import (
     SupportTicketMessage,
 )
 from app.models.user import User
+from app.services import help_service
 from app.services.session_service import session_seconds_remaining
 from app.schemas.product_services import (
     AppReleaseCreate,
@@ -184,7 +187,7 @@ def register_installation(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cette installation appartient deja a un autre compte",
         )
-    now = datetime.utcnow()
+    now = utc_now()
     if installation is None:
         installation = AppInstallation(
             user_id=current_user.id,
@@ -269,7 +272,7 @@ def revoke_installation(
     if installation is None:
         raise HTTPException(status_code=404, detail="Installation introuvable")
     if installation.revoked_at is None:
-        installation.revoked_at = datetime.utcnow()
+        installation.revoked_at = utc_now()
         installation.updated_at = installation.revoked_at
     clear_installation_push(db, installation)
     db.commit()
@@ -309,7 +312,7 @@ def register_push_token(
         if not payload.enable_account_push:
             raise HTTPException(status_code=409, detail="Notifications push désactivées")
         preference.notification_push_enabled = True
-        preference.updated_at = datetime.utcnow()
+        preference.updated_at = utc_now()
     normalized_hash = push_token_hash(payload.token)
     encrypted = encrypt_push_token(payload.token)
     if installation.push_token_hash and installation.push_token_hash != normalized_hash:
@@ -317,7 +320,7 @@ def register_push_token(
             db, installation_id=installation.id,
             token_hash=installation.push_token_hash,
         )
-    now = datetime.utcnow()
+    now = utc_now()
     installation.push_provider = "fcm"
     installation.push_token_ciphertext = encrypted
     installation.push_token_hash = normalized_hash
@@ -350,232 +353,68 @@ def delete_push_token(
 
 
 @support_router.post("", response_model=SupportTicketRead, status_code=201)
-def create_support_ticket(
-    payload: SupportTicketCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    ticket = SupportTicket(
-        user_id=current_user.id,
-        subject=payload.subject.strip(),
-        category=payload.category.value,
-        priority=payload.priority.value,
-    )
-    db.add(ticket)
-    db.flush()
-    db.add(SupportTicketMessage(
-        ticket_id=ticket.id,
-        author_id=current_user.id,
-        message=payload.message.strip(),
-    ))
-    db.commit()
-    db.refresh(ticket)
-    return ticket
-
+def create_support_ticket(payload:SupportTicketCreate,db:Session=Depends(get_db),
+                          current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.create_ticket(db,current_user,payload)
 
 @support_router.get("", response_model=list[SupportTicketRead])
-def list_my_support_tickets(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    return db.query(SupportTicket).filter(
-        SupportTicket.user_id == current_user.id
-    ).order_by(SupportTicket.updated_at.desc()).all()
+def list_my_support_tickets(db:Session=Depends(get_db),current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.list_tickets(db,current_user)
 
+@support_router.get("/{ticket_id}",response_model=SupportTicketDetail)
+def get_my_support_ticket(ticket_id:str,db:Session=Depends(get_db),current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.read_ticket(db,current_user,ticket_id)
 
-@support_router.get("/{ticket_id}", response_model=SupportTicketDetail)
-def get_my_support_ticket(
-    ticket_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    return _ticket_detail(db, _own_ticket_or_404(db, ticket_id, current_user.id))
+@support_router.post("/{ticket_id}/messages",response_model=SupportTicketMessageRead,status_code=201)
+def add_my_support_message(ticket_id:str,payload:SupportTicketMessageCreate,db:Session=Depends(get_db),
+                           current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.reply(db,current_user,ticket_id,payload)
 
+@support_admin_router.get("",response_model=list[SupportTicketRead])
+def list_all_support_tickets(db:Session=Depends(get_db),current_user:User=Depends(require_sg_or_admin)):
+    return help_service.list_tickets(db,current_user,manager=True)
 
-@support_router.post(
-    "/{ticket_id}/messages", response_model=SupportTicketMessageRead, status_code=201
-)
-def add_my_support_message(
-    ticket_id: str,
-    payload: SupportTicketMessageCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    ticket = _own_ticket_or_404(db, ticket_id, current_user.id)
-    if ticket.status == "closed":
-        raise HTTPException(status_code=409, detail="Ce ticket est ferme")
-    message = SupportTicketMessage(
-        ticket_id=ticket.id,
-        author_id=current_user.id,
-        message=payload.message.strip(),
-    )
-    db.add(message)
-    ticket.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(message)
-    return message
+@support_admin_router.get("/{ticket_id}",response_model=SupportTicketDetail)
+def get_support_ticket_for_management(ticket_id:str,db:Session=Depends(get_db),current_user:User=Depends(require_sg_or_admin)):
+    return help_service.read_ticket(db,current_user,ticket_id,manager=True)
 
+@support_admin_router.patch("/{ticket_id}",response_model=SupportTicketRead)
+def manage_support_ticket(ticket_id:str,payload:SupportTicketManage,db:Session=Depends(get_db),
+                          current_user:User=Depends(require_sg_or_admin)):
+    return help_service.manage_ticket(db,current_user,ticket_id,payload)
 
-@support_admin_router.get("", response_model=list[SupportTicketRead])
-def list_all_support_tickets(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    return db.query(SupportTicket).order_by(SupportTicket.updated_at.desc()).all()
+@support_admin_router.post("/{ticket_id}/messages",response_model=SupportTicketMessageRead,status_code=201)
+def add_support_management_message(ticket_id:str,payload:SupportTicketMessageCreate,db:Session=Depends(get_db),
+                                  current_user:User=Depends(require_sg_or_admin)):
+    return help_service.reply(db,current_user,ticket_id,payload,manager=True)
 
+@feedback_router.post("",response_model=ProductFeedbackRead,status_code=201)
+def create_product_feedback(payload:ProductFeedbackCreate,db:Session=Depends(get_db),
+                            current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.create_feedback(db,current_user,payload)
 
-@support_admin_router.get("/{ticket_id}", response_model=SupportTicketDetail)
-def get_support_ticket_for_management(
-    ticket_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    return _ticket_detail(db, _ticket_or_404(db, ticket_id))
+@feedback_router.get("",response_model=list[ProductFeedbackRead])
+def list_my_product_feedback(db:Session=Depends(get_db),current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.list_feedback(db,current_user)
 
+@feedback_router.get("/{feedback_id}",response_model=ProductFeedbackRead)
+def get_my_product_feedback(feedback_id:str,db:Session=Depends(get_db),
+                            current_user:User=Depends(get_current_active_validated_user)):
+    return help_service.read_feedback(db,current_user,feedback_id)
 
-@support_admin_router.patch("/{ticket_id}", response_model=SupportTicketRead)
-def manage_support_ticket(
-    ticket_id: str,
-    payload: SupportTicketManage,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    ticket = _ticket_or_404(db, ticket_id)
-    changes = {}
-    fields = payload.model_fields_set
-    if "status" in fields and payload.status is not None:
-        next_status = payload.status.value
-        if next_status != ticket.status and next_status not in SUPPORT_TRANSITIONS[ticket.status]:
-            raise HTTPException(status_code=409, detail="Transition de statut invalide")
-        if next_status != ticket.status:
-            changes["status"] = {"old": ticket.status, "new": next_status}
-            ticket.status = next_status
-            now = datetime.utcnow()
-            if next_status == "resolved":
-                ticket.resolved_at = now
-                ticket.closed_at = None
-            elif next_status == "closed":
-                ticket.closed_at = now
-            elif next_status in {"open", "in_progress"}:
-                ticket.resolved_at = None
-                ticket.closed_at = None
-    if "priority" in fields and payload.priority is not None:
-        next_priority = payload.priority.value
-        if next_priority != ticket.priority:
-            changes["priority"] = {"old": ticket.priority, "new": next_priority}
-            ticket.priority = next_priority
-    if "assigned_to_id" in fields:
-        if payload.assigned_to_id is not None and db.get(User, payload.assigned_to_id) is None:
-            raise HTTPException(status_code=400, detail="Responsable introuvable")
-        if payload.assigned_to_id != ticket.assigned_to_id:
-            changes["assigned_to_id"] = {
-                "old": str(ticket.assigned_to_id) if ticket.assigned_to_id else None,
-                "new": str(payload.assigned_to_id) if payload.assigned_to_id else None,
-            }
-            ticket.assigned_to_id = payload.assigned_to_id
-    if changes:
-        ticket.updated_at = datetime.utcnow()
-        create_audit_log(
-            db, "support_ticket_managed", current_user.id,
-            "support_ticket", ticket.id, new_value=changes,
-        )
-        db.commit()
-        db.refresh(ticket)
-    return ticket
+@feedback_admin_router.get("",response_model=list[ProductFeedbackAdminRead])
+def list_all_product_feedback(db:Session=Depends(get_db),current_user:User=Depends(require_sg_or_admin)):
+    return help_service.list_feedback(db,current_user,manager=True)
 
+@feedback_admin_router.get("/{feedback_id}",response_model=ProductFeedbackAdminRead)
+def get_product_feedback_for_management(feedback_id:str,db:Session=Depends(get_db),
+                                       current_user:User=Depends(require_sg_or_admin)):
+    return help_service.read_feedback(db,current_user,feedback_id,manager=True)
 
-@support_admin_router.post(
-    "/{ticket_id}/messages", response_model=SupportTicketMessageRead, status_code=201
-)
-def add_support_management_message(
-    ticket_id: str,
-    payload: SupportTicketMessageCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    ticket = _ticket_or_404(db, ticket_id)
-    message = SupportTicketMessage(
-        ticket_id=ticket.id,
-        author_id=current_user.id,
-        message=payload.message.strip(),
-    )
-    db.add(message)
-    ticket.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(message)
-    return message
-
-
-@feedback_router.post("", response_model=ProductFeedbackRead, status_code=201)
-def create_product_feedback(
-    payload: ProductFeedbackCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    feedback = ProductFeedback(
-        user_id=current_user.id,
-        category=payload.category.value,
-        message=payload.message.strip(),
-        rating=payload.rating,
-        platform=payload.platform.value if payload.platform else None,
-        app_version=_clean_optional(payload.app_version),
-        build_number=payload.build_number,
-    )
-    db.add(feedback)
-    db.commit()
-    db.refresh(feedback)
-    return feedback
-
-
-@feedback_router.get("", response_model=list[ProductFeedbackRead])
-def list_my_product_feedback(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    return db.query(ProductFeedback).filter(
-        ProductFeedback.user_id == current_user.id
-    ).order_by(ProductFeedback.created_at.desc()).all()
-
-
-@feedback_router.get("/{feedback_id}", response_model=ProductFeedbackRead)
-def get_my_product_feedback(
-    feedback_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_validated_user),
-):
-    feedback = db.query(ProductFeedback).filter(
-        ProductFeedback.id == feedback_id,
-        ProductFeedback.user_id == current_user.id,
-    ).first()
-    if feedback is None:
-        raise HTTPException(status_code=404, detail="Feedback introuvable")
-    return feedback
-
-
-@feedback_admin_router.get("", response_model=list[ProductFeedbackAdminRead])
-def list_all_product_feedback(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    return db.query(ProductFeedback).order_by(ProductFeedback.created_at.desc()).all()
-
-
-@feedback_admin_router.patch("/{feedback_id}", response_model=ProductFeedbackAdminRead)
-def manage_product_feedback(
-    feedback_id: str,
-    payload: ProductFeedbackManage,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_team_leader),
-):
-    feedback = _feedback_or_404(db, feedback_id)
-    if "status" in payload.model_fields_set and payload.status is None:
-        raise HTTPException(status_code=400, detail="Statut de feedback invalide")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(feedback, field, _enum_value(value) if field == "status" else _clean_optional(value))
-    feedback.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(feedback)
-    return feedback
+@feedback_admin_router.patch("/{feedback_id}",response_model=ProductFeedbackAdminRead)
+def manage_product_feedback(feedback_id:str,payload:ProductFeedbackManage,db:Session=Depends(get_db),
+                            current_user:User=Depends(require_sg_or_admin)):
+    return help_service.manage_feedback(db,current_user,feedback_id,payload)
 
 
 @product_router.get("/bootstrap", response_model=ProductBootstrapRead)
@@ -612,7 +451,7 @@ def product_bootstrap(
     )
     update_available = bool(current and build_number < current.build_number)
     update_required = bool(minimum and build_number < minimum.build_number)
-    now = datetime.utcnow()
+    now = utc_now()
     maintenance_active = policy.maintenance_enabled and (
         policy.maintenance_starts_at is None
         or policy.maintenance_starts_at <= now < policy.maintenance_ends_at
@@ -699,7 +538,7 @@ def update_app_release(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(release, field, _clean_optional(value) if isinstance(value, str) or value is None else value)
-    release.updated_at = datetime.utcnow()
+    release.updated_at = utc_now()
     _commit(db, "Cette version applicative existe deja")
     db.refresh(release)
     return release
@@ -714,7 +553,7 @@ def publish_app_release(
     release = _release_or_404(db, release_id, for_update=True)
     if release.status != "draft":
         raise HTTPException(status_code=409, detail="Cette version ne peut pas etre publiee")
-    now = datetime.utcnow()
+    now = utc_now()
     release.status = "published"
     release.published_at = now
     release.updated_at = now
@@ -747,7 +586,7 @@ def withdraw_app_release(
             detail="Cette version est encore referencee par une politique active",
         )
     release.status = "withdrawn"
-    release.updated_at = datetime.utcnow()
+    release.updated_at = utc_now()
     create_audit_log(
         db, "app_release_withdrawn", current_user.id,
         "app_release", release.id,
@@ -888,7 +727,7 @@ def update_app_version_policy(
     policy.maintenance_starts_at = starts
     policy.maintenance_ends_at = ends
     policy.updated_by_id = current_user.id
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     if is_new:
         db.add(policy)
     db.flush()

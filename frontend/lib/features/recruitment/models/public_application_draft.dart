@@ -1,4 +1,8 @@
+import '../../../shared/attachments/attachment_picker.dart';
+
 class PublicApplicationDraft {
+  final Map<String, String>? questionnaireAnswers;
+  final String? questionnaireVersion;
   final String campaignId;
   final String firstName;
   final String lastName;
@@ -12,6 +16,7 @@ class PublicApplicationDraft {
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
   final String? otherClubs;
+  final int otherClubsCount;
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
@@ -20,11 +25,19 @@ class PublicApplicationDraft {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final bool? campusResident;
+  final List<String>? interviewPreferences;
+  final String? interviewAvailability;
+  final SelectedAttachment? cvFile;
+  final SelectedAttachment? motivationLetterFile;
+  final SelectedAttachment? attachmentFile;
   final String? cvUrl;
   final String? motivationLetterUrl;
   final String? attachmentUrl;
 
   const PublicApplicationDraft({
+    this.questionnaireAnswers,
+    this.questionnaireVersion,
     required this.campaignId,
     required this.firstName,
     required this.lastName,
@@ -38,6 +51,7 @@ class PublicApplicationDraft {
     this.knownEnactusFrom,
     this.enactusKnowledge,
     this.otherClubs,
+    this.otherClubsCount = 0,
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,
@@ -46,6 +60,12 @@ class PublicApplicationDraft {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.campusResident,
+    this.interviewPreferences,
+    this.interviewAvailability,
+    this.cvFile,
+    this.motivationLetterFile,
+    this.attachmentFile,
     this.cvUrl,
     this.motivationLetterUrl,
     this.attachmentUrl,
