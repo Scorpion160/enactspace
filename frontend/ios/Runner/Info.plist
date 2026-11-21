@@ -47,6 +47,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>EnactSpace utilise l’appareil photo pour scanner les QR codes de présence.</string>
 
+	<key>NSFaceIDUsageDescription</key>
+	<string>EnactSpace utilise Face ID pour déverrouiller votre session.</string>
+
 	<key>NFCReaderUsageDescription</key>
 	<string>EnactSpace utilise le NFC pour enregistrer les badges et permettre l’émargement aux activités compatibles.</string>
 

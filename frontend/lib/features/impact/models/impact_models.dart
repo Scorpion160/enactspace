@@ -63,6 +63,7 @@ class ImpactClaimModel {
 class ProjectImpactMetricModel {
   final String id;
   final String projectName;
+  final String? impactRecordId;
   final String status;
   final String poleName;
   final String projectLead;
@@ -101,6 +102,7 @@ class ProjectImpactMetricModel {
   const ProjectImpactMetricModel({
     required this.id,
     required this.projectName,
+    this.impactRecordId,
     required this.status,
     required this.poleName,
     required this.projectLead,
@@ -332,30 +334,44 @@ class OrganizationPerformanceModel {
 }
 
 class HistoricalImpactModel {
-  final int createdProjects;
-  final int developingProjects;
-  final int developedProducts;
-  final int touchedSdgs;
-  final int createdJobs;
-  final int savedLives;
-  final int plantedTrees;
-  final double cumulativeUsdGains;
-  final double cumulativeFcfaGains;
-  final int impactedLives;
+  final String? sourceLabel;
+  final int? developedProducts;
+  final int? touchedSdgs;
+  final int? createdJobs;
+  final bool createdJobsIsMinimum;
+  final int? peopleTrained;
+  final int? workHours;
+  final int? plantedTrees;
+  final int? fieldKilometers;
+  final double? revenueUsd2021To2022;
+  final double? dimbaliRevenueUsd2021To2022;
+  final double? menNanRevenueUsd2021To2022;
+  final double? beneficiaryIncomeIncreasePct;
+  final double? malnutritionBeforePct;
+  final double? malnutritionAfterPct;
+  final int? impactedLives;
+  final bool impactedLivesIsMinimum;
   final List<String> emblematicProjects;
   final List<String> distinctions;
 
   const HistoricalImpactModel({
-    required this.createdProjects,
-    required this.developingProjects,
+    required this.sourceLabel,
     required this.developedProducts,
     required this.touchedSdgs,
     required this.createdJobs,
-    required this.savedLives,
+    required this.createdJobsIsMinimum,
+    required this.peopleTrained,
+    required this.workHours,
     required this.plantedTrees,
-    required this.cumulativeUsdGains,
-    required this.cumulativeFcfaGains,
+    required this.fieldKilometers,
+    required this.revenueUsd2021To2022,
+    required this.dimbaliRevenueUsd2021To2022,
+    required this.menNanRevenueUsd2021To2022,
+    required this.beneficiaryIncomeIncreasePct,
+    required this.malnutritionBeforePct,
+    required this.malnutritionAfterPct,
     required this.impactedLives,
+    required this.impactedLivesIsMinimum,
     required this.emblematicProjects,
     required this.distinctions,
   });

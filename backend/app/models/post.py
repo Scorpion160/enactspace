@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -67,8 +68,8 @@ class Post(Base):
 
     visibility: Mapped[str] = mapped_column(String(50), default="internal")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class PostComment(Base):
@@ -94,7 +95,7 @@ class PostComment(Base):
 
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class PostReaction(Base):
@@ -120,7 +121,7 @@ class PostReaction(Base):
 
     reaction_type: Mapped[str] = mapped_column(String(50), default="like")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("post_id", "user_id", "reaction_type", name="uq_post_user_reaction"),

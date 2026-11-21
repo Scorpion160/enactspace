@@ -18,6 +18,17 @@ const _androidAppId = String.fromEnvironment(
 );
 const _iosApiKey = String.fromEnvironment('ENACTSPACE_FIREBASE_API_KEY_IOS');
 const _iosAppId = String.fromEnvironment('ENACTSPACE_FIREBASE_APP_ID_IOS');
+const _webApiKey = String.fromEnvironment('ENACTSPACE_FIREBASE_API_KEY_WEB');
+const _webAppId = String.fromEnvironment('ENACTSPACE_FIREBASE_APP_ID_WEB');
+const _webAuthDomain = String.fromEnvironment(
+  'ENACTSPACE_FIREBASE_AUTH_DOMAIN_WEB',
+);
+const _webStorageBucket = String.fromEnvironment(
+  'ENACTSPACE_FIREBASE_STORAGE_BUCKET_WEB',
+);
+const _webVapidKey = String.fromEnvironment(
+  'ENACTSPACE_FIREBASE_VAPID_PUBLIC_KEY',
+);
 const _apnsReadinessAttempts = 20;
 const _apnsReadinessDelay = Duration(milliseconds: 250);
 
@@ -47,15 +58,18 @@ Future<String?> readFirebaseTokenWhenReady({
 }
 
 FirebaseOptions? _runtimeFirebaseOptions() {
-  final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-  final isIos = defaultTargetPlatform == TargetPlatform.iOS;
-  if (kIsWeb || (!isAndroid && !isIos)) return null;
-  final apiKey = isAndroid ? _androidApiKey : _iosApiKey;
-  final appId = isAndroid ? _androidAppId : _iosAppId;
+  final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  if (!kIsWeb && !isAndroid && !isIos) return null;
+  final apiKey = kIsWeb
+      ? _webApiKey
+      : (isAndroid ? _androidApiKey : _iosApiKey);
+  final appId = kIsWeb ? _webAppId : (isAndroid ? _androidAppId : _iosAppId);
   if (_projectId.isEmpty ||
       _senderId.isEmpty ||
       apiKey.isEmpty ||
-      appId.isEmpty) {
+      appId.isEmpty ||
+      (kIsWeb && (_webAuthDomain.isEmpty || _webStorageBucket.isEmpty))) {
     return null;
   }
   return FirebaseOptions(
@@ -63,6 +77,8 @@ FirebaseOptions? _runtimeFirebaseOptions() {
     appId: appId,
     messagingSenderId: _senderId,
     projectId: _projectId,
+    authDomain: kIsWeb ? _webAuthDomain : null,
+    storageBucket: kIsWeb ? _webStorageBucket : null,
     iosBundleId: isIos ? 'sn.enactusesp.enactspace' : null,
   );
 }
@@ -89,9 +105,9 @@ class FirebasePushPlatform implements PushPlatform {
 
   @override
   bool get supported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   bool get configured => supported && _options != null;
@@ -113,9 +129,11 @@ class FirebasePushPlatform implements PushPlatform {
     if (options == null) return false;
     try {
       if (Firebase.apps.isEmpty) await Firebase.initializeApp(options: options);
-      FirebaseMessaging.onBackgroundMessage(
-        enactSpaceFirebaseBackgroundHandler,
-      );
+      if (!kIsWeb) {
+        FirebaseMessaging.onBackgroundMessage(
+          enactSpaceFirebaseBackgroundHandler,
+        );
+      }
       _foregroundSubscription ??= FirebaseMessaging.onMessage.listen(
         (message) => _foreground.add(_fromRemote(message)),
       );
@@ -168,6 +186,10 @@ class FirebasePushPlatform implements PushPlatform {
   @override
   Future<String?> currentToken() {
     if (!_initialized) return Future<String?>.value();
+    if (kIsWeb) {
+      if (_webVapidKey.isEmpty) return Future<String?>.value();
+      return FirebaseMessaging.instance.getToken(vapidKey: _webVapidKey);
+    }
     return readFirebaseTokenWhenReady(
       requiresApnsToken: defaultTargetPlatform == TargetPlatform.iOS,
       readFirebaseToken: FirebaseMessaging.instance.getToken,

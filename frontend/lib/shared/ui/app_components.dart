@@ -65,8 +65,8 @@ class AppPageHeader extends StatelessWidget {
             if (eyebrow != null)
               Text(
                 eyebrow!,
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -83,8 +83,8 @@ class AppPageHeader extends StatelessWidget {
               const SizedBox(height: AppTheme.space8),
               Text(
                 subtitle!,
-                style: const TextStyle(
-                  color: AppTheme.secondaryText,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.35,
                 ),
               ),
@@ -100,6 +100,163 @@ class AppPageHeader extends StatelessWidget {
             SizedBox(width: compact ? constraints.maxWidth : 460, child: text),
             ...actions,
           ],
+        );
+      },
+    );
+  }
+}
+
+class AppModuleHeader extends StatelessWidget {
+  const AppModuleHeader({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.eyebrow,
+    this.details = const [],
+    this.actions = const [],
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String? eyebrow;
+  final List<Widget> details;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final accent = dark ? const Color(0xFF84DFDC) : const Color(0xFF005A60);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        final showEmblem =
+            constraints.maxWidth >= 680 &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+        return Card(
+          color: Color.alphaBlend(
+            accent.withValues(alpha: dark ? 0.10 : 0.045),
+            colors.surface,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 24),
+            child: Row(
+              spacing: 24,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        spacing: 10,
+                        children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppTheme.enactusYellow,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(9),
+                              child: Icon(
+                                icon,
+                                size: 22,
+                                color: AppTheme.softBlack,
+                              ),
+                            ),
+                          ),
+                          if (eyebrow != null)
+                            Flexible(
+                              child: Text(
+                                eyebrow!,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          title,
+                          style:
+                              (compact
+                                      ? theme.textTheme.headlineSmall
+                                      : theme.textTheme.headlineMedium)
+                                  ?.copyWith(
+                                    color: colors.onSurface,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                      if (details.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(spacing: 8, runSpacing: 8, children: details),
+                      ],
+                      if (actions.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(spacing: 8, runSpacing: 8, children: actions),
+                      ],
+                    ],
+                  ),
+                ),
+                if (showEmblem)
+                  ExcludeSemantics(
+                    child: SizedBox(
+                      width: 152,
+                      height: 116,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            right: 10,
+                            top: 8,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppTheme.enactusYellow.withValues(
+                                  alpha: 0.55,
+                                ),
+                              ),
+                              child: const SizedBox.square(dimension: 30),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: -0.17,
+                            child: Container(
+                              width: 100,
+                              height: 83,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.32),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Icon(icon, size: 46, color: accent),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -126,14 +283,16 @@ class AppSectionHeader extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             ...(subtitle == null
                 ? const <Widget>[]
                 : [
                     Text(
                       subtitle!,
-                      style: const TextStyle(color: AppTheme.secondaryText),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ]),
           ],
@@ -160,14 +319,15 @@ class AppPrimaryButton extends StatelessWidget {
   final bool expand;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final button = FilledButton.icon(
       onPressed: onPressed,
       icon: icon == null ? const SizedBox.shrink() : Icon(icon),
       label: Text(label),
       style: FilledButton.styleFrom(
         minimumSize: const Size(44, 48),
-        backgroundColor: AppTheme.softBlack,
-        foregroundColor: Colors.white,
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         ),
@@ -191,14 +351,15 @@ class AppSecondaryButton extends StatelessWidget {
   final bool expand;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final button = OutlinedButton.icon(
       onPressed: onPressed,
       icon: icon == null ? const SizedBox.shrink() : Icon(icon),
       label: Text(label),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(44, 48),
-        foregroundColor: AppTheme.softBlack,
-        side: const BorderSide(color: AppTheme.border),
+        foregroundColor: colors.onSurface,
+        side: BorderSide(color: colors.outlineVariant),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
         ),
@@ -244,14 +405,23 @@ class AppStatusBadge extends StatelessWidget {
   final AppStatusTone tone;
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    (Color, Color) accentColors(Color accent) => (
+      accent.withValues(alpha: dark ? 0.24 : 0.12),
+      dark
+          ? Color.lerp(accent, Colors.white, 0.48)!
+          : Color.lerp(accent, Colors.black, 0.22)!,
+    );
     final colors = switch (tone) {
-      AppStatusTone.success => (const Color(0xFFE3F3E8), AppTheme.success),
-      AppStatusTone.warning => (const Color(0xFFFFF0D4), AppTheme.warning),
-      AppStatusTone.error => (const Color(0xFFFCE5E5), AppTheme.error),
-      AppStatusTone.info => (const Color(0xFFE1F1F7), AppTheme.information),
+      AppStatusTone.success => accentColors(AppTheme.success),
+      AppStatusTone.warning => accentColors(AppTheme.warning),
+      AppStatusTone.error => (scheme.errorContainer, scheme.onErrorContainer),
+      AppStatusTone.info => accentColors(AppTheme.information),
       AppStatusTone.neutral => (
-        const Color(0xFFECECE8),
-        AppTheme.secondaryText,
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
       ),
     };
     return Container(
@@ -296,7 +466,7 @@ class AppMetric extends StatelessWidget {
       AppStatusTone.warning => AppTheme.warning,
       AppStatusTone.success => AppTheme.success,
       AppStatusTone.info => AppTheme.information,
-      AppStatusTone.neutral => AppTheme.softBlack,
+      AppStatusTone.neutral => Theme.of(context).colorScheme.onSurface,
     };
     return AppDataCard(
       onTap: onTap,
@@ -314,12 +484,12 @@ class AppMetric extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(label, style: TextStyle(fontWeight: FontWeight.w700)),
           if (detail != null)
             Text(
               detail!,
-              style: const TextStyle(
-                color: AppTheme.secondaryText,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -340,18 +510,21 @@ class AppDataCard extends StatelessWidget {
   final VoidCallback? onTap;
   final EdgeInsets padding;
   @override
-  Widget build(BuildContext context) => Material(
-    color: AppTheme.surfaceElevated,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      side: const BorderSide(color: AppTheme.border),
-    ),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      child: Padding(padding: padding, child: child),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
 }
 
 class AppIdentityCell extends StatelessWidget {
@@ -390,7 +563,7 @@ class AppIdentityCell extends StatelessWidget {
           child: imageUrl == null || imageUrl!.isEmpty
               ? Text(
                   initials.isEmpty ? '?' : initials,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 )
               : null,
         ),
@@ -404,15 +577,15 @@ class AppIdentityCell extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               if (subtitle != null && subtitle!.trim().isNotEmpty)
                 Text(
                   subtitle!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.secondaryText,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -452,10 +625,10 @@ class AppProgressSummary extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(value, style: TextStyle(fontWeight: FontWeight.w800)),
             ],
           ),
           const SizedBox(height: AppTheme.space12),
@@ -465,15 +638,15 @@ class AppProgressSummary extends StatelessWidget {
               value: normalized,
               minHeight: 8,
               color: AppTheme.enactusYellow,
-              backgroundColor: AppTheme.border,
+              backgroundColor: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           if (detail != null) ...[
             const SizedBox(height: AppTheme.space8),
             Text(
               detail!,
-              style: const TextStyle(
-                color: AppTheme.secondaryText,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -500,16 +673,22 @@ class AppEmptyState extends StatelessWidget {
   Widget build(BuildContext context) => AppDataCard(
     child: Row(
       children: [
-        Icon(icon, color: AppTheme.secondaryText, size: 28),
+        Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          size: 28,
+        ),
         const SizedBox(width: AppTheme.space16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800)),
               Text(
                 message,
-                style: const TextStyle(color: AppTheme.secondaryText),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

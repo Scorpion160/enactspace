@@ -241,15 +241,15 @@ class ProductServicesTests(unittest.TestCase):
             settings.SMTP_HOST = "smtp.example.test"
             settings.FCM_SERVER_KEY = "configured-for-test"
             self.assertFalse(_dispatch_push(future, self.other, None))
-            self.assertFalse(_dispatch_email(future, self.user, preference))
+            self.assertFalse(_dispatch_email(self.db, future, self.user, preference))
             self.assertFalse(_dispatch_push(future, self.user, preference))
             preference.notification_email_enabled = True
             preference.notification_push_enabled = True
-            self.assertTrue(_dispatch_email(future, self.user, preference))
+            self.assertTrue(_dispatch_email(self.db, future, self.user, preference))
             self.assertTrue(_dispatch_push(future, self.user, preference))
             settings.EMAIL_ENABLED = False
             settings.PUSH_ENABLED = False
-            self.assertFalse(_dispatch_email(future, self.user, preference))
+            self.assertFalse(_dispatch_email(self.db, future, self.user, preference))
             self.assertFalse(_dispatch_push(future, self.user, preference))
         finally:
             (

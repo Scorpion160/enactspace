@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
 import 'package:go_router/go_router.dart';
+
+import '../../../shared/ui/app_components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/notification_model.dart';
 import '../models/notification_presentation.dart';
@@ -239,17 +243,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer la notification'),
+        title: Text('Supprimer la notification'),
         content: Text('Supprimer « ${notification.title} » ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+            child: Text('Annuler'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Supprimer'),
+            icon: Icon(Icons.delete_outline_rounded),
+            label: Text('Supprimer'),
           ),
         ],
       ),
@@ -317,10 +321,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
   }
 
-  int get _readCount {
-    return _notifications.where((n) => n.isRead).length;
-  }
-
   List<NotificationModel> get _filteredNotifications {
     final query = _searchController.text.trim().toLowerCase();
     final sorted = [..._notifications]
@@ -348,6 +348,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return RefreshIndicator(
       onRefresh: _loadNotifications,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(
           MediaQuery.sizeOf(context).width < 560 ? 10 : 24,
         ),
@@ -355,13 +356,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           _NotificationsHeader(
             total: _notifications.length,
             unread: _unreadCount,
-            read: _readCount,
             lastSyncedAt: _lastSyncedAt,
             onRefresh: _loadNotifications,
             onMarkAllRead: _markAllAsRead,
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           _NotificationsFilters(
+            controller: _searchController,
+            onChanged: () => setState(() {}),
             unreadOnly: _unreadOnly,
             type: _type,
             onUnreadOnlyChanged: (value) async {
@@ -372,14 +374,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               setState(() => _type = value);
             },
           ),
-          const SizedBox(height: 18),
-          _NotificationSearchCard(
-            controller: _searchController,
-            onChanged: () => setState(() {}),
-          ),
-          const SizedBox(height: 22),
+
+          SizedBox(height: 22),
           if (_loading)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.all(40),
                 child: CircularProgressIndicator(),
@@ -409,7 +407,6 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 class _NotificationsHeader extends StatelessWidget {
   final int total;
   final int unread;
-  final int read;
   final DateTime? lastSyncedAt;
   final VoidCallback onRefresh;
   final VoidCallback onMarkAllRead;
@@ -417,157 +414,54 @@ class _NotificationsHeader extends StatelessWidget {
   const _NotificationsHeader({
     required this.total,
     required this.unread,
-    required this.read,
     required this.lastSyncedAt,
     required this.onRefresh,
     required this.onMarkAllRead,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 760;
-
-    final actions = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        OutlinedButton.icon(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Actualiser'),
+  Widget build(BuildContext context) => AppModuleHeader(
+    title: 'Notifications',
+    subtitle: 'Retrouvez les informations et les actions qui vous concernent.',
+    icon: Icons.notifications_outlined,
+    details: [
+      if (lastSyncedAt != null) ...[
+        AppStatusBadge(
+          label: '$unread non ${unread == 1 ? 'lue' : 'lues'}',
+          tone: unread > 0 ? AppStatusTone.info : AppStatusTone.neutral,
         ),
-        ElevatedButton.icon(
-          onPressed: unread > 0 ? onMarkAllRead : null,
-          icon: const Icon(Icons.done_all_rounded),
-          label: const Text('Tout lire'),
+        AppStatusBadge(
+          label: '$total ${total == 1 ? 'affichée' : 'affichées'}',
         ),
+        AppStatusBadge(label: 'Actualisé ${_timeLabel(lastSyncedAt!)}'),
       ],
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: AppTheme.softBlack,
-        borderRadius: BorderRadius.circular(24),
+    ],
+    actions: [
+      OutlinedButton.icon(
+        onPressed: onRefresh,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Actualiser'),
       ),
-      child: isWide
-          ? Row(
-              children: [
-                _HeaderIcon(unread: unread),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: _HeaderText(
-                    total: total,
-                    unread: unread,
-                    read: read,
-                    lastSyncedAt: lastSyncedAt,
-                  ),
-                ),
-                actions,
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _HeaderIcon(unread: unread),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: _HeaderText(
-                        total: total,
-                        unread: unread,
-                        read: read,
-                        lastSyncedAt: lastSyncedAt,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                actions,
-              ],
-            ),
-    );
-  }
-}
-
-class _HeaderIcon extends StatelessWidget {
-  final int unread;
-
-  const _HeaderIcon({required this.unread});
-
-  @override
-  Widget build(BuildContext context) {
-    return Badge(
-      isLabelVisible: unread > 0,
-      label: Text(unread.toString()),
-      child: Container(
-        width: 58,
-        height: 58,
-        decoration: BoxDecoration(
-          color: AppTheme.enactusYellow,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: const Icon(
-          Icons.notifications_rounded,
-          color: AppTheme.softBlack,
-          size: 34,
-        ),
+      FilledButton.icon(
+        onPressed: unread > 0 ? onMarkAllRead : null,
+        icon: const Icon(Icons.done_all_rounded),
+        label: const Text('Tout lire'),
       ),
-    );
-  }
-}
-
-class _HeaderText extends StatelessWidget {
-  final int total;
-  final int unread;
-  final int read;
-  final DateTime? lastSyncedAt;
-
-  const _HeaderText({
-    required this.total,
-    required this.unread,
-    required this.read,
-    required this.lastSyncedAt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Notifications',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '$total notification(s) affichée(s) • $unread non lue(s) • $read lue(s)',
-          style: const TextStyle(color: Colors.white70, height: 1.4),
-        ),
-        if (lastSyncedAt != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Synchronisation auto ${_timeLabel(lastSyncedAt!)}',
-            style: const TextStyle(color: Colors.white60, fontSize: 12),
-          ),
-        ],
-      ],
-    );
-  }
+    ],
+  );
 }
 
 class _NotificationsFilters extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onChanged;
   final bool unreadOnly;
   final String type;
   final ValueChanged<bool> onUnreadOnlyChanged;
   final ValueChanged<String> onTypeChanged;
 
   const _NotificationsFilters({
+    required this.controller,
+    required this.onChanged,
     required this.unreadOnly,
     required this.type,
     required this.onUnreadOnlyChanged,
@@ -576,97 +470,60 @@ class _NotificationsFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final typeWidth = constraints.maxWidth < 560
-                ? constraints.maxWidth
-                : 260.0;
-
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  selected: !unreadOnly,
-                  label: const Text('Toutes'),
-                  avatar: const Icon(Icons.list_rounded, size: 18),
-                  onSelected: (_) => onUnreadOnlyChanged(false),
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          hintText: 'Rechercher une notification',
+          prefixIcon: Icon(Icons.search_rounded),
+          suffixIcon: controller.text.trim().isEmpty
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    controller.clear();
+                    onChanged();
+                  },
+                  icon: Icon(Icons.close_rounded),
+                  tooltip: 'Effacer',
                 ),
-                ChoiceChip(
-                  selected: unreadOnly,
-                  label: const Text('Non lues'),
-                  avatar: const Icon(Icons.mark_email_unread_rounded, size: 18),
-                  onSelected: (_) => onUnreadOnlyChanged(true),
-                ),
-                SizedBox(
-                  width: typeWidth,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Tous les types'),
-                      ),
-                      ...NotificationFamily.values.map(
-                        (family) => DropdownMenuItem(
-                          value: family.value,
-                          child: Text(family.label),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onTypeChanged(value);
-                    },
-                  ),
-                ),
-              ],
-            );
+        ),
+      ),
+      quickFilters: [
+        ChoiceChip(
+          selected: !unreadOnly,
+          label: Text('Toutes'),
+          avatar: Icon(Icons.list_rounded, size: 18),
+          onSelected: (_) => onUnreadOnlyChanged(false),
+        ),
+        ChoiceChip(
+          selected: unreadOnly,
+          label: Text('Non lues'),
+          avatar: Icon(Icons.mark_email_unread_rounded, size: 18),
+          onSelected: (_) => onUnreadOnlyChanged(true),
+        ),
+      ],
+      filters: [
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: type,
+          decoration: const InputDecoration(labelText: 'Type'),
+          items: [
+            const DropdownMenuItem(value: 'all', child: Text('Tous les types')),
+            ...NotificationFamily.values.map(
+              (family) => DropdownMenuItem(
+                value: family.value,
+                child: Text(family.label),
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            if (value != null) onTypeChanged(value);
           },
         ),
-      ),
-    );
-  }
-}
-
-class _NotificationSearchCard extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onChanged;
-
-  const _NotificationSearchCard({
-    required this.controller,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: TextField(
-          controller: controller,
-          onChanged: (_) => onChanged(),
-          decoration: InputDecoration(
-            labelText: 'Rechercher une notification',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: controller.text.trim().isEmpty
-                ? null
-                : IconButton(
-                    onPressed: () {
-                      controller.clear();
-                      onChanged();
-                    },
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Effacer',
-                  ),
-          ),
-        ),
-      ),
+      ],
+      actions: const [],
+      activeFilterCount: type == 'all' ? 0 : 1,
     );
   }
 }
@@ -758,7 +615,7 @@ class _NotificationCard extends StatelessWidget {
                 foregroundColor: AppTheme.softBlack,
                 child: Icon(presentation.icon),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,16 +631,16 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     if (notification.message != null &&
                         notification.message!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       Text(
                         notification.message!,
-                        style: const TextStyle(
-                          color: Colors.black54,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.35,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -799,9 +656,9 @@ class _NotificationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               if (busy)
-                const SizedBox(
+                SizedBox(
                   width: 38,
                   height: 38,
                   child: Padding(
@@ -832,24 +689,24 @@ class _NotificationCard extends StatelessWidget {
                     if (notification.routePath != null)
                       IconButton(
                         onPressed: () => onOpen(notification),
-                        icon: const Icon(Icons.open_in_new_rounded),
+                        icon: Icon(Icons.open_in_new_rounded),
                         tooltip: 'Ouvrir',
                       ),
                     if (!notification.isRead)
                       IconButton(
                         onPressed: () => onMarkAsRead(notification),
-                        icon: const Icon(Icons.mark_email_read_rounded),
+                        icon: Icon(Icons.mark_email_read_rounded),
                         tooltip: 'Marquer comme lue',
                       ),
                     if (notification.isRead)
                       IconButton(
                         onPressed: () => onMarkAsUnread(notification),
-                        icon: const Icon(Icons.mark_email_unread_rounded),
+                        icon: Icon(Icons.mark_email_unread_rounded),
                         tooltip: 'Marquer comme non lue',
                       ),
                     IconButton(
                       onPressed: () => onDelete(notification),
-                      icon: const Icon(Icons.delete_rounded),
+                      icon: Icon(Icons.delete_rounded),
                       tooltip: 'Supprimer',
                       color: Colors.red,
                     ),
@@ -868,13 +725,15 @@ class _EmptyNotificationsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune notification trouvée.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -887,13 +746,15 @@ class _NoNotificationMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
         padding: EdgeInsets.all(26),
         child: Center(
           child: Text(
             'Aucune notification ne correspond à la recherche.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -919,18 +780,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),

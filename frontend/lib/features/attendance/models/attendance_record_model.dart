@@ -61,17 +61,17 @@ class AttendanceRecordModel {
   String get statusLabel {
     switch (status) {
       case 'present':
-        return 'Present';
+        return 'Présent';
       case 'late':
         return 'En retard';
       case 'absent':
         return 'Absent';
       case 'justified_absence':
-        return 'Absence justifiee';
+        return 'Absence justifiée';
       case 'excused':
-        return 'Excuse';
+        return 'Excusé';
       case 'not_recorded':
-        return 'Non renseigne';
+        return 'Non renseigné';
       default:
         return status;
     }

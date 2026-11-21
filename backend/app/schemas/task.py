@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List
@@ -21,6 +21,7 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     due_date: Optional[datetime] = None
+    deadline_change_reason: Optional[str] = Field(default=None, min_length=6, max_length=12000)
     proof_required: Optional[bool] = None
     proof_url: Optional[str] = None
 
@@ -41,8 +42,10 @@ class TaskRead(BaseModel):
     validated_by: Optional[UUID]
     proof_required: bool
     proof_url: Optional[str]
+    proof_filename: Optional[str] = None
     is_late_alert_sent: bool
     can_manage: bool = False
+    can_validate: bool = False
     current_user_assigned: bool = False
     created_at: datetime
     updated_at: datetime

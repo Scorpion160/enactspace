@@ -388,7 +388,7 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
         transaction = MobileMoneyTransaction(
             member_id=member_id,
             finance_item_id=fee.id,
-            provider="fake",
+            provider="paydunya",
             idempotency_key=f"pr65-{uuid.uuid4()}",
             amount=100,
             currency="XOF",
@@ -396,6 +396,8 @@ class OperationalIntegrityPostgreSQLTests(unittest.TestCase):
             metadata_json={"finance_item_ids": [str(fee.id)]},
         )
         db.add(transaction)
+        db.flush()
+        transaction.provider_invoice_token = f"provider-token-{transaction.id}"
         db.commit()
         result = (member_id, transaction.id)
         db.close()

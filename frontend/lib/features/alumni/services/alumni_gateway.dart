@@ -8,6 +8,7 @@ import '../../projects/models/project_model.dart';
 import '../../projects/services/projects_service.dart';
 import '../models/alumni_profile_model.dart';
 import '../models/mentorship_model.dart';
+import '../models/individual_mentorship.dart';
 import 'alumni_service.dart';
 
 class AlumniCenterData {
@@ -17,6 +18,7 @@ class AlumniCenterData {
   final List<MemberModel> members;
   final List<ProjectModel> projects;
   final List<PoleModel> poles;
+  final Set<String>? availableMentorIds;
 
   const AlumniCenterData({
     required this.user,
@@ -25,7 +27,34 @@ class AlumniCenterData {
     required this.members,
     required this.projects,
     required this.poles,
+    this.availableMentorIds,
   });
+
+  bool isMentorAvailable(AlumniProfileModel profile) =>
+      profile.visibility != 'private' &&
+      (availableMentorIds?.contains(profile.userId) ??
+          profile.availableForMentoring);
+}
+
+class AlumniProfileRouteArgs {
+  const AlumniProfileRouteArgs(this.gateway);
+
+  final AlumniGateway gateway;
+}
+
+typedef AlumniMentorSelection = ({String mentorId, bool individual});
+
+abstract interface class IndividualMentorshipGateway {
+  Future<List<IndividualMentorship>> listIndividualRequests();
+  Future<void> createIndividualRequest({
+    required String mentorId,
+    required String menteeId,
+    required String objective,
+  });
+  Future<void> updateIndividualRequest(
+    String requestId,
+    IndividualMentorshipStatus status,
+  );
 }
 
 abstract class AlumniGateway {
@@ -84,7 +113,7 @@ abstract class AlumniGateway {
   Future<void> deleteMentorship(String mentorshipId);
 }
 
-class ApiAlumniGateway implements AlumniGateway {
+class ApiAlumniGateway implements AlumniGateway, IndividualMentorshipGateway {
   final AlumniService alumniService;
   final AuthService authService;
   final MembersService membersService;
@@ -104,6 +133,27 @@ class ApiAlumniGateway implements AlumniGateway {
        polesService = polesService ?? PolesService();
 
   @override
+  Future<List<IndividualMentorship>> listIndividualRequests() =>
+      alumniService.listIndividualRequests();
+
+  @override
+  Future<void> createIndividualRequest({
+    required String mentorId,
+    required String menteeId,
+    required String objective,
+  }) => alumniService.createIndividualRequest(
+    mentorId: mentorId,
+    menteeId: menteeId,
+    objective: objective,
+  );
+
+  @override
+  Future<void> updateIndividualRequest(
+    String requestId,
+    IndividualMentorshipStatus status,
+  ) => alumniService.updateIndividualRequest(requestId, status);
+
+  @override
   Future<AlumniCenterData> loadCenter({
     String? search,
     bool mentorsOnly = false,
@@ -116,9 +166,13 @@ class ApiAlumniGateway implements AlumniGateway {
         availableForMentoring: mentorsOnly ? true : null,
       ),
       alumniService.getMentorships(status: mentorshipStatus),
+      if (!mentorsOnly)
+        alumniService.getProfiles(search: search, availableForMentoring: true),
     ]);
     final references = await Future.wait<dynamic>([
-      if (user.canViewMembersDirectory)
+      if (user.canManageMembers)
+        _safe(membersService.getManagedMembers)
+      else if (user.canViewMembersDirectory)
         _safe(membersService.getMembers)
       else
         Future.value(<MemberModel>[]),
@@ -138,6 +192,11 @@ class ApiAlumniGateway implements AlumniGateway {
       members: references[0] as List<MemberModel>,
       projects: references[1] as List<ProjectModel>,
       poles: references[2] as List<PoleModel>,
+      availableMentorIds: {
+        for (final profile
+            in core[mentorsOnly ? 0 : 2] as List<AlumniProfileModel>)
+          profile.userId,
+      },
     );
   }
 

@@ -1,6 +1,11 @@
+import '../../../core/widgets/preview_mode_scope.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:frontend/shared/ui/app_filter_toolbar.dart';
+
+import '../../../shared/attachments/attachment_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ui/app_components.dart';
 import '../../members/models/member_model.dart';
@@ -26,8 +31,11 @@ class AttendanceSessionDetailScreen extends StatefulWidget {
 
 class _AttendanceSessionDetailScreenState
     extends State<AttendanceSessionDetailScreen> {
-  final AttendanceService _attendanceService = AttendanceService();
-  final MembersService _membersService = MembersService();
+  late final AttendanceService _attendanceService =
+      (PreviewModeScope.service<AttendanceService>(context) ??
+      AttendanceService());
+  late final MembersService _membersService =
+      (PreviewModeScope.service<MembersService>(context) ?? MembersService());
   final TextEditingController _memberSearchController = TextEditingController();
 
   bool _loading = true;
@@ -306,7 +314,7 @@ class _AttendanceSessionDetailScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Justification'),
+          title: Text('Justification'),
           content: TextField(
             controller: controller,
             minLines: 2,
@@ -315,19 +323,19 @@ class _AttendanceSessionDetailScreenState
               labelText: status == 'excused'
                   ? 'Motif de l excuse'
                   : 'Commentaire optionnel',
-              prefixIcon: const Icon(Icons.edit_note_rounded),
+              prefixIcon: Icon(Icons.edit_note_rounded),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Annuler'),
+              child: Text('Annuler'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop(controller.text.trim());
               },
-              child: const Text('Valider'),
+              child: Text('Valider'),
             ),
           ],
         );
@@ -343,20 +351,20 @@ class _AttendanceSessionDetailScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Clôturer la session'),
-          content: const Text(
+          title: Text('Clôturer la session'),
+          content: Text(
             'Voulez-vous clôturer cette session ?\n\n'
             'Tous les membres attendus qui n’ont pas encore été saisis seront marqués comme absents non justifiés.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
+              child: Text('Annuler'),
             ),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.lock_rounded),
-              label: const Text('Clôturer'),
+              icon: Icon(Icons.lock_rounded),
+              label: Text('Clôturer'),
             ),
           ],
         );
@@ -458,7 +466,7 @@ class _AttendanceSessionDetailScreenState
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Refuser la justification'),
+          title: Text('Refuser la justification'),
           content: TextField(
             controller: controller,
             minLines: 2,
@@ -471,11 +479,11 @@ class _AttendanceSessionDetailScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Annuler'),
+              child: Text('Annuler'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('Refuser'),
+              child: Text('Refuser'),
             ),
           ],
         );
@@ -538,7 +546,7 @@ class _AttendanceSessionDetailScreenState
               onOpen: _openSession,
               onClose: _closeSession,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             SessionStatsCards(
               totalExpected: _expectedMembers.length,
               present: _presentCount,
@@ -548,7 +556,7 @@ class _AttendanceSessionDetailScreenState
               notFilled: _notFilledCount,
               totalPenaltyAmount: _totalPenaltyAmount,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _SessionActionPanel(
               session: widget.session,
               expectedCount: _expectedMembers.length,
@@ -557,7 +565,7 @@ class _AttendanceSessionDetailScreenState
               onNfcCheckIn: _openNfcCheckIn,
             ),
             if (widget.session.canManage) ...[
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               QrAttendanceSection(
                 token: _qrToken,
                 status: _qrStatus,
@@ -570,9 +578,9 @@ class _AttendanceSessionDetailScreenState
                 onRefresh: _refreshQrPanel,
               ),
             ],
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             if (_loading)
-              const Center(
+              Center(
                 child: Padding(
                   padding: EdgeInsets.all(40),
                   child: CircularProgressIndicator(),
@@ -585,7 +593,7 @@ class _AttendanceSessionDetailScreenState
                 availableMembers: availableMembers,
                 onAdd: _addExpectedMember,
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               _AttendanceMemberFiltersCard(
                 controller: _memberSearchController,
                 statusFilter: _statusFilter,
@@ -596,7 +604,7 @@ class _AttendanceSessionDetailScreenState
                   });
                 },
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               _ExpectedMembersCard(
                 members: filteredExpectedMembers,
                 recordByUserId: recordByUserId,
@@ -707,30 +715,30 @@ class _SessionHeader extends StatelessWidget {
                   color: AppTheme.enactusYellow,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.fact_check_rounded,
                   color: AppTheme.softBlack,
                   size: 34,
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       session.title,
-                      style: const TextStyle(
-                        color: AppTheme.darkText,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     Text(
                       '${session.typeLabel} • ${isClosed ? 'Clôturée' : session.statusLabel} • ${session.dateLabel}',
-                      style: const TextStyle(
-                        color: AppTheme.secondaryText,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.35,
                       ),
                     ),
@@ -741,7 +749,7 @@ class _SessionHeader extends StatelessWidget {
           );
           final closeButton = ElevatedButton.icon(
             onPressed: isClosed ? null : onClose,
-            icon: const Icon(Icons.lock_rounded),
+            icon: Icon(Icons.lock_rounded),
             label: Text(isClosed ? 'Clôturée' : 'Clôturer'),
           );
 
@@ -752,8 +760,8 @@ class _SessionHeader extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: isClosed || status == 'open' ? null : onOpen,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Ouvrir'),
+                icon: Icon(Icons.play_arrow_rounded),
+                label: Text('Ouvrir'),
               ),
               closeButton,
             ],
@@ -763,7 +771,7 @@ class _SessionHeader extends StatelessWidget {
             return Row(
               children: [
                 Expanded(child: identity),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 actionButtons,
               ],
             );
@@ -773,7 +781,7 @@ class _SessionHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               identity,
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Align(alignment: Alignment.centerRight, child: actionButtons),
             ],
           );
@@ -813,7 +821,7 @@ class _SessionActionPanel extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Pilotage de la session',
                         style: TextStyle(
@@ -824,25 +832,27 @@ class _SessionActionPanel extends StatelessWidget {
                     ),
                     Text(
                       '${(completionRate * 100).round()}%',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: completionRate,
                     minHeight: 10,
                     color: AppTheme.enactusYellow,
-                    backgroundColor: Colors.black12,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant,
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Text(
                   '$recordedCount/$expectedCount saisie(s) • $missing membre(s) à traiter',
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -853,8 +863,8 @@ class _SessionActionPanel extends StatelessWidget {
               runSpacing: 10,
               children: [
                 ActionChip(
-                  avatar: const Icon(Icons.nfc_rounded, size: 16),
-                  label: const Text('Pointage NFC'),
+                  avatar: Icon(Icons.nfc_rounded, size: 16),
+                  label: Text('Pointage NFC'),
                   onPressed: session.status == 'open' ? onNfcCheckIn : null,
                   backgroundColor: AppTheme.enactusYellow.withAlpha(40),
                   side: BorderSide(
@@ -887,7 +897,7 @@ class _SessionActionPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: progress),
-                  const SizedBox(width: 18),
+                  SizedBox(width: 18),
                   Flexible(child: actions),
                 ],
               );
@@ -895,7 +905,7 @@ class _SessionActionPanel extends StatelessWidget {
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [progress, const SizedBox(height: 16), actions],
+              children: [progress, SizedBox(height: 16), actions],
             );
           },
         ),
@@ -918,24 +928,24 @@ class _QrAuditTrail extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withAlpha(5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.history_rounded, size: 18),
               SizedBox(width: 8),
               Text('Journal QR', style: TextStyle(fontWeight: FontWeight.w900)),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           if (logs.isEmpty)
-            const Text(
+            Text(
               'Aucun scan QR pour le moment.',
               style: TextStyle(
-                color: Colors.black54,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             )
@@ -947,7 +957,7 @@ class _QrAuditTrail extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(_auditIcon(log), color: _auditColor(log), size: 18),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,15 +966,17 @@ class _QrAuditTrail extends StatelessWidget {
                             _auditLabel(log),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                           Text(
                             '${_formatShortTime(log.createdAt)}'
                             '${log.userId == null ? '' : ' • ${_shortUserId(log.userId!)}'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.black54,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1036,14 +1048,14 @@ class _AddExpectedMemberCard extends StatelessWidget {
 
                       if (selected != null) onAdd(selected);
                     },
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Ajouter attendu'),
+              icon: Icon(Icons.person_add_alt_1_rounded),
+              label: Text('Ajouter attendu'),
             );
 
             if (constraints.maxWidth >= 560) {
               return Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Membres attendus',
                       style: TextStyle(
@@ -1060,11 +1072,11 @@ class _AddExpectedMemberCard extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Membres attendus',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 button,
               ],
             );
@@ -1088,7 +1100,7 @@ class _SelectMemberDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Choisir un membre'),
+      title: Text('Choisir un membre'),
       content: SizedBox(
         width: _dialogWidth(context, 480),
         height: (MediaQuery.sizeOf(context).height * 0.58)
@@ -1115,7 +1127,7 @@ class _SelectMemberDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('Annuler'),
+          child: Text('Annuler'),
         ),
       ],
     );
@@ -1137,80 +1149,56 @@ class _AttendanceMemberFiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 760;
-            final search = TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Rechercher un membre',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            );
-            final filters = Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _StatusFilterChip(
-                  label: 'Tous',
-                  value: 'all',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Présents',
-                  value: 'present',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Retards',
-                  value: 'late',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Justifiées',
-                  value: 'justified',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Non justifiées',
-                  value: 'unjustified',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-                _StatusFilterChip(
-                  label: 'Non saisis',
-                  value: 'not_filled',
-                  current: statusFilter,
-                  onSelected: onStatusChanged,
-                ),
-              ],
-            );
-
-            if (isWide) {
-              return Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: 14),
-                  Flexible(child: filters),
-                ],
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [search, const SizedBox(height: 12), filters],
-            );
-          },
+    return AppFilterToolbar(
+      search: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: const InputDecoration(
+          hintText: 'Rechercher un membre',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      quickFilters: [
+        _StatusFilterChip(
+          label: 'Tous',
+          value: 'all',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Présents',
+          value: 'present',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Retards',
+          value: 'late',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Justifiées',
+          value: 'justified',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Non justifiées',
+          value: 'unjustified',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+        _StatusFilterChip(
+          label: 'Non saisis',
+          value: 'not_filled',
+          current: statusFilter,
+          onSelected: onStatusChanged,
+        ),
+      ],
+      filters: const [],
+      actions: const [],
+      activeFilterCount: 0,
     );
   }
 }
@@ -1233,7 +1221,7 @@ class _StatusFilterChip extends StatelessWidget {
     return ChoiceChip(
       label: Text(label),
       selected: current == value,
-      selectedColor: AppTheme.enactusYellow.withAlpha(120),
+      selectedColor: AppTheme.enactusYellow,
       onSelected: (_) => onSelected(value),
     );
   }
@@ -1263,12 +1251,14 @@ class _ExpectedMembersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (members.isEmpty) {
-      return const Card(
+      return Card(
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
             'Aucun membre attendu pour cette session.',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       );
@@ -1293,20 +1283,24 @@ class _ExpectedMembersCard extends StatelessWidget {
                       foregroundColor: AppTheme.softBlack,
                       child: Text(member.displayName[0].toUpperCase()),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             member.displayName,
-                            style: const TextStyle(fontWeight: FontWeight.w900),
+                            style: TextStyle(fontWeight: FontWeight.w900),
                           ),
-                          const SizedBox(height: 3),
+                          SizedBox(height: 3),
                           Text(
                             member.email,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.black54),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
@@ -1315,10 +1309,16 @@ class _ExpectedMembersCard extends StatelessWidget {
                 );
 
                 final statusChip = record == null
-                    ? const Chip(label: Text('Non saisi'))
-                    : Chip(
-                        label: Text(record.statusLabel),
-                        backgroundColor: Colors.green.shade50,
+                    ? const AppStatusBadge(label: 'Non saisi')
+                    : AppStatusBadge(
+                        label: record.statusLabel,
+                        tone: record.isPresent
+                            ? AppStatusTone.success
+                            : record.isLate
+                            ? AppStatusTone.warning
+                            : record.isAbsent
+                            ? AppStatusTone.error
+                            : AppStatusTone.info,
                       );
                 final recordDetails = _RecordDetails(record: record);
                 final reviewActions = record?.justificationStatus == 'pending'
@@ -1328,13 +1328,13 @@ class _ExpectedMembersCard extends StatelessWidget {
                         children: [
                           OutlinedButton.icon(
                             onPressed: () => onApproveJustification(record!),
-                            icon: const Icon(Icons.verified_rounded),
-                            label: const Text('Approuver'),
+                            icon: Icon(Icons.verified_rounded),
+                            label: Text('Approuver'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () => onRejectJustification(record!),
-                            icon: const Icon(Icons.block_rounded),
-                            label: const Text('Refuser'),
+                            icon: Icon(Icons.block_rounded),
+                            label: Text('Refuser'),
                           ),
                         ],
                       )
@@ -1351,7 +1351,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                               member: member,
                               status: 'present',
                             ),
-                      child: const Text('Présent'),
+                      child: Text('Présent'),
                     ),
                     OutlinedButton(
                       onPressed: sessionClosed
@@ -1360,7 +1360,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                               member: member,
                               status: 'late',
                             ),
-                      child: const Text('Retard'),
+                      child: Text('Retard'),
                     ),
                     OutlinedButton(
                       onPressed: sessionClosed
@@ -1369,7 +1369,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                               member: member,
                               status: 'absent',
                             ),
-                      child: const Text('Absent'),
+                      child: Text('Absent'),
                     ),
                     OutlinedButton(
                       onPressed: sessionClosed
@@ -1378,7 +1378,7 @@ class _ExpectedMembersCard extends StatelessWidget {
                               member: member,
                               status: 'excused',
                             ),
-                      child: const Text('Excuse'),
+                      child: Text('Excuse'),
                     ),
                   ],
                 );
@@ -1387,14 +1387,14 @@ class _ExpectedMembersCard extends StatelessWidget {
                   return Row(
                     children: [
                       Expanded(flex: 2, child: identity),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [statusChip, recordDetails, reviewActions],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(flex: 3, child: actions),
                     ],
                   );
@@ -1404,11 +1404,11 @@ class _ExpectedMembersCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     identity,
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     statusChip,
                     recordDetails,
                     reviewActions,
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     actions,
                   ],
                 );
@@ -1455,9 +1455,10 @@ class _RecordDetails extends StatelessWidget {
         ),
       if ((record!.justificationFileUrl ?? '').trim().isNotEmpty ||
           (record!.justificationFileId ?? '').trim().isNotEmpty)
-        const _RecordDetailLine(
-          icon: Icons.attach_file_rounded,
-          text: 'Piece jointe disponible',
+        StoredAttachmentButton(
+          url: record!.justificationFileUrl?.trim().isNotEmpty == true
+              ? record!.justificationFileUrl!
+              : '/api/files/${record!.justificationFileId}/download',
         ),
       if ((record!.penaltyAmount ?? 0) > 0)
         _RecordDetailLine(
@@ -1491,15 +1492,19 @@ class _RecordDetailLine extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.black45),
-          const SizedBox(width: 5),
+          Icon(
+            icon,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          SizedBox(width: 5),
           Flexible(
             child: Text(
               text,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.black54,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1528,18 +1533,18 @@ class _ErrorCard extends StatelessWidget {
               color: Colors.red.shade600,
               size: 44,
             ),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'Erreur de chargement',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Réessayer'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Réessayer'),
             ),
           ],
         ),
@@ -1642,7 +1647,7 @@ class _AttendanceStatsCard extends StatelessWidget {
                       foregroundColor: AppTheme.softBlack,
                       child: Icon(stat.icon),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1652,7 +1657,7 @@ class _AttendanceStatsCard extends StatelessWidget {
                             stat.value,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
                             ),
@@ -1661,8 +1666,10 @@ class _AttendanceStatsCard extends StatelessWidget {
                             stat.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.black54,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

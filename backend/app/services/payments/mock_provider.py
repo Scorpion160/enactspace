@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import datetime, timedelta
 
 from app.services.payments.base import PaymentProviderRequest, PaymentProviderResult
@@ -10,7 +11,7 @@ class MockPaymentProvider:
         self,
         request: PaymentProviderRequest,
     ) -> PaymentProviderResult:
-        expires_at = datetime.utcnow() + timedelta(minutes=30)
+        expires_at = utc_now() + timedelta(minutes=30)
         return PaymentProviderResult(
             provider=self.name,
             provider_token=f"mock_{request.transaction_id}",

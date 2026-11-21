@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pump();
 
-    expect(find.text('Connexion des comptes validés'), findsOneWidget);
+    expect(find.text('Bienvenue sur EnactSpace'), findsOneWidget);
     expect(find.text('Se connecter'), findsOneWidget);
   });
 
@@ -235,6 +235,7 @@ void main() {
           home: PaymentDecisionDialog(
             payment: payment,
             memberName: 'Audit Member',
+            fees: [],
             approve: false,
           ),
         ),
@@ -254,6 +255,7 @@ void main() {
           home: PaymentDecisionDialog(
             payment: payment,
             memberName: 'Audit Member',
+            fees: [],
             approve: true,
           ),
         ),
@@ -279,7 +281,7 @@ void main() {
     },
   );
 
-  testWidgets('finance proof dialog renders an image preview', (tester) async {
+  testWidgets('finance proof dialog prepares an image preview', (tester) async {
     const payment = PaymentModel(
       id: 'payment-image',
       userId: 'member-1',
@@ -296,7 +298,8 @@ void main() {
     );
 
     expect(find.text('Image de preuve'), findsOneWidget);
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
   });
 
   testWidgets('finance proof opening failure offers retry', (tester) async {
@@ -306,7 +309,7 @@ void main() {
       amount: 2500,
       method: 'wave',
       status: 'pending',
-      proofUrl: '/uploads/proof.pdf',
+      proofUrl: '/uploads/proof.txt',
       canValidate: false,
       canReject: false,
       canCancel: false,

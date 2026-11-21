@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 from datetime import date, datetime
 
 from sqlalchemy import func
@@ -83,13 +84,13 @@ def capture_project_completion(
             status="completed",
             validation_status="VERIFIED",
             validated_by_id=actor_id,
-            validated_at=datetime.utcnow(),
+            validated_at=utc_now(),
             origin="operational",
             capture_key=f"project:{project.id}:termine",
             source_entity_type="project",
             source_entity_id=project.id,
             source_entity_version="termine",
-            captured_at=datetime.utcnow(),
+            captured_at=utc_now(),
             operational_project_id=project.id,
             canonical_project_id=canonical_project_id,
         ),
@@ -115,7 +116,7 @@ def capture_attendance_archive(
         .scalar()
         or 0
     )
-    scheduled = session.scheduled_at or session.created_at or datetime.utcnow()
+    scheduled = session.scheduled_at or session.created_at or utc_now()
     summary = (
         f"Type: {session.session_type}; perimetre: {session.scope_type}; "
         f"attendus: {expected}; presents: {int(counts.get('present', 0))}; "
@@ -134,13 +135,13 @@ def capture_attendance_archive(
             status="archived",
             validation_status="VERIFIED",
             validated_by_id=actor_id,
-            validated_at=datetime.utcnow(),
+            validated_at=utc_now(),
             origin="operational",
             capture_key=f"attendance_session:{session.id}:archived",
             source_entity_type="attendance_session",
             source_entity_id=session.id,
             source_entity_version="archived",
-            captured_at=datetime.utcnow(),
+            captured_at=utc_now(),
             operational_project_id=session.project_id,
             pole_id=session.pole_id,
             operational_event_id=session.event_id,

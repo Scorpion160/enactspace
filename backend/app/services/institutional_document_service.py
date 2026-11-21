@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -556,7 +557,7 @@ def validate_payload(rule: InstitutionalTemplateRule, payload: dict[str, Any]) -
     missing = []
     for field_name in rule.required_payload_fields:
         value = payload.get(field_name)
-        if value is None or value == "" or value == [] or value == {}:
+        if value is None or (isinstance(value, str) and not value.strip()) or value == [] or value == {}:
             missing.append(field_name)
     if missing:
         raise HTTPException(
@@ -566,6 +567,45 @@ def validate_payload(rule: InstitutionalTemplateRule, payload: dict[str, Any]) -
                 "missing_fields": missing,
             },
         )
+
+    invalid = []
+    parsed_dates = {}
+    for field in rule.fields:
+        name, kind = field["name"], field["type"]
+        value = payload.get(name)
+        if value is None or value == "" or value == []:
+            continue
+        try:
+            if kind == "number":
+                import math
+                number = float(value)
+                if isinstance(value, bool) or not math.isfinite(number) or number < 0:
+                    raise ValueError()
+                if name in {"passenger_count", "requested_capacity"} and (number <= 0 or not number.is_integer()):
+                    raise ValueError()
+            elif kind in {"date", "datetime"}:
+                parsed_dates[name] = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            elif kind == "time":
+                from datetime import time
+                time.fromisoformat(str(value))
+            elif kind == "email" and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", str(value)):
+                raise ValueError()
+            elif kind in {"users", "list", "structured_list", "action_list", "decision_list", "vote_list", "route_list"} and not isinstance(value, list):
+                raise ValueError()
+        except (ValueError, TypeError, OverflowError):
+            invalid.append(name)
+    for earlier, later in (("departure_at", "return_at"), ("decision_date", "effective_date")):
+        if earlier in parsed_dates and later in parsed_dates:
+            try:
+                if parsed_dates[later] < parsed_dates[earlier]:
+                    invalid.append(later)
+            except TypeError:
+                invalid.extend([earlier, later])
+    if invalid:
+        raise HTTPException(status_code=422, detail={
+            "message": "Certains champs du formulaire sont invalides.",
+            "invalid_fields": sorted(set(invalid)),
+        })
 
 
 def get_current_season(db: Session) -> Season | None:
@@ -616,7 +656,7 @@ def _season_reference_slug(name: str) -> str:
     normalized = unicodedata.normalize("NFKD", name)
     ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
     slug = re.sub(r"[^A-Za-z0-9]+", "-", ascii_text).strip("-")
-    return slug or "SAISON"
+    return slug or "ANNEE"
 
 
 def allocate_official_reference(db: Session, request: InstitutionalDocumentRequest) -> str:
@@ -625,7 +665,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
     if request.season_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Impossible d’officialiser sans saison.",
+            detail="Impossible d’officialiser sans année.",
         )
     rule = get_template_rule(request.template_code)
     if db.get_bind().dialect.name == "postgresql":
@@ -635,7 +675,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
         )
     season = db.query(Season).filter(Season.id == request.season_id).first()
     if season is None:
-        raise HTTPException(status_code=409, detail="Saison introuvable.")
+        raise HTTPException(status_code=409, detail="Année introuvable.")
 
     sequence = (
         db.query(InstitutionalDocumentSequence)
@@ -656,7 +696,7 @@ def allocate_official_reference(db: Session, request: InstitutionalDocumentReque
         db.flush()
 
     sequence.last_number += 1
-    sequence.updated_at = datetime.utcnow()
+    sequence.updated_at = utc_now()
     request.sequence_number = sequence.last_number
     request.official_reference = (
         f"EESP/{rule.reference_prefix}/{_season_reference_slug(season.name)}/"
@@ -679,6 +719,7 @@ def request_flags(db: Session, user: User, request: InstitutionalDocumentRequest
             request.status == "pending_approval"
             and TEAM_LEADER_ROLE in roles
             and request.requested_by != user.id
+            and request.sg_validated_by != user.id
         ),
         "can_cancel": request.requested_by == user.id
         and request.status in {"draft", "rejected", "pending_sg_validation"},

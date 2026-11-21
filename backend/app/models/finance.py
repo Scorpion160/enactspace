@@ -1,7 +1,8 @@
+from app.core.time import utc_now
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Index, String, Text, DateTime, Date, ForeignKey, Numeric, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, Index, String, Text, DateTime, Date, ForeignKey, Numeric, UniqueConstraint, JSON, text
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,7 +28,7 @@ class FinancialAccount(Base):
     balance_due: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     total_paid: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
 
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("balance_due >= 0", name="ck_financial_accounts_balance_nonnegative"),
@@ -90,8 +91,8 @@ class Fee(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_fees_amount_positive"),
@@ -143,6 +144,11 @@ class Payment(Base):
         ForeignKey("stored_files.id"),
         nullable=True,
     )
+    allocation_plan: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    receipt_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    unallocated_amount: Mapped[float] = mapped_column(
+        Numeric(12, 2), nullable=False, default=0
+    )
 
     validated_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -161,7 +167,7 @@ class Payment(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_payments_amount_positive"),
@@ -191,7 +197,7 @@ class PaymentAllocation(Base):
 
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("payment_id", "fee_id", name="uq_payment_allocation_fee"),
@@ -259,7 +265,7 @@ class ClubTransaction(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_club_transactions_amount_positive"),

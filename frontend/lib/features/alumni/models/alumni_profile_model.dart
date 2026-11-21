@@ -12,6 +12,8 @@ class AlumniProfileModel {
   final String? portfolioUrl;
   final String visibility;
   final String displayName;
+  final String? firstName;
+  final String? lastName;
   final String? photoUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -30,6 +32,8 @@ class AlumniProfileModel {
     required this.portfolioUrl,
     required this.visibility,
     required this.displayName,
+    this.firstName,
+    this.lastName,
     required this.photoUrl,
     required this.createdAt,
     required this.updatedAt,
@@ -50,6 +54,8 @@ class AlumniProfileModel {
       portfolioUrl: json['portfolio_url']?.toString(),
       visibility: json['visibility']?.toString() ?? 'internal',
       displayName: json['display_name']?.toString() ?? 'Alumni',
+      firstName: json['first_name']?.toString(),
+      lastName: json['last_name']?.toString(),
       photoUrl: json['photo_url']?.toString(),
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??

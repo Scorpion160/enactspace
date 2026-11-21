@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -37,4 +38,4 @@ class AuditLog(Base):
 
     ip_address: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

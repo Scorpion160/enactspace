@@ -16,8 +16,7 @@ class SupportMessage {
     authorId: json['author_id']?.toString(),
     message: json['message']?.toString() ?? '',
     createdAt:
-        DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0),
+        _helpTime(json['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
   );
 }
 
@@ -28,6 +27,7 @@ class SupportTicket {
   final String status;
   final String priority;
   final DateTime updatedAt;
+  final String? userId, assignedToId, requesterName;
   final List<SupportMessage> messages;
 
   const SupportTicket({
@@ -38,6 +38,9 @@ class SupportTicket {
     required this.priority,
     required this.updatedAt,
     this.messages = const [],
+    this.userId,
+    this.assignedToId,
+    this.requesterName,
   });
 
   factory SupportTicket.fromJson(Map<String, dynamic> json) => SupportTicket(
@@ -47,14 +50,28 @@ class SupportTicket {
     status: json['status']?.toString() ?? 'open',
     priority: json['priority']?.toString() ?? 'normal',
     updatedAt:
-        DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0),
+        _helpTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    userId: json['user_id']?.toString(),
+    assignedToId: json['assigned_to_id']?.toString(),
+    requesterName: json['requester_name']?.toString(),
     messages: (json['messages'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(SupportMessage.fromJson)
         .toList(),
   );
 
+  SupportTicket withMessages(List<SupportMessage> value) => SupportTicket(
+    id: id,
+    subject: subject,
+    category: category,
+    status: status,
+    priority: priority,
+    updatedAt: updatedAt,
+    messages: value,
+    userId: userId,
+    assignedToId: assignedToId,
+    requesterName: requesterName,
+  );
   bool get canReply => status != 'closed';
 
   String get categoryLabel => switch (category) {
@@ -82,6 +99,8 @@ class SupportTicket {
 }
 
 class ProductFeedback {
+  final String? publicReply;
+  final DateTime? updatedAt;
   final String id;
   final String category;
   final String message;
@@ -96,24 +115,41 @@ class ProductFeedback {
     required this.rating,
     required this.status,
     required this.createdAt,
+    this.publicReply,
+    this.updatedAt,
   });
 
   factory ProductFeedback.fromJson(Map<String, dynamic> json) =>
       ProductFeedback(
         id: json['id']?.toString() ?? '',
         category: json['category']?.toString() ?? 'other',
+        publicReply: json['public_reply']?.toString(),
+        updatedAt: _helpTime(json['updated_at']),
         message: json['message']?.toString() ?? '',
         rating: json['rating'] as int?,
         status: json['status']?.toString() ?? 'new',
         createdAt:
-            DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+            _helpTime(json['created_at']) ??
             DateTime.fromMillisecondsSinceEpoch(0),
       );
 
+  String get statusLabel => switch (status) {
+    'reviewed' => 'Étudié',
+    'planned' => 'Prévu',
+    'closed' => 'Clôturé',
+    _ => 'Reçu',
+  };
   String get categoryLabel => switch (category) {
     'bug' => 'Problème',
     'idea' => 'Idée',
     'usability' => 'Facilité d’utilisation',
     _ => 'Autre',
   };
+}
+
+DateTime? _helpTime(Object? value) {
+  final text = value?.toString() ?? '';
+  if (text.isEmpty) return null;
+  final explicit = RegExp(r'(Z|[+-]\d{2}:\d{2})$').hasMatch(text);
+  return DateTime.tryParse(explicit ? text : '${text}Z');
 }

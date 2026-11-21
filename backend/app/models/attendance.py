@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -31,7 +32,7 @@ class AttendanceSetting(Base):
     key: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     value: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class AttendanceSession(Base):
@@ -87,8 +88,8 @@ class AttendanceSession(Base):
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         CheckConstraint(
@@ -126,7 +127,7 @@ class AttendanceExpectedMember(Base):
 
     is_required: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint(
@@ -194,8 +195,8 @@ class AttendanceRecord(Base):
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint(
@@ -253,7 +254,7 @@ class AttendanceNfcTag(Base):
         ForeignKey("users.id"),
         nullable=True,
     )
-    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     revoked_by_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
@@ -263,5 +264,5 @@ class AttendanceNfcTag(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

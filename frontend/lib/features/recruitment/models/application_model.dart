@@ -1,6 +1,10 @@
+import 'application_review_model.dart';
 import 'application_status_presentation.dart';
+import 'application_history_model.dart';
 
 class ApplicationModel {
+  final List<ApplicationHistoryModel> history;
+  final List<Map<String, dynamic>> questionnaireAnswers;
   final String id;
   final String campaignId;
   final String firstName;
@@ -15,6 +19,7 @@ class ApplicationModel {
   final String? knownEnactusFrom;
   final String? enactusKnowledge;
   final String? otherClubs;
+  final int? otherClubsCount;
   final String? contribution;
   final String? projectIdeas;
   final String? leadershipProfile;
@@ -23,9 +28,20 @@ class ApplicationModel {
   final String? associativeExperience;
   final String? availability;
   final String? publicComment;
+  final bool? campusResident;
+  final List<String> interviewPreferences;
+  final String? interviewAvailability;
+  final DateTime? interviewEndAt;
+  final String? interviewMode;
+  final List<Map<String, dynamic>> interviewJurors;
+  final bool interviewNeedsReassignment;
+  final Map<String, dynamic>? interviewTeam;
+  final Map<String, dynamic> permissions;
+  final String? personalityStatus;
   final DateTime? interviewAt;
   final String? interviewLocation;
   final String? interviewLink;
+  final String? interviewMeetingId;
   final String? interviewJury;
   final String? interviewNote;
   final String? cvUrl;
@@ -34,14 +50,29 @@ class ApplicationModel {
   final String status;
   final String? trackingCode;
   final double? finalScore;
+  final double? humanScreeningScore;
+  final int screeningReviewCount;
+  final double? screeningSpread;
+  final int? selectionRequiredReviews;
+  final bool? selectionReady;
+  final Map<String, dynamic>? screeningRubric;
+  final ApplicationReviewModel? myReview;
   final String? convertedUserId;
   final String? createdAt;
   final String? updatedAt;
   final bool isAnonymized;
   final String? serverAnonymousCode;
   final bool canConvert;
+  final String? screeningDecision;
+  final String? pendingFinalDecision;
+  final bool screeningPublished;
+
+  bool get blindSelection => permissions['blind_selection'] == true;
+  String get assessmentStage => permissions['selection_stage']?.toString() ?? 'screening';
 
   const ApplicationModel({
+    this.history = const [],
+    this.questionnaireAnswers = const [],
     required this.id,
     required this.campaignId,
     required this.firstName,
@@ -56,6 +87,7 @@ class ApplicationModel {
     this.knownEnactusFrom,
     this.enactusKnowledge,
     this.otherClubs,
+    this.otherClubsCount,
     this.contribution,
     this.projectIdeas,
     this.leadershipProfile,
@@ -64,9 +96,20 @@ class ApplicationModel {
     this.associativeExperience,
     this.availability,
     this.publicComment,
+    this.campusResident,
+    this.interviewPreferences = const [],
+    this.interviewAvailability,
+    this.interviewEndAt,
+    this.interviewMode,
+    this.interviewJurors = const [],
+    this.interviewNeedsReassignment = false,
+    this.interviewTeam,
+    this.permissions = const {},
+    this.personalityStatus,
     this.interviewAt,
     this.interviewLocation,
     this.interviewLink,
+    this.interviewMeetingId,
     this.interviewJury,
     this.interviewNote,
     this.cvUrl,
@@ -75,19 +118,51 @@ class ApplicationModel {
     required this.status,
     this.trackingCode,
     this.finalScore,
+    this.humanScreeningScore,
+    this.screeningReviewCount = 0,
+    this.screeningSpread,
+    this.selectionRequiredReviews,
+    this.selectionReady,
+    this.screeningRubric,
+    this.myReview,
     this.convertedUserId,
     this.createdAt,
     this.updatedAt,
     required this.isAnonymized,
     this.serverAnonymousCode,
     required this.canConvert,
+    this.screeningDecision,
+    this.pendingFinalDecision,
+    this.screeningPublished = false,
   });
 
   factory ApplicationModel.fromJson(Map<String, dynamic> json) {
     return ApplicationModel(
+      history: (json['history'] as List? ?? const [])
+          .whereType<Map>()
+          .map(
+            (row) => ApplicationHistoryModel.tryParse(
+              Map<String, dynamic>.from(row),
+            ),
+          )
+          .whereType<ApplicationHistoryModel>()
+          .toList(),
+      questionnaireAnswers: (json['questionnaire_answers'] as List? ?? const [])
+          .whereType<Map>()
+          .map((q) => Map<String, dynamic>.from(q))
+          .toList(),
+      myReview: json['my_review'] is Map
+          ? ApplicationReviewModel.fromJson(
+              Map<String, dynamic>.from(json['my_review']),
+            )
+          : null,
+      screeningDecision: json['screening_decision']?.toString(),
+      pendingFinalDecision: json['pending_final_decision']?.toString(),
+      screeningPublished: json['screening_published'] == true,
       id: json['id']?.toString() ?? '',
       campaignId: json['campaign_id']?.toString() ?? '',
       firstName: json['first_name']?.toString() ?? '',
+      otherClubsCount: (json['other_clubs_count'] as num?)?.toInt(),
       lastName: json['last_name']?.toString() ?? '',
       gender: json['gender']?.toString(),
       email: json['email']?.toString() ?? '',
@@ -107,9 +182,29 @@ class ApplicationModel {
       associativeExperience: json['associative_experience']?.toString(),
       availability: json['availability']?.toString(),
       publicComment: json['public_comment']?.toString(),
-      interviewAt: DateTime.tryParse(json['interview_at']?.toString() ?? ''),
+      campusResident: json['campus_resident'] as bool?,
+      interviewPreferences: (json['interview_preferences'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
+      interviewAvailability: json['interview_availability']?.toString(),
+      interviewEndAt: _utcDate(json['interview_end_at']),
+      interviewMode: json['interview_mode']?.toString(),
+      interviewJurors: (json['interview_jurors'] as List? ?? const [])
+          .whereType<Map>()
+          .map((v) => Map<String, dynamic>.from(v))
+          .toList(),
+      interviewNeedsReassignment: json['interview_needs_reassignment'] == true,
+      interviewTeam: json['interview_team'] is Map
+          ? Map<String, dynamic>.from(json['interview_team'] as Map)
+          : null,
+      permissions: Map<String, dynamic>.from(
+        json['permissions'] as Map? ?? const {},
+      ),
+      personalityStatus: json['personality_status']?.toString(),
+      interviewAt: _utcDate(json['interview_at']),
       interviewLocation: json['interview_location']?.toString(),
       interviewLink: json['interview_link']?.toString(),
+      interviewMeetingId: json['interview_meeting_id']?.toString(),
       interviewJury: json['interview_jury']?.toString(),
       interviewNote: json['interview_note']?.toString(),
       cvUrl: json['cv_url']?.toString(),
@@ -118,6 +213,20 @@ class ApplicationModel {
       status: json['status']?.toString() ?? 'submitted',
       trackingCode: json['tracking_code']?.toString(),
       finalScore: double.tryParse(json['final_score']?.toString() ?? ''),
+      humanScreeningScore: double.tryParse(
+        json['screening_score']?.toString() ?? '',
+      ),
+      screeningReviewCount:
+          (json['screening_review_count'] as num?)?.toInt() ?? 0,
+      screeningSpread: double.tryParse(
+        json['screening_spread']?.toString() ?? '',
+      ),
+      selectionRequiredReviews:
+          (json['selection_required_reviews'] as num?)?.toInt(),
+      selectionReady: json['selection_ready'] as bool?,
+      screeningRubric: json['screening_rubric'] is Map
+          ? Map<String, dynamic>.from(json['screening_rubric'])
+          : null,
       convertedUserId: json['converted_user_id']?.toString(),
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
@@ -136,8 +245,11 @@ class ApplicationModel {
       ApplicationStatusPresentation.fromStatus(status).title;
 
   String get scoreLabel {
-    if (finalScore == null) return 'Non noté';
-    return '${finalScore!.toStringAsFixed(1)}/20';
+    if (screeningScore != null) {
+      return '${(screeningScore! / 5).toStringAsFixed(1)}/20';
+    }
+    if (finalScore == null) return 'Non évalué';
+    return 'Note antérieure : ${finalScore!.toStringAsFixed(1)}/20';
   }
 
   String get anonymousCode {
@@ -158,68 +270,12 @@ class ApplicationModel {
     return id;
   }
 
-  String get stabilityLabel {
-    final level = (studyLevel ?? '').toLowerCase();
-
-    if (level.contains('dic1') ||
-        level.contains('l1') ||
-        level.contains('1ere') ||
-        level.contains('1ère') ||
-        level.contains('premi')) {
-      return 'Stabilité forte';
-    }
-
-    if (level.contains('dic2') ||
-        level.contains('l2') ||
-        level.contains('deux')) {
-      return 'Bonne stabilité';
-    }
-
-    if (level.contains('dic3') ||
-        level.contains('m2') ||
-        level.contains('fin') ||
-        level.contains('5')) {
-      return 'Départ proche';
-    }
-
-    return 'Stabilité à qualifier';
-  }
-
-  int get screeningScore {
-    var score = 0;
-
-    if ((motivation ?? '').trim().length >= 80) score += 20;
-    if ((enactusKnowledge ?? '').trim().length >= 50) score += 15;
-    if ((contribution ?? '').trim().length >= 50) score += 15;
-    if ((leadershipProfile ?? '').trim().length >= 40) score += 10;
-    if ((projectIdeas ?? '').trim().length >= 40) score += 10;
-    if ((department ?? '').trim().isNotEmpty) score += 10;
-    if ((phone ?? '').trim().isNotEmpty) score += 5;
-
-    final level = (studyLevel ?? '').toLowerCase();
-    if (level.contains('dic1') ||
-        level.contains('l1') ||
-        level.contains('1ere') ||
-        level.contains('1Ã¨re') ||
-        level.contains('premi')) {
-      score += 15;
-    } else if (level.contains('dic2') ||
-        level.contains('l2') ||
-        level.contains('deux')) {
-      score += 10;
-    } else if (level.trim().isNotEmpty) {
-      score += 5;
-    }
-
-    return score.clamp(0, 100);
-  }
-
+  double? get screeningScore => humanScreeningScore;
   String get screeningLabel {
-    final score = screeningScore;
-    if (score >= 75) return 'Priorité forte';
-    if (score >= 55) return 'Bon potentiel';
-    if (score >= 35) return 'À creuser';
-    return 'Dossier incomplet';
+    if (screeningScore == null) return 'Évaluation à réaliser';
+    if (screeningReviewCount < 2) return 'Un avis à croiser';
+    if ((screeningSpread ?? 0) >= 20) return 'Écart à discuter en jury';
+    return 'Avis du jury enregistrés';
   }
 
   bool get isConverted {
@@ -228,11 +284,18 @@ class ApplicationModel {
 
   String get interviewLabel {
     if (interviewAt == null) return 'Entretien à programmer';
-    final local = interviewAt!.toLocal();
+    final local = interviewAt!.toUtc();
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
-    return '$day/$month/${local.year} $hour:$minute';
+    return '$day/$month/${local.year} $hour:$minute · Dakar';
   }
+}
+
+DateTime? _utcDate(Object? value) {
+  final raw = value?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  final explicit = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(raw);
+  return DateTime.tryParse(explicit ? raw : '${raw}Z')?.toUtc();
 }

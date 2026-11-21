@@ -11,6 +11,7 @@ class AcademyCourseCreate(BaseModel):
     category: str = "Vie interne Enactus ESP"
     level: str = "debutant"
     target_roles: list[str] = Field(default_factory=list)
+    prerequisite_course_ids: list[UUID] = Field(default_factory=list, max_length=12)
     estimated_duration_minutes: int = 0
     points: int = 0
     is_required: bool = False
@@ -25,6 +26,7 @@ class AcademyCourseUpdate(BaseModel):
     category: Optional[str] = None
     level: Optional[str] = None
     target_roles: Optional[list[str]] = None
+    prerequisite_course_ids: Optional[list[UUID]] = Field(default=None, max_length=12)
     estimated_duration_minutes: Optional[int] = None
     points: Optional[int] = None
     is_required: Optional[bool] = None
@@ -35,6 +37,7 @@ class AcademyCourseUpdate(BaseModel):
 
 
 class AcademyCourseRead(AcademyCourseCreate):
+    prerequisite_course_ids: list[UUID] | None = None
     id: UUID
     is_archived: bool
     created_by_id: Optional[UUID]
@@ -137,6 +140,7 @@ class AcademyProgressRead(BaseModel):
 
 class AcademyQuizSubmit(BaseModel):
     answers: list = Field(default_factory=list)
+    client_submission_id: Optional[str] = Field(default=None, max_length=100)
 
 
 class AcademyQuizAttemptRead(BaseModel):

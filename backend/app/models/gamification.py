@@ -1,3 +1,4 @@
+from app.core.time import utc_now
 import uuid
 from datetime import datetime
 
@@ -53,7 +54,7 @@ class EngagementPoint(Base):
         nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class Badge(Base):
@@ -70,7 +71,7 @@ class Badge(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     icon_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class UserBadge(Base):
@@ -106,7 +107,7 @@ class UserBadge(Base):
         nullable=True,
     )
 
-    awarded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    awarded_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint("user_id", "badge_id", "season_id", name="uq_user_badge_season"),
