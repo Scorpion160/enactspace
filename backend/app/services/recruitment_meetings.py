@@ -23,6 +23,17 @@ def candidate_interview_released(campaign, application):
                 and application.screening_decision == "shortlisted")
 
 
+def candidate_enactmeet_access_state(*, status, mode, released, meeting, questionnaire_submitted):
+    """Public, non-secret explanation for a candidate's online joining state."""
+    if status != "interview_scheduled" or mode != "online":
+        return None
+    if not released or meeting is None:
+        return "pending_publication"
+    if not questionnaire_submitted:
+        return "questionnaire_required"
+    return "ready" if meeting.status == "live" else "waiting_for_jury"
+
+
 def candidate_interview_room(db, application):
     if application.status != "interview_scheduled" or application.interview_meeting_id is None:
         return None

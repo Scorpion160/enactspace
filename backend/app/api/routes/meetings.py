@@ -79,14 +79,34 @@ def _interview_application_id(db: Session, meeting: Meeting):
     return db.query(Application.id).filter(Application.interview_meeting_id == meeting.id).limit(1).scalar()
 
 
+def _open_recruitment_campaign(db: Session, meeting: Meeting):
+    """Only a privately provisioned custom room scoped to a campaign.
+
+    The ordinary create/update meeting APIs forbid custom scope IDs, so
+    arbitrary meetings cannot declare themselves open interview rooms.
+    """
+    if meeting.scope_type != "custom" or meeting.scope_id is None:
+        return None
+    from app.models.recruitment import RecruitmentCampaign
+    return db.get(RecruitmentCampaign, meeting.scope_id)
+
+
+def _can_moderate_open_recruitment(db: Session, meeting: Meeting, user: User) -> bool:
+    from app.services.recruitment_access import active_jury_member
+    campaign = _open_recruitment_campaign(db, meeting)
+    return bool(campaign and active_jury_member(db, user, campaign.id))
+
+
 def _require_regular_meeting(db: Session, meeting: Meeting) -> None:
-    if _interview_application_id(db, meeting) is not None:
+    if _interview_application_id(db, meeting) is not None or _open_recruitment_campaign(db, meeting):
         raise HTTPException(409, "Le créneau et le jury de cet entretien se gèrent depuis la candidature.")
 
 
 def _can_access(db: Session, meeting: Meeting, user: User) -> bool:
     from app.models.recruitment import ApplicationInterviewJuror, RecruitmentJuryMember
     from app.services.recruitment_access import can_manage_jury, eligible_juror
+    if _open_recruitment_campaign(db, meeting) is not None:
+        return can_manage_jury(db, user) or _can_moderate_open_recruitment(db, meeting, user)
     application_id = _interview_application_id(db, meeting)
     if application_id is not None:
         if can_manage_jury(db, user):
@@ -498,7 +518,8 @@ def join_meeting(
     if meeting.status in {"ended", "cancelled"}:
         raise HTTPException(status_code=409, detail="Cette réunion est terminée")
 
-    moderator = _can_manage(db, meeting, current_user)
+    moderator = (_can_manage(db, meeting, current_user)
+                 or _can_moderate_open_recruitment(db, meeting, current_user))
     now = utc_now()
     if meeting.status == "scheduled" and not moderator:
         if meeting.scheduled_start is None:
@@ -549,7 +570,8 @@ def enter_meeting(
     member.left_at = None
     member.last_seen_at = now
 
-    moderator = _can_manage(db, meeting, current_user)
+    moderator = (_can_manage(db, meeting, current_user)
+                 or _can_moderate_open_recruitment(db, meeting, current_user))
     became_live = meeting.status == "scheduled" and moderator
     if became_live:
         meeting.status = "live"

@@ -100,6 +100,31 @@ def active_jury_member(db, user, campaign_id):
     ).first() is not None
 
 
+def open_interview_application_ids(db, user, campaign_id) -> set:
+    """Only dossiers in the current campaign's explicitly open Jitsi jury room.
+
+    This is not general interview access: an enrolled, verified jury member
+    gains the right only for appointments linked to a custom meeting scoped
+    to exactly this campaign. The public meeting API cannot create this scope.
+    """
+    if not active_jury_member(db, user, campaign_id):
+        return set()
+    from app.models.meeting import Meeting
+    from app.models.recruitment import Application
+    return {
+        row.id for row in db.query(Application.id).join(
+            Meeting, Meeting.id == Application.interview_meeting_id,
+        ).filter(
+            Application.campaign_id == campaign_id,
+            Application.status == "interview_scheduled",
+            Application.screening_decision == "shortlisted",
+            Meeting.scope_type == "custom",
+            Meeting.scope_id == campaign_id,
+            Meeting.status.in_(("scheduled", "live")),
+        ).all()
+    }
+
+
 def active_reader(db, user, campaign_id):
     return eligible_juror(user) and db.query(RecruitmentViewerAccess.id).filter(
         RecruitmentViewerAccess.campaign_id == campaign_id,

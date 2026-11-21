@@ -232,7 +232,15 @@ def _readable_rows(db, campaign, actor):
                 return data.get("actual_jury_member_ids") or row.jury_member_ids
         return row.jury_member_ids
 
-    visible = [row for row in drafts if manager or bool(current.intersection(effective_ids(row)))]
+    from app.services.recruitment_access import open_interview_application_ids
+    open_jury_ids = (set() if manager else open_interview_application_ids(
+        db, actor, campaign.id,
+    ))
+    visible = [
+        row for row in drafts
+        if manager or bool(current.intersection(effective_ids(row)))
+        or row.application_id in open_jury_ids
+    ]
     apps = {app.id:app for app in db.query(Application).filter(
         Application.id.in_([row.application_id for row in visible])
     ).all()}

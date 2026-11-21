@@ -470,6 +470,7 @@ class ApplicationTrackingRequest(BaseModel):
 
 class ApplicationTrackingRead(BaseModel):
     enactmeet_available: bool = False
+    enactmeet_access_state: Optional[str] = None
     selection_schedule: Optional[RecruitmentPublicSchedule] = None
     application_id: UUID
     tracking_code: str
