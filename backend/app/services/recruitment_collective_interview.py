@@ -128,7 +128,9 @@ def _private_access(db, application_id, actor, *, management=False):
         RecruitmentJuryMember.id.in_(current),
         RecruitmentJuryMember.is_active.is_(True),
     ).first()
-    if not manager and not (juror and eligible_juror(actor)):
+    from app.services.recruitment_access import open_interview_application_ids
+    open_jury = app.id in open_interview_application_ids(db, actor, app.campaign_id)
+    if not manager and not ((juror and eligible_juror(actor)) or open_jury):
         raise HTTPException(403, "Accès réservé au jury affecté et aux responsables.")
     return app, attendance, current, manager
 

@@ -17,6 +17,7 @@ from app.api.routes.meetings import (
 )
 from app.schemas.meeting import MeetingCreate
 from app.services.recruitment_meetings import candidate_enactmeet_access_state
+from app.services.recruitment_access import open_interview_application_ids
 
 
 class OpenJuryRoomTests(TestCase):
@@ -53,6 +54,23 @@ class OpenJuryRoomTests(TestCase):
         self.meeting.scope_id = None
         self.assertIsNone(_open_recruitment_campaign(self.db, self.meeting))
         self.assertFalse(_can_moderate_open_recruitment(self.db, self.meeting, self.user))
+
+    def test_open_jury_dossiers_require_active_campaign_membership(self):
+        dossier = uuid4()
+        rows = [SimpleNamespace(id=dossier)]
+        self.db.query.return_value.join.return_value.filter.return_value.all.return_value = rows
+        with patch("app.services.recruitment_access.active_jury_member", return_value=True):
+            self.assertEqual(
+                open_interview_application_ids(self.db, self.user, self.campaign.id),
+                {dossier},
+            )
+        self.db.query.reset_mock()
+        with patch("app.services.recruitment_access.active_jury_member", return_value=False):
+            self.assertEqual(
+                open_interview_application_ids(self.db, self.user, self.campaign.id),
+                set(),
+            )
+        self.db.query.assert_not_called()
 
     def test_custom_public_create_cannot_claim_campaign_scope(self):
         with self.assertRaises(ValidationError):
