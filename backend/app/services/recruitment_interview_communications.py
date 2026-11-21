@@ -36,7 +36,7 @@ from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
 from app.models.user import User
 from app.services.audit_service import create_audit_log
 from app.services.email_delivery_service import enqueue_email_delivery
-from app.services.email_templates import render_email_html
+from app.services.email_templates import app_link, render_email_html
 from app.services.operational_integrity import lock_row
 from app.services.recruitment_access import can_manage_jury, require_campaign_access
 from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
@@ -131,6 +131,34 @@ def _validate_mail(mail):
             or parsed.get_body(preferencelist=("plain",)).get_content().rstrip("\n") != body):
         raise HTTPException(409, "Le contrôle de l'encodage UTF-8 a échoué.")
     mail["html"] = html
+
+
+def _insert_candidate_instructions(body: str, addition: str) -> str:
+    footer = "\n\nL\u2019\u00e9quipe de recrutement Enactus ESP"
+    if not body.endswith(footer):
+        raise HTTPException(409, "La signature du message est introuvable.")
+    return body[:-len(footer)] + addition + footer
+
+
+def _online_candidate_instructions(application) -> str:
+    if not application.tracking_code:
+        raise HTTPException(409, "Le candidat n'a pas de code de suivi utilisable.")
+    tracking_url = app_link("application-tracking")
+    return (
+        "\n\nPour rejoindre ton entretien EnactMeet :"
+        f"\n1. Ouvre cette page : {tracking_url}"
+        f"\n2. Saisis ton code de suivi : {application.tracking_code}"
+        "\n3. Saisis l'adresse e-mail utilis\u00e9e lors de ta candidature."
+        "\n4. Si ton questionnaire n'est pas encore envoy\u00e9, termine-le "
+        "et valide tes r\u00e9ponses avant le rendez-vous."
+        "\n5. Quinze minutes avant ton cr\u00e9neau, clique sur "
+        "Rejoindre mon entretien, une fois la salle ouverte par le jury."
+        "\n6. Reste dans la salle d'attente jusqu'\u00e0 ce qu'un jur\u00e9 t'admette. "
+        "Ne rejoins pas le passage d'un autre candidat."
+        "\n7. Si la connexion est interrompue, reviens sur le suivi "
+        "de ta candidature et clique de nouveau sur Rejoindre mon entretien."
+        "\nPr\u00e9pare ton micro et ta cam\u00e9ra et utilise une connexion stable."
+    )
 
 
 def _members(db, campaign_id):
@@ -291,7 +319,11 @@ def _build(db, campaign, actor, payload):
                     "Merci de te présenter quelques minutes avant ton passage. "
                     "En cas d'empêchement, informe rapidement l'équipe de recrutement.\n\n"
                     "L’équipe de recrutement Enactus ESP")
-            if payload.action == "publish":
+            if new_mode == "online":
+                body = _insert_candidate_instructions(
+                    body, _online_candidate_instructions(app),
+                )
+            if payload.action in ("publish", "reminder"):
                 from app.services.recruitment_interview_outcomes import (
                     confirmed_absence_days, absence_limit,
                 )
