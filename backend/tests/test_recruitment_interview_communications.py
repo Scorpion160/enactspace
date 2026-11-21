@@ -124,3 +124,39 @@ class InterviewCommunicationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CandidateOnlineMailCopyTests(unittest.TestCase):
+    def test_portal_code_questionnaire_lobby_and_reconnect(self):
+        from types import SimpleNamespace
+        from app.services.recruitment_interview_communications import (
+            _online_candidate_instructions, _insert_candidate_instructions,
+            _validate_mail,
+        )
+        candidate=SimpleNamespace(tracking_code="ESP-TEST-123456")
+        instructions=_online_candidate_instructions(candidate)
+        self.assertIn("application-tracking",instructions)
+        self.assertIn(candidate.tracking_code,instructions)
+        self.assertIn("questionnaire",instructions)
+        self.assertIn("salle d'attente",instructions)
+        self.assertIn("connexion",instructions)
+        self.assertNotIn("meet-enactspace.kerunjombor.net",instructions)
+        body=_insert_candidate_instructions(
+            "Bonjour candidat.\n\nL\u2019\u00e9quipe de recrutement Enactus ESP",
+            instructions,
+        )
+        mail={
+            "email":"candidate@example.org","subject":"Enactus ESP \u2014 Entretien",
+            "body":body,
+        }
+        _validate_mail(mail)
+        self.assertIn(candidate.tracking_code,mail["html"])
+
+    def test_no_portal_instructions_without_tracking_code(self):
+        from types import SimpleNamespace
+        from app.services.recruitment_interview_communications import (
+            _online_candidate_instructions,
+        )
+        with self.assertRaises(HTTPException):
+            _online_candidate_instructions(SimpleNamespace(tracking_code=None))
