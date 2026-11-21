@@ -2098,3 +2098,6 @@ register_private_interview_proposals(router)
 
 from app.services.recruitment_interview_communications import register_interview_communications
 register_interview_communications(router)
+
+from app.services.recruitment_interview_outcomes import register_interview_outcomes
+register_interview_outcomes(router)

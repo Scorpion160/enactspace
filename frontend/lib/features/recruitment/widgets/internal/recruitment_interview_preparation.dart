@@ -4,6 +4,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
 import 'recruitment_collective_evaluation_dialog.dart';
 import 'recruitment_interview_attendance_dialog.dart';
+import 'recruitment_interview_outcome_dialog.dart';
 import 'recruitment_interview_communication_dialog.dart';
 import 'recruitment_private_proposal_dialog.dart';
 import 'recruitment_jury_kit_dialog.dart';
@@ -377,6 +378,19 @@ class _RecruitmentInterviewPreparationState
                           'no_show' => 'Absence signalée',
                           _ => 'Entretien à réaliser',
                         }, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        if ((row['confirmed_no_shows'] as num? ?? 0) > 0)
+                          Text(
+                            'Absences confirmées : ${row['confirmed_no_shows']} / ${row['absence_limit'] ?? 3}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        if (row['last_chance'] == true)
+                          const Text(
+                            'Dernière chance : prochaine absence à confirmer par la coordination',
+                          ),
+                        if (row['absence_decision_pending'] == true)
+                          const Text(
+                            'Limite d’absences atteinte : décision du responsable requise',
+                          ),
                         if (row['awaiting_candidate_notification'] == true)
                           const Text(
                             'Nouvel horaire interne · convocation non envoyée',
@@ -505,6 +519,8 @@ class _RecruitmentInterviewPreparationState
                                             'Candidat',
                                       );
                                   if (saved && context.mounted) {
+                                    await _load();
+                                    if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
@@ -516,6 +532,23 @@ class _RecruitmentInterviewPreparationState
                                 },
                                 icon: const Icon(Icons.fact_check_outlined),
                                 label: const Text('Présence / report'),
+                              ),
+                            if (_canManage)
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final saved =
+                                      await showInterviewOutcomeDialog(
+                                        context,
+                                        applicationId: row['application_id']
+                                            .toString(),
+                                        candidateName:
+                                            row['candidate_name']?.toString() ??
+                                            'Candidat',
+                                      );
+                                  if (saved && mounted) await _load();
+                                },
+                                icon: const Icon(Icons.person_off_outlined),
+                                label: const Text('Absences / désistement'),
                               ),
                             if (_canManage ||
                                 (row['effective_jury'] as List? ?? const [])
