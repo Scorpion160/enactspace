@@ -256,8 +256,8 @@ class _RecruitmentInterviewPreparationState
                 Expanded(
                   child: Text(
                     _canManage
-                        ? 'Entretiens en pr?paration'
-                        : 'Mes entretiens ? pr?parer',
+                        ? 'Entretiens en préparation'
+                        : 'Mes entretiens à préparer',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
