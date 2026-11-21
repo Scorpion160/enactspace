@@ -88,6 +88,14 @@ def _allowed_status(status, action):
     return status in {"interview", "interview_scheduled"}
 
 
+def _has_confirmed_realization(events):
+    """Missed appointments can be reprogrammed; completed ones cannot."""
+    return any(
+        (event.new_value or {}).get("status") in {"completed", "completed_pending_score"}
+        for event in events
+    )
+
+
 def _name(value):
     return f"{value.first_name} {value.last_name}".strip()
 
@@ -213,9 +221,10 @@ def _build(db, campaign, actor, payload):
                 AuditLog.action.in_(("entretien_presence_enregistree",
                                      "entretien_reel_confirme_par_organisateur")),
             ).all()
-            if existing_score or any((event.new_value or {}).get("status") in
-                                     {"completed", "completed_pending_score", "no_show"} for event in realized):
-                raise HTTPException(409, f"{_name(app)} : l'entretien est déjà marqué réalisé ou absent.")
+            if existing_score or _has_confirmed_realization(realized):
+                raise HTTPException(
+                    409, f"{_name(app)} : l'entretien est déjà marqué réalisé."
+                )
             if not within_windows(fetch_policy(db, campaign.id), new_start, new_end):
                 raise HTTPException(409, f"{_name(app)} : horaire hors des règles de campagne.")
             if len(new_jury) != 3 or len(set(new_jury)) != 3:
@@ -282,6 +291,23 @@ def _build(db, campaign, actor, payload):
                     "Merci de te présenter quelques minutes avant ton passage. "
                     "En cas d'empêchement, informe rapidement l'équipe de recrutement.\n\n"
                     "L’équipe de recrutement Enactus ESP")
+            if payload.action == "publish":
+                from app.services.recruitment_interview_outcomes import (
+                    confirmed_absence_days, absence_limit,
+                )
+                misses = len(confirmed_absence_days(db, app.id))
+                if misses >= absence_limit(campaign) - 1:
+                    warning = (
+                        "Ce rendez-vous constitue ta dernière chance "
+                        "de passer l'entretien. Une nouvelle absence "
+                        "confirmée pourra conduire à une exclusion "
+                        "après vérification et décision "
+                        "de l'équipe de recrutement."
+                    )
+                    signature = "\n\nL’équipe de recrutement Enactus ESP"
+                    if not body.endswith(signature):
+                        raise HTTPException(409, "Signature de convocation invalide.")
+                    body = body[:-len(signature)] + "\n\n" + warning + signature
             subject = {"publish": "Confirmation ou reprogrammation de ton entretien",
                        "venue": "Lieu de ton entretien",
                        "reminder": "Rappel de ton entretien"}[payload.action]
@@ -329,7 +355,7 @@ def _build(db, campaign, actor, payload):
             for right in changes[i + 1:]:
                 if (left["new"] < right["end"] and right["new"] < left["end"]
                         and set(left["new_jury"]) & set(right["new_jury"])):
-                    raise HTTPException(409, "Un jur? figure dans deux entretiens simultan?s.")
+                    raise HTTPException(409, "Un juré figure dans deux entretiens simultanés.")
     # One individual email per juror, no ambiguous duplicate recipients.
     if len({(m["kind"], m["email"]) for m in notices}) != len(notices):
         raise HTTPException(409, "Deux comptes destinataires utilisent la même adresse.")
