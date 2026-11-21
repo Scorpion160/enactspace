@@ -25,6 +25,7 @@ class ApplicationTrackingModel {
   final DateTime? personalityDueAt;
   final String? screeningResult;
   final bool enactmeetAvailable;
+  final String? enactmeetAccessState;
   final RecruitmentScheduleModel? selectionSchedule;
 
   const ApplicationTrackingModel({
@@ -50,6 +51,7 @@ class ApplicationTrackingModel {
     this.personalityDueAt,
     this.screeningResult,
     this.enactmeetAvailable = false,
+    this.enactmeetAccessState,
     this.selectionSchedule,
   });
 
@@ -57,7 +59,10 @@ class ApplicationTrackingModel {
     return ApplicationTrackingModel(
       screeningResult: json['screening_result']?.toString(),
       enactmeetAvailable: json['enactmeet_available'] == true,
-      selectionSchedule: RecruitmentScheduleModel.fromJson(json['selection_schedule']),
+      enactmeetAccessState: json['enactmeet_access_state']?.toString(),
+      selectionSchedule: RecruitmentScheduleModel.fromJson(
+        json['selection_schedule'],
+      ),
       applicationId: json['application_id']?.toString() ?? '',
       trackingCode: json['tracking_code']?.toString() ?? '',
       campaignTitle: json['campaign_title']?.toString() ?? 'Recrutement',
@@ -88,8 +93,10 @@ class ApplicationTrackingModel {
       return const ApplicationStatusPresentation(
         status: 'rejected',
         title: 'Dossier non retenu',
-        explanation: 'La sélection s’arrête après l’étude de ton dossier pour cette campagne.',
-        nextAction: 'Merci pour le temps consacré à ta candidature. Tu peux suivre les prochaines campagnes et les activités du club.',
+        explanation:
+            'La sélection s’arrête après l’étude de ton dossier pour cette campagne.',
+        nextAction:
+            'Merci pour le temps consacré à ta candidature. Tu peux suivre les prochaines campagnes et les activités du club.',
         timelineStep: 2,
         icon: Icons.info_outline_rounded,
         terminalException: true,
@@ -100,7 +107,8 @@ class ApplicationTrackingModel {
         status: 'under_review',
         title: 'Dossier retenu',
         explanation: 'Ton dossier est retenu pour un entretien avec l’équipe.',
-        nextAction: 'Les informations de l’entretien te seront communiquées dans le suivi et par e-mail.',
+        nextAction:
+            'Les informations de l’entretien te seront communiquées dans le suivi et par e-mail.',
         timelineStep: 2,
         icon: Icons.fact_check_outlined,
       );

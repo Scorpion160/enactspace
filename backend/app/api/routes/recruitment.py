@@ -1139,6 +1139,14 @@ def track_application(
         and attempt is not None and attempt.submitted_at is not None
         and candidate_interview_room(db, application) is not None
     )
+    from app.services.recruitment_meetings import candidate_enactmeet_access_state
+    enactmeet_access_state = candidate_enactmeet_access_state(
+        status=normalized_status,
+        mode=application.interview_mode,
+        released=candidate_interview_released(campaign, application),
+        meeting=candidate_interview_room(db, application),
+        questionnaire_submitted=bool(attempt and attempt.submitted_at),
+    )
     db.commit()
     next_step = APPLICATION_TRACKING_NEXT_STEPS.get(normalized_status, "Votre dossier est en cours de traitement.")
     candidate_message = APPLICATION_TRACKING_MESSAGES.get(normalized_status)
@@ -1165,6 +1173,7 @@ def track_application(
         "screening_result": screening_result,
         "selection_schedule": public_deposit_dates(campaign),
         "enactmeet_available": enactmeet_available,
+        "enactmeet_access_state": enactmeet_access_state,
         "result_published_at": published_at,
         "submitted_at": application.created_at,
         "updated_at": application.updated_at,

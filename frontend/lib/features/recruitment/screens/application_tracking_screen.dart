@@ -110,8 +110,38 @@ class _ApplicationTrackingScreenState extends State<ApplicationTrackingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           TrackingResultView(tracking: _tracking!),
+                          if (_tracking!.enactmeetAccessState ==
+                              'questionnaire_required')
+                            const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  'Avant de rejoindre ton entretien en ligne, '
+                                  'tu dois envoyer le questionnaire de recrutement. '
+                                  'Ouvre le questionnaire ci-dessous, valide tes r?ponses, '
+                                  'puis consulte ? nouveau ton dossier. '
+                                  'Si tu rencontres une difficult?, contacte '
+                                  'l??quipe recrutement avant ton rendez-vous.',
+                                ),
+                              ),
+                            ),
+                          if (_tracking!.enactmeetAccessState ==
+                              'pending_publication')
+                            const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  'Ton entretien en ligne est en pr?paration. '
+                                  'L?acc?s ? la salle sera disponible apr?s validation '
+                                  'de ton rendez-vous par l??quipe recrutement.',
+                                ),
+                              ),
+                            ),
                           if (_tracking!.enactmeetAvailable)
-                            CandidateInterviewButton(code: _tracking!.trackingCode, email: _tracking!.email),
+                            CandidateInterviewButton(
+                              code: _tracking!.trackingCode,
+                              email: _tracking!.email,
+                            ),
                           if (_tracking!.personalityStatus != null &&
                               (widget.personalityGateway != null ||
                                   _gateway is RecruitmentPublicGateway))
@@ -433,7 +463,8 @@ class TrackingResultView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ApplicationTimeline(tracking: tracking),
-              if (tracking.selectionSchedule != null && tracking.screeningResult != 'not_shortlisted') ...[
+              if (tracking.selectionSchedule != null &&
+                  tracking.screeningResult != 'not_shortlisted') ...[
                 const SizedBox(height: 18),
                 RecruitmentScheduleCard(schedule: tracking.selectionSchedule!),
               ],
