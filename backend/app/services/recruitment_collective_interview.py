@@ -4,7 +4,7 @@ The source of truth for each score is the seven-criterion interview workbook.
 English is a separate training indicator, never added to the general ranking.
 """
 from uuid import UUID
-from datetime import date as CalendarDate
+from datetime import date as CalendarDate, timedelta
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field, ConfigDict, StrictInt, model_validator
 from sqlalchemy.orm import Session
@@ -329,6 +329,24 @@ def register_collective_interview(router):
         if not actual:
             raise HTTPException(409, "Aucun jury n'est rattaché à cet entretien.")
         changed = set(actual) != set(previous)
+        if payload.status == "no_show":
+            # Never infer a no-show just because an appointment has expired.
+            # A jury member must explicitly record the missed interview.
+            if app.status != "interview_scheduled" or not app.interview_at:
+                raise HTTPException(409, "Aucun entretien actif ? d?clarer absent.")
+            actual_day = payload.actual_day or app.interview_at.date()
+            if actual_day > utc_now().date():
+                raise HTTPException(409, "Une absence future ne peut pas ?tre confirm?e.")
+            if actual_day == app.interview_at.date() and (
+                (app.interview_end_at or (app.interview_at + timedelta(minutes=20))) > utc_now()
+            ):
+                raise HTTPException(409, "Attends la fin du rendez-vous avant de confirmer l'absence.")
+            if actual_day != app.interview_at.date() and not manager:
+                raise HTTPException(403, "Un historique d'absence ne peut ?tre corrig? que par la coordination.")
+            if _review(db, app.id) is not None:
+                existing = _review(db, app.id)
+                if existing is not None and existing.score is not None:
+                    raise HTTPException(409, "Un entretien not? ne peut pas ?tre marqu? absent.")
         if changed and (not manager or not payload.reason.strip()):
             raise HTTPException(403, "Seul un responsable peut valider un remplacement motivé.")
         if changed:
@@ -342,7 +360,11 @@ def register_collective_interview(router):
                 raise HTTPException(409, "Un juré indiqué n'est pas habilité.")
         value = {
             "status": payload.status,
-            "actual_day": payload.actual_day.isoformat() if payload.actual_day else None,
+            "actual_day": (
+                (payload.actual_day or app.interview_at.date()).isoformat()
+                if payload.status == "no_show" and app.interview_at
+                else payload.actual_day.isoformat() if payload.actual_day else None
+            ),
             "actual_jury_member_ids": [str(x) for x in actual],
             "reason": payload.reason.strip(),
             "public_schedule_changed": False,

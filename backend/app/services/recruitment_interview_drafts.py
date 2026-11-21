@@ -241,6 +241,23 @@ def _readable_rows(db, campaign, actor):
             ApplicationPersonality.application_id.in_([row.application_id for row in visible])
         ).all()
     }
+    # Absence counters use explicit historical evidence, not elapsed clock time.
+    from app.services.recruitment_interview_outcomes import (
+        _absence_days_from_events, absence_limit,
+    )
+    absence_logs = db.query(AuditLog).filter(
+        AuditLog.entity_type == "application",
+        AuditLog.entity_id.in_([row.application_id for row in visible]),
+    ).all()
+    historical_absences = {}
+    for event in absence_logs:
+        historical_absences.setdefault(event.entity_id, []).append(event)
+    no_show_days = {
+        aid: _absence_days_from_events(events)
+        for aid, events in historical_absences.items()
+    }
+    max_no_shows = absence_limit(campaign)
+
     scored = {
         review.application_id: float(review.score)
         for review in db.query(ApplicationReview).filter(
@@ -293,6 +310,15 @@ def _readable_rows(db, campaign, actor):
             "draft_only": not communicated,
             "operational_status": status,
             "score_recorded": row.application_id in scored,
+            "confirmed_no_shows": len(no_show_days.get(row.application_id, [])),
+            "last_chance": (
+                len(no_show_days.get(row.application_id, [])) == max_no_shows - 1
+            ),
+            "absence_limit": max_no_shows,
+            "absence_decision_pending": (
+                len(no_show_days.get(row.application_id, [])) >= max_no_shows
+                and app.status == "interview_scheduled"
+            ),
             "interview_score": scored.get(row.application_id),
             "awaiting_score": status == "completed" and row.application_id not in scored,
             "official_starts_at": published,
