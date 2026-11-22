@@ -1,8 +1,10 @@
 """Shortlist remains ranked, confidential and independent of interview outcomes."""
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+from fastapi import HTTPException
 
 from app.services import recruitment_selection as selection
 
@@ -66,6 +68,34 @@ class RecruitmentShortlistTests(unittest.TestCase):
             self.campaign.identities_revealed_at = "date"
             self.assertEqual(selection.screening_shortlist_rows(
                 [a], reviews, self.campaign)[0]["candidate_name"], "Awa Test")
+
+    def test_jury_ranking_access_is_scoped_to_active_campaign_jurors(self):
+        campaign_id = uuid4()
+        user = SimpleNamespace(id=uuid4())
+        campaign = SimpleNamespace(selection_policy_version=selection.POLICY_VERSION)
+        db = MagicMock()
+        db.get.return_value = campaign
+
+        with patch.object(selection, "can_manage_jury", return_value=False), \
+             patch.object(selection, "active_jury_member", return_value=True) as member:
+            self.assertIs(selection._ranking_reader_campaign(db, user, campaign_id), campaign)
+            member.assert_called_once_with(db, user, campaign_id)
+
+        with patch.object(selection, "can_manage_jury", return_value=True), \
+             patch.object(selection, "active_jury_member", return_value=False):
+            self.assertIs(selection._ranking_reader_campaign(db, user, campaign_id), campaign)
+
+        # Campaign readers and unaffiliated jurors do not receive ranking access.
+        with patch.object(selection, "can_manage_jury", return_value=False), \
+             patch.object(selection, "active_jury_member", return_value=False):
+            with self.assertRaises(HTTPException) as denied:
+                selection._ranking_reader_campaign(db, user, campaign_id)
+            self.assertEqual(denied.exception.status_code, 403)
+
+        db.get.return_value = None
+        with self.assertRaises(HTTPException) as missing:
+            selection._ranking_reader_campaign(db, user, campaign_id)
+        self.assertEqual(missing.exception.status_code, 404)
 
     def test_missing_scores_are_last_without_inventing_notes(self):
         a = candidate("Awa", "shortlisted")
