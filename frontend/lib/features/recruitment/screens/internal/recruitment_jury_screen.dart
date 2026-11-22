@@ -10,6 +10,7 @@ import '../../services/recruitment_message.dart';
 import '../../widgets/internal/jury_teams_section.dart';
 import '../../widgets/internal/recruitment_interview_preparation.dart';
 import '../../widgets/internal/recruitment_jury_policy_panel.dart';
+import '../../widgets/internal/recruitment_shortlist_panel.dart';
 import '../../widgets/internal/recruitment_viewers_section.dart';
 
 class RecruitmentJuryScreen extends StatefulWidget {
@@ -198,6 +199,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
             ),
           );
     final canManage = _roster?['can_manage'] == true;
+    final canViewRanking = _roster?['can_view_ranking'] == true;
     final teams = (_roster?['teams'] as List? ?? const [])
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
@@ -219,6 +221,7 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
         (0, 'Mes entretiens', Icons.assignment_ind_outlined),
       (1, 'Équipes', Icons.groups_outlined),
       (2, 'Membres', Icons.people_outline_rounded),
+      if (canViewRanking) (5, 'Classement', Icons.leaderboard_outlined),
       if (canManage) (4, 'Organisation', Icons.calendar_month_outlined),
       if (canManage) (3, 'Accès', Icons.admin_panel_settings_outlined),
     ];
@@ -369,6 +372,16 @@ class _RecruitmentJuryScreenState extends State<RecruitmentJuryScreen> {
                     key: ValueKey('interview-drafts-$_campaign'),
                     campaignId: _campaign!,
                     onOpenApplication: widget.onOpenApplication,
+                  ),
+                if (selected == 5 && canViewRanking && _campaign != null)
+                  RecruitmentShortlistPanel(
+                    key: ValueKey('jury-ranking-$_campaign'),
+                    campaignId: _campaign!,
+                    refreshToken: 0,
+                    initiallyExpanded: true,
+                    onOpen: widget.onOpenApplication == null
+                        ? null
+                        : (id) { widget.onOpenApplication!(id); },
                   ),
                 if (selected == 1 && _campaign != null) ...[
                   Card(
