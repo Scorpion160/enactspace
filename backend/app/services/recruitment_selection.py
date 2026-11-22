@@ -375,6 +375,18 @@ def _manager_campaign(db, user, campaign_id):
     return campaign
 
 
+def _ranking_reader_campaign(db, user, campaign_id):
+    """Permit read-only ranking access to jury managers and active campaign jurors."""
+    campaign = db.get(RecruitmentCampaign, campaign_id)
+    if campaign is None:
+        raise HTTPException(404, "Campagne introuvable")
+    if not (can_manage_jury(db, user) or active_jury_member(db, user, campaign_id)):
+        raise HTTPException(403, "Le classement est réservé aux responsables et aux jurés actifs de cette campagne.")
+    if not uses_blind_selection(campaign):
+        raise HTTPException(409, "Cette campagne historique utilise un processus déjà terminé.")
+    return campaign
+
+
 def selection_overview(db, campaign):
     applications = db.query(Application).filter(
         Application.campaign_id == campaign.id, Application.status != "cancelled",
@@ -600,7 +612,7 @@ def register_recruitment_selection(router):
     @router.get("/campaigns/{campaign_id}/selection/shortlist")
     def shortlisted_candidates(campaign_id: UUID, db=Depends(get_db),
                                user=Depends(require_recruitment_access)):
-        campaign = _manager_campaign(db, user, campaign_id)
+        campaign = _ranking_reader_campaign(db, user, campaign_id)
         return selection_shortlist(db, campaign)
 
     @router.post("/campaigns/{campaign_id}/selection/assign")
