@@ -27,7 +27,7 @@ from app.services.recruitment_access import (
     can_manage_jury, eligible_juror, require_campaign_access,
 )
 from app.services.recruitment_interview_policy import (
-    fetch_policy, juror_available, within_windows,
+    fetch_policy, require_juror_window, within_windows,
 )
 from app.services.recruitment_interviews import (
     department_key, effective_interview_end,
@@ -47,6 +47,7 @@ class PrivateProposalSave(BaseModel):
     location: str | None = Field(default=None, max_length=180)
     jury_member_ids: list[UUID] = Field(min_length=1, max_length=6)
     reason: str = Field(min_length=3, max_length=900)
+    confirm_unrecorded_jury_availability: bool = False
 
     @model_validator(mode="after")
     def valid(self):
@@ -86,10 +87,11 @@ def check_private_proposal(db, campaign, app, proposal):
             user.id, start, proposal.mode, blackouts, remote_only,
         ):
             raise HTTPException(409, f"{user.first_name} {user.last_name} est indisponible ou à distance uniquement.")
-        if user.id not in availabilities or not juror_available(
-            availabilities[user.id], start, end,
-        ):
-            raise HTTPException(409, f"Disponibilités non confirmées pour {user.first_name} {user.last_name}.")
+        require_juror_window(
+            availabilities, user.id, start, end,
+            manager_confirmed_missing=proposal.confirm_unrecorded_jury_availability,
+            display_name=f"{user.first_name} {user.last_name}",
+        )
         if app.email and user.email and user.email.strip().casefold() == app.email.strip().casefold():
             raise HTTPException(409, "Un juré ne peut pas évaluer sa propre candidature.")
     deps = [department_key(user.department) for _, user in members]
@@ -198,6 +200,8 @@ def register_private_interview_proposals(router):
                 "reason": payload.reason,
                 "exceptional_jury": exceptional,
                 "candidate_confirmation_pending": True,
+                "unrecorded_jury_availability_confirmed_by_manager":
+                    payload.confirm_unrecorded_jury_availability,
                 "official_appointment_unchanged": True,
                 "notifications_sent": 0,
             },

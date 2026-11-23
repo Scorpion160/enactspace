@@ -11,6 +11,8 @@ Future<bool> showInterviewCommunicationDialog(
   String? applicationId,
   String? candidateName,
   DateTime? proposedDay,
+  String initialAction = 'reminder',
+  bool candidateOnly = false,
 }) async {
   final token = await AuthService().getToken();
   if (token == null || !context.mounted) return false;
@@ -19,7 +21,10 @@ Future<bool> showInterviewCommunicationDialog(
   final reason = TextEditingController();
   final fromTime = TextEditingController(text: '00:00');
   final untilTime = TextEditingController(text: '23:59');
-  var action = 'reminder';
+  var action = const {'publish', 'venue', 'reminder'}.contains(initialAction)
+      ? initialAction
+      : 'reminder';
+  var confirmUnrecordedAvailability = false;
   var dayMode = applicationId == null;
   var day = proposedDay ?? DateTime.now();
   var toCandidates = true;
@@ -45,6 +50,8 @@ Future<bool> showInterviewCommunicationDialog(
     'exception_reason': action != 'publish' || reason.text.trim().isEmpty
         ? null
         : reason.text.trim(),
+    'confirm_unrecorded_jury_availability':
+        action == 'publish' && confirmUnrecordedAvailability,
     'send_candidates': toCandidates,
     'send_jurors': toJurors,
   };
@@ -226,7 +233,7 @@ Future<bool> showInterviewCommunicationDialog(
                           },
                   ),
                   const SizedBox(height: 8),
-                  if (applicationId != null)
+                  if (applicationId != null && !candidateOnly)
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: dayMode,
@@ -301,7 +308,7 @@ Future<bool> showInterviewCommunicationDialog(
                       onChanged: (_) => invalidate(),
                     ),
                   ],
-                  if (action == 'publish')
+                  if (action == 'publish') ...[
                     TextField(
                       controller: reason,
                       enabled: !loading,
@@ -311,6 +318,26 @@ Future<bool> showInterviewCommunicationDialog(
                       ),
                       onChanged: (_) => invalidate(),
                     ),
+                    CheckboxListTile(
+                      key: const Key('confirm-unrecorded-jury-availability-publication'),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Je confirme la disponibilité des jurés sans calendrier renseigné',
+                      ),
+                      subtitle: const Text(
+                        'Une indisponibilité déjà enregistrée reste bloquante.',
+                      ),
+                      value: confirmUnrecordedAvailability,
+                      onChanged: loading
+                          ? null
+                          : (value) {
+                              update(() =>
+                                  confirmUnrecordedAvailability = value ?? false);
+                              invalidate();
+                            },
+                    ),
+                  ],
                   CheckboxListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
