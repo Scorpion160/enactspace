@@ -1102,3 +1102,108 @@ class _EditMeetingSheetState extends State<_EditMeetingSheet> {
     return '$day/$month · $hour:$minute';
   }
 }
+
+
+class _ExternalGuestSelection {
+  final String email;
+  final String? name;
+  const _ExternalGuestSelection(this.email, this.name);
+}
+
+class _ExternalGuestInviteDialog extends StatefulWidget {
+  const _ExternalGuestInviteDialog();
+
+  @override
+  State<_ExternalGuestInviteDialog> createState() =>
+      _ExternalGuestInviteDialogState();
+}
+
+class _ExternalGuestInviteDialogState extends State<_ExternalGuestInviteDialog> {
+  final _form = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Inviter une personne externe'),
+    content: SizedBox(
+      width: 480,
+      child: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'La personne recevra un lien personnel par e-mail. '
+              'Elle rejoindra EnactMeet dans son navigateur, '
+              'sans créer de compte EnactSpace.',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('meeting-guest-email'),
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Adresse e-mail',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                final email = (value ?? '').trim();
+                if (!RegExp(r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+                    .hasMatch(email)) {
+                  return 'Saisis une adresse e-mail valide.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const Key('meeting-guest-name'),
+              controller: _name,
+              maxLength: 160,
+              decoration: const InputDecoration(
+                labelText: 'Nom de la personne (facultatif)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'La salle d’attente sera activée. '
+              'L’invité aura uniquement le rôle de participant. '
+              'L’e-mail ne sera envoyé qu’après confirmation.',
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton.icon(
+        onPressed: () {
+          if (!_form.currentState!.validate()) return;
+          final name = _name.text.trim();
+          Navigator.pop(
+            context,
+            _ExternalGuestSelection(
+              _email.text.trim(),
+              name.isEmpty ? null : name,
+            ),
+          );
+        },
+        icon: const Icon(Icons.send_outlined),
+        label: const Text("Envoyer l'invitation"),
+      ),
+    ],
+  );
+}
