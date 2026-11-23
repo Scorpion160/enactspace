@@ -44,6 +44,18 @@ class InterviewCommunicationTests(unittest.TestCase):
                 location="Salle CRENT", send_candidates=False, send_jurors=True,
             )
 
+    def test_unrecorded_availability_attestation_is_off_by_default(self):
+        candidate = uuid4()
+        standard = InterviewCommunicationRequest(
+            action="publish", application_ids=[candidate],
+        )
+        self.assertFalse(standard.confirm_unrecorded_jury_availability)
+        manager_reviewed = InterviewCommunicationRequest(
+            action="publish", application_ids=[candidate],
+            confirm_unrecorded_jury_availability=True,
+        )
+        self.assertTrue(manager_reviewed.confirm_unrecorded_jury_availability)
+
     def test_first_publication_allows_shortlisted_unpublished_dossier(self):
         self.assertTrue(_allowed_status("under_review", "publish"))
         self.assertFalse(_allowed_status("under_review", "reminder"))
