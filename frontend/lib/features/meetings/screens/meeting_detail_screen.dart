@@ -1145,6 +1145,7 @@ class _ExternalGuestInviteDialogState extends State<_ExternalGuestInviteDialog> 
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     title: const Text('Inviter une personne externe'),
     content: SizedBox(
       width: 480,
