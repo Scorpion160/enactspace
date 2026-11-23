@@ -270,7 +270,9 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
       'Le lien personnel de ${guest.displayName} sera désactivé. '
           'Une personne déjà connectée devra être retirée de la salle par un modérateur.',
       'Révoquer',
-    )) return;
+    )) {
+      return;
+    }
     setState(() => _actionBusy = true);
     try {
       await _service.revokeExternalGuest(widget.meetingId, guest.id);
