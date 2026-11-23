@@ -98,6 +98,21 @@ def juror_available(windows, start, end):
     return any(w["start"] <= begin and finish <= w["end"] for w in eligible)
 
 
+def require_juror_window(availability_by_user, user_id, start, end, *,
+                         manager_confirmed_missing=False, display_name="Juré"):
+    """Recorded unavailability always blocks; missing records need manager attestation."""
+    if user_id not in availability_by_user:
+        if not manager_confirmed_missing:
+            raise HTTPException(
+                409,
+                f"Disponibilités non renseignées pour {display_name}. "
+                "Confirme explicitement sa disponibilité avant de poursuivre.",
+            )
+        return
+    if not juror_available(availability_by_user[user_id], start, end):
+        raise HTTPException(409, f"{display_name} est indisponible sur ce créneau.")
+
+
 def can_manage(db,campaign_id,actor):
     campaign=db.get(RecruitmentCampaign,campaign_id)
     if not campaign:raise HTTPException(404,"Campagne introuvable.")
