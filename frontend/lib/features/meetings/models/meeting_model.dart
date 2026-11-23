@@ -141,6 +141,16 @@ class MeetingExternalGuestModel {
     required this.emailStatus,
   });
 
+  String get emailStatusLabel => switch (emailStatus) {
+    'sent' => 'E-mail envoyé',
+    'pending' => 'E-mail en attente',
+    'processing' => 'Envoi en cours',
+    'retry' => 'Nouvelle tentative',
+    'dead' => 'Échec de l’envoi',
+    'cancelled' => 'Envoi annulé',
+    _ => 'Statut d’envoi indisponible',
+  };
+
   factory MeetingExternalGuestModel.fromJson(Map<String, dynamic> json) =>
       MeetingExternalGuestModel(
         id: json['id']?.toString() ?? '',
