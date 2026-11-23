@@ -1157,7 +1157,57 @@ class _ExternalGuestInviteDialogState extends State<_ExternalGuestInviteDialog> 
               ),
               validator: (value) {
                 final email = (value ?? '').trim();
-                if (!RegExp(r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+                if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+
+                    .hasMatch(email)) {
+                  return 'Saisis une adresse e-mail valide.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const Key('meeting-guest-name'),
+              controller: _name,
+              maxLength: 160,
+              decoration: const InputDecoration(
+                labelText: 'Nom de la personne (facultatif)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'La salle d’attente sera activée. '
+              'L’invité aura uniquement le rôle de participant. '
+              'L’e-mail ne sera envoyé qu’après confirmation.',
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton.icon(
+        onPressed: () {
+          if (!_form.currentState!.validate()) return;
+          final name = _name.text.trim();
+          Navigator.pop(
+            context,
+            _ExternalGuestSelection(
+              _email.text.trim(),
+              name.isEmpty ? null : name,
+            ),
+          );
+        },
+        icon: const Icon(Icons.send_outlined),
+        label: const Text("Envoyer l'invitation"),
+      ),
+    ],
+  );
+}
+)
                     .hasMatch(email)) {
                   return 'Saisis une adresse e-mail valide.';
                 }
