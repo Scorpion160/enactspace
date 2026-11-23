@@ -11,7 +11,8 @@ from app.models.recruitment_interview_policy import RecruitmentJuryAvailability
 from app.models.user import User
 from pydantic import ValidationError
 from app.services.recruitment_interview_policy import (
-    PolicySave, AvailabilitySave, fetch_policy, within_windows, juror_available, register_interview_policy, DEFAULT_WINDOWS,
+    PolicySave, AvailabilitySave, fetch_policy, within_windows, juror_available,
+    require_juror_window, register_interview_policy, DEFAULT_WINDOWS,
 )
 
 class RecruitmentInterviewPolicyTests(unittest.TestCase):
@@ -66,6 +67,38 @@ class RecruitmentInterviewPolicyTests(unittest.TestCase):
         self.assertTrue(juror_available(windows,midday,midday+timedelta(minutes=20)))
         next_tuesday=start+timedelta(days=7)
         self.assertTrue(juror_available(windows,next_tuesday,next_tuesday+timedelta(minutes=20)))
+
+    def test_unrecorded_juror_window_requires_manager_attestation(self):
+        juror = uuid4()
+        start = datetime(2026, 11, 23, 12, 30)
+        end = start + timedelta(minutes=20)
+        with self.assertRaises(HTTPException) as denied:
+            require_juror_window(
+                {}, juror, start, end,
+                manager_confirmed_missing=False, display_name="Juré A",
+            )
+        self.assertEqual(denied.exception.status_code, 409)
+        require_juror_window(
+            {}, juror, start, end,
+            manager_confirmed_missing=True, display_name="Juré A",
+        )
+
+    def test_known_unavailability_cannot_be_overridden(self):
+        juror = uuid4()
+        start = datetime(2026, 11, 23, 12, 30)
+        end = start + timedelta(minutes=20)
+        unavailable = {juror: [{"weekday": 0, "start": "19:00", "end": "21:00"}]}
+        with self.assertRaises(HTTPException) as denied:
+            require_juror_window(
+                unavailable, juror, start, end,
+                manager_confirmed_missing=True, display_name="Juré A",
+            )
+        self.assertEqual(denied.exception.status_code, 409)
+        allowed = {juror: [{"weekday": 0, "start": "12:30", "end": "14:00"}]}
+        require_juror_window(
+            allowed, juror, start, end,
+            manager_confirmed_missing=False, display_name="Juré A",
+        )
 
     def test_updating_availability_cannot_break_saved_interview_draft(self):
         routes = {}
