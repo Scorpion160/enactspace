@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.roles import ENACCHEF_ROLES, GLOBAL_MANAGEMENT_ROLES
 from app.core.time import utc_now
 from app.db.database import get_db
-from app.models.meeting import Meeting, MeetingMember
+from app.models.meeting import Meeting, MeetingMember, MeetingGuestInvitation
 from app.models.notification import Notification
 from app.models.pole import PoleMember
 from app.models.project import ProjectMember
@@ -154,9 +154,16 @@ def _require_manage(db: Session, meeting: Meeting, user: User) -> None:
 def _meeting_payload(db: Session, meeting: Meeting, user: User) -> MeetingRead:
     member = _member(db, meeting, user.id)
     is_recruitment_interview = _interview_application_id(db, meeting) is not None
-    invited_count = db.query(MeetingMember.id).filter(
-        MeetingMember.meeting_id == meeting.id
-    ).count()
+    invited_count = (
+        db.query(MeetingMember.id).filter(
+            MeetingMember.meeting_id == meeting.id
+        ).count()
+        + db.query(MeetingGuestInvitation.id).filter(
+            MeetingGuestInvitation.meeting_id == meeting.id,
+            MeetingGuestInvitation.revoked_at.is_(None),
+            MeetingGuestInvitation.expires_at > utc_now(),
+        ).count()
+    )
     joined_count = db.query(MeetingMember.id).filter(
         MeetingMember.meeting_id == meeting.id,
         MeetingMember.joined_at.is_not(None),
@@ -181,6 +188,7 @@ def _meeting_payload(db: Session, meeting: Meeting, user: User) -> MeetingRead:
         lobby_enabled=meeting.lobby_enabled,
         recording_enabled=meeting.recording_enabled,
         can_manage=_can_manage(db, meeting, user),
+        can_invite_external=not is_recruitment_interview and _open_recruitment_campaign(db, meeting) is None,
         can_delete=not is_recruitment_interview and _can_delete(db, meeting, user),
         is_recruitment_interview=is_recruitment_interview,
         current_user_role=(
@@ -404,6 +412,16 @@ def update_meeting(
     if meeting.status in {"ended", "cancelled"}:
         raise HTTPException(status_code=409, detail="Cette réunion est clôturée")
     changes = payload.model_dump(exclude_unset=True)
+    if changes.get("lobby_enabled") is False:
+        active_guests = db.query(MeetingGuestInvitation.id).filter(
+            MeetingGuestInvitation.meeting_id == meeting.id,
+            MeetingGuestInvitation.revoked_at.is_(None),
+            MeetingGuestInvitation.expires_at > utc_now(),
+        ).first()
+        if active_guests:
+            raise HTTPException(
+                409, "La salle d'attente est obligatoire tant qu'une invitation externe est active."
+            )
     for key, value in changes.items():
         if key in {"title", "description"} and isinstance(value, str):
             value = value.strip()
@@ -734,3 +752,8 @@ def delete_meeting(
     db.delete(meeting)
     db.commit()
     return {"ok": True}
+
+
+# Invited externals join Jitsi via one revocable email link; no EnactSpace login.
+from app.services.meeting_guest_invitations import register_guest_meeting_routes
+register_guest_meeting_routes(router)

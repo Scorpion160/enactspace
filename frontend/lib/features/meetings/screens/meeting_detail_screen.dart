@@ -33,6 +33,8 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
       widget.membersService ?? MembersService();
   MeetingModel? _meeting;
   List<MeetingMemberModel> _members = const [];
+  List<MeetingExternalGuestModel> _externalGuests = const [];
+  String? _guestError;
   bool _loading = true;
   String? _error;
   bool _actionBusy = false;
@@ -55,9 +57,22 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         _service.listMembers(widget.meetingId),
       ]);
       if (!mounted) return;
+      final meeting = results[0] as MeetingModel;
+      List<MeetingExternalGuestModel> guests = const [];
+      String? guestError;
+      if (meeting.canManage && meeting.canInviteExternal) {
+        try {
+          guests = await _service.listExternalGuests(widget.meetingId);
+        } catch (_) {
+          guestError = "Impossible de charger les invitations externes.";
+        }
+      }
+      if (!mounted) return;
       setState(() {
-        _meeting = results[0] as MeetingModel;
+        _meeting = meeting;
         _members = results[1] as List<MeetingMemberModel>;
+        _externalGuests = guests;
+        _guestError = guestError;
         _loading = false;
       });
     } catch (error) {
@@ -111,6 +126,8 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
               canDelete: meeting.canDelete,
               isRecruitmentInterview: meeting.isRecruitmentInterview,
               onInvite: _invite,
+              onInviteExternal: _inviteExternal,
+              canInviteExternal: meeting.canInviteExternal,
               onSettings: _openSettings,
               onEnd: meeting.isLive ? _end : null,
               onCancel: meeting.isScheduled && !meeting.isRecruitmentInterview
@@ -136,6 +153,49 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
             const Text('Aucun participant enregistré.')
           else
             for (final member in _members) _MemberTile(member: member),
+          if (meeting.canManage && meeting.canInviteExternal) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'Invités externes',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Ces personnes reçoivent un lien personnel par e-mail, sans compte EnactSpace.',
+            ),
+            const SizedBox(height: 8),
+            if (_guestError != null)
+              Row(
+                children: [
+                  Expanded(child: Text(_guestError!)),
+                  TextButton(
+                    onPressed: _load,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              )
+            else if (_externalGuests.isEmpty)
+              const Text('Aucune invitation externe enregistrée.')
+            else
+              for (final guest in _externalGuests)
+                ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.mail_outline_rounded),
+                  ),
+                  title: Text(guest.displayName),
+                  subtitle: Text(
+                    '${guest.email} · ${guest.active ? "Invitation active" : "Invitation expirée ou révoquée"}'
+                    ' · ${guest.emailStatusLabel}',
+                  ),
+                  trailing: guest.active
+                      ? IconButton(
+                          tooltip: "Révoquer l'invitation",
+                          onPressed: _actionBusy ? null : () => _revokeExternal(guest),
+                          icon: const Icon(Icons.person_remove_alt_1_outlined),
+                        )
+                      : null,
+                ),
+          ],
         ],
       ),
     );
@@ -174,6 +234,50 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     } catch (error) {
       if (!mounted) return;
       _snack(_message(error));
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _inviteExternal() async {
+    if (PreviewModeScope.block(context) || _actionBusy) return;
+    final entry = await showDialog<_ExternalGuestSelection>(
+      context: context,
+      builder: (context) => const _ExternalGuestInviteDialog(),
+    );
+    if (entry == null || !mounted) return;
+    setState(() => _actionBusy = true);
+    try {
+      await _service.inviteExternalGuest(
+        widget.meetingId,
+        email: entry.email,
+        displayName: entry.name,
+      );
+      await _load();
+      if (mounted) {
+        _snack('Invitation préparée pour ${entry.email}. Vérifie son statut dans la liste.');
+      }
+    } catch (error) {
+      if (mounted) _snack(_message(error));
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _revokeExternal(MeetingExternalGuestModel guest) async {
+    if (_actionBusy || !await _confirm(
+      'Révoquer cette invitation ?',
+      'Le lien personnel de ${guest.displayName} sera désactivé. '
+          'Une personne déjà connectée devra être retirée de la salle par un modérateur.',
+      'Révoquer',
+    )) return;
+    setState(() => _actionBusy = true);
+    try {
+      await _service.revokeExternalGuest(widget.meetingId, guest.id);
+      await _load();
+      if (mounted) _snack('Invitation révoquée.');
+    } catch (error) {
+      if (mounted) _snack(_message(error));
     } finally {
       if (mounted) setState(() => _actionBusy = false);
     }
@@ -468,6 +572,8 @@ class _HostActions extends StatelessWidget {
   final bool canDelete;
   final bool isRecruitmentInterview;
   final VoidCallback onInvite;
+  final VoidCallback onInviteExternal;
+  final bool canInviteExternal;
   final VoidCallback onSettings;
   final VoidCallback? onEnd;
   final VoidCallback? onCancel;
@@ -480,6 +586,8 @@ class _HostActions extends StatelessWidget {
     required this.canDelete,
     required this.isRecruitmentInterview,
     required this.onInvite,
+    required this.onInviteExternal,
+    required this.canInviteExternal,
     required this.onSettings,
     required this.onEnd,
     required this.onCancel,
@@ -513,6 +621,12 @@ class _HostActions extends StatelessWidget {
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('Inviter'),
                   ),
+                  if (canInviteExternal)
+                    OutlinedButton.icon(
+                      onPressed: busy || closed ? null : onInviteExternal,
+                      icon: const Icon(Icons.alternate_email_rounded),
+                      label: const Text('Inviter un externe'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: busy || closed ? null : onSettings,
                     icon: const Icon(Icons.settings_rounded),
@@ -1000,4 +1114,110 @@ class _EditMeetingSheetState extends State<_EditMeetingSheet> {
     final minute = value.minute.toString().padLeft(2, '0');
     return '$day/$month · $hour:$minute';
   }
+}
+
+
+class _ExternalGuestSelection {
+  final String email;
+  final String? name;
+  const _ExternalGuestSelection(this.email, this.name);
+}
+
+class _ExternalGuestInviteDialog extends StatefulWidget {
+  const _ExternalGuestInviteDialog();
+
+  @override
+  State<_ExternalGuestInviteDialog> createState() =>
+      _ExternalGuestInviteDialogState();
+}
+
+class _ExternalGuestInviteDialogState extends State<_ExternalGuestInviteDialog> {
+  final _form = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: const Text('Inviter une personne externe'),
+    content: SizedBox(
+      width: 480,
+      child: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'La personne recevra un lien personnel par e-mail. '
+              'Elle rejoindra EnactMeet dans son navigateur, '
+              'sans créer de compte EnactSpace.',
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const Key('meeting-guest-email'),
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Adresse e-mail',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                final email = (value ?? '').trim();
+                if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                    .hasMatch(email)) {
+                  return 'Saisis une adresse e-mail valide.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const Key('meeting-guest-name'),
+              controller: _name,
+              maxLength: 160,
+              decoration: const InputDecoration(
+                labelText: 'Nom de la personne (facultatif)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'La salle d’attente sera activée. '
+              'L’invité aura uniquement le rôle de participant. '
+              'L’e-mail ne sera envoyé qu’après confirmation.',
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Annuler'),
+      ),
+      FilledButton.icon(
+        onPressed: () {
+          if (!_form.currentState!.validate()) return;
+          final name = _name.text.trim();
+          Navigator.pop(
+            context,
+            _ExternalGuestSelection(
+              _email.text.trim(),
+              name.isEmpty ? null : name,
+            ),
+          );
+        },
+        icon: const Icon(Icons.send_outlined),
+        label: const Text("Envoyer l'invitation"),
+      ),
+    ],
+  );
 }

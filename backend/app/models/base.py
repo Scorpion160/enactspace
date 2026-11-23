@@ -109,7 +109,7 @@ from app.models.product_services import (
     SupportTicket,
     SupportTicketMessage,
 )
-from app.models.meeting import Meeting, MeetingMember
+from app.models.meeting import Meeting, MeetingMember, MeetingGuestInvitation
 
 from app.models.veille import (VeilleSettings, VeilleRule, VeillePlan, VeilleBlocker, VeilleReview, VeilleReport, VeilleLeave, VeilleCase, VeilleEvent, VeilleReminder)
 from app.services import veille_history  # register task history on every write

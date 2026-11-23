@@ -18,6 +18,7 @@ class MeetingModel {
   final bool lobbyEnabled;
   final bool recordingEnabled;
   final bool canManage;
+  final bool canInviteExternal;
   final bool canDelete;
   final bool isRecruitmentInterview;
   final String currentUserRole;
@@ -45,6 +46,7 @@ class MeetingModel {
     required this.lobbyEnabled,
     required this.recordingEnabled,
     required this.canManage,
+    this.canInviteExternal = false,
     required this.canDelete,
     this.isRecruitmentInterview = false,
     required this.currentUserRole,
@@ -74,6 +76,7 @@ class MeetingModel {
       lobbyEnabled: json['lobby_enabled'] != false,
       recordingEnabled: json['recording_enabled'] == true,
       canManage: json['can_manage'] == true,
+      canInviteExternal: json['can_invite_external'] == true,
       canDelete: json['can_delete'] == true,
       isRecruitmentInterview: json['is_recruitment_interview'] == true,
       currentUserRole: json['current_user_role']?.toString() ?? 'participant',
@@ -117,6 +120,47 @@ class MeetingModel {
 DateTime? _date(dynamic value) {
   if (value == null) return null;
   return DateTime.tryParse(value.toString());
+}
+
+class MeetingExternalGuestModel {
+  final String id;
+  final String displayName;
+  final String email;
+  final bool active;
+  final DateTime? expiresAt;
+  final DateTime? revokedAt;
+  final String emailStatus;
+
+  const MeetingExternalGuestModel({
+    required this.id,
+    required this.displayName,
+    required this.email,
+    required this.active,
+    required this.expiresAt,
+    required this.revokedAt,
+    required this.emailStatus,
+  });
+
+  String get emailStatusLabel => switch (emailStatus) {
+    'sent' => 'E-mail envoyé',
+    'pending' => 'E-mail en attente',
+    'processing' => 'Envoi en cours',
+    'retry' => 'Nouvelle tentative',
+    'dead' => 'Échec de l’envoi',
+    'cancelled' => 'Envoi annulé',
+    _ => 'Statut d’envoi indisponible',
+  };
+
+  factory MeetingExternalGuestModel.fromJson(Map<String, dynamic> json) =>
+      MeetingExternalGuestModel(
+        id: json['id']?.toString() ?? '',
+        displayName: json['display_name']?.toString() ?? 'Invité externe',
+        email: json['email']?.toString() ?? '',
+        active: json['active'] == true,
+        expiresAt: _date(json['expires_at']),
+        revokedAt: _date(json['revoked_at']),
+        emailStatus: json['email_status']?.toString() ?? 'unknown',
+      );
 }
 
 class MeetingMemberModel {

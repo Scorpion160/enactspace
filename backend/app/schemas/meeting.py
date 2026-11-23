@@ -97,6 +97,7 @@ class MeetingRead(BaseModel):
     lobby_enabled: bool
     recording_enabled: bool
     can_manage: bool = False
+    can_invite_external: bool = False
     can_delete: bool = False
     is_recruitment_interview: bool = False
     current_user_role: str = "participant"

@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - feat/enactmeet-open-campaign-jury-and-guest-journey-20261121
       - integration/consolidated-20261113
       - feature/interface-coherence-20261107
       - feature/recruitment-decision-workspace-20261110
@@ -15,6 +16,7 @@ on:
   push:
     branches:
       - main
+      - feat/enactmeet-open-campaign-jury-and-guest-journey-20261121
       - feature/recruitment-decision-workspace-20261110
       - integration/recruitment-production-parity-20261110
       - fix/chat-scroll-and-payment-hardening-20261111
@@ -137,7 +139,7 @@ jobs:
         run: |
           output="$(python -m alembic heads)"
           printf '%s\n' "$output"
-          test "$output" = "20261115_0040 (head)"
+          test "$output" = "20261123_0041 (head)"
 
       - name: Run complete backend suite with PostgreSQL and PDF tests
         shell: bash
