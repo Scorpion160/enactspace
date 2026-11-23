@@ -4,7 +4,7 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/auth/auth_service.dart';
 
 /// A proposal only: no public appointment update or e-mail can occur here.
-Future<bool> showPrivateInterviewProposalDialog(
+Future<DateTime?> showPrivateInterviewProposalDialog(
   BuildContext context, {
   required String campaignId,
   required String applicationId,
@@ -17,8 +17,9 @@ Future<bool> showPrivateInterviewProposalDialog(
 }) async {
   final api = ApiClient();
   final token = await AuthService().getToken();
-  if (token == null) return false;
+  if (token == null) return null;
   late final List<Map<String, dynamic>> members;
+  late final int durationMinutes;
   try {
     final data = Map<String, dynamic>.from(
       await api.get(
@@ -26,6 +27,16 @@ Future<bool> showPrivateInterviewProposalDialog(
         token: token,
       ) as Map,
     );
+    final policy = Map<String, dynamic>.from(
+      await api.get(
+        '/recruitment/campaigns/$campaignId/interviews/policy',
+        token: token,
+      ) as Map,
+    );
+    durationMinutes = (policy['duration_minutes'] as num?)?.toInt() ?? 20;
+    if (durationMinutes < 5 || durationMinutes > 180) {
+      throw StateError('La durée de la campagne est invalide.');
+    }
     members = (data['members'] as List? ?? const [])
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
@@ -33,12 +44,12 @@ Future<bool> showPrivateInterviewProposalDialog(
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de charger les jurés.')),
+        const SnackBar(content: Text('Impossible de charger les jurés ou les règles de la campagne.')),
       );
     }
-    return false;
+    return null;
   }
-  if (!context.mounted) return false;
+  if (!context.mounted) return null;
 
   final beginning = DateTime.tryParse(currentStart) ?? DateTime.now();
   var chosenDate = DateTime(beginning.year, beginning.month, beginning.day);
@@ -61,13 +72,14 @@ Future<bool> showPrivateInterviewProposalDialog(
   final reason = TextEditingController();
   final location = TextEditingController(text: currentLocation);
   var saving = false;
+  var confirmUnrecordedAvailability = false;
   String? error;
   String fmtDay(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   String iso(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}T${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:00';
   try {
-    return await showDialog<bool>(
+    return await showDialog<DateTime>(
           context: context,
           builder: (dialog) => StatefulBuilder(
             builder: (context, update) => AlertDialog(
@@ -130,6 +142,7 @@ Future<bool> showPrivateInterviewProposalDialog(
                           ),
                         ],
                       ),
+                      Text('Durée prévue : $durationMinutes minutes.'),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         initialValue: mode,
@@ -269,6 +282,23 @@ Future<bool> showPrivateInterviewProposalDialog(
                           ),
                         ),
                       ),
+                      CheckboxListTile(
+                        key: const Key('confirm-unrecorded-jury-availability'),
+                        contentPadding: EdgeInsets.zero,
+                        value: confirmUnrecordedAvailability,
+                        onChanged: saving
+                            ? null
+                            : (value) => update(
+                                () => confirmUnrecordedAvailability = value ?? false,
+                              ),
+                        title: const Text(
+                          'Je confirme la disponibilité des jurés sans calendrier renseigné',
+                        ),
+                        subtitle: const Text(
+                          'Cette confirmation ne remplace pas une indisponibilité déjà déclarée.',
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: reason,
@@ -294,7 +324,7 @@ Future<bool> showPrivateInterviewProposalDialog(
               ),
               actions: [
                 TextButton(
-                  onPressed: saving ? null : () => Navigator.pop(dialog, false),
+                  onPressed: saving ? null : () => Navigator.pop(dialog),
                   child: const Text('Annuler'),
                 ),
                 FilledButton(
@@ -305,7 +335,7 @@ Future<bool> showPrivateInterviewProposalDialog(
                             chosenDate.year, chosenDate.month, chosenDate.day,
                             chosenTime.hour, chosenTime.minute,
                           );
-                          final end = start.add(const Duration(minutes: 20));
+                          final end = start.add(Duration(minutes: durationMinutes));
                           if (reason.text.trim().length < 3) {
                             update(() => error = 'Indiquez le motif de la modification.');
                             return;
@@ -327,9 +357,11 @@ Future<bool> showPrivateInterviewProposalDialog(
                                     : location.text.trim(),
                                 'jury_member_ids': selected.toList(),
                                 'reason': reason.text.trim(),
+                                'confirm_unrecorded_jury_availability':
+                                    confirmUnrecordedAvailability,
                               },
                             );
-                            if (dialog.mounted) Navigator.pop(dialog, true);
+                            if (dialog.mounted) Navigator.pop(dialog, start);
                           } on ApiException catch (failure) {
                             if (dialog.mounted) {
                               update(() {
@@ -347,13 +379,12 @@ Future<bool> showPrivateInterviewProposalDialog(
                             }
                           }
                         },
-                  child: const Text('Enregistrer la proposition'),
+                  child: const Text('Enregistrer et préparer la convocation'),
                 ),
               ],
             ),
           ),
-        ) ??
-        false;
+        );
   } finally {
     reason.dispose();
     location.dispose();
