@@ -18,6 +18,7 @@ class MeetingModel {
   final bool lobbyEnabled;
   final bool recordingEnabled;
   final bool canManage;
+  final bool canInviteExternal;
   final bool canDelete;
   final bool isRecruitmentInterview;
   final String currentUserRole;
@@ -45,6 +46,7 @@ class MeetingModel {
     required this.lobbyEnabled,
     required this.recordingEnabled,
     required this.canManage,
+    this.canInviteExternal = false,
     required this.canDelete,
     this.isRecruitmentInterview = false,
     required this.currentUserRole,
@@ -74,6 +76,7 @@ class MeetingModel {
       lobbyEnabled: json['lobby_enabled'] != false,
       recordingEnabled: json['recording_enabled'] == true,
       canManage: json['can_manage'] == true,
+      canInviteExternal: json['can_invite_external'] == true,
       canDelete: json['can_delete'] == true,
       isRecruitmentInterview: json['is_recruitment_interview'] == true,
       currentUserRole: json['current_user_role']?.toString() ?? 'participant',
