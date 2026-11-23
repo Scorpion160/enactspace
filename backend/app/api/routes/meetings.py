@@ -188,6 +188,7 @@ def _meeting_payload(db: Session, meeting: Meeting, user: User) -> MeetingRead:
         lobby_enabled=meeting.lobby_enabled,
         recording_enabled=meeting.recording_enabled,
         can_manage=_can_manage(db, meeting, user),
+        can_invite_external=not is_recruitment_interview and _open_recruitment_campaign(db, meeting) is None,
         can_delete=not is_recruitment_interview and _can_delete(db, meeting, user),
         is_recruitment_interview=is_recruitment_interview,
         current_user_role=(
