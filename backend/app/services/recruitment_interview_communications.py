@@ -39,7 +39,7 @@ from app.services.email_delivery_service import enqueue_email_delivery
 from app.services.email_templates import render_email_html
 from app.services.operational_integrity import lock_row
 from app.services.recruitment_access import can_manage_jury, require_campaign_access
-from app.services.recruitment_interview_policy import fetch_policy, within_windows, juror_available
+from app.services.recruitment_interview_policy import fetch_policy, within_windows, require_juror_window
 from app.services.recruitment_jury_constraints import jury_constraints, juror_respects_constraints
 from app.services.recruitment_interviews import department_key, effective_interview_end
 
@@ -187,7 +187,7 @@ def _build(db, campaign, actor, payload):
     members = _members(db, campaign.id)
     current = utc_now()
     chosen_ids = {app.id for app, _ in rows}
-    availabilities = {str(x.user_id): x.windows for x in db.query(
+    availabilities = {x.user_id: x.windows for x in db.query(
         RecruitmentJuryAvailability).filter(
             RecruitmentJuryAvailability.campaign_id == campaign.id,
         ).all()}
@@ -239,16 +239,11 @@ def _build(db, campaign, actor, payload):
                     raise HTTPException(409, f"{_name(app)} : juré non actif.")
                 if not juror_respects_constraints(user.id, new_start, new_mode, blackouts, remote_only):
                     raise HTTPException(409, f"{_name(app)} : {_name(user)} est indisponible.")
-                if str(user.id) not in availabilities:
-                    if not payload.confirm_unrecorded_jury_availability:
-                        raise HTTPException(
-                            409, f"{_name(app)} : disponibilité non renseignée pour {_name(user)}. "
-                            "Confirme explicitement leur disponibilité pour publier."
-                        )
-                elif not juror_available(availabilities[str(user.id)], new_start, new_end):
-                    raise HTTPException(
-                        409, f"{_name(app)} : {_name(user)} est indisponible sur ce créneau."
-                    )
+                require_juror_window(
+                    availabilities, user.id, new_start, new_end,
+                    manager_confirmed_missing=payload.confirm_unrecorded_jury_availability,
+                    display_name=_name(user),
+                )
                 if user.email.casefold() == app.email.casefold():
                     raise HTTPException(409, "Un juré ne peut pas évaluer sa propre candidature.")
                 dept_set.add(department_key(user.department))
