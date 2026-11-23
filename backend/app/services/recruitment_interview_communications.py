@@ -58,6 +58,7 @@ class InterviewCommunicationRequest(BaseModel):
     until_time: str = Field(default="23:59", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
     location: str | None = Field(default=None, max_length=180)
     exception_reason: str | None = Field(default=None, max_length=900)
+    confirm_unrecorded_jury_availability: bool = False
     send_candidates: bool = True
     send_jurors: bool = True
     batch_id: UUID | None = None
@@ -236,9 +237,18 @@ def _build(db, campaign, actor, payload):
                 member, user = members[mid]
                 if not member.is_active or not user.is_active or not user.email_verified or user.status not in ("active", "alumni"):
                     raise HTTPException(409, f"{_name(app)} : juré non actif.")
-                if not juror_available(availabilities.get(str(user.id), []), new_start, new_end) \
-                        or not juror_respects_constraints(user.id, new_start, new_mode, blackouts, remote_only):
+                if not juror_respects_constraints(user.id, new_start, new_mode, blackouts, remote_only):
                     raise HTTPException(409, f"{_name(app)} : {_name(user)} est indisponible.")
+                if str(user.id) not in availabilities:
+                    if not payload.confirm_unrecorded_jury_availability:
+                        raise HTTPException(
+                            409, f"{_name(app)} : disponibilité non renseignée pour {_name(user)}. "
+                            "Confirme explicitement leur disponibilité pour publier."
+                        )
+                elif not juror_available(availabilities[str(user.id)], new_start, new_end):
+                    raise HTTPException(
+                        409, f"{_name(app)} : {_name(user)} est indisponible sur ce créneau."
+                    )
                 if user.email.casefold() == app.email.casefold():
                     raise HTTPException(409, "Un juré ne peut pas évaluer sa propre candidature.")
                 dept_set.add(department_key(user.department))
@@ -366,6 +376,7 @@ def _build(db, campaign, actor, payload):
     fingerprint_data = {
         "campaign_id": str(campaign.id), "action": payload.action,
         "location": payload.location, "exception_reason": payload.exception_reason,
+        "confirmed_unrecorded_jury_availability": payload.confirm_unrecorded_jury_availability,
         "changes": changes,
         "messages": [{key: msg[key] for key in ("kind", "name", "email", "subject", "body")}
                      for msg in notices],
@@ -466,7 +477,9 @@ def register_interview_communications(router):
                              new_value={"action": payload.action, "batch_id": str(payload.batch_id),
                                         "interview_at": change["new"],
                                         "location": change["location"],
-                                        "jury_member_ids": change["new_jury"]})
+                                        "jury_member_ids": change["new_jury"],
+                                        "confirmed_unrecorded_jury_availability":
+                                            payload.confirm_unrecorded_jury_availability})
         db.flush()
         delivery_ids = []
         for index, msg in enumerate(result["messages"]):
