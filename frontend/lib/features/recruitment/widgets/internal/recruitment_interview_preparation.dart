@@ -447,7 +447,7 @@ class _RecruitmentInterviewPreparationState
                                 row['operational_status'] != 'completed')
                               TextButton.icon(
                                 onPressed: () async {
-                                  final saved =
+                                  final savedStart =
                                       await showPrivateInterviewProposalDialog(
                                         context,
                                         campaignId: widget.campaignId,
@@ -475,8 +475,35 @@ class _RecruitmentInterviewPreparationState
                                                 .where((id) => id.isNotEmpty)
                                                 .toList(),
                                       );
-                                  if (saved && context.mounted) {
+                                  if (savedStart != null && context.mounted) {
                                     await _load();
+                                    if (!context.mounted) return;
+                                    final published =
+                                        await showInterviewCommunicationDialog(
+                                          context,
+                                          campaignId: widget.campaignId,
+                                          applicationId: row['application_id']
+                                              .toString(),
+                                          candidateName:
+                                              row['candidate_name']?.toString(),
+                                          proposedDay: savedStart,
+                                          initialAction: 'publish',
+                                          candidateOnly: true,
+                                        );
+                                    if (!context.mounted) return;
+                                    if (published) {
+                                      await _load();
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Nouvel horaire enregistré en préparation. '
+                                            'Le rendez-vous officiel ne change '
+                                            'pas avant la publication.',
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   }
                                 },
                                 icon: const Icon(Icons.edit_calendar_outlined),
