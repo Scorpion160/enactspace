@@ -34,6 +34,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
   MeetingModel? _meeting;
   List<MeetingMemberModel> _members = const [];
   List<MeetingExternalGuestModel> _externalGuests = const [];
+  String? _guestError;
   bool _loading = true;
   String? _error;
   bool _actionBusy = false;
@@ -58,11 +59,12 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
       if (!mounted) return;
       final meeting = results[0] as MeetingModel;
       List<MeetingExternalGuestModel> guests = const [];
+      String? guestError;
       if (meeting.canManage && meeting.canInviteExternal) {
         try {
           guests = await _service.listExternalGuests(widget.meetingId);
         } catch (_) {
-          // Do not prevent a meeting from opening if guest management is unavailable.
+          guestError = "Impossible de charger les invitations externes.";
         }
       }
       if (!mounted) return;
@@ -70,6 +72,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         _meeting = meeting;
         _members = results[1] as List<MeetingMemberModel>;
         _externalGuests = guests;
+        _guestError = guestError;
         _loading = false;
       });
     } catch (error) {
@@ -161,7 +164,17 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
               'Ces personnes reçoivent un lien personnel par e-mail, sans compte EnactSpace.',
             ),
             const SizedBox(height: 8),
-            if (_externalGuests.isEmpty)
+            if (_guestError != null)
+              Row(
+                children: [
+                  Expanded(child: Text(_guestError!)),
+                  TextButton(
+                    onPressed: _load,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              )
+            else if (_externalGuests.isEmpty)
               const Text('Aucune invitation externe enregistrée.')
             else
               for (final guest in _externalGuests)
@@ -172,7 +185,7 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
                   title: Text(guest.displayName),
                   subtitle: Text(
                     '${guest.email} · ${guest.active ? "Invitation active" : "Invitation expirée ou révoquée"}'
-                    ' · ${guest.emailStatus == "sent" ? "E-mail envoyé" : guest.emailStatus == "pending" ? "E-mail en attente" : guest.emailStatus == "retry" ? "Nouvelle tentative" : "Suivi : ${guest.emailStatus}"}',
+                    ' · ${guest.emailStatusLabel}',
                   ),
                   trailing: guest.active
                       ? IconButton(
