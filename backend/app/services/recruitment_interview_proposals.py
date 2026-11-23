@@ -27,7 +27,7 @@ from app.services.recruitment_access import (
     can_manage_jury, eligible_juror, require_campaign_access,
 )
 from app.services.recruitment_interview_policy import (
-    fetch_policy, juror_available, within_windows,
+    fetch_policy, require_juror_window, within_windows,
 )
 from app.services.recruitment_interviews import (
     department_key, effective_interview_end,
@@ -87,17 +87,11 @@ def check_private_proposal(db, campaign, app, proposal):
             user.id, start, proposal.mode, blackouts, remote_only,
         ):
             raise HTTPException(409, f"{user.first_name} {user.last_name} est indisponible ou à distance uniquement.")
-        if user.id not in availabilities:
-            if not proposal.confirm_unrecorded_jury_availability:
-                raise HTTPException(
-                    409,
-                    f"Disponibilités non renseignées pour {user.first_name} {user.last_name}. "
-                    "Confirme leur disponibilité dans le formulaire avant de poursuivre.",
-                )
-        elif not juror_available(availabilities[user.id], start, end):
-            raise HTTPException(
-                409, f"{user.first_name} {user.last_name} est indisponible sur ce créneau."
-            )
+        require_juror_window(
+            availabilities, user.id, start, end,
+            manager_confirmed_missing=proposal.confirm_unrecorded_jury_availability,
+            display_name=f"{user.first_name} {user.last_name}",
+        )
         if app.email and user.email and user.email.strip().casefold() == app.email.strip().casefold():
             raise HTTPException(409, "Un juré ne peut pas évaluer sa propre candidature.")
     deps = [department_key(user.department) for _, user in members]
