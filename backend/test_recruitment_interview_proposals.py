@@ -35,7 +35,8 @@ class PrivateProposalTests(unittest.TestCase):
             reason="Report demandé par le candidat",
         )
 
-    def _db(self, *, conflict=False, remote=False, unavailable=False):
+    def _db(self, *, conflict=False, remote=False, unavailable=False,
+            missing_availability=False, recorded_unavailable=False):
         db = MagicMock()
         db.get.return_value = None
         qs=[MagicMock() for _ in range(6)]
@@ -55,12 +56,15 @@ class PrivateProposalTests(unittest.TestCase):
                            "date":"2026-11-20", "available":False},
             ))
         qs[1].filter.return_value.order_by.return_value.all.return_value = events
-        qs[2].filter.return_value.all.return_value = [
-            SimpleNamespace(
-                user_id=u.id,
-                windows=[{"weekday":4, "start":"12:00","end":"14:00"}],
-            ) for _,u in self.members
-        ]
+        qs[2].filter.return_value.all.return_value = (
+            [] if missing_availability else [
+                SimpleNamespace(
+                    user_id=u.id,
+                    windows=[] if recorded_unavailable and u.id == self.members[0][1].id
+                    else [{"weekday":4, "start":"12:00","end":"14:00"}],
+                ) for _, u in self.members
+            ]
+        )
         qs[3].filter.return_value.all.return_value = (
             [SimpleNamespace(
                 starts_at=self.start, ends_at=self.start+timedelta(minutes=20),
@@ -93,6 +97,33 @@ class PrivateProposalTests(unittest.TestCase):
             check_private_proposal(
                 self._db(unavailable=True),self.campaign,self.app,self.proposal
             )
+
+    def test_unrecorded_availability_needs_explicit_manager_confirmation(self):
+        with self.assertRaises(HTTPException) as blocked:
+            check_private_proposal(
+                self._db(missing_availability=True),
+                self.campaign, self.app, self.proposal,
+            )
+        self.assertEqual(blocked.exception.status_code, 409)
+        confirmed = self.proposal.model_copy(
+            update={"confirm_unrecorded_jury_availability": True}
+        )
+        _, _, exception = check_private_proposal(
+            self._db(missing_availability=True),
+            self.campaign, self.app, confirmed,
+        )
+        self.assertFalse(exception)
+
+    def test_recorded_unavailability_never_overridden_by_confirmation(self):
+        confirmed = self.proposal.model_copy(
+            update={"confirm_unrecorded_jury_availability": True}
+        )
+        with self.assertRaises(HTTPException) as blocked:
+            check_private_proposal(
+                self._db(recorded_unavailable=True),
+                self.campaign, self.app, confirmed,
+            )
+        self.assertEqual(blocked.exception.status_code, 409)
 
     def test_juror_may_not_have_overlapping_private_draft(self):
         with self.assertRaises(HTTPException):
