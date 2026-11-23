@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -88,4 +89,32 @@ class MeetingMember(Base):
             "role IN ('host','cohost','participant')",
             name="ck_meeting_members_role",
         ),
+    )
+
+
+class MeetingGuestInvitation(Base):
+    """External guests have a meeting-only email link, never a club account."""
+    __tablename__ = "meeting_guest_invitations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), primary_key=True, default=uuid.uuid4
+    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    )
+    invited_by: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    email_delivery_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("email_deliveries.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)
+
+    __table_args__ = (
+        Index("ix_meeting_guest_invites_meeting_email", "meeting_id", "email"),
     )
