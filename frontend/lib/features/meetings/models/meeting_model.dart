@@ -119,6 +119,37 @@ DateTime? _date(dynamic value) {
   return DateTime.tryParse(value.toString());
 }
 
+class MeetingExternalGuestModel {
+  final String id;
+  final String displayName;
+  final String email;
+  final bool active;
+  final DateTime? expiresAt;
+  final DateTime? revokedAt;
+  final String emailStatus;
+
+  const MeetingExternalGuestModel({
+    required this.id,
+    required this.displayName,
+    required this.email,
+    required this.active,
+    required this.expiresAt,
+    required this.revokedAt,
+    required this.emailStatus,
+  });
+
+  factory MeetingExternalGuestModel.fromJson(Map<String, dynamic> json) =>
+      MeetingExternalGuestModel(
+        id: json['id']?.toString() ?? '',
+        displayName: json['display_name']?.toString() ?? 'Invité externe',
+        email: json['email']?.toString() ?? '',
+        active: json['active'] == true,
+        expiresAt: _date(json['expires_at']),
+        revokedAt: _date(json['revoked_at']),
+        emailStatus: json['email_status']?.toString() ?? 'unknown',
+      );
+}
+
 class MeetingMemberModel {
   final String userId;
   final String displayName;
