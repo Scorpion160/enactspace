@@ -7,6 +7,7 @@ import '../../services/recruitment_selection_api.dart';
 class RecruitmentShortlistPanel extends StatefulWidget {
   final String campaignId;
   final int refreshToken;
+  final bool initiallyExpanded;
   final ValueChanged<String>? onOpen;
   final RecruitmentSelectionApi? api;
 
@@ -14,6 +15,7 @@ class RecruitmentShortlistPanel extends StatefulWidget {
     super.key,
     required this.campaignId,
     required this.refreshToken,
+    this.initiallyExpanded = false,
     this.onOpen,
     this.api,
   });
@@ -117,7 +119,7 @@ class _RecruitmentShortlistPanelState extends State<RecruitmentShortlistPanel> {
       key: const Key('screening-shortlist-panel'),
       margin: EdgeInsets.zero,
       child: ExpansionTile(
-        initiallyExpanded: false,
+        initiallyExpanded: widget.initiallyExpanded,
         title: Text(
           'Retenus pour entretien (${all.length})',
           style: theme.textTheme.titleMedium?.copyWith(

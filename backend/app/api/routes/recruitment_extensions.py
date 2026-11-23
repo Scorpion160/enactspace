@@ -21,7 +21,7 @@ from app.services.email_delivery_service import enqueue_email_delivery
 from app.services.email_templates import app_link
 from app.services.operational_integrity import lock_row, to_naive_utc
 from app.services.recruitment_access import (
-    can_manage_jury, capabilities, eligible_juror, is_recruitment_staff, require_campaign_access, require_staff,
+    active_jury_member, can_manage_jury, capabilities, eligible_juror, is_recruitment_staff, require_campaign_access, require_staff,
 )
 from app.services.recruitment_interviews import affected_future_interviews, interviews_needing_reassignment
 from app.services.recruitment_personality import instrument, public_instrument, score, validate_answers
@@ -181,7 +181,9 @@ def register_recruitment_extensions(router):
         require_campaign_access(db, user, campaign_id)
         rows = db.query(RecruitmentJuryMember, User).join(User, User.id == RecruitmentJuryMember.user_id).filter(
             RecruitmentJuryMember.campaign_id == campaign_id).order_by(User.last_name, User.first_name).all()
-        return {"can_manage": can_manage_jury(db, user), "members": [member_payload(m, u) for m, u in rows],
+        return {"can_manage": can_manage_jury(db, user),
+                "can_view_ranking": can_manage_jury(db, user) or active_jury_member(db, user, campaign_id),
+                "members": [member_payload(m, u) for m, u in rows],
                 "teams": campaign_teams(db, campaign_id, user),
                 "interviews_needing_reassignment": interviews_needing_reassignment(db, campaign_id, user)}
 
