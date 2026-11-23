@@ -1,0 +1,54 @@
+{
+  "submitted": {
+    "subject": "Ta candidature à Enactus ESP a bien été reçue",
+    "body": "Bonjour {first_name},\n\nNous avons bien reçu ta candidature à Enactus ESP. Merci d’avoir pris le temps de nous présenter ton parcours et tes motivations.\n\nTu peux suivre l’avancement de ton dossier avec le code ci-dessous. Les dates de dépôt sont indiquées dans ton suivi."
+  },
+  "under_review": {
+    "subject": "Ton dossier est en cours d’étude",
+    "body": "Bonjour {first_name},\n\nL’équipe recrutement a commencé l’étude de ton dossier.\n\nLe résultat de la présélection te sera communiqué dans ton suivi et par mail."
+  },
+  "screening_shortlisted": {
+    "subject": "Ton dossier est retenu pour un entretien",
+    "body": "Bonjour {first_name},\n\nTon dossier est retenu pour la suite du recrutement Enactus ESP. Nous te proposons maintenant un entretien pour échanger sur tes motivations et la place que tu souhaites prendre dans l’équipe.\n\nLa date, l’heure et les modalités de ton entretien te seront communiquées dans ton suivi et par mail."
+  },
+  "screening_not_shortlisted": {
+    "subject": "Le résultat de ta candidature à Enactus ESP",
+    "body": "Bonjour {first_name},\n\nMerci d’avoir pris le temps de nous présenter ta candidature. Après l’étude des dossiers, nous n’avons pas retenu le tien pour les entretiens de cette campagne.\n\nMerci pour ton intérêt pour Enactus ESP. Nous te souhaitons une bonne continuation dans tes projets et tes engagements."
+  },
+  "interview_scheduled": {
+    "subject": "Ton entretien avec Enactus ESP",
+    "body": "Bonjour {first_name},\n\nNous te donnons rendez-vous pour ton entretien avec l’équipe Enactus ESP.\n\n{details}\n\nEn cas d’empêchement, contacte l’équipe de recrutement avant le rendez-vous."
+  },
+  "interview_updated": {
+    "subject": "Le rendez-vous de ton entretien a été modifié",
+    "body": "Bonjour {first_name},\n\nLe rendez-vous de ton entretien avec Enactus ESP a été modifié. Voici les informations à retenir :\n\n{details}\n\nMerci de prendre en compte ce nouveau rendez-vous. En cas d’empêchement, contacte l’équipe de recrutement."
+  },
+  "questionnaire": {
+    "subject": "Préparons ton entretien avec Enactus ESP",
+    "body": "Bonjour {first_name},\n\nPour préparer notre échange, merci de répondre au questionnaire sur ta façon de travailler et de participer à une équipe. Cette étape est obligatoire pour poursuivre la sélection.\n\nTu peux enregistrer tes réponses et les reprendre plus tard. Pense à répondre à toutes les questions, puis à confirmer leur envoi avant ton entretien.\n\n{details}\nLe questionnaire est accessible depuis le suivi de ta candidature."
+  },
+  "accepted": {
+    "subject": "Bienvenue dans l’équipe Enactus ESP !",
+    "body": "Bonjour {first_name},\n\nBonne nouvelle : ta candidature est retenue pour rejoindre Enactus ESP !\n\nMerci pour ton dossier et pour notre échange. L’équipe te communiquera les informations sur ton accueil, les premières activités et ton accès à EnactSpace.\n\nAu plaisir de commencer cette aventure avec toi !"
+  },
+  "rejected": {
+    "subject": "Le résultat de ton entretien avec Enactus ESP",
+    "body": "Bonjour {first_name},\n\nMerci pour le temps consacré à ta candidature et pour notre échange. À l’issue des entretiens, nous n’avons pas retenu ta candidature pour cette campagne.\n\nMerci pour ton intérêt pour Enactus ESP. Nous te souhaitons une bonne continuation dans tes projets et tes engagements."
+  },
+  "waiting_list": {
+    "subject": "Ta candidature est placée en liste d’attente",
+    "body": "Bonjour {first_name},\n\nÀ l’issue des entretiens, ta candidature à Enactus ESP est placée en liste d’attente. Aucune place n’est donc confirmée pour le moment.\n\nL’équipe de recrutement te contactera si une place se libère. Merci pour ton intérêt et pour le temps consacré à ce recrutement."
+  },
+  "cancelled": {
+    "subject": "Le suivi de ta candidature à Enactus ESP",
+    "body": "Bonjour {first_name},\n\nTa candidature a été clôturée pour cette campagne. Si tu as une question sur cette clôture, contacte l’équipe de recrutement.\n\nMerci pour ton intérêt pour Enactus ESP."
+  },
+  "activation": {
+    "subject": "Ton accès à EnactSpace",
+    "body": "Bonjour {first_name},\n\nTon compte EnactSpace est prêt à être activé.\n\nTon identifiant : {username}\nTon code personnel : {code}\nPremière connexion : {activation_url}\n\nCe code est valable 30 minutes et utilisable une seule fois. Ouvre la page Première connexion pour choisir ton mot de passe, puis complète ton profil.\n\nGarde ce code pour toi. L’équipe n’a pas besoin de connaître ton mot de passe.\n\nL’équipe Enactus ESP"
+  },
+  "activation_complete": {
+    "subject": "Ton accès EnactSpace est activé",
+    "body": "Bonjour {first_name},\n\nTon mot de passe est enregistré. Tu peux te connecter avec ton adresse e-mail ou ton identifiant {username}, puis compléter ton profil.\n\nSi tu n’es pas à l’origine de cette activation, contacte le secrétariat.\n\nL’équipe Enactus ESP"
+  }
+}
