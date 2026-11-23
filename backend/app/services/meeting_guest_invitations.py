@@ -46,8 +46,10 @@ class GuestInvitationRequest(BaseModel):
     def name_is_valid(cls, value: str | None) -> str | None:
         if value is None:
             return None
+        if any(ord(ch) < 32 for ch in value):
+            raise ValueError("Nom de l'invité invalide.")
         name = value.strip()
-        if not name or any(ord(ch) < 32 for ch in name):
+        if not name:
             raise ValueError("Nom de l'invité invalide.")
         return name
 
@@ -206,9 +208,10 @@ def register_guest_meeting_routes(router):
         db.add(row)
         db.flush()
         date_text = meeting.scheduled_start.strftime("%d/%m/%Y à %H:%M") if meeting.scheduled_start else "à confirmer par l'organisateur"
+        safe_title = " ".join(meeting.title.splitlines()).strip()
         body = (
             f"Bonjour {name},\n\n"
-            f"Tu es invité(e) à participer à une réunion EnactMeet : {meeting.title}.\n"
+            f"Tu es invité(e) à participer à une réunion EnactMeet : {safe_title}.\n"
             f"Date et heure : {date_text} (heure de Dakar).\n\n"
             f"Lien personnel pour rejoindre la réunion : {link}\n\n"
             "Ouvre le lien après le démarrage de la réunion. Aucun compte EnactSpace n'est nécessaire. "
@@ -218,7 +221,7 @@ def register_guest_meeting_routes(router):
         )
         email = enqueue_email_delivery(
             db, recipient_email=payload.email,
-            subject=f"Enactus ESP — Invitation EnactMeet : {meeting.title}",
+            subject=f"Enactus ESP — Invitation EnactMeet : {safe_title}",
             text_body=body, dedupe_key=f"meeting:guest:{row.id}",
         )
         if email is None:
