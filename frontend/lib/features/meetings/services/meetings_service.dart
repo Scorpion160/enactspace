@@ -127,6 +127,44 @@ class MeetingsService {
     return members;
   }
 
+  Future<List<MeetingExternalGuestModel>> listExternalGuests(
+    String meetingId,
+  ) async {
+    final response = await _api.get(
+      '/meetings/$meetingId/guests',
+      token: await _token(),
+    );
+    return _list(response)
+        .map(MeetingExternalGuestModel.fromJson)
+        .toList();
+  }
+
+  Future<void> inviteExternalGuest(
+    String meetingId, {
+    required String email,
+    String? displayName,
+  }) async {
+    await _api.postJson(
+      '/meetings/$meetingId/guests',
+      token: await _token(),
+      data: {
+        'email': email.trim(),
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'display_name': displayName.trim(),
+      },
+    );
+  }
+
+  Future<void> revokeExternalGuest(
+    String meetingId,
+    String invitationId,
+  ) async {
+    await _api.delete(
+      '/meetings/$meetingId/guests/$invitationId',
+      token: await _token(),
+    );
+  }
+
   Future<MeetingJoinModel> joinMeeting(String meetingId) async {
     final response = await _api.postJson(
       '/meetings/$meetingId/join',
