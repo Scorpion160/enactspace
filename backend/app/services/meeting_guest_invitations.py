@@ -116,7 +116,7 @@ def register_guest_meeting_routes(router):
         # The link itself can remain usable until revoked/expired; JWTs cannot.
         jwt_token = _make_jitsi_token(
             meeting, invited, moderator=False,
-            expires_at=min(guest.expires_at, utc_now() + timedelta(minutes=20)),
+            expires_at=min(guest.expires_at, utc_now() + timedelta(minutes=60)),
         )
         if not jwt_token:
             raise HTTPException(503, "Authentification EnactMeet indisponible.")
@@ -175,6 +175,8 @@ def register_guest_meeting_routes(router):
         _require_regular_meeting(db, meeting)
         if meeting.status in {"ended", "cancelled"}:
             raise HTTPException(409, "Cette réunion est clôturée.")
+        # Serialize invitations for this room: duplicate active emails cannot race.
+        db.query(Meeting).filter(Meeting.id == meeting.id).with_for_update().one()
         if (not settings.MEET_REQUIRE_JWT or not settings.MEET_JWT_SECRET):
             raise HTTPException(503, "EnactMeet privé doit être configuré avec JWT.")
         if (not settings.email_enabled or not settings.SMTP_HOST
@@ -255,6 +257,11 @@ def register_guest_meeting_routes(router):
             raise HTTPException(404, "Invitation introuvable.")
         if guest.revoked_at is None:
             guest.revoked_at = utc_now()
+            if guest.email_delivery_id is not None:
+                delivery = db.get(EmailDelivery, guest.email_delivery_id)
+                if delivery is not None and delivery.status in {"pending", "retry"}:
+                    delivery.status = "cancelled"
+                    delivery.processing_started_at = None
             create_audit_log(
                 db, "meeting_guest_revoked", current_user.id, "meeting", meeting.id,
                 new_value={"guest_id": str(guest.id), "email": guest.email},
