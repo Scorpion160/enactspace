@@ -1,6 +1,6 @@
 """External EnactMeet guests: meeting scope, short-lived JWTs and revocation."""
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -120,7 +120,10 @@ class ExternalMeetingGuestTests(unittest.TestCase):
         self.assertEqual(claims["room"], "one-meeting")
         self.assertFalse(claims["context"]["user"]["moderator"])
         self.assertEqual(claims["context"]["user"]["email"], guest.email)
-        self.assertEqual(claims["exp"], int((now + timedelta(minutes=20)).timestamp()))
+        self.assertEqual(
+            claims["exp"],
+            int((now + timedelta(minutes=20)).replace(tzinfo=timezone.utc).timestamp()),
+        )
 
 
 if __name__ == "__main__":
